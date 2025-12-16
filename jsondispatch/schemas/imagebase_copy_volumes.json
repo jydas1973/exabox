@@ -1,0 +1,108 @@
+{
+    "$schema": "http://json-schema.org/schema#",
+    "type": "object",
+    "properties": {
+        "customer_network": {
+            "type": "object",
+            "properties": {
+                "nodes": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "volumes": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "volumeid": {
+                                            "type": "string"
+                                        },
+                                        "volumetype": {
+                                            "type": "string"
+                                        },
+                                        "volumename": {
+                                            "type": "string"
+                                        },
+                                        "volumedevicepath": {
+                                            "type": "string"
+                                        },
+                                        "dom0": {
+                                            "type": ["string", "null"]
+                                        },
+                                        "domU": {
+                                            "type": ["string", "null"]
+                                        },
+                                        "attach_host": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "attach_host",
+                    "dom0",
+                    "domU",
+                                        "volumedevicepath",
+                                        "volumeid",
+                                        "volumename",
+                                        "volumetype"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "image_base_bom": {
+            "type": "object",
+            "properties": {
+                "bomfileVersion": {
+                    "type": "string"
+                },
+                "BOM_file_version": {
+                    "type": "string"
+                },
+                "BuildID": {
+                    "type": "string"
+                },
+                "gold_image": {
+                    "type": "object",
+                    "properties": {
+                        "system_image": {
+                            "type": "string"
+                        },
+                        "u01_image": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "oss_url",
+                        "system_image",
+                        "u01_image"
+                    ]
+                }
+            },
+            "required": [
+                "BuildID",
+                "artifacts",
+                "build_state",
+                "gold_image",
+                "master_edv_volumes",
+                "promotion_state",
+                "validation_state"
+            ]
+        },
+        "idemtoken": {
+            "type": "string"
+        },
+        "requestId": {
+            "type": "string"
+        },
+        "canonicalUri": {
+            "type": "string"
+        }
+    },
+    "required": [
+        "image_base_bom"
+    ]
+}

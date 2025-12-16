@@ -1,0 +1,506 @@
+#
+# $Header: ecs/exacloud/exabox/infrapatching/test/test_infrapatching_clusterless_cell.txt /main/3 2025/09/26 16:25:32 sdevasek Exp $
+#
+# test_infrapatching_clusterless_cell.py
+#
+# Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+#
+#    NAME
+#      test_infrapatching_cell.py - Unit test case script for all cell operations.
+#
+#    DESCRIPTION
+#      Unit test case script for all cell operations.
+#
+#    NOTES
+#      Unit test case script for all cell operations.
+#
+#    MODIFIED   (MM/DD/YY)
+#    apotluri    08/26/25 - Bug 38301663 - EXACS:25.2.2.1:RAISE AN ERROR WHEN
+#                           THE EXTERNAL LAUNCH NODE IS UNAVAILABLE DUE TO
+#                           REACHING THE MAXIMUM ALLOWED CONCURRENT SESSIONS
+#    apotluri    08/18/25 - Enhancement Request 38260898 - INFRAPATCH TEST
+#                           AUTOMATION CLUSTERLESS : CREATE TEST FOR PATCHMGR
+#                           FAILURE CASE FOR CELL/DOM0
+#    sdevasek    06/20/25 - Enh 38059211  - ENHANCE TESTS MAINTENABILITY BY
+#                           SEPARATING OUT CLUSTERLESS TESTS AND SINGLE VM
+#                           TESTS INTO SEPARATE FILES
+#    sdevasek    06/20/25 - Creation
+#
+
+import pytest
+import unittest
+
+from utils import *
+from constants import *
+
+
+# Class which defines unit tests with clusterless cells as target
+@pytest.mark.clusterless_cell
+class Test_clusterless_cell_class(unittest.TestCase):
+    # Class level variables
+    __cells = []
+    __dom0s = []
+    __target_name = PATCH_CELL
+
+    @classmethod
+    def setUpClass(cls):
+        cls.__cells = mGetInfraPatchingTestConfigParam('cells')
+        cls.__dom0s = mGetInfraPatchingTestConfigParam('dom0s')
+
+    @classmethod
+    def tearDownClass(cls):
+        mUpdateInfrapatchingConfParam("disable_exacloud_plugin_execution", "False")
+
+    def __init__(self, *initial_data, **kwargs):
+        super(Test_clusterless_cell_class, self).__init__(*initial_data, **kwargs)
+        self.__operation = ""
+        self.__operation_style = OP_STYLE_AUTO
+        self.__required_nodes_in_node_progress_status = []
+        self.__non_required_nodes_in_node_progress_status = []
+        self.__patch_node_list = []
+        self.__patch_operation_status_result = False
+        self.__patch_operation_status_output = ""
+        self.__launch_node_type = 'COMPUTE'
+
+    # This method is to run something similar before every test execution.
+    def setUp(self):
+        self.__required_nodes_in_node_progress_status = Test_clusterless_cell_class.__cells
+        self.__non_required_nodes_in_node_progress_status = []
+        self.__patch_node_list = []
+        mUpdateAdditionalOptionsInPayload("IncludeNodeList", "none")
+        mUpdateAdditionalOptionsInPayload("OneoffCustomPluginFile", "none")
+        mUpdateAdditionalOptionsInPayload("OneoffScriptArgs", "none")
+        mUpdateAdditionalOptionsInPayload("exasplice", "no")
+        mUpdateAdditionalOptionsInPayload("CellCountFromCP", 0)
+        mUpdateParamInPayload("EnablePlugins", "no")
+        mUpdateParamInPayload("BackupMode", "yes")
+        mUpdateParamInPayload("PluginTypes", "none")
+        cell_cabinet = mGetInfraPatchingTestConfigParam('cell_cabinet')
+        mUpdateInfraPatchingTestConfigParam("cluster", cell_cabinet)
+        mUpdateAdditionalOptionsInPayload("LaunchNode", Test_clusterless_cell_class.__dom0s[0])
+        mUpdateAdditionalOptionsInPayload("LaunchNodeType", "COMPUTE")
+        mUpdateAdditionalOptionsInPayload("ClusterLess", "yes")
+        mUpdateInfrapatchingConfParam("disable_exacloud_plugin_execution", "True")
+        self.__launch_node_type = 'COMPUTE'
+
+
+    @pytest.mark.clusterless_cell_patch_prereq_check_patchmgr_failure
+    def test_clusterless_cell_patch_prereq_check_patchmgr_failure(self):
+        """
+        This test is to simulate patch error for cells and validate error code with the expected code
+
+        The following are done in this test
+        1. Move cell.conf
+        2. Execute cell precheck
+        3. Validate cell precheck operation for expected error code
+        3. Move back cell.conf to original location
+        """
+
+        # move cell.conf
+        cell_conf = "/opt/oracle.cellos/cell.conf"
+        mExecuteRemoteExasshCmd("mv %s %s_orig" % (cell_conf, cell_conf), [Test_clusterless_cell_class.__cells[0]])
+
+        # Execute patch and make it to fail
+        _result, _status_output = mExecuteInfraPatchCommand(TASK_PREREQ_CHECK, PATCH_CELL, OP_STYLE_AUTO)
+
+        # revert back cell.conf
+        mExecuteRemoteExasshCmd("mv %s_orig %s" % (cell_conf, cell_conf), [Test_clusterless_cell_class.__cells[0]])
+
+        # Verify if it failed with expected error code
+        _status_json = json.loads(_status_output)
+        _error_code = _status_json["errorCode"]
+        self.assertEqual(_error_code, "0x03010045", "Cell patch didn't fail with expected error code")
+
+    @pytest.mark.clusterless_cell_patch_prereq_check
+    def test_clusterless_cell_patch_prereq_check(self):
+        _result, _status_output = mExecuteInfraPatchCommandWithDCSAgentChecks(TASK_PREREQ_CHECK,
+                                                                              PATCH_CELL, OP_STYLE_AUTO)
+        self.assertTrue(_result, "Precheck operation failed.")
+        _copy_time_profile_diff_data = mCopyTimeStatsFileForTimeDiffAnalysis(_status_output)
+        self.assertEqual(_copy_time_profile_diff_data, EXIT_SUCCESS, "Copying time profile data failed.")
+
+
+    @pytest.mark.clusterless_cell_patch
+    def test_clusterless_cell_patch(self):
+        updated_patch_list = []
+        self.__operation = TASK_PATCH
+        self.__operation_style = OP_STYLE_ROLLING
+        self.__patch_node_list = Test_clusterless_cell_class.__cells
+        self.__patch_operation_status_result, self.__patch_operation_status_output = \
+            mExecuteInfraPatchCommandWithDCSAgentChecks(self.__operation, Test_clusterless_cell_class.__target_name,
+                                                        self.__operation_style)
+        self.assertTrue(self.__patch_operation_status_result, "Patch operation failed.")
+
+        updated_patch_list = mGetNodesWithPatchOperation(self.__patch_operation_status_output)
+
+        _time_profile_data_validator = TimeProfileDataValidator(Test_clusterless_cell_class.__target_name,
+                                                                self.__operation, self.__operation_style)
+        self.assertTrue(_time_profile_data_validator.mValidate(self.__patch_operation_status_output,
+                                                               updated_patch_list, []),
+                        "time_profile_data validation failed.")
+
+    @pytest.mark.clusterless_cell_postcheck
+    def test_clusterless_cell_postcheck(self):
+        _result, _status_output = mExecuteInfraPatchCommandWithDCSAgentChecks(TASK_POSTCHECK, PATCH_CELL)
+        self.assertTrue(_result, "Postcheck operation failed.")
+        # To delete any left over entry from ecs_external_launch_node_patching_operations
+        _delete_launch_node_ret, _delete_launch_node_output = CurlRequest().mExecute("infrapatch/launchNode/infrapatchOperations?LaunchNode=%s" % Test_clusterless_cell_class.__dom0s[0], "DELETE", {})
+
+    @pytest.mark.clusterless_cell_rollback_prereq_check
+    def test_clusterless_cell_rollback_prereq_check(self):
+        _result, _status_output = mExecuteInfraPatchCommandWithDCSAgentChecks(TASK_ROLLBACK_PREREQ_CHECK, PATCH_CELL,
+                                                                              OP_STYLE_AUTO)
+        self.assertTrue(_result, "Rollback_prereq_check operation failed.")
+        _copy_time_profile_diff_data = mCopyTimeStatsFileForTimeDiffAnalysis(_status_output)
+        self.assertEqual(_copy_time_profile_diff_data, EXIT_SUCCESS, "Copying time profile data failed.")
+
+    @pytest.mark.clusterless_cell_rollback
+    def test_clusterless_cell_rollback(self):
+        updated_patch_list = []
+        self.__operation = TASK_ROLLBACK
+        self.__operation_style = OP_STYLE_ROLLING
+        self.__patch_node_list = Test_clusterless_cell_class.__cells
+        self.__patch_operation_status_result, self.__patch_operation_status_output = \
+            mExecuteInfraPatchCommandWithDCSAgentChecks(self.__operation, Test_clusterless_cell_class.__target_name,
+                                                        self.__operation_style)
+        self.assertTrue(self.__patch_operation_status_result, "Rollback operation failed.")
+        updated_patch_list = mGetNodesWithPatchOperation(self.__patch_operation_status_output)
+        _time_profile_data_validator = TimeProfileDataValidator(Test_clusterless_cell_class.__target_name,
+                                                                self.__operation, self.__operation_style)
+        self.assertTrue(_time_profile_data_validator.mValidate(self.__patch_operation_status_output,
+                                                               updated_patch_list, []),
+                        "time_profile_data validation failed.")
+
+    @pytest.mark.clusterless_cell_patch_prereq_check_with_include_list
+    def test_clusterless_cell_patch_prereq_check_with_include_list(self):
+        # Enabling space validation
+        self.assertTrue(mUpdateInfrapatchingConfParam("free_space_check_validation_enabled_on_cell", "True"),
+                        "parameter updation in infrapatching.conf failed.")
+
+        self.__operation = TASK_PREREQ_CHECK
+        self.__operation_style = OP_STYLE_ROLLING
+        self.mValidatePatchOperationWithIncludeNodeList()
+
+
+    @pytest.mark.clusterless_cell_patch_with_cell_count
+    def test_clusterless_cell_patch_with_cell_count(self):
+        """
+        Here in this test two cells are patched by passing cell count as 1.
+        In the first run, node_progress_data contains 1 node and in teh second run two nodes
+        but one node is already patched in the first run.
+
+        Test validates node_progress_data to have always single node in the patched list
+        """
+        self.__operation = TASK_PATCH
+        self.__operation_style = OP_STYLE_ROLLING
+        self.mExecuteCellPatchOperationsWithCellCountValue(1)
+        self.mExecuteCellPatchOperationsWithCellCountValue(1)
+
+
+    @pytest.mark.clusterless_cell_patch_failure_pre_patchmgr_with_include_list
+    def test_clusterless_cell_patch_failure_pre_patchmgr_with_include_list(self):
+        """
+        This test is to simulate patch error for cells and validate error code with the expected code
+
+        The following are done in this test
+        1. Create a file with 3G under root partition
+        2. Execute cell patch with include list
+        3. Validate cell patch operation for expected error code
+        """
+
+        fallocate_binary = "/usr/bin/fallocate"
+        sample_file = "/root/3G_test_file"
+        mExecuteRemoteExasshCmd("%s -l 3G %s" % (fallocate_binary, sample_file),
+                                [Test_clusterless_cell_class.__cells[0]])
+
+        # Execute patch and make it to fail
+        _result, _status_output = mExecuteInfraPatchCommand(TASK_PATCH, PATCH_CELL, OP_STYLE_NON_ROLLING)
+
+        # Remove the created file
+        mExecuteRemoteExasshCmd("rm -f %s" % sample_file,
+                                [Test_clusterless_cell_class.__cells[0]])
+
+        # Verify if it failed with expected error code
+        _status_json = json.loads(_status_output)
+        _error_code = _status_json["errorCode"]
+        self.assertEqual(_error_code, "0x03010054", "Cell patch didn't fail with expected error code")
+
+    @pytest.mark.cell_patch_prereq_check_with_include_list_mgmt_host
+    def test_cell_patch_prereq_check_with_include_list_mgmt_host(self):
+        mUpdateAdditionalOptionsInPayload("LaunchNode", mGetInfraPatchingTestConfigParam('management_host_name'))
+        mUpdateAdditionalOptionsInPayload("LaunchNodeType", "MANAGEMENT_HOST")
+        self.__launch_node_type = 'MANAGEMENT_HOST'
+        # Enabling space validation
+        self.assertTrue(mUpdateInfrapatchingConfParam("free_space_check_validation_enabled_on_cell", "True"),
+                        "parameter updation in infrapatching.conf failed.")
+        self.__operation = TASK_PREREQ_CHECK
+        self.__operation_style = OP_STYLE_ROLLING
+        self.mValidatePatchOperationWithIncludeNodeList()
+
+    @pytest.mark.clusterless_cell_one_off
+    def test_clusterless_cell_one_off(self):
+        self.__operation = TASK_ONEOFF
+        self.__operation_style = OP_STYLE_AUTO
+        self.mValidatePatchOperationWithIncludeNodeList()
+        # To delete any left over entry from ecs_external_launch_node_patching_operations
+        _delete_launch_node_ret, _delete_launch_node_output = CurlRequest().mExecute("infrapatch/launchNode/infrapatchOperations?LaunchNode=%s" % Test_clusterless_cell_class.__dom0s[0], "DELETE", {})
+
+    @pytest.mark.clusterless_cell_rollback_prereq_check_with_include_list
+    def test_clusterless_cell_rollback_prereq_check_with_include_list(self):
+        self.__operation = TASK_ROLLBACK_PREREQ_CHECK
+        self.__operation_style = OP_STYLE_ROLLING
+        self.mValidatePatchOperationWithIncludeNodeList()
+
+    @pytest.mark.clusterless_cell_rollback_with_include_list
+    def test_clusterless_cell_rollback_with_include_list(self):
+        self.__operation = TASK_ROLLBACK
+        self.__operation_style = OP_STYLE_ROLLING
+        self.mValidatePatchOperationWithIncludeNodeList()
+
+
+    @pytest.mark.cell_patch_with_include_list_mgmt_host
+    def test_cell_patch_with_include_list_mgmt_host(self):
+        mUpdateAdditionalOptionsInPayload("LaunchNode", mGetInfraPatchingTestConfigParam('management_host_name'))
+        mUpdateAdditionalOptionsInPayload("LaunchNodeType", "MANAGEMENT_HOST")
+        self.__launch_node_type = 'MANAGEMENT_HOST'
+        self.__operation = TASK_PATCH
+        self.__operation_style = OP_STYLE_ROLLING
+        self.__launch_node_type = 'MANAGEMENT_HOST'
+        self.mValidatePatchOperationWithIncludeNodeList()
+
+    @pytest.mark.cell_rollback_with_include_list_mgmt_host
+    def test_cell_rollback_with_include_list_mgmt_host(self):
+        mUpdateAdditionalOptionsInPayload("LaunchNode", mGetInfraPatchingTestConfigParam('management_host_name'))
+        mUpdateAdditionalOptionsInPayload("LaunchNodeType", "MANAGEMENT_HOST")
+        self.__launch_node_type = 'MANAGEMENT_HOST'
+        self.__operation = TASK_ROLLBACK
+        self.__operation_style = OP_STYLE_ROLLING
+        self.__launch_node_type = 'MANAGEMENT_HOST'
+        self.mValidatePatchOperationWithIncludeNodeList()
+
+    @pytest.mark.cell_precheck_mgmt_host
+    def test_cell_precheck_mgmt_host(self):
+        updated_patch_list = []
+        self.__operation = TASK_PREREQ_CHECK
+        self.__operation_style = OP_STYLE_ROLLING
+        self.__patch_node_list = Test_clusterless_cell_class.__cells
+        mUpdateAdditionalOptionsInPayload("LaunchNode", mGetInfraPatchingTestConfigParam('management_host_name'))
+        mUpdateAdditionalOptionsInPayload("LaunchNodeType", "MANAGEMENT_HOST")
+        self.__launch_node_type = 'MANAGEMENT_HOST'
+
+        self.__patch_operation_status_result, self.__patch_operation_status_output = \
+            mExecuteInfraPatchCommandWithDCSAgentChecks(self.__operation, Test_clusterless_cell_class.__target_name,
+                                                        self.__operation_style)
+        self.assertTrue(self.__patch_operation_status_result, "Patch operation failed.")
+
+    @pytest.mark.cell_patch_mgmt_host
+    def test_cell_patch_mgmt_host(self):
+        updated_patch_list = []
+        self.__operation = TASK_PATCH
+        self.__operation_style = OP_STYLE_ROLLING
+        self.__patch_node_list = Test_clusterless_cell_class.__cells
+        mUpdateAdditionalOptionsInPayload("LaunchNode", mGetInfraPatchingTestConfigParam('management_host_name'))
+        mUpdateAdditionalOptionsInPayload("LaunchNodeType", "MANAGEMENT_HOST")
+        self.__launch_node_type = 'MANAGEMENT_HOST'
+        self.__patch_operation_status_result, self.__patch_operation_status_output = \
+            mExecuteInfraPatchCommandWithDCSAgentChecks(self.__operation, Test_clusterless_cell_class.__target_name,
+                                                        self.__operation_style)
+        self.assertTrue(self.__patch_operation_status_result, "Patch operation failed.")
+
+    @pytest.mark.cell_rollback_mgmt_host
+    def test_cell_rollback_mgmt_host(self):
+        updated_patch_list = []
+        self.__operation = TASK_ROLLBACK
+        self.__operation_style = OP_STYLE_ROLLING
+        self.__patch_node_list = Test_clusterless_cell_class.__cells
+        mUpdateAdditionalOptionsInPayload("LaunchNode", mGetInfraPatchingTestConfigParam('management_host_name'))
+        mUpdateAdditionalOptionsInPayload("LaunchNodeType", "MANAGEMENT_HOST")
+        self.__launch_node_type = 'MANAGEMENT_HOST'
+        self.__patch_operation_status_result, self.__patch_operation_status_output = \
+            mExecuteInfraPatchCommandWithDCSAgentChecks(self.__operation, Test_clusterless_cell_class.__target_name,
+                                                        self.__operation_style)
+        self.assertTrue(self.__patch_operation_status_result, "Rollback operation failed.")
+
+    """
+    This test is to validate multiple patch sessions can run on the launchnode
+    The following are the steps followed in this test
+    1. Set MAX_CONCURRENT_PATCH_SESSIONS_ON_LAUNCHNODE to 2
+    2. Trigger both dom0 and cell prechecks concurrently using MGMT_HOST as the launchnode
+    3. Validate for both requests to succeed 
+    4. Revert back LaunchNode and LaunchNode type back to original values as this test ins run cluster less setup
+    5. Revert back cluster with cell cabinet    
+    """
+
+    @pytest.mark.validate_multiple_patch_sessions_on_mgmt_host_as_launchnode
+    def test_validate_multiple_patch_sessions_on_mgmt_host_as_launchnode(self):
+        mUpdateAdditionalOptionsInPayload("LaunchNode", mGetInfraPatchingTestConfigParam('management_host_name'))
+        mUpdateAdditionalOptionsInPayload("LaunchNodeType", "MANAGEMENT_HOST")
+        cell_cabinet = mGetInfraPatchingTestConfigParam('cell_cabinet')
+        compute_cabinet = mGetInfraPatchingTestConfigParam('compute_cabinet')
+        mSetECRAProperty("MAX_CONCURRENT_PATCH_SESSIONS_ON_LAUNCHNODE", "2")
+
+        import concurrent.futures
+
+        # Trigger both and cell prechecks concurrently using MGMT_HOST as the launchnode
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            f1 = executor.submit(mExecuteInfraPatchCommand, aOperation=TASK_PREREQ_CHECK, aTarget=PATCH_CELL,
+                                 aOperationStyle=OP_STYLE_AUTO)
+            time.sleep(5)
+            mUpdateInfraPatchingTestConfigParam("cluster", compute_cabinet)
+            f2 = executor.submit(mExecuteInfraPatchCommand, aOperation=TASK_PREREQ_CHECK, aTarget=PATCH_DOM0,
+                                 aOperationStyle=OP_STYLE_AUTO)
+
+            _ret1, _status_output1 = f1.result()
+            _ret2, _status_output2 = f2.result()
+
+        mUpdateInfraPatchingTestConfigParam("cluster", cell_cabinet)
+        self.assertTrue(_ret1, "precheck operation failed.")
+        self.assertTrue(_ret2, "precheck operation failed.")
+
+        mUpdateAdditionalOptionsInPayload("LaunchNode", Test_clusterless_cell_class.__dom0s[0])
+        mUpdateAdditionalOptionsInPayload("LaunchNodeType", "COMPUTE")
+
+    """
+    This test is to validate limiting patch sessions on External LaucnchNode is working or not..
+
+    The following are the steps followed in this test
+    1. Set MAX_CONCURRENT_PATCH_SESSIONS_ON_LAUNCHNODE to 1
+    2. Trigger two cell prechecks concurrently using dom0 from cabinet as the launchnode
+    3. Validate whether second request is failing for insufficient no LaunchNodes 
+    4. Revert back LaunchNode and LaunchNode type back to original values as this test ins run cluster less setup
+    5. Revert back cluster with cell cabinet    
+    """
+    @pytest.mark.cell_patch_prereq_check_to_validate_multiple_patch_sessions_limit_on_launchnode
+    def test_cell_patch_prereq_check_to_validate_multiple_patch_sessions_limit_on_launchnode(self):
+        mUpdateAdditionalOptionsInPayload("LaunchNode", Test_clusterless_cell_class.__dom0s[0])
+        mUpdateAdditionalOptionsInPayload("LaunchNodeType", "COMPUTE")
+        mSetECRAProperty("MAX_CONCURRENT_PATCH_SESSIONS_ON_LAUNCHNODE", "1")
+
+        # To delete any left over entry from ecs_external_launch_node_patching_operations
+        _delete_launch_node_ret, _delete_launch_node_output = CurlRequest().mExecute(
+            "infrapatch/launchNode/infrapatchOperations?LaunchNode=%s" % Test_clusterless_cell_class.__dom0s[0], "DELETE", {})
+
+        import concurrent.futures
+
+        # Here External LaunchNode is used from addition options..For the 2nd request LaunchNode gets passed as empty string
+        # so cell precheck fails
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            f1 = executor.submit(mExecuteInfraPatchCommand, aOperation=TASK_PREREQ_CHECK, aTarget=PATCH_CELL,
+                                 aOperationStyle=OP_STYLE_AUTO)
+            time.sleep(5)
+            f2 = executor.submit(mExecuteInfraPatchCommand, aOperation=TASK_PREREQ_CHECK, aTarget=PATCH_CELL,
+                                 aOperationStyle=OP_STYLE_AUTO)
+
+            _ret1, _status_output1 = f1.result()
+            _ret2, _status_output2 = f2.result()
+
+        self.assertTrue(_ret1, "precheck operation failed.")
+        self.assertFalse(_ret2, "precheck operation failed.")
+        mSetECRAProperty("MAX_CONCURRENT_PATCH_SESSIONS_ON_LAUNCHNODE", "2")
+        _status_json = json.loads(_status_output2)
+        print(_status_json)
+        _errorcode = _status_json["errorCode"]
+        # Insufficient LaunchNode for cell patching
+        self.assertEqual(_errorcode, "0x030E0024", "Incorrect error code is returned..")
+
+    def mValidatePatchOperationWithIncludeNodeList(self):
+        """
+        First run patch operation in first two cells and then run patch operation in all cells.
+        The second iteration is to cover the scenario of filter node list in infrapatching backend.
+        """
+        _cells = Test_clusterless_cell_class.__cells
+        # Run patch operation with first two cells
+
+        _include_node_list = ",".join(_cells[:2])
+        mUpdateAdditionalOptionsInPayload("IncludeNodeList", _include_node_list)
+        self.__required_nodes_in_node_progress_status = _cells[:2]
+        self.__non_required_nodes_in_node_progress_status = [_cells[2]]
+        # First two cell nodes gets patched
+        self.__patch_node_list = _cells[:2]
+        if self.__operation in [TASK_ONEOFF, TASK_ONEOFFV2]:
+            # Need to check script execution console logs only in includenodelist
+            # Use custom script in first iteration and default script in second iteration, so default script here.
+            self.mExecuteAndValidateOneoffOperation()
+        else:
+            self.__mExecuteAndValidatePatchOperation()
+
+            # Postchecks are internal infra tests and not execute via patchmgr cmds
+            # hence time profile details won't be available
+            if not self.__operation == TASK_POSTCHECK and self.__launch_node_type == 'COMPUTE':
+                # Capturing time profile diff only for single cell
+                _copy_time_profile_diff_data = mCopyTimeStatsFileForTimeDiffAnalysis(
+                    self.__patch_operation_status_output)
+                self.assertEqual(_copy_time_profile_diff_data, EXIT_SUCCESS, "Copying time profile data failed.")
+
+    # Private method to execute and validate patch operation
+    def __mExecuteAndValidatePatchOperation(self):
+        updated_patch_list = []
+        _disable_exacloud_plugin_execution = (
+                mGetInfraPatchingTestConfigParam('disable_exacloud_plugin_execution') == 'True')
+
+        if not _disable_exacloud_plugin_execution:
+            # plugin execution need to be done only for patch operation
+            # In case of non-rolling, custom scripts are staged to dom0/domus before even start of cell patching test
+            if self.__operation in [TASK_PATCH] and self.__operation_style != OP_STYLE_NON_ROLLING:
+                self.assertTrue(mStageCustomPluginScripts(Test_clusterless_dom0_class.__target_name),
+                                "Staging custom scripts failed for exacloud plugin execution.")
+
+        self.__patch_operation_status_result, self.__patch_operation_status_output = \
+            mExecuteInfraPatchCommandWithDCSAgentChecks(self.__operation, Test_clusterless_cell_class.__target_name,
+                                                        self.__operation_style)
+        self.assertTrue(self.__patch_operation_status_result,
+                        "%s operation failed." % (self.__operation.capitalize()))
+
+        # Postchecks are internal infra tests and not execute via patchmgr cmds
+        if not self.__operation == TASK_POSTCHECK and self.__launch_node_type == 'COMPUTE':
+            updated_patch_list = mGetNodesWithPatchOperation(self.__patch_operation_status_output)
+            if not _disable_exacloud_plugin_execution:
+                # plugin execution need to be done only for patch and rollback operation
+                if self.__operation in [TASK_PATCH, TASK_ROLLBACK]:
+                    _exacloud_plugin_script_execution_validator = ExacloudPluginScriptExecutionValidator(
+                        Test_clusterless_cell_class.__target_name,
+                        self.__operation,
+                        self.__operation_style)
+                    self.assertTrue(
+                        _exacloud_plugin_script_execution_validator.mValidate(self.__patch_operation_status_output,
+                                                                              updated_patch_list),
+                        "Exacloud plugin execution failed.")
+
+            # Node progress is currently not there in prod, when management host is used as launch node
+            self.assertTrue(
+                mCheckNodesPresenceInNodeProgressStatus(self.__patch_operation_status_output,
+                                                        updated_patch_list,
+                                                        self.__non_required_nodes_in_node_progress_status),
+                "Either expected nodes are not present or unexpected nodes are present in node_progress_status.")
+
+            _time_profile_data_validator = TimeProfileDataValidator(Test_clusterless_cell_class.__target_name,
+                                                                    self.__operation, self.__operation_style)
+            # Need to pass nodes where actual patching happens and nodes where patching does not happen (Test_clusterless_cell_class.__cells-self.__patch_node_list)
+            self.assertTrue(
+                _time_profile_data_validator.mValidate(self.__patch_operation_status_output, updated_patch_list,
+                                                       [i for i in Test_clusterless_cell_class.__cells if
+                                                        i not in updated_patch_list]),
+                "time_profile_data validation failed.")
+
+    def mExecuteAndValidateOneoffOperation(self, aUseDefaultScript=True):
+        if not aUseDefaultScript and self.__operation != TASK_ONEOFFV2:
+            _one_off_script_file_path = mCreateOneOffScriptFile(self.__operation)
+            if not _one_off_script_file_path:
+                self.assertTrue(False, "Failed to create one-off script file.")
+            mUpdateAdditionalOptionsInPayload("OneoffCustomPluginFile", _one_off_script_file_path)
+        mUpdateAdditionalOptionsInPayload("OneoffScriptArgs", "stage=Pre,EXACS=yes,root_access=True")
+
+        mUpdateParamInPayload("BackupMode", "no")
+        self.__patch_operation_status_result, self.__patch_operation_status_output = \
+            mExecuteInfraPatchCommandWithDCSAgentChecks(self.__operation, Test_clusterless_cell_class.__target_name,
+                                                        self.__operation_style)
+        self.assertTrue(self.__patch_operation_status_result,
+                        "%s operation failed." % (self.__operation.capitalize()))
+
+        _script_execution_validator = OneOffPluginScriptExecutionValidator(Test_clusterless_cell_class.__target_name,
+                                                                           self.__operation,
+                                                                           self.__operation_style)
+        self.assertTrue(_script_execution_validator.mValidate(self.__patch_operation_status_output,
+                                                              self.__required_nodes_in_node_progress_status),
+                        "One-off script execution failed.")
+

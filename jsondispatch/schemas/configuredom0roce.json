@@ -1,0 +1,16 @@
+{
+    "properties": {
+        "roce_config_dom0_name": {
+            "type": "string"
+        },
+        "stre0_ip": {
+            "type": "string"
+        }
+    },
+    "required": [
+        "roce_config_dom0_name",
+        "stre0_ip"
+    ],
+    "type": "object"
+}
+

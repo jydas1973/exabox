@@ -1,0 +1,61 @@
+{
+  "properties":
+  {
+      "user_handler":
+      {
+              "properties":
+                  {
+                  "user":
+                    {
+                      "properties":
+                      {
+                          "id":
+                          {
+                              "type": "string"
+                          },
+                          "action":
+                          {
+                              "type": "string",
+                              "enum": ["inject", "delete"]
+                          },
+                          "create_user":
+                          {
+                              "type": "boolean"
+                          }
+                      },
+                      "required":
+                      [
+                        "id",                          
+                        "action"
+                      ],
+                      "if": {
+                          "properties": {
+                            "action": {
+                              "const": "inject"
+                            }
+                          }
+                        },
+                        "then": {
+                          "required": ["create_user"]
+                        },
+                        "else": {
+                          "not": {
+                            "required": ["create_user"]
+                          }
+                        },                         
+                      "type": "object"
+                  }
+          },
+          "required":
+          [
+              "user"
+          ],
+          "type": "object"
+        }
+      },
+  "required":
+  [
+      "user_handler"
+  ],
+  "type": "object"
+}

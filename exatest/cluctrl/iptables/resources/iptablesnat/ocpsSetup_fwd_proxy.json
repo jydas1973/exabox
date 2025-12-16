@@ -1,0 +1,66 @@
+{
+    "exaOcid": "ocid1.exadatainfrastructure.oc1.sea.abzwklsscaqak01adm0304clu6",
+    "adminNetworkCidr": "10.31.16.0\/20",
+    "ibNetworkCidr": "192.168.31.0\/24",
+    "ntp": ["10.89.138.44"],
+    "dns": ["10.89.138.33"],
+    "serviceType": "nonATP",
+    "vpnHeIp": "vpn-he.sic-dbaas.exacc.oc9qadev.com",
+    "ossUrl": "http:\/\/swiftobjectstorage.us-phoenix-1.oraclecloud.com\/v1\/intdbaasecra",
+    "vpnHeFqdn": "vpn-he.sic-dbaas.exacc.oc9qadev.com",
+    "forwardProxy_ip": "20.20.20.20",
+    "forwardProxy_port" : "3081",
+    "patchServer_ip": "10.31.16.4",
+    "patchServer_subnet": "10.31.16.0\/20",
+    "patchServer_gateway": "10.31.16.1",
+    "patchServer_host_network_interface": "eth0",
+    "dhcp": "false",
+    "netmask": "255.255.240.0",
+    "proxy": "t001exa001-proxy.us.oracle.com",
+    "linux_users": {
+        "installation": "ecra",
+        "operations": "ops"
+    },
+    "linux_groups": {
+        "installation": "dba",
+        "operations": "docker"
+    },
+    "install_dir": "\/opt\/oci\/exacc",
+    "SDO": "",
+    "exabox_updates": {"ociexacc": "True"},
+    "pkey": "0xaa31",
+    "servers": [
+        {
+            "hostname": "scaqak01cps01",
+            "username": "",
+            "agent_port": 7080,
+            "worker_port": 9100,
+            "remote_mgmt": 7071,
+            "cpsagent_port": 2081,
+            "ib_interface_name": "stbondib00",
+            "adminIp": "10.31.20.175",
+            "ilomIp": "10.31.20.171",
+            "ibAdmin": [
+                "192.168.11.46",
+                "192.168.11.47"
+            ],
+            "ip": "10.31.16.7"
+        },
+        {
+            "hostname": "scaqak01cps02",
+            "username": "",
+            "agent_port": 7090,
+            "worker_port": 9100,
+            "remote_mgmt": 7071,
+            "cpsagent_port": 2081,
+            "ib_interface_name": "stbondib00",
+            "adminIp": "10.31.20.175",
+            "ilomIp": "10.31.20.172",
+            "ibAdmin": [
+                "192.168.11.48",
+                "192.168.11.49"
+            ],
+            "ip": "10.31.16.8"
+        }
+    ]
+}

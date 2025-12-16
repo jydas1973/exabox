@@ -1,0 +1,768 @@
+{
+  "reshaped_node_subset": {
+    "added_computes": [
+      {
+        "compute_node_alias": "iad103709exdd003",
+        "compute_node_hostname": "iad103709exdd003.iad103709exd.adminiad1.oraclevcn.com",
+        "rack_info": {
+          "uloc": "2",
+          "uheight": "1"
+        },
+        "network_info": {
+          "computenetworks": [
+            {
+              "admin": [
+                {
+                  "ipaddr": "10.0.6.4",
+                  "fqdn": "iad103709exdd003.iad103709exd.adminiad1.oraclevcn.com",
+                  "gateway": "10.0.6.1",
+                  "master": "eth0",
+                  "netmask": "255.255.255.128"
+                }
+              ]
+            },
+            {
+              "private": [
+                {
+                  "ipaddr": "192.168.132.32",
+                  "fqdn": "iad103709exdd003-priv1.iad103709exd.adminiad1.oraclevcn.com",
+                  "gateway": "192.168.132.1",
+                  "netmask": "255.255.254.0"
+                },
+                {
+                  "ipaddr": "192.168.132.33",
+                  "fqdn": "iad103709exdd003-priv2.iad103709exd.adminiad1.oraclevcn.com",
+                  "gateway": "192.168.132.1",
+                  "netmask": "255.255.254.0"
+                }
+              ]
+            },
+            {
+              "ilom": [
+                {
+                  "ipaddr": "10.0.6.22",
+                  "fqdn": "iad103709exdd003lo.iad103709exd.adminiad1.oraclevcn.com",
+                  "gateway": "10.0.6.1",
+                  "netmask": "255.255.255.128"
+                }
+              ]
+            }
+          ]
+        },
+        "model": "X8M-2",
+        "racktype": "1035",
+        "virtual_compute_info": [
+          {
+            "network_info": {
+              "virtualcomputenetworks": [
+                {
+                  "private": [
+                    {
+                      "ipaddr": "192.168.136.4",
+                      "fqdn": "iad103709exddu0301-stre0.iad103709exd.adminiad1.oraclevcn.com",
+                      "gateway": "erased",
+                      "netmask": "255.255.254.0"
+                    },
+                    {
+                      "ipaddr": "192.168.136.5",
+                      "fqdn": "iad103709exddu0301-stre1.iad103709exd.adminiad1.oraclevcn.com",
+                      "gateway": "erased",
+                      "netmask": "255.255.254.0"
+                    }
+                  ]
+                },
+                {
+                  "client": [
+                    {
+                      "ipaddr": "10.32.16.4",
+                      "fqdn": "iad103709exddu0301.us.oracle.com",
+                      "gateway": "10.32.16.1",
+                      "netmask": "255.255.248.0",
+                      "vlantag": null,
+                      "mac": "00:10:1b:e6:52:87",
+                      "natip": "10.0.6.49",
+                      "nathostname": "iad103709exddu0301",
+                      "natdomain": "iad103709exd.adminiad1.oraclevcn.com",
+                      "slave": "eth1 eth2"
+                    }
+                  ]
+                },
+                {
+                  "backup": [
+                    {
+                      "ipaddr": "10.32.94.61",
+                      "fqdn": "iad103709exddu0301-backup.iad103709exd.adminiad1.oraclevcn.com",
+                      "gateway": "10.32.94.33",
+                      "netmask": "255.255.255.224",
+                      "vlantag": "1",
+                      "mac": "02:00:17:01:0c:e2",
+                      "slave": "eth1 eth2"
+                    }
+                  ]
+                },
+                {
+                  "interconnect": [
+                    {
+                      "ipaddr": "192.168.138.4",
+                      "fqdn": "iad103709exddu0301-clre0.iad103709exd.adminiad1.oraclevcn.com",
+                      "gateway": "erased",
+                      "netmask": "255.255.254.0"
+                    },
+                    {
+                      "ipaddr": "192.168.138.5",
+                      "fqdn": "iad103709exddu0301-clre1.iad103709exd.adminiad1.oraclevcn.com",
+                      "gateway": "erased",
+                      "netmask": "255.255.254.0"
+                    }
+                  ]
+                },
+                {
+                  "vip": [
+                    {
+                      "ipaddr": "10.32.16.5",
+                      "fqdn": "iad103709exddu0301-vip.iad103709exd.adminiad1.oraclevcn.com",
+                      "gateway": "10.32.16.1",
+                      "netmask": "255.255.248.0"
+                    }
+                  ]
+                }
+              ]
+            },
+            "compute_node_hostname": "iad103709exddu0301.iad103709exd.adminiad1.oraclevcn.com"
+          }
+        ]
+      },
+      {
+        "compute_node_alias": "iad103709exdd004",
+        "compute_node_hostname": "iad103709exdd004.iad103709exd.adminiad1.oraclevcn.com",
+        "rack_info": {
+          "uloc": "1",
+          "uheight": "1"
+        },
+        "network_info": {
+          "computenetworks": [
+            {
+              "admin": [
+                {
+                  "ipaddr": "10.0.6.5",
+                  "fqdn": "iad103709exdd004.iad103709exd.adminiad1.oraclevcn.com",
+                  "gateway": "10.0.6.1",
+                  "master": "eth0",
+                  "netmask": "255.255.255.128"
+                }
+              ]
+            },
+            {
+              "private": [
+                {
+                  "ipaddr": "192.168.132.30",
+                  "fqdn": "iad103709exdd004-priv1.iad103709exd.adminiad1.oraclevcn.com",
+                  "gateway": "192.168.132.1",
+                  "netmask": "255.255.254.0"
+                },
+                {
+                  "ipaddr": "192.168.132.31",
+                  "fqdn": "iad103709exdd004-priv2.iad103709exd.adminiad1.oraclevcn.com",
+                  "gateway": "192.168.132.1",
+                  "netmask": "255.255.254.0"
+                }
+              ]
+            },
+            {
+              "ilom": [
+                {
+                  "ipaddr": "10.0.6.23",
+                  "fqdn": "iad103709exdd004lo.iad103709exd.adminiad1.oraclevcn.com",
+                  "gateway": "10.0.6.1",
+                  "netmask": "255.255.255.128"
+                }
+              ]
+            }
+          ]
+        },
+        "model": "X8M-2",
+        "racktype": "1035",
+        "virtual_compute_info": [
+          {
+            "network_info": {
+              "virtualcomputenetworks": [
+                {
+                  "private": [
+                    {
+                      "ipaddr": "192.168.136.2",
+                      "fqdn": "iad103709exddu0401-stre0.iad103709exd.adminiad1.oraclevcn.com",
+                      "gateway": "erased",
+                      "netmask": "255.255.254.0"
+                    },
+                    {
+                      "ipaddr": "192.168.136.3",
+                      "fqdn": "iad103709exddu0401-stre1.iad103709exd.adminiad1.oraclevcn.com",
+                      "gateway": "erased",
+                      "netmask": "255.255.254.0"
+                    }
+                  ]
+                },
+                {
+                  "client": [
+                    {
+                      "ipaddr": "10.32.16.2",
+                      "fqdn": "iad103709exddu0401.us.oracle.com",
+                      "gateway": "10.32.16.1",
+                      "netmask": "255.255.248.0",
+                      "vlantag": null,
+                      "mac": "00:10:45:15:ba:d5",
+                      "natip": "10.0.6.50",
+                      "nathostname": "iad103709exddu0401",
+                      "natdomain": "iad103709exd.adminiad1.oraclevcn.com",
+                      "slave": "eth2 eth1"
+                    }
+                  ]
+                },
+                {
+                  "backup": [
+                    {
+                      "ipaddr": "10.32.94.62",
+                      "fqdn": "iad103709exddu0401-backup.iad103709exd.adminiad1.oraclevcn.com",
+                      "gateway": "10.32.94.33",
+                      "netmask": "255.255.255.224",
+                      "vlantag": "1",
+                      "mac": "02:00:17:01:af:fe",
+                      "slave": "eth2 eth1"
+                    }
+                  ]
+                },
+                {
+                  "interconnect": [
+                    {
+                      "ipaddr": "192.168.138.2",
+                      "fqdn": "iad103709exddu0401-clre0.iad103709exd.adminiad1.oraclevcn.com",
+                      "gateway": "erased",
+                      "netmask": "255.255.254.0"
+                    },
+                    {
+                      "ipaddr": "192.168.138.3",
+                      "fqdn": "iad103709exddu0401-clre1.iad103709exd.adminiad1.oraclevcn.com",
+                      "gateway": "erased",
+                      "netmask": "255.255.254.0"
+                    }
+                  ]
+                },
+                {
+                  "vip": [
+                    {
+                      "ipaddr": "10.32.16.3",
+                      "fqdn": "iad103709exddu0401-vip.iad103709exd.adminiad1.oraclevcn.com",
+                      "gateway": "10.32.16.1",
+                      "netmask": "255.255.248.0"
+                    }
+                  ]
+                }
+              ]
+            },
+            "compute_node_hostname": "iad103709exddu0401.iad103709exd.adminiad1.oraclevcn.com"
+          }
+        ]
+      },
+      {
+        "compute_node_alias": "iad103709exdd002",
+        "compute_node_hostname": "iad103709exdd002.iad103709exd.adminiad1.oraclevcn.com",
+        "rack_info": {
+          "uloc": "3",
+          "uheight": "1"
+        },
+        "network_info": {
+          "computenetworks": [
+            {
+              "admin": [
+                {
+                  "ipaddr": "10.0.6.3",
+                  "fqdn": "iad103709exdd002.iad103709exd.adminiad1.oraclevcn.com",
+                  "gateway": "10.0.6.1",
+                  "netmask": "255.255.255.128"
+                }
+              ]
+            },
+            {
+              "private": [
+                {
+                  "ipaddr": "192.168.132.34",
+                  "fqdn": "iad103709exdd002-priv1.iad103709exd.adminiad1.oraclevcn.com",
+                  "gateway": "192.168.132.1",
+                  "netmask": "255.255.254.0"
+                },
+                {
+                  "ipaddr": "192.168.132.35",
+                  "fqdn": "iad103709exdd002-priv2.iad103709exd.adminiad1.oraclevcn.com",
+                  "gateway": "192.168.132.1",
+                  "netmask": "255.255.254.0"
+                }
+              ]
+            },
+            {
+              "ilom": [
+                {
+                  "ipaddr": "10.0.6.21",
+                  "fqdn": "iad103709exdd002lo.iad103709exd.adminiad1.oraclevcn.com",
+                  "gateway": "10.0.6.1",
+                  "netmask": "255.255.255.128"
+                }
+              ]
+            }
+          ]
+        },
+        "model": "X8M-2",
+        "racktype": "1035",
+        "virtual_compute_info": [
+          {
+            "network_info": {
+              "virtualcomputenetworks": [
+                {
+                  "private": [
+                    {
+                      "ipaddr": "192.168.136.6",
+                      "fqdn": "iad103709exddu0201-stre0.iad103709exd.adminiad1.oraclevcn.com",
+                      "gateway": "erased",
+                      "netmask": "255.255.254.0"
+                    },
+                    {
+                      "ipaddr": "192.168.136.7",
+                      "fqdn": "iad103709exddu0201-stre1.iad103709exd.adminiad1.oraclevcn.com",
+                      "gateway": "erased",
+                      "netmask": "255.255.254.0"
+                    }
+                  ]
+                },
+                {
+                  "client": [
+                    {
+                      "ipaddr": "10.32.16.6",
+                      "fqdn": "iad103709exddu0201.us.oracle.com",
+                      "gateway": "10.32.16.1",
+                      "netmask": "255.255.248.0",
+                      "vlantag": null,
+                      "mac": "00:10:aa:73:f4:b2",
+                      "natip": "10.0.6.48",
+                      "nathostname": "iad103709exddu0201",
+                      "natdomain": "iad103709exd.adminiad1.oraclevcn.com",
+                      "slave": "eth2 eth1"
+                    }
+                  ]
+                },
+                {
+                  "backup": [
+                    {
+                      "ipaddr": "10.32.94.60",
+                      "fqdn": "iad103709exddu0201-backup.iad103709exd.adminiad1.oraclevcn.com",
+                      "gateway": "10.32.94.33",
+                      "netmask": "255.255.255.224",
+                      "vlantag": "1",
+                      "mac": "02:00:17:01:b9:b0",
+                      "slave": "eth2 eth1"
+                    }
+                  ]
+                },
+                {
+                  "interconnect": [
+                    {
+                      "ipaddr": "192.168.138.6",
+                      "fqdn": "iad103709exddu0201-clre0.iad103709exd.adminiad1.oraclevcn.com",
+                      "gateway": "erased",
+                      "netmask": "255.255.254.0"
+                    },
+                    {
+                      "ipaddr": "192.168.138.7",
+                      "fqdn": "iad103709exddu0201-clre1.iad103709exd.adminiad1.oraclevcn.com",
+                      "gateway": "erased",
+                      "netmask": "255.255.254.0"
+                    }
+                  ]
+                },
+                {
+                  "vip": [
+                    {
+                      "ipaddr": "10.32.16.7",
+                      "fqdn": "iad103709exddu0201-vip.iad103709exd.adminiad1.oraclevcn.com",
+                      "gateway": "10.32.16.1",
+                      "netmask": "255.255.248.0"
+                    }
+                  ]
+                }
+              ]
+            },
+            "compute_node_hostname": "iad103709exddu0201.iad103709exd.adminiad1.oraclevcn.com"
+          }
+        ]
+      },
+      {
+        "compute_node_alias": "iad103709exdd001",
+        "compute_node_hostname": "iad103709exdd001.iad103709exd.adminiad1.oraclevcn.com",
+        "rack_info": {
+          "uloc": "4",
+          "uheight": "1"
+        },
+        "network_info": {
+          "computenetworks": [
+            {
+              "admin": [
+                {
+                  "ipaddr": "10.0.6.2",
+                  "fqdn": "iad103709exdd001.iad103709exd.adminiad1.oraclevcn.com",
+                  "gateway": "10.0.6.1",
+                  "netmask": "255.255.255.128"
+                }
+              ]
+            },
+            {
+              "private": [
+                {
+                  "ipaddr": "192.168.132.36",
+                  "fqdn": "iad103709exdd001-priv1.iad103709exd.adminiad1.oraclevcn.com",
+                  "gateway": "192.168.132.1",
+                  "netmask": "255.255.254.0"
+                },
+                {
+                  "ipaddr": "192.168.132.37",
+                  "fqdn": "iad103709exdd001-priv2.iad103709exd.adminiad1.oraclevcn.com",
+                  "gateway": "192.168.132.1",
+                  "netmask": "255.255.254.0"
+                }
+              ]
+            },
+            {
+              "ilom": [
+                {
+                  "ipaddr": "10.0.6.20",
+                  "fqdn": "iad103709exdd001lo.iad103709exd.adminiad1.oraclevcn.com",
+                  "gateway": "10.0.6.1",
+                  "netmask": "255.255.255.128"
+                }
+              ]
+            }
+          ]
+        },
+        "model": "X8M-2",
+        "racktype": "1035",
+        "virtual_compute_info": [
+          {
+            "network_info": {
+              "virtualcomputenetworks": [
+                {
+                  "private": [
+                    {
+                      "ipaddr": "192.168.136.8",
+                      "fqdn": "iad103709exddu0101-stre0.iad103709exd.adminiad1.oraclevcn.com",
+                      "gateway": "erased",
+                      "netmask": "255.255.254.0"
+                    },
+                    {
+                      "ipaddr": "192.168.136.9",
+                      "fqdn": "iad103709exddu0101-stre1.iad103709exd.adminiad1.oraclevcn.com",
+                      "gateway": "erased",
+                      "netmask": "255.255.254.0"
+                    }
+                  ]
+                },
+                {
+                  "client": [
+                    {
+                      "ipaddr": "10.32.16.8",
+                      "fqdn": "iad103709exddu0101.us.oracle.com",
+                      "gateway": "10.32.16.1",
+                      "netmask": "255.255.248.0",
+                      "vlantag": null,
+                      "mac": "00:10:23:e2:11:e3",
+                      "natip": "10.0.6.47",
+                      "nathostname": "iad103709exddu0101",
+                      "natdomain": "iad103709exd.adminiad1.oraclevcn.com",
+                      "slave": "eth1 eth2"
+                    }
+                  ]
+                },
+                {
+                  "backup": [
+                    {
+                      "ipaddr": "10.32.94.59",
+                      "fqdn": "iad103709exddu0101-backup.iad103709exd.adminiad1.oraclevcn.com",
+                      "gateway": "10.32.94.33",
+                      "netmask": "255.255.255.224",
+                      "vlantag": "1",
+                      "mac": "02:00:17:01:4f:58",
+                      "slave": "eth1 eth2"
+                    }
+                  ]
+                },
+                {
+                  "interconnect": [
+                    {
+                      "ipaddr": "192.168.138.8",
+                      "fqdn": "iad103709exddu0101-clre0.iad103709exd.adminiad1.oraclevcn.com",
+                      "gateway": "erased",
+                      "netmask": "255.255.254.0"
+                    },
+                    {
+                      "ipaddr": "192.168.138.9",
+                      "fqdn": "iad103709exddu0101-clre1.iad103709exd.adminiad1.oraclevcn.com",
+                      "gateway": "erased",
+                      "netmask": "255.255.254.0"
+                    }
+                  ]
+                },
+                {
+                  "vip": [
+                    {
+                      "ipaddr": "10.32.16.9",
+                      "fqdn": "iad103709exddu0101-vip.iad103709exd.adminiad1.oraclevcn.com",
+                      "gateway": "10.32.16.1",
+                      "netmask": "255.255.248.0"
+                    }
+                  ]
+                }
+              ]
+            },
+            "compute_node_hostname": "iad103709exddu0101.iad103709exd.adminiad1.oraclevcn.com"
+          }
+        ]
+      }
+    ],
+    "added_cells": [
+      {
+        "cell_hostname": "iad103712exdcl04.iad103712exd.adminiad1.oraclevcn.com",
+        "network_info": {
+          "cellnetworks": [
+            {
+              "admin": [
+                {
+                  "ipaddr": "10.0.4.133",
+                  "fqdn": "iad103712exdcl04.iad103712exd.adminiad1.oraclevcn.com",
+                  "gateway": "10.0.4.129",
+                  "netmask": "255.255.255.128"
+                }
+              ]
+            },
+            {
+              "private": [
+                {
+                  "ipaddr": "100.106.30.18",
+                  "fqdn": "iad103712exdcl04-priv1.iad103712exd.adminiad1.oraclevcn.com",
+                  "gateway": "100.106.0.1",
+                  "netmask": "255.255.0.0"
+                },
+                {
+                  "ipaddr": "100.106.30.19",
+                  "fqdn": "iad103712exdcl04-priv2.iad103712exd.adminiad1.oraclevcn.com",
+                  "gateway": "100.106.0.1",
+                  "netmask": "255.255.0.0"
+                }
+              ]
+            },
+            {
+              "ilom": [
+                {
+                  "ipaddr": "10.0.4.148",
+                  "fqdn": "iad103712exdcl04lo.iad103712exd.adminiad1.oraclevcn.com",
+                  "gateway": "10.0.4.129",
+                  "netmask": "255.255.255.128"
+                }
+              ]
+            }
+          ]
+        },
+        "rack_info": {
+          "uloc": "5",
+          "uheight": "1"
+        },
+        "model": "X8M-2",
+        "racktype": "1035"
+      },
+      {
+        "cell_hostname": "iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com",
+        "network_info": {
+          "cellnetworks": [
+            {
+              "admin": [
+                {
+                  "ipaddr": "10.0.4.132",
+                  "fqdn": "iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com",
+                  "gateway": "10.0.4.129",
+                  "netmask": "255.255.255.128"
+                }
+              ]
+            },
+            {
+              "private": [
+                {
+                  "ipaddr": "100.106.30.16",
+                  "fqdn": "iad103712exdcl03-priv1.iad103712exd.adminiad1.oraclevcn.com",
+                  "gateway": "100.106.0.1",
+                  "netmask": "255.255.0.0"
+                },
+                {
+                  "ipaddr": "100.106.30.17",
+                  "fqdn": "iad103712exdcl03-priv2.iad103712exd.adminiad1.oraclevcn.com",
+                  "gateway": "100.106.0.1",
+                  "netmask": "255.255.0.0"
+                }
+              ]
+            },
+            {
+              "ilom": [
+                {
+                  "ipaddr": "10.0.4.147",
+                  "fqdn": "iad103712exdcl03lo.iad103712exd.adminiad1.oraclevcn.com",
+                  "gateway": "10.0.4.129",
+                  "netmask": "255.255.255.128"
+                }
+              ]
+            }
+          ]
+        },
+        "rack_info": {
+          "uloc": "6",
+          "uheight": "1"
+        },
+        "model": "X8M-2",
+        "racktype": "1035"
+      },
+      {
+        "cell_hostname": "iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com",
+        "network_info": {
+          "cellnetworks": [
+            {
+              "admin": [
+                {
+                  "ipaddr": "10.0.4.131",
+                  "fqdn": "iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com",
+                  "gateway": "10.0.4.129",
+                  "netmask": "255.255.255.128"
+                }
+              ]
+            },
+            {
+              "private": [
+                {
+                  "ipaddr": "100.106.30.14",
+                  "fqdn": "iad103712exdcl02-priv1.iad103712exd.adminiad1.oraclevcn.com",
+                  "gateway": "100.106.0.1",
+                  "netmask": "255.255.0.0"
+                },
+                {
+                  "ipaddr": "100.106.30.15",
+                  "fqdn": "iad103712exdcl02-priv2.iad103712exd.adminiad1.oraclevcn.com",
+                  "gateway": "100.106.0.1",
+                  "netmask": "255.255.0.0"
+                }
+              ]
+            },
+            {
+              "ilom": [
+                {
+                  "ipaddr": "10.0.4.146",
+                  "fqdn": "iad103712exdcl02lo.iad103712exd.adminiad1.oraclevcn.com",
+                  "gateway": "10.0.4.129",
+                  "netmask": "255.255.255.128"
+                }
+              ]
+            }
+          ]
+        },
+        "rack_info": {
+          "uloc": "7",
+          "uheight": "1"
+        },
+        "model": "X8M-2",
+        "racktype": "1035"
+      },
+      {
+        "cell_hostname": "iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com",
+        "network_info": {
+          "cellnetworks": [
+            {
+              "admin": [
+                {
+                  "ipaddr": "10.0.4.130",
+                  "fqdn": "iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com",
+                  "gateway": "10.0.4.129",
+                  "netmask": "255.255.255.128"
+                }
+              ]
+            },
+            {
+              "private": [
+                {
+                  "ipaddr": "100.106.30.6",
+                  "fqdn": "iad103712exdcl01-priv1.iad103712exd.adminiad1.oraclevcn.com",
+                  "gateway": "100.106.0.1",
+                  "netmask": "255.255.0.0"
+                },
+                {
+                  "ipaddr": "100.106.30.7",
+                  "fqdn": "iad103712exdcl01-priv2.iad103712exd.adminiad1.oraclevcn.com",
+                  "gateway": "100.106.0.1",
+                  "netmask": "255.255.0.0"
+                }
+              ]
+            },
+            {
+              "ilom": [
+                {
+                  "ipaddr": "10.0.4.145",
+                  "fqdn": "iad103712exdcl01lo.iad103712exd.adminiad1.oraclevcn.com",
+                  "gateway": "10.0.4.129",
+                  "netmask": "255.255.255.128"
+                }
+              ]
+            }
+          ]
+        },
+        "rack_info": {
+          "uloc": "8",
+          "uheight": "1"
+        },
+        "model": "X8M-2",
+        "racktype": "1035"
+      }
+    ],
+    "added_switches": [
+      {
+        "network_info": {
+          "switchnetworks": [
+            {
+              "admin": [
+                {
+                  "ipaddr": "192.168.0.2",
+                  "fqdn": "iad103709exdre02.iad103709exd.adminiad1.oraclevcn.com",
+                  "gateway": "10.0.6.1",
+                  "netmask": "255.255.255.128"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "network_info": {
+          "switchnetworks": [
+            {
+              "admin": [
+                {
+                  "ipaddr": "192.168.0.1",
+                  "fqdn": "iad103709exdre01.iad103709exd.adminiad1.oraclevcn.com",
+                  "gateway": "10.0.6.1",
+                  "netmask": "255.255.255.128"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "ostype": "kvm",
+    "exadata_info": {
+      "model": "X8M-2",
+      "racktype": "1035",
+      "description": "X8M-2 Elastic Rack HC 14TB",
+      "rackname": "iad1-d4-cl4-a7bf0d38-91f6-496a-b408-ab563d9b6cc0-clu01"
+    }
+  },
+  "mock_mode": "FALSE"
+}

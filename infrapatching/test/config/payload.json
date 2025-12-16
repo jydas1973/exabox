@@ -1,0 +1,37 @@
+{
+    "style": "auto",
+    "PluginTypes": "none",
+    "target": "cell",
+    "Fedramp": "DISABLED",
+    "TargetVersion": "LATEST",
+    "BackupMode": "yes",
+    "additional_options": [
+        {
+            "ClusterLess": "no",
+            "OneoffCustomPluginFile": "none",
+            "OneoffScriptArgs": "none",
+            "KspliceAction": "none",
+            "EnvType": "ecs",
+            "RackSwitchesOnly": "no",
+            "AllowActiveNfsMounts": "yes",
+            "IncludeNodeList": "none",
+            "IgnoreAlerts": "no",
+            "serviceType": "EXACS",
+            "SingleUpgradeNodeName": "none",
+            "SkipDomuCheck": "no",
+            "IgnoreDateValidation": "no",
+            "isSingleNodeUpgrade": "no",
+            "LaunchNode": "none",
+            "exaunitId": 0,
+            "exasplice": "no",
+            "ForceRemoveCustomRpms": "no",
+            "CellCountFromCP": 0,
+            "EnableDBHealthChecks": "yes",
+            "PatchSwitchType": ""
+        }
+    ],
+    "Retry": "no",
+    "operation": "patch_prereq_check",
+    "OneoffScriptAlias": "none",
+    "EnablePlugins": "no"
+}

@@ -1,0 +1,466 @@
+#
+# $Header: ecs/exacloud/exabox/infrapatching/test/test_infrapatching_clusterless_dom0.txt /main/4 2025/09/26 16:25:32 sdevasek Exp $
+#
+# test_infrapatching_clusterless_dom0.py
+#
+# Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+#
+#    NAME
+#      test_infrapatching_dom0.py - Unit test case script for all Dom0 operations.
+#
+#    DESCRIPTION
+#      Unit test case script for all Dom0 operations.
+#
+#    NOTES
+#      Unit test case script for all Dom0 operations.
+#
+#    MODIFIED   (MM/DD/YY)
+#       apotluri 08/28/25 - Bug 38301663 - EXACS:25.2.2.1:RAISE AN ERROR WHEN
+#                           THE EXTERNAL LAUNCH NODE IS UNAVAILABLE DUE TO
+#                           REACHING THE MAXIMUM ALLOWED CONCURRENT SESSIONS
+#       apotluri 08/11/25 - Enhancement Request 38260898 - INFRAPATCH TEST
+#                           AUTOMATION CLUSTERLESS : CREATE TEST FOR PATCHMGR
+#                           FAILURE CASE FOR CELL/DOM0
+#    antamil     07/04/25   Bug 37994044 - Testscript changes to verify
+#                           node_state during clusterless patching
+#    sdevasek    06/20/25 - Enh 38059211  - ENHANCE TESTS MAINTENABILITY BY
+#                           SEPARATING OUT CLUSTERLESS TESTS AND SINGLE VM
+#                           TESTS INTO SEPARATE FILES
+#    sdevasek    06/20/25 - Creation
+#
+
+import pytest
+import unittest
+import re
+
+from utils import *
+from constants import *
+
+# Class which defines unit tests as dom0 target
+@pytest.mark.clusterless_dom0
+class Test_clusterless_dom0_class(unittest.TestCase):
+    # Class level variables
+    __dom0s = []
+    __target_name = PATCH_DOM0
+
+    @classmethod
+    def setUpClass(cls):
+        cls.__dom0s = mGetInfraPatchingTestConfigParam('dom0s')
+
+
+    def __init__(self, *initial_data, **kwargs):
+        super(Test_clusterless_dom0_class, self).__init__(*initial_data, **kwargs)
+        self.__operation = ""
+        self.__operation_style = OP_STYLE_AUTO
+        self.__required_nodes_in_node_progress_status = []
+        self.__non_required_nodes_in_node_progress_status = []
+        self.__patch_node_list = []
+        self.__patch_operation_status_result = False
+        self.__patch_operation_status_output = ""
+        self.__crs_bin_path = ""
+        self.__launch_node_type = "COMPUTE"
+        self.__launch_node_handler = LaunchNodeRegistrationHandler()
+
+    # This method is to run something similar before every test execution.
+    def setUp(self):
+        self.__required_nodes_in_node_progress_status = Test_clusterless_dom0_class.__dom0s
+        self.__non_required_nodes_in_node_progress_status = []
+        self.__patch_node_list = []
+        mUpdateAdditionalOptionsInPayload("IncludeNodeList", "none")
+        mUpdateAdditionalOptionsInPayload("OneoffCustomPluginFile", "none")
+        mUpdateAdditionalOptionsInPayload("OneoffScriptArgs", "none")
+        mUpdateAdditionalOptionsInPayload("exasplice", "no")
+        mUpdateParamInPayload("BackupMode", "yes")
+        mUpdateParamInPayload("EnablePlugins", "no")
+        mUpdateParamInPayload("PluginTypes", "none")
+        compute_cabinet = mGetInfraPatchingTestConfigParam('compute_cabinet')
+        mUpdateInfraPatchingTestConfigParam("cluster", compute_cabinet)
+        mUpdateAdditionalOptionsInPayload("ClusterLess", "yes")
+        self.__launch_node_type = "COMPUTE"
+        mDeleteAdditionalOptionsFromPayload('LaunchNode')
+        mDeleteAdditionalOptionsFromPayload('LaunchNodeType')
+        mExecuteRemoteExasshCmd(
+            "/bin/sed  \\'s/ClientAliveInterval.*/ClientAliveInterval 600/\\' -i /etc/ssh/sshd_config",
+            Test_clusterless_dom0_class.__dom0s)
+
+    @pytest.mark.dom0_patch_prereq_check_patchmgr_failure
+    def test_dom0_patch_prereq_check_patchmgr_failure(self):
+        mExecuteRemoteExasshCmd(
+            "/bin/sed  \\'s/ClientAliveInterval.*/ClientAliveInterval 590/\\' -i /etc/ssh/sshd_config",
+            Test_clusterless_dom0_class.__dom0s)
+        _result, _status_output = mExecuteInfraPatchCommand(TASK_PREREQ_CHECK, PATCH_DOM0, OP_STYLE_AUTO)
+        _status_json = json.loads(_status_output)
+        _error_code = _status_json["errorCode"]
+
+        self.assertEqual(_error_code, "0x03020001", "dom0 precheck didn't fail with expected error code.")
+
+    @pytest.mark.dom0_patch_prereq_check_mgmt_host
+    def test_dom0_patch_prereq_check_mgmt_host(self):
+        mUpdateInfrapatchingConfParam("disable_exacloud_plugin_execution", "True")
+        self.__launch_node_type = "MANAGEMENT_HOST"
+        _compute_cabinet = mGetInfraPatchingTestConfigParam('compute_cabinet')
+        _data = '{"infraType": "CABINET", "infraName": "%s", "launchNodes": "%s", "launchNodeType": "MANAGEMENT_HOST"}' % (
+        _compute_cabinet, mGetInfraPatchingTestConfigParam('management_host_name'))
+        _status, _ = self.__launch_node_handler.mRegisterInfrapatchLaunchNode(_data)
+        self.assertFalse(_status, "Launch node registration failed.")
+
+        # delete patches from mgmt host so that it copies during execution. This will increase a coverage a bit
+        _cmd = "ssh %s 'sudo rm -rf /var/odo/InfraPatchBase/*.zip'" % mGetInfraPatchingTestConfigParam('management_host_name')
+        _out, _stat = mExecuteLocal(_cmd)
+        self.assertEqual(_stat, 0, "Removing directory '/var/odo/InfraPatchBase/*.zip' failed.")
+
+        _result, _status_output = mExecuteInfraPatchCommandWithDCSAgentChecks(TASK_PREREQ_CHECK, PATCH_DOM0,
+                                                                              OP_STYLE_AUTO)
+        mUpdateInfrapatchingConfParam("disable_exacloud_plugin_execution", "False")
+        _status, _ = self.__launch_node_handler.mDeregisterInfrapatchLaunchNode(infraType='CABINET',
+                                                                                infraName=_compute_cabinet)
+        self.assertFalse(_status, "Launch node deregistration failed.")
+        self.assertTrue(_result, "Precheck operation failed.")
+
+    @pytest.mark.dom0_patch_mgmt_host
+    def test_dom0_patch_mgmt_host(self):
+        mUpdateInfrapatchingConfParam("disable_exacloud_plugin_execution", "True")
+        self.__launch_node_type = "MANAGEMENT_HOST"
+        _compute_cabinet = mGetInfraPatchingTestConfigParam('compute_cabinet')
+        _data = '{"infraType": "CABINET", "infraName": "%s", "launchNodes": "%s", "launchNodeType": "MANAGEMENT_HOST"}' % (
+        _compute_cabinet, mGetInfraPatchingTestConfigParam('management_host_name'))
+        _status, _ = self.__launch_node_handler.mRegisterInfrapatchLaunchNode(_data)
+        self.assertFalse(_status, "Launch node registration failed.")
+        _result, _status_output = mExecuteInfraPatchCommandWithDCSAgentChecks(TASK_PATCH, PATCH_DOM0,
+                                                                              OP_STYLE_AUTO)
+        mUpdateInfrapatchingConfParam("disable_exacloud_plugin_execution", "False")
+        _status, _ = self.__launch_node_handler.mDeregisterInfrapatchLaunchNode(infraType='CABINET',
+                                                                                infraName=_compute_cabinet)
+        self.assertFalse(_status, "Launch node deregistration failed.")
+        self.assertTrue(_result, "Patch operation failed.")
+
+    @pytest.mark.dom0_rollback_mgmt_host
+    def test_dom0_rollback_mgmt_host(self):
+        self.__launch_node_type = "MANAGEMENT_HOST"
+        _compute_cabinet = mGetInfraPatchingTestConfigParam('compute_cabinet')
+        _data = '{"infraType": "CABINET", "infraName": "%s", "launchNodes": "%s", "launchNodeType": "MANAGEMENT_HOST"}' % (
+        _compute_cabinet, mGetInfraPatchingTestConfigParam('management_host_name'))
+        _status, _ = self.__launch_node_handler.mRegisterInfrapatchLaunchNode(_data)
+        self.assertFalse(_status, "Launch node registration failed.")
+        _result, _status_output = mExecuteInfraPatchCommandWithDCSAgentChecks(TASK_ROLLBACK, PATCH_DOM0,
+                                                                              OP_STYLE_AUTO)
+        _status, _ = self.__launch_node_handler.mDeregisterInfrapatchLaunchNode(infraType='CABINET',
+                                                                                infraName=_compute_cabinet)
+        self.assertFalse(_status, "Launch node deregistration failed.")
+        self.assertTrue(_result, "Rollback operation failed.")
+
+    @pytest.mark.dom0_patch_prereq_check_with_include_list_compute_host
+    def test_dom0_patch_prereq_check_with_include_list_compute_host(self):
+        # Enabling space validation in precheck
+        self.assertTrue(mUpdateInfrapatchingConfParam("free_space_check_validation_enabled_on_dom0", "True"),
+                        "parameter updation in infrapatching.conf failed.")
+        self.assertTrue(mUpdateInfrapatchingConfParam("enable_stale_mount_check", "True"),
+                        "parameter updation in infrapatching.conf failed.")
+        _dom0s = Test_clusterless_dom0_class.__dom0s
+        _compute_cabinet = mGetInfraPatchingTestConfigParam('compute_cabinet')
+        _data = '{"infraType": "CABINET", "infraName": "%s", "launchNodes": "%s", "launchNodeType": "COMPUTE"}' % (
+        _compute_cabinet, _dom0s[1])
+        _status, _ = self.__launch_node_handler.mRegisterInfrapatchLaunchNode(_data)
+        self.assertFalse(_status, "Launch node registration failed.")
+        self.__operation = TASK_PREREQ_CHECK
+        self.mValidatePatchOperationWithIncludeNodeList()
+        _status, _ = self.__launch_node_handler.mDeregisterInfrapatchLaunchNode(infraType='CABINET',
+                                                                                infraName=_compute_cabinet)
+        self.assertFalse(_status, "Launch node deregistration failed.")
+
+    @pytest.mark.dom0_patch_with_include_list_compute_host
+    def test_dom0_patch_with_include_list_compute_host(self):
+        _dom0s = Test_clusterless_dom0_class.__dom0s
+        self.__operation = TASK_PATCH
+        _compute_cabinet = mGetInfraPatchingTestConfigParam('compute_cabinet')
+        _data = '{"infraType": "CABINET", "infraName": "%s", "launchNodes": "%s", "launchNodeType": "COMPUTE"}' % (_compute_cabinet, _dom0s[1])
+        _status, _ = self.__launch_node_handler.mRegisterInfrapatchLaunchNode(_data)
+        _hostname = _dom0s[0].split('.')[0]
+        _sql = f"update ecs_hw_nodes set node_state='FREE' where oracle_hostname in ('{_hostname}');\ncommit;\n"
+        mExecuteSqlonEcraDb(_sql)
+        self.assertFalse(_status, "Launch node registration failed.")
+        self.mValidatePatchOperationWithIncludeNodeList()
+        _status, _ = self.__launch_node_handler.mDeregisterInfrapatchLaunchNode(infraType='CABINET', infraName=_compute_cabinet)
+        self.assertFalse(_status, "Launch node deregistration failed.")
+        _sql = f"select node_state from ecs_hw_nodes where oracle_hostname in ('{_hostname}');"
+        _sqlout = mExecuteSqlonEcraDb(_sql)
+        _match = False
+        for _s in _sqlout:
+            _match = re.fullmatch(r'FREE',_s)
+            if _match:
+                break;
+        self.assertTrue(_match, "Post patching node state is back to FREE state")
+
+    @pytest.mark.dom0_rollback_with_include_list_compute_host
+    def test_dom0_rollback_with_include_list_compute_host(self):
+        _dom0s = Test_clusterless_dom0_class.__dom0s
+        self.__operation = TASK_ROLLBACK
+        _compute_cabinet = mGetInfraPatchingTestConfigParam('compute_cabinet')
+        _data = '{"infraType": "CABINET", "infraName": "%s", "launchNodes": "%s", "launchNodeType": "COMPUTE"}' % (_compute_cabinet, _dom0s[1])
+        _status, _ = self.__launch_node_handler.mRegisterInfrapatchLaunchNode(_data)
+        self.assertFalse(_status, "Launch node registration failed.")
+        _hostname = _dom0s[0].split('.')[0]
+        _sql = f"update ecs_hw_nodes set node_state='FREE' where oracle_hostname in ('{_hostname}');\ncommit;\n"
+        mExecuteSqlonEcraDb(_sql)
+        self.mValidatePatchOperationWithIncludeNodeList()
+        _status, _ = self.__launch_node_handler.mDeregisterInfrapatchLaunchNode(infraType='CABINET', infraName=_compute_cabinet)
+        self.assertFalse(_status, "Launch node deregistration failed.")
+        _sql = f"select node_state from ecs_hw_nodes where oracle_hostname in ('{_hostname}');"
+        _sqlout = mExecuteSqlonEcraDb(_sql)
+        _match = False
+        for _s in _sqlout:
+            _match = re.fullmatch(r'FREE',_s)
+            if _match:
+                break
+        self.assertTrue(_match, "Post patching node state is back to FREE state")
+
+
+    @pytest.mark.dom0_patch_prereq_check_with_include_list_mgmt_host
+    def test_dom0_patch_prereq_check_with_include_list_mgmt_host(self):
+        # Enabling space validation in precheck
+        self.assertTrue(mUpdateInfrapatchingConfParam("free_space_check_validation_enabled_on_dom0", "True"),
+                        "parameter updation in infrapatching.conf failed.")
+        self.assertTrue(mUpdateInfrapatchingConfParam("enable_stale_mount_check", "True"),
+                        "parameter updation in infrapatching.conf failed.")
+        self.__launch_node_type = "MANAGEMENT_HOST"
+        _compute_cabinet = mGetInfraPatchingTestConfigParam('compute_cabinet')
+        _data = '{"infraType": "CABINET", "infraName": "%s", "launchNodes": "%s", "launchNodeType": "MANAGEMENT_HOST"}' % (
+        _compute_cabinet, mGetInfraPatchingTestConfigParam('management_host_name'))
+        _status, _ = self.__launch_node_handler.mRegisterInfrapatchLaunchNode(_data)
+        self.assertFalse(_status, "Launch node registration failed.")
+        mUpdateInfrapatchingConfParam("disable_exacloud_plugin_execution", "True")
+        self.__operation = TASK_PREREQ_CHECK
+        self.mValidatePatchOperationWithIncludeNodeList()
+        mUpdateInfrapatchingConfParam("disable_exacloud_plugin_execution", "False")
+        _status, _ = self.__launch_node_handler.mDeregisterInfrapatchLaunchNode(infraType='CABINET',
+                                                                                infraName=_compute_cabinet)
+        self.assertFalse(_status, "Launch node deregistration failed.")
+
+    @pytest.mark.dom0_patch_with_include_list_mgmt_host
+    def test_dom0_patch_with_include_list_mgmt_host(self):
+        mUpdateInfrapatchingConfParam("disable_exacloud_plugin_execution", "True")
+        self.__operation = TASK_PATCH
+        self.__launch_node_type = "MANAGEMENT_HOST"
+        _compute_cabinet = mGetInfraPatchingTestConfigParam('compute_cabinet')
+        _data = '{"infraType": "CABINET", "infraName": "%s", "launchNodes": "%s", "launchNodeType": "MANAGEMENT_HOST"}' % (
+        _compute_cabinet, mGetInfraPatchingTestConfigParam('management_host_name'))
+        _status, _ = self.__launch_node_handler.mRegisterInfrapatchLaunchNode(_data)
+        self.assertFalse(_status, "Launch node registration failed.")
+        self.mValidatePatchOperationWithIncludeNodeList()
+        mUpdateInfrapatchingConfParam("disable_exacloud_plugin_execution", "False")
+        _status, _ = self.__launch_node_handler.mDeregisterInfrapatchLaunchNode(infraType='CABINET',
+                                                                                infraName=_compute_cabinet)
+        self.assertFalse(_status, "Launch node deregistration failed.")
+
+    @pytest.mark.dom0_rollback_with_include_list_mgmt_host
+    def test_dom0_rollback_with_include_list_mgmt_host(self):
+        mUpdateInfrapatchingConfParam("disable_exacloud_plugin_execution", "True")
+        self.__operation = TASK_ROLLBACK
+        self.__launch_node_type = "MANAGEMENT_HOST"
+        _compute_cabinet = mGetInfraPatchingTestConfigParam('compute_cabinet')
+        _data = '{"infraType": "CABINET", "infraName": "%s", "launchNodes": "%s", "launchNodeType": "MANAGEMENT_HOST"}' % (
+        _compute_cabinet, mGetInfraPatchingTestConfigParam('management_host_name'))
+        _status, _ = self.__launch_node_handler.mRegisterInfrapatchLaunchNode(_data)
+        self.assertFalse(_status, "Launch node registration failed.")
+        self.mValidatePatchOperationWithIncludeNodeList()
+        mUpdateInfrapatchingConfParam("disable_exacloud_plugin_execution", "False")
+        _status, _ = self.__launch_node_handler.mDeregisterInfrapatchLaunchNode(infraType='CABINET',
+                                                                                infraName=_compute_cabinet)
+        self.assertFalse(_status, "Launch node deregistration failed.")
+
+    """
+    This test is to validate limiting patch sessions on External LaucnchNode is working or not..
+
+    The following are the steps followed in this test
+    1. Set MAX_CONCURRENT_PATCH_SESSIONS_ON_LAUNCHNODE to 1
+    2. Trigger both dom0 and cell prechecks concurrently using MGMT_HOST as the launchnode
+    3. Validate whether second request is failing for insufficient no LaunchNodes 
+    4. Revert back LaunchNode and LaunchNode type back to original values as this test ins run cluster less setup
+    5. Revert back cluster with compute cabinet    
+    """
+    @pytest.mark.dom0_patch_prereq_check_to_validate_multiple_patch_sessions_limit
+    def test_dom0_patch_prereq_check_to_validate_multiple_patch_sessions_limit(self):
+        mUpdateAdditionalOptionsInPayload("LaunchNode", mGetInfraPatchingTestConfigParam('management_host_name'))
+        mUpdateInfrapatchingConfParam("disable_exacloud_plugin_execution", "True")
+        mUpdateAdditionalOptionsInPayload("LaunchNodeType", "MANAGEMENT_HOST")
+        self.__launch_node_type = "MANAGEMENT_HOST"
+        mSetECRAProperty("MAX_CONCURRENT_PATCH_SESSIONS_ON_LAUNCHNODE", "1")
+        _cell_cabinet = mGetInfraPatchingTestConfigParam('cell_cabinet')
+        _compute_cabinet = mGetInfraPatchingTestConfigParam('compute_cabinet')
+
+        import concurrent.futures
+
+        # send 3 concurrent precheck requests
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            f1 = executor.submit(mExecuteInfraPatchCommand, aOperation=TASK_PREREQ_CHECK, aTarget=PATCH_DOM0,
+                                 aOperationStyle=OP_STYLE_AUTO)
+            time.sleep(5)
+            mUpdateInfraPatchingTestConfigParam("cluster", _cell_cabinet)
+            f2 = executor.submit(mExecuteInfraPatchCommand, aOperation=TASK_PREREQ_CHECK, aTarget=PATCH_CELL,
+                                 aOperationStyle=OP_STYLE_AUTO)
+
+            _ret1, _status_output1 = f1.result()
+            _ret2, _status_output2 = f2.result()
+
+        mUpdateInfraPatchingTestConfigParam("cluster", _compute_cabinet)
+        mSetECRAProperty("MAX_CONCURRENT_PATCH_SESSIONS_ON_LAUNCHNODE", "2")
+        mUpdateAdditionalOptionsInPayload("LaunchNode", "")
+        self.assertTrue(_ret1, "precheck operation failed.")
+
+        _status_json = json.loads(_status_output2)
+        _errorcode = _status_json["errorCode"]
+        # Insufficient LaunchNode for cell patching
+        self.assertEqual(_errorcode, "0x030E0024", "Incorrect error code is returned..")
+
+
+    def mValidatePatchOperationWithIncludeNodeList(self):
+        """
+        First run patch operation in first dom0 and then run patch operation in all dom0s.
+        The second iteration is to cover the scenario of filter node list in infrapatching backend
+        for precheck/patch/rollback scenario.
+        """
+        _dom0s = Test_clusterless_dom0_class.__dom0s
+        # Run patch operation with first dom0
+        _include_node_list = ",".join(_dom0s[:1])
+        mUpdateAdditionalOptionsInPayload("IncludeNodeList", _include_node_list)
+        self.__required_nodes_in_node_progress_status = [_dom0s[0]]
+        self.__non_required_nodes_in_node_progress_status = [_dom0s[1]]
+        self.__patch_node_list = [_dom0s[0]]
+
+        if self.__operation in [TASK_ONEOFF, TASK_ONEOFFV2]:
+            # Use custom script in first iteration and default script in second iteration, so default script here.
+            self.mExecuteAndValidateOneoffOperation()
+        else:
+            self.mExecuteAndValidatePatchOperationWithExacloudPlugins()
+
+            # Postchecks are internal infra tests and not execute via patchmgr cmds
+            # hence time profile details won't be available
+            if not self.__operation == TASK_POSTCHECK and self.__launch_node_type == 'COMPUTE':
+                # Capturing time profile diff only for single dom0
+                _copy_time_profile_diff_data = mCopyTimeStatsFileForTimeDiffAnalysis(
+                    self.__patch_operation_status_output)
+                self.assertEqual(_copy_time_profile_diff_data, EXIT_SUCCESS, "Copying time profile data failed.")
+
+    def mExecuteAndValidatePatchOperationWithExacloudPlugins(self):
+        _updated_patch_list = []
+        _disable_exacloud_plugin_execution = (
+                mGetInfraPatchingTestConfigParam('disable_exacloud_plugin_execution') == 'True')
+
+        if not _disable_exacloud_plugin_execution:
+            # plugin execution need to be done only for patch operation
+            # In case of non-rolling, custom scripts are staged to dom0/domus before even start of cell patching test
+            if self.__operation in [TASK_PATCH] and self.__operation_style != OP_STYLE_NON_ROLLING:
+                mUpdateParamInPayload("EnablePlugins", "yes")
+                mUpdateParamInPayload("PluginTypes", "dom0+dom0domu")
+                self.assertTrue(mStageCustomPluginScripts(Test_clusterless_dom0_class.__target_name),
+                                "Staging custom scripts failed for exacloud plugin execution.")
+
+        # we get the latest timestamp from dbnu plugin log from here and pass it to verify_dbnu_plugin_logs method
+        # This to check the messages post the given time stamp for the execution logs where dbnu plugins are executed in the latest run
+        _plugin_log = "/var/log/exadatatmp/dbnu-plugin.log"
+        _exacloud_path = mGetExacloudInstallPath()
+        _exassh_bin_path = "%s/bin/exassh" % _exacloud_path
+        _cmd = "tail -1 %s | cut -c1-20" % _plugin_log
+        _exassh_cmd = "%s %s -sl -e %s" % (_exassh_bin_path, Test_clusterless_dom0_class.__dom0s[0], _cmd)
+        _time_stamp, _stat = mExecuteLocal(_exassh_cmd)
+        if _stat != 0:
+            self.assertTrue(_stat, "Problem while getting timestamp from plugin log %s on %s" % (
+                _plugin_log, [Test_clusterless_dom0_class.__dom0s[0]]))
+
+        self.__patch_operation_status_result, self.__patch_operation_status_output = \
+            mExecuteInfraPatchCommandWithDCSAgentChecks(self.__operation, Test_clusterless_dom0_class.__target_name,
+                                                        self.__operation_style)
+        self.assertTrue(self.__patch_operation_status_result,
+                        "%s operation failed." % (self.__operation.capitalize()))
+
+        # Postchecks are internal infra tests and not execute via patchmgr cmds
+        if not self.__operation == TASK_POSTCHECK and self.__launch_node_type == 'COMPUTE':
+            _updated_patch_list = mGetNodesWithPatchOperation(self.__patch_operation_status_output)
+            if self.__operation == TASK_PATCH and Test_clusterless_dom0_class.__dom0s[0] in _updated_patch_list:
+                self.verify_dbnu_plugin_logs(_time_stamp)
+
+            if not _disable_exacloud_plugin_execution:
+                # plugin execution need to be done only for patch and rollback operation
+                if self.__operation in [TASK_PATCH, TASK_ROLLBACK]:
+                    _exacloud_plugin_script_execution_validator = ExacloudPluginScriptExecutionValidator(
+                        Test_clusterless_dom0_class.__target_name,
+                        self.__operation,
+                        self.__operation_style)
+                    self.assertTrue(
+                        _exacloud_plugin_script_execution_validator.mValidate(self.__patch_operation_status_output,
+                                                                              _updated_patch_list),
+                        "Exacloud plugin execution failed.")
+
+            self.assertTrue(
+                mCheckNodesPresenceInNodeProgressStatus(self.__patch_operation_status_output,
+                                                        _updated_patch_list,
+                                                        self.__non_required_nodes_in_node_progress_status),
+                "Either expected nodes are not present or unexpected nodes are present in node_progress_status.")
+
+            _time_profile_data_validator = TimeProfileDataValidator(Test_clusterless_dom0_class.__target_name,
+                                                                    self.__operation, self.__operation_style)
+            # Need to pass nodes where actual patching happens and nodes where patching does not happen (Test_clusterless_dom0_class.__dom0s-self.__patch_node_list)
+            self.assertTrue(
+                _time_profile_data_validator.mValidate(self.__patch_operation_status_output, _updated_patch_list,
+                                                       [i for i in Test_clusterless_dom0_class.__dom0s if
+                                                        i not in _updated_patch_list]),
+                "time_profile_data validation failed.")
+
+    def mExecuteAndValidateOneoffOperation(self, aUseDefaultScript=True):
+        if not aUseDefaultScript and self.__operation != TASK_ONEOFFV2:
+            _one_off_script_file_path = mCreateOneOffScriptFile(self.__operation)
+            if not _one_off_script_file_path:
+                self.assertTrue(False, "Failed to create one-off script file.")
+            mUpdateAdditionalOptionsInPayload("OneoffCustomPluginFile", _one_off_script_file_path)
+
+        mUpdateAdditionalOptionsInPayload("OneoffScriptArgs", "stage=Pre,EXACS=yes,root_access=True")
+        mUpdateParamInPayload("BackupMode", "no")
+        self.__patch_operation_status_result, self.__patch_operation_status_output = \
+            mExecuteInfraPatchCommandWithDCSAgentChecks(self.__operation, Test_clusterless_dom0_class.__target_name,
+                                                        self.__operation_style)
+        self.assertTrue(self.__patch_operation_status_result,
+                        "%s operation failed." % (self.__operation.capitalize()))
+
+        _script_execution_validator = OneOffPluginScriptExecutionValidator(Test_clusterless_dom0_class.__target_name,
+                                                                           self.__operation,
+                                                                           self.__operation_style)
+        self.assertTrue(_script_execution_validator.mValidate(self.__patch_operation_status_output,
+                                                              self.__patch_node_list),
+                        "One-off script execution failed.")
+
+    def verify_dbnu_plugin_logs(self, timeStamp):
+        # This method will check for the required_messages if they are present in the dbnu log after given timeStamp
+
+        _required_messages = [
+            "[vm_serial_console script execution successful, Exit Status : 0]",
+            "[dbnu Plugin Message] : Custom plugin upgrade run completed with success."
+        ]
+
+        # ignore known failure messages
+        _ignore_failures_x9 = [
+            "[IPrules dbnu Plugin Message] : FILE vif-bridge.EBT DOES NOT EXIST, SYMLINK COULD NOT BE RESTORED",
+            "[dbnu Plugin Message] : Custom plugin upgrade run completed with success."
+        ]
+
+        _plugin_log = "/var/log/exadatatmp/dbnu-plugin.log"
+        _exacloud_path = mGetExacloudInstallPath()
+        _exassh_bin_path = "%s/bin/exassh" % _exacloud_path
+        # print the content of file by removing all lines from the beginning of a file up to the last occurrence of given timeStamp
+        # Ex: sed '1,$(grep -n "Wed May 22 23:08:15" /var/log/exadatatmp/dbnu-plugin.log | tail -1 | cut -d: -f1)d' /var/log/exadatatmp/dbnu-plugin.log
+        _cmd = "sed '1,$(grep -n \"%s\" %s | tail -1 | cut -d: -f1)d' %s" % (timeStamp, _plugin_log, _plugin_log)
+        _exassh_cmd = "%s %s -sl -e %s" % (_exassh_bin_path, Test_clusterless_dom0_class.__dom0s[0], _cmd)
+        _logs, _stat = mExecuteLocal(_exassh_cmd)
+        if _stat != 0:
+            self.assertTrue(_stat, "Problem while getting plugin log %s from %s" % (
+                _plugin_log, [Test_clusterless_dom0_class.__dom0s[0]]))
+
+        # Find missing messages
+        _missing_messages = [_msg for _msg in _required_messages if _msg not in _logs]
+
+        if mGetInfraPatchingTestConfigParam("is_r1_env") == "True":
+            # Remove ignored messages for x9 rack
+            _missing_messages = [_msg for _msg in _missing_messages if _msg not in _ignore_failures_x9]
+
+        _messages_missing = len(_missing_messages) > 0
+        self.assertFalse(_messages_missing, "Following messages are not found in %s log of %s after %s : \n%s" % (
+        _plugin_log, Test_clusterless_dom0_class.__dom0s[0], timeStamp, _missing_messages))

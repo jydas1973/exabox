@@ -1,0 +1,195 @@
+table ip filter { # handle 55
+	chain INPUT { # handle 1
+		type filter hook input priority filter; policy accept;
+		iifname "lo" counter accept # handle 10
+		iifname "vmeth0" counter accept # handle 11
+		icmp type echo-request counter accept # handle 12
+		icmp type echo-request counter accept # handle 13
+		limit rate 2/minute counter log prefix "IPTables-INPUT Dropped: " # handle 14
+		counter drop # handle 15
+	}
+
+	chain FORWARD { # handle 2
+		type filter hook forward priority filter; policy drop;
+		oifname "vmeth100" meta l4proto tcp ct state established,related counter accept # handle 18
+		oifname "vmeth100" meta l4proto icmp ct state established,related counter accept # handle 19
+		iifname "vmeth100" meta l4proto tcp ct state established,related counter accept # handle 20
+		iifname "vmeth100" meta l4proto icmp ct state established,related counter accept # handle 21
+		oifname "vmeth100" tcp dport 22 counter accept # handle 22
+		oifname "vmeth100" icmp type echo-request counter accept # handle 23
+		oifname "vmeth100" tcp dport 7060 counter accept # handle 24
+		oifname "vmeth100" tcp dport 7070 counter accept # handle 25
+		oifname "vmeth100" tcp dport 7090 counter accept # handle 26
+		oifname "vmeth200" meta l4proto tcp ct state established,related counter accept # handle 27
+		oifname "vmeth200" meta l4proto icmp ct state established,related counter accept # handle 28
+		iifname "vmeth200" meta l4proto tcp ct state established,related counter accept # handle 29
+		iifname "vmeth200" meta l4proto icmp ct state established,related counter accept # handle 30
+		oifname "vmeth200" tcp dport 22 counter accept # handle 31
+		oifname "vmeth200" icmp type echo-request counter accept # handle 32
+		oifname "vmeth200" tcp dport 7060 counter accept # handle 33
+		oifname "vmeth200" tcp dport 7070 counter accept # handle 34
+		oifname "vmeth200" tcp dport 7090 counter accept # handle 35
+		oifname "vmeth201" meta l4proto tcp ct state established,related counter accept # handle 36
+		oifname "vmeth201" meta l4proto icmp ct state established,related counter accept # handle 37
+		iifname "vmeth201" meta l4proto tcp ct state established,related counter accept # handle 38
+		iifname "vmeth201" meta l4proto icmp ct state established,related counter accept # handle 39
+		oifname "vmeth201" tcp dport 22 counter accept # handle 40
+		oifname "vmeth201" icmp type echo-request counter accept # handle 41
+		oifname "vmeth201" tcp dport 7060 counter accept # handle 42
+		oifname "vmeth201" tcp dport 7070 counter accept # handle 43
+		oifname "vmeth201" tcp dport 7090 counter accept # handle 44
+		oifname "vmeth202" meta l4proto tcp ct state established,related counter accept # handle 45
+		oifname "vmeth202" meta l4proto icmp ct state established,related counter accept # handle 46
+		iifname "vmeth202" meta l4proto tcp ct state established,related counter accept # handle 47
+		iifname "vmeth202" meta l4proto icmp ct state established,related counter accept # handle 48
+		oifname "vmeth202" tcp dport 22 counter accept # handle 49
+		oifname "vmeth202" icmp type echo-request counter accept # handle 50
+		oifname "vmeth202" tcp dport 7060 counter accept # handle 51
+		oifname "vmeth202" tcp dport 7070 counter accept # handle 52
+		oifname "vmeth202" tcp dport 7090 counter accept # handle 53
+		oifname "vmeth203" meta l4proto tcp ct state established,related counter accept # handle 54
+		oifname "vmeth203" meta l4proto icmp ct state established,related counter accept # handle 55
+		iifname "vmeth203" meta l4proto tcp ct state established,related counter accept # handle 56
+		iifname "vmeth203" meta l4proto icmp ct state established,related counter accept # handle 57
+		oifname "vmeth203" tcp dport 22 counter accept # handle 58
+		oifname "vmeth203" icmp type echo-request counter accept # handle 59
+		oifname "vmeth203" tcp dport 7060 counter accept # handle 60
+		oifname "vmeth203" tcp dport 7070 counter accept # handle 61
+		oifname "vmeth203" tcp dport 7090 counter accept # handle 62
+		oifname "vmeth204" meta l4proto tcp ct state established,related counter accept # handle 63
+		oifname "vmeth204" meta l4proto icmp ct state established,related counter accept # handle 64
+		iifname "vmeth204" meta l4proto tcp ct state established,related counter accept # handle 65
+		iifname "vmeth204" meta l4proto icmp ct state established,related counter accept # handle 66
+		oifname "vmeth204" tcp dport 22 counter accept # handle 67
+		oifname "vmeth204" icmp type echo-request counter accept # handle 68
+		oifname "vmeth204" tcp dport 7060 counter accept # handle 69
+		oifname "vmeth204" tcp dport 7070 counter accept # handle 70
+		oifname "vmeth204" tcp dport 7090 counter accept # handle 71
+		oifname "vmeth205" meta l4proto tcp ct state established,related counter accept # handle 72
+		oifname "vmeth205" meta l4proto icmp ct state established,related counter accept # handle 73
+		iifname "vmeth205" meta l4proto tcp ct state established,related counter accept # handle 74
+		iifname "vmeth205" meta l4proto icmp ct state established,related counter accept # handle 75
+		oifname "vmeth205" tcp dport 22 counter accept # handle 76
+		oifname "vmeth205" icmp type echo-request counter accept # handle 77
+		oifname "vmeth205" tcp dport 7060 counter accept # handle 78
+		oifname "vmeth205" tcp dport 7070 counter accept # handle 79
+		oifname "vmeth205" tcp dport 7090 counter accept # handle 80
+		oifname "vmeth206" meta l4proto tcp ct state established,related counter accept # handle 81
+		oifname "vmeth206" meta l4proto icmp ct state established,related counter accept # handle 82
+		iifname "vmeth206" meta l4proto tcp ct state established,related counter accept # handle 83
+		iifname "vmeth206" meta l4proto icmp ct state established,related counter accept # handle 84
+		oifname "vmeth206" tcp dport 22 counter accept # handle 85
+		oifname "vmeth206" icmp type echo-request counter accept # handle 86
+		oifname "vmeth206" tcp dport 7060 counter accept # handle 87
+		oifname "vmeth206" tcp dport 7070 counter accept # handle 88
+		oifname "vmeth206" tcp dport 7090 counter accept # handle 89
+		oifname "vmeth207" meta l4proto tcp ct state established,related counter accept # handle 90
+		oifname "vmeth207" meta l4proto icmp ct state established,related counter accept # handle 91
+		iifname "vmeth207" meta l4proto tcp ct state established,related counter accept # handle 92
+		iifname "vmeth207" meta l4proto icmp ct state established,related counter accept # handle 93
+		oifname "vmeth207" tcp dport 22 counter accept # handle 94
+		oifname "vmeth207" icmp type echo-request counter accept # handle 95
+		oifname "vmeth207" tcp dport 7060 counter accept # handle 96
+		oifname "vmeth207" tcp dport 7070 counter accept # handle 97
+		oifname "vmeth207" tcp dport 7090 counter accept # handle 98
+		oifname "vmeth208" meta l4proto tcp ct state established,related counter accept # handle 99
+		oifname "vmeth208" meta l4proto icmp ct state established,related counter accept # handle 100
+		iifname "vmeth208" meta l4proto tcp ct state established,related counter accept # handle 101
+		iifname "vmeth208" meta l4proto icmp ct state established,related counter accept # handle 102
+		oifname "vmeth208" tcp dport 22 counter accept # handle 103
+		oifname "vmeth208" icmp type echo-request counter accept # handle 104
+		oifname "vmeth208" tcp dport 7060 counter accept # handle 105
+		oifname "vmeth208" tcp dport 7070 counter accept # handle 106
+		oifname "vmeth208" tcp dport 7090 counter accept # handle 107
+		oifname "vmeth209" meta l4proto tcp ct state established,related counter accept # handle 108
+		oifname "vmeth209" meta l4proto icmp ct state established,related counter accept # handle 109
+		iifname "vmeth209" meta l4proto tcp ct state established,related counter accept # handle 110
+		iifname "vmeth209" meta l4proto icmp ct state established,related counter accept # handle 111
+		oifname "vmeth209" tcp dport 22 counter accept # handle 112
+		oifname "vmeth209" icmp type echo-request counter accept # handle 113
+		oifname "vmeth209" tcp dport 7060 counter accept # handle 114
+		oifname "vmeth209" tcp dport 7070 counter accept # handle 115
+		oifname "vmeth209" tcp dport 7090 counter accept # handle 116
+		oifname "vmeth210" meta l4proto tcp ct state established,related counter accept # handle 117
+		oifname "vmeth210" meta l4proto icmp ct state established,related counter accept # handle 118
+		iifname "vmeth210" meta l4proto tcp ct state established,related counter accept # handle 119
+		iifname "vmeth210" meta l4proto icmp ct state established,related counter accept # handle 120
+		oifname "vmeth210" tcp dport 22 counter accept # handle 121
+		oifname "vmeth210" icmp type echo-request counter accept # handle 122
+		oifname "vmeth210" tcp dport 7060 counter accept # handle 123
+		oifname "vmeth210" tcp dport 7070 counter accept # handle 124
+		oifname "vmeth210" tcp dport 7090 counter accept # handle 125
+		oifname "vmeth211" meta l4proto tcp ct state established,related counter accept # handle 126
+		oifname "vmeth211" meta l4proto icmp ct state established,related counter accept # handle 127
+		iifname "vmeth211" meta l4proto tcp ct state established,related counter accept # handle 128
+		iifname "vmeth211" meta l4proto icmp ct state established,related counter accept # handle 129
+		oifname "vmeth211" tcp dport 22 counter accept # handle 130
+		oifname "vmeth211" icmp type echo-request counter accept # handle 131
+		oifname "vmeth211" tcp dport 7060 counter accept # handle 132
+		oifname "vmeth211" tcp dport 7070 counter accept # handle 133
+		oifname "vmeth211" tcp dport 7090 counter accept # handle 134
+		oifname "vmeth212" meta l4proto tcp ct state established,related counter accept # handle 135
+		oifname "vmeth212" meta l4proto icmp ct state established,related counter accept # handle 136
+		iifname "vmeth212" meta l4proto tcp ct state established,related counter accept # handle 137
+		iifname "vmeth212" meta l4proto icmp ct state established,related counter accept # handle 138
+		oifname "vmeth212" tcp dport 22 counter accept # handle 139
+		oifname "vmeth212" icmp type echo-request counter accept # handle 140
+		oifname "vmeth212" tcp dport 7060 counter accept # handle 141
+		oifname "vmeth212" tcp dport 7070 counter accept # handle 142
+		oifname "vmeth212" tcp dport 7090 counter accept # handle 143
+		oifname "vmeth213" meta l4proto tcp ct state established,related counter accept # handle 144
+		oifname "vmeth213" meta l4proto icmp ct state established,related counter accept # handle 145
+		iifname "vmeth213" meta l4proto tcp ct state established,related counter accept # handle 146
+		iifname "vmeth213" meta l4proto icmp ct state established,related counter accept # handle 147
+		oifname "vmeth213" tcp dport 22 counter accept # handle 148
+		oifname "vmeth213" icmp type echo-request counter accept # handle 149
+		oifname "vmeth213" tcp dport 7060 counter accept # handle 150
+		oifname "vmeth213" tcp dport 7070 counter accept # handle 151
+		oifname "vmeth213" tcp dport 7090 counter accept # handle 152
+		oifname "vmeth214" meta l4proto tcp ct state established,related counter accept # handle 153
+		oifname "vmeth214" meta l4proto icmp ct state established,related counter accept # handle 154
+		iifname "vmeth214" meta l4proto tcp ct state established,related counter accept # handle 155
+		iifname "vmeth214" meta l4proto icmp ct state established,related counter accept # handle 156
+		oifname "vmeth214" tcp dport 22 counter accept # handle 157
+		oifname "vmeth214" icmp type echo-request counter accept # handle 158
+		oifname "vmeth214" tcp dport 7060 counter accept # handle 159
+		oifname "vmeth214" tcp dport 7070 counter accept # handle 160
+		oifname "vmeth214" tcp dport 7090 counter accept # handle 161
+		oifname "vmeth215" meta l4proto tcp ct state established,related counter accept # handle 162
+		oifname "vmeth215" meta l4proto icmp ct state established,related counter accept # handle 163
+		iifname "vmeth215" meta l4proto tcp ct state established,related counter accept # handle 164
+		iifname "vmeth215" meta l4proto icmp ct state established,related counter accept # handle 165
+		oifname "vmeth215" tcp dport 22 counter accept # handle 166
+		oifname "vmeth215" icmp type echo-request counter accept # handle 167
+		oifname "vmeth215" tcp dport 7060 counter accept # handle 168
+		oifname "vmeth215" tcp dport 7070 counter accept # handle 169
+		oifname "vmeth215" tcp dport 7090 counter accept # handle 170
+		limit rate 2/minute counter log prefix "IPTables-FORWARD Dropped: " # handle 171
+		counter jump vm_ol8clu1-xr2jp1 # handle 191
+	}
+
+	chain OUTPUT { # handle 3
+		type filter hook output priority filter; policy accept;
+		oifname "lo" counter accept # handle 175
+		oifname "vmeth0" counter accept # handle 176
+		icmp type echo-request counter accept # handle 177
+	}
+
+	chain trace_chain { # handle 188
+		type filter hook prerouting priority filter - 1; policy accept;
+		meta nftrace set 1 # handle 189
+	}
+
+	chain vm_ol8clu1-xr2jp1 { # handle 190
+		oifname "vmbondeth0.1" ip saddr 169.254.169.254 tcp dport 7060 counter accept # handle 192
+		oifname "vmbondeth0.1" ip saddr 169.254.169.254 tcp dport 7070 counter accept # handle 193
+		oifname "vmbondeth0.1" tcp dport 7060 counter drop # handle 194
+		oifname "vmbondeth0.2" tcp dport 7060 counter drop # handle 195
+		oifname "vmbondeth0.1" tcp dport 7070 counter drop # handle 196
+		oifname "vmbondeth0.2" tcp dport 7070 counter drop # handle 197
+		iifname "vmbondeth0.2" counter accept # handle 198
+		oifname "vmbondeth0.2" counter accept # handle 199
+		iifname "vmbondeth0.1" counter accept # handle 200
+		oifname "vmbondeth0.1" counter accept # handle 201
+	}
+}

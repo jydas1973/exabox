@@ -1,0 +1,31 @@
+table ip filter { # handle 2
+    chain INPUT { # handle 1
+    }
+
+    chain OUTPUT { # handle 2
+    }
+
+    chain FORWARD { # handle 3
+        counter packets 0 bytes 0 jump vm_scaqab10adm01nat08 # handle 5
+    }
+
+    chain vm_scaqab10adm01nat08 { # handle 4
+        ct state established,related counter packets 0 bytes 0 accept # handle 6
+        oifname "vifX.1" ip saddr 169.254.169.254 tcp dport 7060 counter packets 0 bytes 0 accept # handle 7
+        oifname "vifX.1" ip saddr 169.254.169.254 tcp dport 7070 counter packets 0 bytes 0 accept # handle 8
+        oifname "vifX.1" tcp dport 7060 counter packets 0 bytes 0 drop # handle 9
+        oifname "vifX.2" tcp dport 7060 counter packets 0 bytes 0 drop # handle 10
+        oifname "vifX.1" tcp dport 7070 counter packets 0 bytes 0 drop # handle 11
+        oifname "vifX.2" tcp dport 7070 counter packets 0 bytes 0 drop # handle 12
+        iifname "vifX.2" counter packets 0 bytes 0 accept # handle 13
+        oifname "vifX.2" counter packets 0 bytes 0 accept # handle 14
+        iifname "vifX.1" counter packets 0 bytes 0 accept # handle 15
+        oifname "vifX.1" counter packets 0 bytes 0 accept # handle 16
+    }
+}
+table ip FORWARD { # handle 3
+}
+table ip INPUT { # handle 4
+}
+table ip OUTPUT { # handle 5
+}

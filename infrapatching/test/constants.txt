@@ -1,0 +1,124 @@
+#
+# $Header: ecs/exacloud/exabox/infrapatching/test/constants.txt /main/18 2025/01/17 05:22:26 emekala Exp $
+#
+# constants.py
+#
+# Copyright (c) 2020, 2024, Oracle and/or its affiliates.
+#
+#    NAME
+#      constants.py - Contains all the constants used in test code.
+#
+#    DESCRIPTION
+#      This contains all the constants used in test code.
+#
+#    NOTES
+#      This contains all the constants used in util and testcases code.
+#
+#    MODIFIED   (MM/DD/YY)
+#    emekala     12/12/24 - ENH 37374442 - SUPPORT INFRA PATCH MOCK FWK TO
+#                           ACCEPT MOCK RESPONSE IN JSON FORMAT VIA REST API
+#    araghave    12/10/24 - Enh 37241595 - TEST CHANGES TO REPLACE ALL IBSWITCH
+#                           REFERENCE WITH GENERIC SWITCH REFERENCES IN INFRA
+#                           PATCHING TEST CODE
+#    araghave    07/16/24 - Enh 36830077 - CLEANUP KSPLICE CODE FROM
+#                           INFRAPATCHING FILES
+#    apotluri    06/21/24 - Enhancement Request 36750543 - PYTHON UPGRADE -
+#                           INFRAPATCHING FILES SHOULD HAVE DYNAMICALLY SET
+#                           PYTHON PATHS TO AVOID REGRESSIONS
+#    sdevasek    03/25/24 - Enh 36317237 - TEST AUTOMATION - ADD TEST FOR
+#                           ONEOFF V2 IMPLEMENTATION
+#    emekala     01/22/24 - ENH 36094940 - Support ECRA mock mode for
+#                           Infrapatching operations
+#    sdevasek    12/15/23 - Enh 36097928 - ADDITION OF TESTS TO MODIFY DEFAULT
+#                           INFRAPATCHING.CONF PARAMS TO INCREASE CODE COVERAGE
+#    emekala     03/28/23 - Enh 35000319 - TEST ADDITION TO VALIDATE EXASPLICE
+#                           SCENARIO IN INFRAPATCHING AUTOMATION
+#    hbpatel     16/02/23 - ENH 34976382 - INFRAPATCHING AUTOMATION TO DETECT
+#                           AND REPORT IF TIME DURATION CHANGE FOR ANY STAGE
+#                           IS MORE THAN 10 MINS BETWEEN LAST TWO SUCCESSFUL RUNS
+#    sdevasek    04/26/22 - ENH 34108685 - ADD RETRY MECHANISM TO EXECUTE PATCH
+#                           COMMANDS FOR CERTAIN FAILURES IN AUTOMATION
+#    sdevasek    04/21/22 - ENH 34088744 - ENABLE TESTS FOR KSPLICE AND ONEOFF
+#                           OPERATIONS IN INFRAPTACHING AUTOMATION
+#    sdevasek    03/10/22 - Enh-33913390 - ENABLE EXACLOUD AGENT TO
+#                           CAPTURE CODE COVERAGE IN AUTOMATION
+#    sdevasek    02/04/22 - Enh-33819329 - TEST ADDITION TO THE INFRAPATCHING
+#                           AUTOMATION FOR INCLUDELIST FEATURE
+#    sdevasek    12/03/21 - Enh-33310641 - TEST ADDITION TO THE INFRAPATCHING
+#                           AUTOMATION FOR DCS AGENT BASED SANITY CHECKS
+#    sdevasek    11/23/21 - Enh33504205 - IMAGE REFRESHING INCLUSION IN
+#                           INFRAPATCHING AUTOMATION
+#    nmallego    10/25/21 - Bug-33310632 - Test for non-rolling upgrade
+#    sdevasek    09/13/21 - Enh 32929805 - Infrapatching CI/CD pipeline
+#                           implementation
+#    sdevasek    08/16/21 - Creation
+#
+
+
+#All Tasks
+TASK_PREREQ_CHECK = "patch_prereq_check"
+TASK_PATCH = "patch"
+TASK_POSTCHECK = "postcheck"
+TASK_ROLLBACK_PREREQ_CHECK = "rollback_prereq_check"
+TASK_ROLLBACK = "rollback"
+TASK_BACKUP_IMAGE = "backup_image"
+TASK_PRECHECK = "precheck"
+TASK_ONEOFF = "oneoff"
+TASK_ONEOFFV2 = "oneoffv2"
+TASK_EXASPLICE = "exasplice"
+
+#All Targets
+PATCH_DOM0 = "dom0"
+PATCH_CELL = "cell"
+PATCH_IBSWITCH = "ibswitch"
+PATCH_ROCESWITCH = "roceswitch"
+PATCH_DOMU = "domu"
+OP_STYLE_NON_ROLLING = "non-rolling"
+OP_STYLE_ROLLING = "rolling"
+OP_STYLE_AUTO = "auto"
+SANITY_CHECK_SCOPE_VM = "VM"
+SANITY_CHECK_SCOPE_CLUSTER = "CLUSTER"
+
+#Plugin Types
+EXACLOUD_PLUGIN = "exacloud"
+DBNU_PLUGIN = "dbnu"
+ONEOFF_PLUGIN = "oneoff"
+
+EXIT_SUCCESS = 0
+EXIT_FAILURE = 1
+TEST_PAYLOAD_FILE = "config/payload.json"
+TEST_INFRAPATCHING_CONFIG_FILE_LOCATION = "config/test_infrapatching.conf"
+TIME_DIFF_THRESHOLD_IN_SECONDS = 10*60 # minutes*seconds
+INFRAPATCHING_CONFIG_FILE_LOCATION = "exabox/infrapatching/config/infrapatching.conf"
+
+#Tests are executed from /scratch/xyz/ecra_installs/ebase/mw_home/user_projects/domains/exacloud/exabox/infrapatching/test
+#Thread logs are in /scratch/xyz/ecra_installs/ebase/mw_home/user_projects/domains/exacloud/log/threads/0000-0000-0000-0000
+RELATIVE_PATH_OF_EXACLOUD_THREAD_LOG_LOCATION_FROM_TEST_EXECUTION = "/../../../log/threads/0000-0000-0000-0000/"
+
+HTTP_202_RESPONSE_CODE = "HTTP/1.1 202 Accepted"
+HTTP_200_RESPONSE_CODE = "HTTP/1.1 200 OK"
+STATUS_URI = "status_uri"
+EXADATA_PATCHMGR_CONSOLE_READ_TIMEOUT_SEC = 82800
+SLEEP_TIME_BETWEEN_PATCH_EXECUTION_RETRIES_IN_SECONDS = 30
+PATCH_TEST_HANDLER = "PatchTestHandler"
+
+# Code coverage related constants
+COV_DATA_PRESERVE_DIRECTORY = "cov_data"
+PROXY = "http://www-proxy.us.oracle.com:80/"
+COVERAGE_PACKAGE = "coverage==5.0.3"
+
+# Mock mode related constants
+SUPPORTED_MOCK_MODE_TYPES = ['exacloud']
+ECRA_MOCK_PROPERTY_NAMES = ['MOCKEXACLOUD']
+EXACLOUD_MOCK_PROPERTY_NAMES = ['mock_mode_patch']
+SUPPORTED_MOCK_TARGETS = ['cell', 'dom0', 'domu', 'ibswitch', 'switch']
+SUPPORTED_MOCK_OPERATIONS = ['patch_prereq_check', 'patch', 'postcheck', 'rollback_prereq_check', 'oneoff']
+SUPPORTED_MOCK_OPERATION_STYLES = ['rolling', 'non-rolling', 'auto']
+DOMAINS_FOLDER = "mw_home/user_projects/domains"
+EXACLOUD_LOG_FOLDER = "{domainsFolder}/exacloud/log".format(domainsFolder=DOMAINS_FOLDER)
+INFRAPATCHING_LOG_FOLDER = "{exacloudLogFolder}/threads/0000-0000-0000-0000/00000000-0000-0000-0000-000000000000".format(exacloudLogFolder=EXACLOUD_LOG_FOLDER)
+MOCK_LOG_FOLDER = "{infrapatchingLogFolder}/mock".format(infrapatchingLogFolder=INFRAPATCHING_LOG_FOLDER)
+ECRADB_DEPLOYMENT_FILE = "deployment/deployment.readme"
+
+# Infrapatching custom mock patch json file capturing mock rack and response details. Its placed under exacloud/config/
+CUSTOM_MOCK_PATCH_FILE_NAME = "custom_mock_patch.json"

@@ -1,0 +1,630 @@
+2022-10-17 09:57:10-0700 - INFO - ECS Version: ECS_22.3.1.0.0_LINUX.X64_221009.0901
+2022-10-17 09:57:10-0700 - INFO - Dispatching UUID: bceca276-4e3c-11ed-a829-52540094717e
+2022-10-17 09:57:10-0700 - INFO - Assign worker Port: 9105 PID: 305170
+2022-10-17 09:57:10-0700 - INFO - Using ExaKms of type: <exabox.exakms.ExaKmsKeysDB.ExaKmsKeysDB object at 0x7f4501e56048>
+2022-10-17 09:57:10-0700 - INFO - *** init: ui_oedaxml disable
+2022-10-17 09:57:10-0700 - INFO - *** FEDRAMP FEATURE DISABLE
+2022-10-17 09:57:10-0700 - INFO - _stagesh_path : /opt/oci/exacc/exacloud/oeda/stage.sh
+2022-10-17 09:57:10-0700 - INFO -  self.__oeda_path : /opt/oci/exacc/exacloud/oeda/requests/bceca276-4e3c-11ed-a829-52540094717e
+2022-10-17 09:57:10-0700 - INFO - *** CTX_REG_NATHN _natHN_iad156921exd01vm1.oraclecloud.internal : scaqan03dv0311m.us.oracle.com
+2022-10-17 09:57:10-0700 - INFO - *** CTX_REG_NATIP _natIP_iad156921exd01vm1 : 10.32.228.174
+2022-10-17 09:57:10-0700 - INFO - *** CTX_REG_NATHN _natHN_iad156921exd02vm1.oraclecloud.internal : scaqan03dv0411m.us.oracle.com
+2022-10-17 09:57:10-0700 - INFO - *** CTX_REG_NATIP _natIP_iad156921exd02vm1 : 10.32.228.190
+2022-10-17 09:57:10-0700 - INFO - *** ui_oeda_xml is set to TRUE
+2022-10-17 09:57:10-0700 - INFO - Generate Exacloud XML on: /opt/oci/exacc/exacloud/log/ui_oedaxml_bceca276-4e3c-11ed-a829-52540094717e/exacloud16660258302252142.xml
+2022-10-17 09:57:10-0700 - INFO - *** CTX_REG_NATHN _natHN_iad156921exd01vm1.oraclecloud.internal : scaqan03dv0311m.us.oracle.com
+2022-10-17 09:57:10-0700 - INFO - *** CTX_REG_NATIP _natIP_iad156921exd01vm1 : 10.32.228.174
+2022-10-17 09:57:10-0700 - INFO - *** CTX_REG_NATHN _natHN_iad156921exd02vm1.oraclecloud.internal : scaqan03dv0411m.us.oracle.com
+2022-10-17 09:57:10-0700 - INFO - *** CTX_REG_NATIP _natIP_iad156921exd02vm1 : 10.32.228.190
+2022-10-17 09:57:10-0700 - INFO - Environment type is set to: DEV
+2022-10-17 09:57:10-0700 - INFO - *** Request Object found updating clustername (iad156921exd-atpmg-scaqan03XXX-clu01)
+2022-10-17 09:57:10-0700 - INFO - *** KEY_CHECK: (False/scaqan03adm03scaqan03dv0311mscaqan03adm04scaqan03dv0411m)
+2022-10-17 09:57:10-0700 - INFO - mRestoreRootAccess skipped since enable_restore_root is not True
+2022-10-17 09:57:11-0700 - INFO - *** SHARED_ENVIRONMENT DETECTED ***
+2022-10-17 09:57:12-0700 - INFO - *** System Image: 22.1.1.0.0.220814/221100 found in Host: scaqan03adm03.us.oracle.com
+2022-10-17 09:57:13-0700 - INFO - *** System Image: 22.1.1.0.0.220814/221100 found in Host: scaqan03adm04.us.oracle.com
+2022-10-17 09:57:13-0700 - INFO - *** All Computes have a System Image above version 182000: (19c and above supported)
+2022-10-17 09:57:13-0700 - INFO - *** repository_root found in exabox.conf: /u01/downloads. Parsing activeVersion.json
+2022-10-17 09:57:13-0700 - INFO - *** Acquiring lock on file: /u01/downloads/activeVersion.json
+2022-10-17 09:57:13-0700 - INFO - *** DB/GI download location found in activeVersion.json: /u01/downloads//dbgi/APR2022_220419/. Parsing inventory.json
+2022-10-17 09:57:13-0700 - INFO - *** Acquiring lock on file: /u01/downloads//dbgi/APR2022_220419/inventory.json
+2022-10-17 09:57:13-0700 - INFO - *** Generating image mapping...
+2022-10-17 09:57:13-0700 - INFO - *** mCheckZdlraInEnv: rackDescription is X8M-2 Elastic Rack HC 14TB
+2022-10-17 09:57:13-0700 - INFO - mManageDatabaseHomes: Manage Database Homes.
+2022-10-17 09:57:13-0700 - INFO - Skip ManageDatabaseHomes on cmd patch_prereq_check
+2022-10-17 09:57:13-0700 - INFO - *** Invoking Callback for Process ID:bf4326d0-4e3c-11ed-9dbc-52540094717e
+2022-10-17 09:57:13-0700 - INFO - *** Invoking Callback for Process ID:bf461318-4e3c-11ed-9dbc-52540094717e
+2022-10-17 09:57:13-0700 - INFO - *** Invoking Callback for Process ID:bf48f718-4e3c-11ed-9dbc-52540094717e
+2022-10-17 09:57:17-0700 - INFO - *** Cells System Image checks disabled
+2022-10-17 09:57:25-0700 - INFO - *** mGetPkeysConfig / KVM SKM/CKM generation : 0xaa0c/ 0xaec1
+2022-10-17 09:57:25-0700 - INFO - *** ClusterName updated to: cluclu01ec1
+2022-10-17 09:57:25-0700 - WARNING - *** keep_dbfs_dg is enabled (bypassing QUORUM)
+2022-10-17 09:57:25-0700 - INFO - *** ASM Scoped Security disabled
+2022-10-17 09:57:25-0700 - INFO - *** num_computes: 2, num_cells : 3, disk_cnt per cell : 12
+2022-10-17 09:57:25-0700 - INFO - *** quarter
+2022-10-17 09:57:25-0700 - INFO - *** Racksize : quarter rack, Disksize : 14TB, Total Celldisks : 36
+2022-10-17 09:57:25-0700 - INFO - *** Total DB Storage Size is 5120
+2022-10-17 09:57:25-0700 - INFO - Current DG Setup: DATA: 256G TOTAL: 3072
+2022-10-17 09:57:25-0700 - INFO -                   RECO: 171G TOTAL: 2048
+2022-10-17 09:57:25-0700 - INFO - Multi VM not sparse and backup2disk is false
+2022-10-17 09:57:25-0700 - INFO - 80%-20% DG Setup: DATA: 341G TOTAL: 4096
+2022-10-17 09:57:25-0700 - INFO -                   RECO: 85G TOTAL: 1024
+2022-10-17 09:57:25-0700 - INFO - *** 12.X GI ENABLED setting OCR Voting and QuorumDisk for DATA & RECO DGs
+2022-10-17 09:57:25-0700 - INFO - *** Getting Cell Exadata model
+2022-10-17 09:57:25-0700 - INFO - *** Cell Exadata model: X8
+2022-10-17 09:57:25-0700 - INFO - Current DATA DG size is: 4096G
+2022-10-17 09:57:25-0700 - INFO - Setting ACFS volume details: Volume Name: acfsvol01, Volume size: 204G, Mount path: /acfs01
+2022-10-17 09:57:25-0700 - INFO - Setting domU iad156921exd01vm1.oraclecloud.internal with cores = 4
+2022-10-17 09:57:25-0700 - INFO - Setting domU iad156921exd01vm1.oraclecloud.internal with memory = 24GB
+2022-10-17 09:57:25-0700 - INFO - Setting domU iad156921exd01vm1.oraclecloud.internal with disk = 40GB
+2022-10-17 09:57:25-0700 - INFO - Setting domU iad156921exd02vm1.oraclecloud.internal with cores = 4
+2022-10-17 09:57:25-0700 - INFO - Setting domU iad156921exd02vm1.oraclecloud.internal with memory = 24GB
+2022-10-17 09:57:25-0700 - INFO - Setting domU iad156921exd02vm1.oraclecloud.internal with disk = 40GB
+2022-10-17 09:57:25-0700 - INFO - *** TimeZone not specified in payload assuming default XML TZ : UTC
+2022-10-17 09:57:25-0700 - INFO - *** TSS set in XML to: 5120G
+2022-10-17 09:57:25-0700 - INFO - *** BM_NTPSL: ['10.10.10.1', '10.10.10.2', '10.10.10.3']
+2022-10-17 09:57:25-0700 - INFO - Skip mUpdateVmNameReconfigDeleteService since is not delete service
+2022-10-17 09:57:25-0700 - INFO - Apply change of oeda properties
+2022-10-17 09:57:25-0700 - INFO - *** OEDA ROLLBACK temporary: Adding 19.4 to OEDA properties
+2022-10-17 09:57:25-0700 - INFO - Change grid home disksize to: 50G
+2022-10-17 09:57:25-0700 - INFO - Calling mUpdateOEDAPropertiesFromFile: Updating es.properties from properties/OEDAProperties.json.
+2022-10-17 09:57:26-0700 - INFO - Apply oedacli commands to XML
+2022-10-17 09:57:37-0700 - INFO - ebCluCtrl: Saved patched Cluster Config: /opt/oci/exacc/exacloud/clusters/scaqan03adm03scaqan03dv0311mscaqan03adm04scaqan03dv0411m/config/8f38ce6dc2c91962992bfab01c5868cea8e85deea3541e22fe27b5249ae61b91_e8ac554e-4e34-11ed-b0e8-52540094717e.xml
+2022-10-17 09:57:37-0700 - INFO - *** Request Object found updating clustername (iad156921exd-atpmg-scaqan03XXX-clu01)
+2022-10-17 09:57:38-0700 - INFO - *** OEDA XML Version: 200308
+2022-10-17 09:57:38-0700 - INFO - *** OEDA Version installed: 220824
+2022-10-17 09:57:40-0700 - INFO - ebCluInfraPatch - INFO - Invoking Patch Executor in ebCluInfraPatch
+2022-10-17 09:57:40-0700 - INFO - ebCluInfraPatch - INFO - Created directory /opt/oci/exacc/exacloud/oeda/requests/bceca276-4e3c-11ed-a829-52540094717e/log/patchmgr_logs
+2022-10-17 09:57:40-0700 - INFO - ebCluInfraPatch - INFO - {
+  "Operation": "patch_prereq_check",
+  "PayloadType": "exadata_release",
+  "OperationStyle": "auto",
+  "TargetType": [
+    "dom0"
+  ],
+  "TargetVersion": "22.1.2.0.0.220816",
+  "BackupMode": "yes",
+  "EnablePlugins": "no",
+  "PluginTypes": "none",
+  "Fedramp": "DISABLED",
+  "Retry": "no",
+  "RequestId": "b672ecab-2688-4b75-95b4-ece7398992b5",
+  "AdditionalOptions": [
+    {
+      "AllowActiveNfsMounts": "yes",
+      "ClusterLess": "no",
+      "EnvType": "ecs",
+      "ForceRemoveCustomRpms": "no",
+      "IgnoreAlerts": "no",
+      "IgnoreDateValidation": "yes",
+      "IncludeNodeList": "none",
+      "KspliceAction": "none",
+      "LaunchNode": "none",
+      "OneoffCustomPluginFile": "none",
+      "OneoffScriptArgs": "none",
+      "PluginLocation": "none",
+      "RackSwitchesOnly": "no",
+      "SingleUpgradeNodeName": "none",
+      "SkipDomuCheck": "no",
+      "exasplice": "no",
+      "isSingleNodeUpgrade": "no",
+      "serviceType": "EXACC",
+      "exaunitId": 21
+    }
+  ],
+  "ComputeNodeList": {},
+  "StorageNodeList": {},
+  "Dom0domUDetails": {},
+  "DBPatchFile": "/u01/downloads/exadata/PatchPayloads/22.1.2.0.0.220816/DBPatchFile/dbserver.patch.zip",
+  "Dom0YumRepository": "/u01/downloads/exadata/PatchPayloads/22.1.2.0.0.220816/Dom0YumRepository/exadata_ovs_22.1.2.0.0.220816_Linux-x86-64.zip,/u01/downloads/exadata/PatchPayloads/22.1.2.0.0.220816/Dom0YumRepository/exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip",
+  "XmlOeda": "log/patch/bc1a81ba-4e3c-11ed-a829-52540094717e/exadata_patching_oedaxml_iad156921exd-atpmg-scaqan03XXX-clu01.xml",
+  "TargetEnv": "production",
+  "RackName": "iad156921exd-atpmg-scaqan03XXX-clu01",
+  "ClusterID": "1",
+  "rack": {
+    "backup_disk": "false"
+  }
+}
+2022-10-17 09:57:40-0700 - INFO - ebCluInfraPatch - INFO - TargetType: ['dom0']
+2022-10-17 09:57:40-0700 - INFO - ebCluInfraPatch - INFO - OpStyle: auto
+2022-10-17 09:57:40-0700 - INFO - ebCluInfraPatch - INFO - Payload: exadata_release
+2022-10-17 09:57:40-0700 - INFO - ebCluInfraPatch - INFO - TargetEnv: production
+2022-10-17 09:57:40-0700 - INFO - ebCluInfraPatch - INFO - CellSwitchFile: 
+2022-10-17 09:57:40-0700 - INFO - ebCluInfraPatch - INFO - DBPatchFiles: ['/u01/downloads/exadata/PatchPayloads/22.1.2.0.0.220816/DBPatchFile/dbserver.patch.zip', '/u01/downloads/exadata/PatchPayloads/22.1.2.0.0.220816/Dom0YumRepository/exadata_ovs_22.1.2.0.0.220816_Linux-x86-64.zip,/u01/downloads/exadata/PatchPayloads/22.1.2.0.0.220816/Dom0YumRepository/exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip']
+2022-10-17 09:57:40-0700 - INFO - ebCluInfraPatch - INFO - TargetVersion: 22.1.2.0.0.220816
+2022-10-17 09:57:40-0700 - INFO - PreReqHandler - INFO - GenericHandler
+2022-10-17 09:57:40-0700 - INFO - PreReqHandler - INFO - Exadata patchmgr console read timeout is 82800 seconds.
+2022-10-17 09:57:40-0700 - INFO - PreReqHandler - INFO - The environment is KVM
+2022-10-17 09:57:40-0700 - INFO - PreReqHandler - INFO - The environment is ExaCC
+2022-10-17 09:57:40-0700 - INFO - PreReqHandler - INFO - VMs up found in cluster. Operation style will be set to 'rolling'
+2022-10-17 09:57:40-0700 - INFO - PreReqHandler - INFO - Operation style set to rolling
+2022-10-17 09:57:40-0700 - WARNING - PreReqHandler - WARN - No VMs shutdown requested.
+2022-10-17 09:57:40-0700 - INFO - PreReqHandler - INFO - 
+EXACC DBNU plugins base dir prefix '/u01/downloads/exadata/'
+2022-10-17 09:57:40-0700 - INFO - PreReqHandler - INFO - TaskHandler
+2022-10-17 09:57:40-0700 - INFO - PreReqHandler - INFO - PreReqHandler
+2022-10-17 09:57:40-0700 - INFO - PreReqHandler - INFO - Reading collect_dom0_time_stats parameter from infrapatching.conf.
+2022-10-17 09:57:40-0700 - INFO - PreReqHandler - INFO - Fetching Patch List Details using child request uuid bceca276-4e3c-11ed-a829-52540094717e 
+2022-10-17 09:57:40-0700 - INFO - PreReqHandler - INFO - mCreateInfrapatchingTimeStatsEntry : Updating timestat details for PRE_PATCH and nodes ['scaqan03adm03.us.oracle.com', 'scaqan03adm04.us.oracle.com']
+2022-10-17 09:57:40-0700 - INFO - PreReqHandler - INFO - Checking IBFabric lock before running patchmgr
+2022-10-17 09:57:40-0700 - INFO - PreReqHandler - INFO - Lock was correctly acquired by master request
+2022-10-17 09:57:40-0700 - INFO - Dom0Handler - INFO - GenericHandler
+2022-10-17 09:57:40-0700 - INFO - Dom0Handler - INFO - Exadata patchmgr console read timeout is 82800 seconds.
+2022-10-17 09:57:40-0700 - INFO - Dom0Handler - INFO - The environment is KVM
+2022-10-17 09:57:40-0700 - INFO - Dom0Handler - INFO - The environment is ExaCC
+2022-10-17 09:57:41-0700 - INFO - Dom0Handler - INFO - VMs up found in cluster. Operation style will be set to 'rolling'
+2022-10-17 09:57:41-0700 - INFO - Dom0Handler - INFO - Operatiot status:0
+
+2022-10-17 10:03:54-0700 - INFO - Dom0Handler - INFO - 
+
+--------> Patchmgr output ends here <--------
+
+2022-10-17 10:03:54-0700 - INFO - Dom0Handler - INFO - *** Checking for existence of patchmgr/dbnodeupdate.sh sessions in the cluster.
+2022-10-17 10:03:55-0700 - INFO - Dom0Handler - INFO - mUpdateInfraPatchingTimeStatEntry : Updating timestat details for PATCH_MGR  and nodes ['scaqan03adm03.us.oracle.com']
+2022-10-17 10:03:55-0700 - INFO - Dom0Handler - INFO - Fetching Patch List Details using child request uuid bceca276-4e3c-11ed-a829-52540094717e 
+2022-10-17 10:03:55-0700 - INFO - Dom0Handler - INFO - mCreateInfrapatchingTimeStatsEntry : Updating timestat details for POST_PATCH and nodes ['scaqan03adm03.us.oracle.com']
+2022-10-17 10:03:55-0700 - INFO - Dom0Handler - INFO - Log file from output patchmgr.stdout 
+2022-10-17 10:03:55-0700 - INFO - Dom0Handler - INFO - Copying patchmgr.stdout file from node - scaqan03adm04.us.oracle.com , location - /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5 to exacloud location - /opt/oci/exacc/exacloud/oeda/requests/bceca276-4e3c-11ed-a829-52540094717e/log/patchmgr_logs
+2022-10-17 10:03:55-0700 - INFO - Dom0Handler - INFO - Copying patchmgr.stderr file from node - scaqan03adm04.us.oracle.com , location - /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5 to exacloud location - /opt/oci/exacc/exacloud/oeda/requests/bceca276-4e3c-11ed-a829-52540094717e/log/patchmgr_logs
+2022-10-17 10:03:55-0700 - INFO - Dom0Handler - INFO - Copying patchmgr.trc file from node - scaqan03adm04.us.oracle.com , location - /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5 to exacloud location - /opt/oci/exacc/exacloud/oeda/requests/bceca276-4e3c-11ed-a829-52540094717e/log/patchmgr_logs
+2022-10-17 10:03:55-0700 - INFO - Dom0Handler - INFO - Copying patchmgr.log file from node - scaqan03adm04.us.oracle.com , location - /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5 to exacloud location - /opt/oci/exacc/exacloud/oeda/requests/bceca276-4e3c-11ed-a829-52540094717e/log/patchmgr_logs
+2022-10-17 10:03:55-0700 - INFO - Dom0Handler - INFO - Patchmgr diag logs are not collected in case of a successful infra patch operation.
+2022-10-17 10:03:55-0700 - INFO - Dom0Handler - INFO - Copying PatchmgrConsole.out file from node - scaqan03adm04.us.oracle.com , location - /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5 to exacloud location - /opt/oci/exacc/exacloud/oeda/requests/bceca276-4e3c-11ed-a829-52540094717e/log/patchmgr_logs
+2022-10-17 10:03:55-0700 - INFO - Dom0Handler - INFO - Remove temporary patchmgr log files
+2022-10-17 10:03:56-0700 - INFO - Dom0Handler - INFO - Updating Patchmgr log location for collecting notifications : /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5.
+2022-10-17 10:03:56-0700 - INFO - Dom0Handler - INFO - Log path updated to metadata file : /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5_scaqan03adm04.
+2022-10-17 10:03:56-0700 - INFO - Dom0Handler - INFO - Finished running pre-check on initial dom0 Node . Pre-check run finished
+2022-10-17 10:03:56-0700 - INFO - Dom0Handler - INFO - mUpdateInfrapatchingTimeStatsForUnfilledStages : Updating timestat details for the child_uuid bceca276-4e3c-11ed-a829-52540094717e 
+2022-10-17 10:03:56-0700 - INFO - Dom0Handler - INFO - Fetching Patch List Details using child request uuid bceca276-4e3c-11ed-a829-52540094717e 
+2022-10-17 10:03:56-0700 - INFO - Dom0Handler - INFO - mCreateInfrapatchingTimeStatsEntry : Updating timestat details for POST_PATCH and nodes ['scaqan03adm03.us.oracle.com', 'scaqan03adm04.us.oracle.com']
+2022-10-17 10:03:56-0700 - INFO - Dom0Handler - INFO - PreCheck Operation is Success
+2022-10-17 10:03:56-0700 - INFO - Dom0Handler - INFO - Final return code from task : patch_prereq_check is 0x00000000 
+2022-10-17 10:03:56-0700 - INFO - PreReqHandler - INFO - Task: patch_prereq_check - Type: dom0		[ ret_code = 0x00000000 ]
+2022-10-17 10:03:56-0700 - INFO - PreReqHandler - INFO - Collecting final patch notification for the cluster iad156921exd-atpmg-scaqan03XXX-clu01
+2022-10-17 10:03:56-0700 - INFO - Dom0Handler - INFO - mMonitorPatchReqForCNS: Patchmgr_old_xml_loc = /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5/notification_patchxml_old
+2022-10-17 10:03:56-0700 - INFO - Dom0Handler - INFO - Log directory path is changed during patching. Create initial patchmgr xml on new node
+2022-10-17 10:03:56-0700 - INFO - Dom0Handler - INFO - Log directory path is changed during patching. Create initial patchmgr xml on new node
+2022-10-17 10:03:56-0700 - INFO - Dom0Handler - INFO - mCreateDummyPatchmgrXml: __patchmgr_old_xml_loc /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5_scaqan03adm04/notification_patchxml_old
+2022-10-17 10:03:56-0700 - INFO - Dom0Handler - INFO - mCreateDummyPatchmgrXml: mGetPatchmgrLogPathOnLaunchNode(). Before Update = /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5
+2022-10-17 10:03:56-0700 - INFO - Dom0Handler - INFO - mCreateDummyPatchmgrXml: mGetPatchmgrLogPathOnLaunchNode(). After Update = /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5_scaqan03adm04
+2022-10-17 10:03:56-0700 - INFO - Dom0Handler - INFO - mCreateDummyPatchmgrXml: __patchmgr_old_xml_loc /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5_scaqan03adm04/notification_patchxml_old
+2022-10-17 10:03:56-0700 - INFO - Dom0Handler - INFO - mCreateDummyPatchmgrXml: mGetPatchmgrLogPathOnLaunchNode(). Before Update = /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5
+2022-10-17 10:03:56-0700 - INFO - Dom0Handler - INFO - mCreateDummyPatchmgrXml: mGetPatchmgrLogPathOnLaunchNode(). After Update = /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5_scaqan03adm04
+2022-10-17 10:03:56-0700 - INFO - Dom0Handler - INFO - Fetching Patch List Details using child request uuid bceca276-4e3c-11ed-a829-52540094717e 
+2022-10-17 10:03:56-0700 - INFO - Dom0Handler - INFO - Master request uuid for cnsjson in success case bc1a81ba-4e3c-11ed-a829-52540094717e
+2022-10-17 10:03:56-0700 - WARNING - Dom0Handler - WARN - json_report error code is not populated in mParsePatchmgrXml
+2022-10-17 10:03:56-0700 - INFO - Dom0Handler - INFO - Found Json patch report data.
+2022-10-17 10:03:56-0700 - WARNING - Dom0Handler - WARN - Current state of patch notification is not available as of now. Displaying last updated status.
+2022-10-17 10:03:56-0700 - INFO - Dom0Handler - INFO - mUpdateCnsJsonPayload - Save the patch notification JSON to database
+2022-10-17 10:03:56-0700 - INFO - PreReqHandler - INFO - Found Json patch report data.
+2022-10-17 10:03:56-0700 - INFO - PreReqHandler - INFO - Task: patch_prereq_check - Type: ['dom0'] completed successfully.
+2022-10-17 10:03:56-0700 - INFO - PreReqHandler - INFO - Fetching Patch List Details using child request uuid bceca276-4e3c-11ed-a829-52540094717e 
+2022-10-17 10:03:56-0700 - INFO - PreReqHandler - INFO - Master request uuid for error status bc1a81ba-4e3c-11ed-a829-52540094717e
+2022-10-17 10:03:56-0700 - INFO - PreReqHandler - INFO - Updating patch status JSON report to Exacloud DB.
+2022-10-17 10:03:56-0700 - INFO - PreReqHandler - INFO - mAddError - Output
+2022-10-17 10:03:56-0700 - INFO - PreReqHandler - INFO - Patch status details.
+
+2022-10-17 10:03:56-0700 - INFO - PreReqHandler - INFO - {'data': {'httpRequestId': '4f8e8d5657be4dab85de2fc2e9e2d474', 'recipients': [{'channelType': 'topics'}], 'notificationType': {'componentId': 'Patch_ExadataInfra_SM', 'id': 'Patch_ExadataInfra_SMnotification_v1'}, 'service': 'ExadataPatch', 'component': 'Patch Exadata Infrastructure', 'subject': 'Patch Exadata Infrastructure Service Update', 'event_post_time': '2022-10-17:10.03.56 ', 'log_dir': '', 'cluster_name': 'iad156921exd-atpmg-scaqan03XXX-clu01', 'exadata_rack': 'iad156921exd-atpmg-scaqan03XXX-clu01', 'target_type': ['dom0'], 'operation_type': 'patch_prereq_check', 'operation_style': 'rolling', 'target_version': '22.1.2.0.0.220816', 'cluster_less': 'no', 'exaunit_id': 21, 'exa_ocid': None, 'exa_splice': 'no', 'topic': '', 'error_code': '0x00000000', 'error_message': 'Patch operation Status successful, no further action required.', 'error_detail': "Task: patch_prereq_check - Type: ['dom0'] completed successfully.", 'node_progressing_status': {'sleep_infra_patch': 'no', 'infra_patch_start_time': '2022-10-17 09:58:23-0700', 'node_patching_progress_data': [{'node_name': 'scaqan03adm03.us.oracle.com', 'target_type': 'dom0', 'patchmgr_start_time': '2022-10-17 10:01:30-0700', 'last_updated_time': '2022-10-17 10:03:35-0700', 'status': 'Completed', 'status_details': 'Succeeded'}, {'node_name': 'scaqan03adm04.us.oracle.com', 'target_type': 'dom0', 'patchmgr_start_time': '2022-10-17 09:58:54-0700', 'last_updated_time': '2022-10-17 10:00:59-0700', 'status': 'Completed', 'status_details': 'Succeeded'}]}, 'child_request_uuid': 'bceca276-4e3c-11ed-a829-52540094717e', 'master_request_uuid': 'bc1a81ba-4e3c-11ed-a829-52540094717e'}}
+2022-10-17 10:03:56-0700 - INFO - PreReqHandler - INFO - Execution time for the operation patch_prereq_check on targets ['dom0'] is 0:06:15 in hh:mm:ss 
+2022-10-17 10:03:56-0700 - INFO - PreReqHandler - INFO - Operation patch_prereq_check completed successfully
+2022-10-17 10:03:56-0700 - INFO - PreReqHandler - INFO - Releasing IBFabric lock
+2022-10-17 10:03:56-0700 - INFO - PreReqHandler - INFO - mReleaseLock: Deleting patch operation entry for dom0 on scaqan03adm03scaqan03dv0311mscaqan03adm04scaqan03dv0411m
+2022-10-17 10:03:56-0700 - INFO - PreReqHandler - INFO - Updated Patch Status
+2022-10-17 10:03:56-0700 - INFO - PreReqHandler - INFO - Invoking mVerifySystemImage method on Dom0
+2022-10-17 10:03:56-0700 - INFO - Dom0Handler - INFO - System First Boot image is: System.first.boot.22.1.2.0.0.220816.kvm.img.bz2 
+2022-10-17 10:03:56-0700 - INFO - Dom0Handler - INFO - Passwdless ssh connectivity is validated between Exacloud/CPS nodes to target launch nodes.
+2022-10-17 10:03:56-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com
+2022-10-17 10:03:56-0700 - INFO - ebCluPatchHealthCheck - INFO - Validating to check if scaqan03adm03.us.oracle.com is accessible from localhost via ssh.
+2022-10-17 10:03:56-0700 - INFO - ebCluPatchHealthCheck - INFO - Node : scaqan03adm03.us.oracle.com is accessible from scaqan03dv0811m.us.oracle.com(Exacloud Node) during Pre-Patch operation.
+2022-10-17 10:03:56-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com
+2022-10-17 10:03:56-0700 - INFO - ebCluPatchHealthCheck - INFO - Validating to check if scaqan03adm04.us.oracle.com is accessible from localhost via ssh.
+2022-10-17 10:03:56-0700 - INFO - ebCluPatchHealthCheck - INFO - Node : scaqan03adm04.us.oracle.com is accessible from scaqan03dv0811m.us.oracle.com(Exacloud Node) during Pre-Patch operation.
+2022-10-17 10:03:56-0700 - INFO - Dom0Handler - INFO - 
+*** Generating checksum for the patch file : /u01/downloads/exadata/images/System.first.boot.22.1.2.0.0.220816.kvm.img.bz2 ***
+2022-10-17 10:03:56-0700 - INFO - Dom0Handler - INFO - Fetching Patch List Details using child request uuid bceca276-4e3c-11ed-a829-52540094717e 
+2022-10-17 10:03:56-0700 - INFO - Dom0Handler - INFO - Master request uuid for cnsjson in success case bc1a81ba-4e3c-11ed-a829-52540094717e
+2022-10-17 10:03:56-0700 - INFO - Dom0Handler - INFO - Found Json patch report data.
+2022-10-17 10:03:56-0700 - WARNING - Dom0Handler - WARN - Current state of patch notification is not available as of now. Displaying last updated status.
+2022-10-17 10:03:56-0700 - INFO - Dom0Handler - INFO - mUpdateCnsJsonPayload - Save the patch notification JSON to database
+2022-10-17 10:04:00-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com
+2022-10-17 10:04:00-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com
+2022-10-17 10:04:00-0700 - INFO - Dom0Handler - INFO - Sufficient space available to stage patches on Node : scaqan03adm03.us.oracle.com, Location : /EXAVMIMAGES/, Required : 2360, Available Space : 6144584
+2022-10-17 10:04:00-0700 - INFO - Dom0Handler - INFO - Sufficient space available to stage patches on Node : scaqan03adm04.us.oracle.com, Location : /EXAVMIMAGES/, Required : 2360, Available Space : 6228292
+2022-10-17 10:04:00-0700 - INFO - Dom0Handler - INFO - Patch file 'System.first.boot.22.1.2.0.0.220816.kvm.img.bz2' with the same checksum and size as source is already staged on remote node = scaqan03adm04.us.oracle.com
+2022-10-17 10:04:00-0700 - INFO - Dom0Handler - INFO - Patch file 'System.first.boot.22.1.2.0.0.220816.kvm.img.bz2' with the same checksum and size as source is already staged on remote node = scaqan03adm03.us.oracle.com
+2022-10-17 10:04:00-0700 - INFO - PreReqHandler - INFO - mUpdateInfrapatchingTimeStatsForUnfilledStages : Updating timestat details for the child_uuid bceca276-4e3c-11ed-a829-52540094717e 
+2022-10-17 10:04:00-0700 - INFO - PreReqHandler - INFO - mGetInfrapactchOperationTimeStats : final time_stats are {'master_uuid': 'bc1a81ba-4e3c-11ed-a829-52540094717e', 'child_uuid': 'bceca276-4e3c-11ed-a829-52540094717e', 'rack_name': 'iad156921exd-atpmg-scaqan03XXX-clu01', 'target_type': "['dom0']", 'operation': 'patch_prereq_check', 'patch_type': 'quarterly', 'operation_style': 'rolling', 'node_patching_time_stats': [{'node_names': "['scaqan03adm04.us.oracle.com']", 'stage': 'PATCH_MGR', 'sub_stage': '', 'start_time': '2022-10-17 09:58:58-0700', 'end_time': '2022-10-17 10:01:20-0700', 'duration_in_seconds': 142}, {'node_names': "['scaqan03adm03.us.oracle.com']", 'stage': 'PATCH_MGR', 'sub_stage': '', 'start_time': '2022-10-17 10:01:34-0700', 'end_time': '2022-10-17 10:03:55-0700', 'duration_in_seconds': 141}, {'node_names': "['scaqan03adm03.us.oracle.com', 'scaqan03adm04.us.oracle.com']", 'stage': 'PRE_PATCH', 'sub_stage': '', 'start_time': '2022-10-17 09:57:40-0700', 'end_time': '2022-10-17 09:58:58-0700', 'duration_in_seconds': 78}, {'node_names': "['scaqan03adm03.us.oracle.com', 'scaqan03adm04.us.oracle.com']", 'stage': 'POST_PATCH', 'sub_stage': '', 'start_time': '2022-10-17 10:01:20-0700', 'end_time': '2022-10-17 10:04:00-0700', 'duration_in_seconds': 19}]} 
+2022-10-17 10:04:00-0700 - INFO - PreReqHandler - INFO - Fetching Patch List Details using child request uuid bceca276-4e3c-11ed-a829-52540094717e 
+2022-10-17 10:04:00-0700 - INFO - PreReqHandler - INFO - mUpdateCurrentInfrapactchOperationTimeStatsToDB : node_progress_data is - {'sleep_infra_patch': 'no', 'infra_patch_start_time': '2022-10-17 09:58:23-0700', 'node_patching_progress_data': [{'node_name': 'scaqan03adm03.us.oracle.com', 'target_type': 'dom0', 'patchmgr_start_time': '2022-10-17 10:01:30-0700', 'last_updated_time': '2022-10-17 10:03:35-0700', 'status': 'Completed', 'status_details': 'Succeeded'}, {'node_name': 'scaqan03adm04.us.oracle.com', 'target_type': 'dom0', 'patchmgr_start_time': '2022-10-17 09:58:54-0700', 'last_updated_time': '2022-10-17 10:00:59-0700', 'status': 'Completed', 'status_details': 'Succeeded'}]}
+2022-10-17 10:04:00-0700 - INFO - PreReqHandler - INFO - Updating patch_mgr time_stats for dom0 rolling infra operation
+2022-10-17 10:04:00-0700 - INFO - PreReqHandler - INFO - Updating patch_mgr time_stats for dom0 rolling infra operation
+2022-10-17 10:04:00-0700 - INFO - PreReqHandler - INFO - Updating patch status JSON into Exacloud DB.
+2022-10-17 10:04:00-0700 - INFO - PreReqHandler - INFO - Fetching Patch List Details using child request uuid bceca276-4e3c-11ed-a829-52540094717e 
+2022-10-17 10:04:00-0700 - INFO - PreReqHandler - INFO - mUpdateImageVersionInfoDetailsInNodeProgressData - node_progress_data is - {'sleep_infra_patch': 'no', 'infra_patch_start_time': '2022-10-17 09:58:23-0700', 'node_patching_progress_data': [{'node_name': 'scaqan03adm03.us.oracle.com', 'target_type': 'dom0', 'patchmgr_start_time': '2022-10-17 10:01:30-0700', 'last_updated_time': '2022-10-17 10:03:35-0700', 'status': 'Completed', 'status_details': 'Succeeded'}, {'node_name': 'scaqan03adm04.us.oracle.com', 'target_type': 'dom0', 'patchmgr_start_time': '2022-10-17 09:58:54-0700', 'last_updated_time': '2022-10-17 10:00:59-0700', 'status': 'Completed', 'status_details': 'Succeeded'}]}
+2022-10-17 10:04:01-0700 - INFO - ebCluPatchHealthCheck - INFO - mGetImageVersionInfoDetails - _image_info_details for the node is {'image_version': '22.1.1.0.0.220814', 'image_status': 'success', 'image_activation_date': '2022-08-24 17:21:12 -0700'} 
+2022-10-17 10:04:02-0700 - INFO - ebCluPatchHealthCheck - INFO - mGetImageVersionInfoDetails - _image_info_details for the node is {'image_version': '22.1.1.0.0.220814', 'image_status': 'success', 'image_activation_date': '2022-08-24 17:21:07 -0700'} 
+2022-10-17 10:04:02-0700 - INFO - PreReqHandler - INFO - Node_progress_data after updating imageinfo details- {'sleep_infra_patch': 'no', 'infra_patch_start_time': '2022-10-17 09:58:23-0700', 'node_patching_progress_data': [{'node_name': 'scaqan03adm03.us.oracle.com', 'target_type': 'dom0', 'patchmgr_start_time': '2022-10-17 10:01:30-0700', 'last_updated_time': '2022-10-17 10:03:35-0700', 'status': 'Completed', 'status_details': 'Succeeded', 'image_version': '22.1.1.0.0.220814', 'image_status': 'success', 'image_activation_date': '2022-08-24 17:21:12 -0700'}, {'node_name': 'scaqan03adm04.us.oracle.com', 'target_type': 'dom0', 'patchmgr_start_time': '2022-10-17 09:58:54-0700', 'last_updated_time': '2022-10-17 10:00:59-0700', 'status': 'Completed', 'status_details': 'Succeeded', 'image_version': '22.1.1.0.0.220814', 'image_status': 'success', 'image_activation_date': '2022-08-24 17:21:07 -0700'}]}
+2022-10-17 10:04:02-0700 - INFO - PreReqHandler - INFO - Updating patch status JSON into Exacloud DB.
+2022-10-17 10:04:02-0700 - INFO - mUnRestoreRootAccess skipped since enable_restore_root is not True
+2022-10-17 10:04:02-0700 - INFO - *** Deleting UI_OEDACLI files under: log/ui_oedaxml_bceca276-4e3c-11ed-a829-52540094717e
+2022-10-17 10:04:02-0700 - INFO - Status code from infra patching: 0x00000000
+ status:0
+
+2022-10-17 10:01:19-0700 - INFO - Dom0Handler - INFO - 
+
+--------> Patchmgr output ends here <--------
+
+2022-10-17 10:01:19-0700 - INFO - Dom0Handler - INFO - *** Checking for existence of patchmgr/dbnodeupdate.sh sessions in the cluster.
+2022-10-17 10:01:20-0700 - INFO - Dom0Handler - INFO - mUpdateInfraPatchingTimeStatEntry : Updating timestat details for PATCH_MGR  and nodes ['scaqan03adm04.us.oracle.com']
+2022-10-17 10:01:20-0700 - INFO - Dom0Handler - INFO - Fetching Patch List Details using child request uuid bceca276-4e3c-11ed-a829-52540094717e 
+2022-10-17 10:01:20-0700 - INFO - Dom0Handler - INFO - mCreateInfrapatchingTimeStatsEntry : Updating timestat details for POST_PATCH and nodes ['scaqan03adm04.us.oracle.com']
+2022-10-17 10:01:20-0700 - INFO - Dom0Handler - INFO - Log file from output patchmgr.stdout 
+2022-10-17 10:01:20-0700 - INFO - Dom0Handler - INFO - Copying patchmgr.stdout file from node - scaqan03adm03.us.oracle.com , location - /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5 to exacloud location - /opt/oci/exacc/exacloud/oeda/requests/bceca276-4e3c-11ed-a829-52540094717e/log/patchmgr_logs
+2022-10-17 10:01:20-0700 - INFO - Dom0Handler - INFO - Copying patchmgr.stderr file from node - scaqan03adm03.us.oracle.com , location - /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5 to exacloud location - /opt/oci/exacc/exacloud/oeda/requests/bceca276-4e3c-11ed-a829-52540094717e/log/patchmgr_logs
+2022-10-17 10:01:20-0700 - INFO - Dom0Handler - INFO - Copying patchmgr.trc file from node - scaqan03adm03.us.oracle.com , location - /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5 to exacloud location - /opt/oci/exacc/exacloud/oeda/requests/bceca276-4e3c-11ed-a829-52540094717e/log/patchmgr_logs
+2022-10-17 10:01:20-0700 - INFO - Dom0Handler - INFO - Copying patchmgr.log file from node - scaqan03adm03.us.oracle.com , location - /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5 to exacloud location - /opt/oci/exacc/exacloud/oeda/requests/bceca276-4e3c-11ed-a829-52540094717e/log/patchmgr_logs
+2022-10-17 10:01:20-0700 - INFO - Dom0Handler - INFO - Patchmgr diag logs are not collected in case of a successful infra patch operation.
+2022-10-17 10:01:20-0700 - INFO - Dom0Handler - INFO - Copying PatchmgrConsole.out file from node - scaqan03adm03.us.oracle.com , location - /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5 to exacloud location - /opt/oci/exacc/exacloud/oeda/requests/bceca276-4e3c-11ed-a829-52540094717e/log/patchmgr_logs
+2022-10-17 10:01:20-0700 - INFO - Dom0Handler - INFO - Remove temporary patchmgr log files
+2022-10-17 10:01:21-0700 - INFO - Dom0Handler - INFO - Updating Patchmgr log location for collecting notifications : /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5.
+2022-10-17 10:01:21-0700 - INFO - Dom0Handler - INFO - Log path updated to metadata file : /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5_scaqan03adm03.
+2022-10-17 10:01:21-0700 - INFO - Dom0Handler - INFO - *** Finished running pre-check in all the dom0s except initial dom0 node
+2022-10-17 10:01:21-0700 - INFO - Dom0Handler - INFO - mMonitorPatchReqForCNS: Patchmgr_old_xml_loc = /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5/notification_patchxml_old
+2022-10-17 10:01:21-0700 - INFO - Dom0Handler - INFO - Log directory path is changed during patching. Create initial patchmgr xml on new node
+2022-10-17 10:01:21-0700 - INFO - Dom0Handler - INFO - mCreateDummyPatchmgrXml: __patchmgr_old_xml_loc /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5_scaqan03adm03/notification_patchxml_old
+2022-10-17 10:01:21-0700 - INFO - Dom0Handler - INFO - mCreateDummyPatchmgrXml: mGetPatchmgrLogPathOnLaunchNode(). Before Update = /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5
+2022-10-17 10:01:21-0700 - INFO - Dom0Handler - INFO - mCreateDummyPatchmgrXml: mGetPatchmgrLogPathOnLaunchNode(). After Update = /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5_scaqan03adm03
+2022-10-17 10:01:21-0700 - INFO - Dom0Handler - INFO - Fetching Patch List Details using child request uuid bceca276-4e3c-11ed-a829-52540094717e 
+2022-10-17 10:01:21-0700 - INFO - Dom0Handler - INFO - Master request uuid for cnsjson in success case bc1a81ba-4e3c-11ed-a829-52540094717e
+2022-10-17 10:01:21-0700 - WARNING - Dom0Handler - WARN - json_report error code is not populated in mParsePatchmgrXml
+2022-10-17 10:01:21-0700 - INFO - Dom0Handler - INFO - Found Json patch report data.
+2022-10-17 10:01:21-0700 - WARNING - Dom0Handler - WARN - Current state of patch notification is not available as of now. Displaying last updated status.
+2022-10-17 10:01:21-0700 - INFO - Dom0Handler - INFO - mUpdateCnsJsonPayload - Save the patch notification JSON to database
+2022-10-17 10:01:21-0700 - INFO - Dom0Handler - INFO - Launch node = scaqan03adm04.us.oracle.com, List of Nodes to work on = ['scaqan03adm03.us.oracle.com']
+2022-10-17 10:01:21-0700 - INFO - ebCluPatchHealthCheck - INFO - Checking connection to scaqan03adm03.us.oracle.com.
+2022-10-17 10:01:23-0700 - INFO - ebCluPatchHealthCheck - INFO - Image version retrieved = 22.1.1.0.0.220814
+2022-10-17 10:01:23-0700 - INFO - Dom0Handler - INFO - ebCluPatchControl._mPatchDom0UsPreChecks: _dom0Us_count = 1, aListOfNodesToPatch = 1, doums_count_on_same_target_version = 0
+2022-10-17 10:01:23-0700 - INFO - Dom0Handler - INFO - Creating patch input file: /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/node_list
+2022-10-17 10:01:23-0700 - INFO - Dom0Handler - INFO - Create node list: ['scaqan03adm03.us.oracle.com']
+2022-10-17 10:01:23-0700 - INFO - Dom0Handler - INFO - *** Checking for existence of patchmgr/dbnodeupdate.sh sessions in the cluster.
+2022-10-17 10:01:24-0700 - INFO - Dom0Handler - INFO - 
+Patchmgr Command running in the background : 
+
+cd /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/; nohup ./patchmgr -dbnodes node_list -precheck  -iso_repo exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip -target_version 22.1.2.0.0.220816 -log_dir /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5 -allow_active_network_mounts </dev/null &> /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5/PatchmgrConsole.out &
+
+2022-10-17 10:01:24-0700 - INFO - Dom0Handler - INFO - mCreateDummyPatchmgrXml: __patchmgr_old_xml_loc /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5/notification_patchxml_old
+2022-10-17 10:01:24-0700 - INFO - Dom0Handler - INFO - mCreateDummyPatchmgrXml: mGetPatchmgrLogPathOnLaunchNode(). Before Update = /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5
+2022-10-17 10:01:24-0700 - INFO - Dom0Handler - INFO - mCreateDummyPatchmgrXml: mGetPatchmgrLogPathOnLaunchNode(). After Update = /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5
+2022-10-17 10:01:24-0700 - WARNING - Dom0Handler - WARN - Patch notification log location : '/EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5/notifications' does not exist. Checking again after 10 seconds
+2022-10-17 10:01:34-0700 - INFO - Dom0Handler - INFO - Patch notification log location exists : /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5/notifications
+2022-10-17 10:01:34-0700 - INFO - Dom0Handler - INFO - mUpdateInfrapatchingTimeStatsForUnfilledStages : Updating timestat details for the child_uuid bceca276-4e3c-11ed-a829-52540094717e 
+2022-10-17 10:01:34-0700 - INFO - Dom0Handler - INFO - Fetching Patch List Details using child request uuid bceca276-4e3c-11ed-a829-52540094717e 
+2022-10-17 10:01:34-0700 - INFO - Dom0Handler - INFO - mCreateInfrapatchingTimeStatsEntry : Updating timestat details for PATCH_MGR and nodes ['scaqan03adm03.us.oracle.com']
+2022-10-17 10:01:34-0700 - INFO - Dom0Handler - INFO - Read patchmgr console from node = scaqan03adm04.us.oracle.com and log loc = /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5
+2022-10-17 10:01:34-0700 - INFO - Dom0Handler - INFO - 
+
+--------> Patchmgr output starts here <--------
+
+2022-10-17 10:01:34-0700 - INFO - PatchmgrHandler - INFO - Initiate precheck on 1 node(s)
+2022-10-17 10:01:48-0700 - INFO - PatchmgrHandler - INFO - Check free space on scaqan03adm03.us.oracle.com
+2022-10-17 10:01:53-0700 - INFO - PatchmgrHandler - INFO - Preparing nodes: scaqan03adm03.us.oracle.com
+2022-10-17 10:01:55-0700 - INFO - Dom0Handler - INFO - mCreateDummyPatchmgrXml: __patchmgr_old_xml_loc /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5/notification_patchxml_old
+2022-10-17 10:01:55-0700 - INFO - Dom0Handler - INFO - mCreateDummyPatchmgrXml: mGetPatchmgrLogPathOnLaunchNode(). Before Update = /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5
+2022-10-17 10:01:55-0700 - INFO - Dom0Handler - INFO - mCreateDummyPatchmgrXml: mGetPatchmgrLogPathOnLaunchNode(). After Update = /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5
+2022-10-17 10:01:55-0700 - INFO - Dom0Handler - INFO - Fetching Patch List Details using child request uuid bceca276-4e3c-11ed-a829-52540094717e 
+2022-10-17 10:01:55-0700 - INFO - Dom0Handler - INFO - Master request uuid for cnsjson in success case bc1a81ba-4e3c-11ed-a829-52540094717e
+2022-10-17 10:01:55-0700 - WARNING - Dom0Handler - WARN - json_report error code is not populated in mParsePatchmgrXml
+2022-10-17 10:01:55-0700 - INFO - Dom0Handler - INFO - Found Json patch report data.
+2022-10-17 10:01:55-0700 - WARNING - Dom0Handler - WARN - Current state of patch notification is not available as of now. Displaying last updated status.
+2022-10-17 10:01:55-0700 - INFO - Dom0Handler - INFO - mUpdateCnsJsonPayload - Save the patch notification JSON to database
+2022-10-17 10:02:14-0700 - INFO - PatchmgrHandler - INFO - dbnodeupdate.sh running a precheck for the conventional update on node(s).
+2022-10-17 10:02:56-0700 - INFO - Dom0Handler - INFO - Fetching Patch List Details using child request uuid bceca276-4e3c-11ed-a829-52540094717e 
+2022-10-17 10:02:56-0700 - INFO - Dom0Handler - INFO - Master request uuid for cnsjson in success case bc1a81ba-4e3c-11ed-a829-52540094717e
+2022-10-17 10:02:56-0700 - WARNING - Dom0Handler - WARN - json_report error code is not populated in mParsePatchmgrXml
+2022-10-17 10:02:56-0700 - INFO - Dom0Handler - INFO - Found Json patch report data.
+2022-10-17 10:02:56-0700 - WARNING - Dom0Handler - WARN - Current state of patch notification is not available as of now. Displaying last updated status.
+2022-10-17 10:02:56-0700 - INFO - Dom0Handler - INFO - mUpdateCnsJsonPayload - Save the patch notification JSON to database
+2022-10-17 10:03:53-0700 - INFO - PatchmgrHandler - INFO - Initiate precheck on node(s).
+2022-10-17 10:03:54-0700 - INFO - PatchmgrHandler - INFO - - patchmgr.trc
+2022-10-17 10:03:54-0700 - INFO - PatchmgrHandler - INFO - Exit status:0
+2022-10-17 10:03:54-0700 - INFO - PatchmgrHandler - INFO - 0m
+2022-10-17 10:03:54-0700 - INFO - PatchmgrHandler - INFO - 0m Your patchmgr is more than 60 days old. Check MOS 1553103.1 and make sure you have the most recent version.
+2022-10-17 10:03:54-0700 - INFO - PatchmgrHandler - INFO - Checking hosts connectivity via ICMP/ping
+2022-10-17 10:03:54-0700 - INFO - PatchmgrHandler - INFO - Hosts Reachable: [scaqan03adm03.us.oracle.com->
+2022-10-17 10:03:54-0700 - INFO - PatchmgrHandler - INFO - All hosts are reachable via ping/ICMP
+2022-10-17 10:03:54-0700 - INFO - PatchmgrHandler - INFO - Verify SSH equivalence for the root user to scaqan03adm03.us.oracle.com
+2022-10-17 10:03:54-0700 - INFO - PatchmgrHandler - INFO - --
+2022-10-17 10:03:54-0700 - INFO - PatchmgrHandler - INFO - For details, check the following files in /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5:
+2022-10-17 10:03:54-0700 - INFO - PatchmgrHandler - INFO - - <dbnode_name>_dbnodeupdate.log
+2022-10-17 10:03:54-0700 - INFO - PatchmgrHandler - INFO - - patchmgr.log
+2022-10-17 10:03:54-0700 - INFO - PatchmgrHandler - INFO - - patchmgr.trc
+2022-10-17 10:03:54-0700 - INFO - PatchmgrHandler - INFO - Collected dbnodeupdate diag in file: Diag_patchmgr_dbnode_precheck_171022100124.tbz
+2022-10-17 10:03:54-0700 - INFO - PatchmgrHandler - INFO - 2022-10-17 10:03:54 -0700        : style set to rolling
+2022-10-17 09:57:41-0700 - WARNING - Dom0Handler - WARN - No VMs shutdown requested.
+2022-10-17 09:57:41-0700 - INFO - Dom0Handler - INFO - 
+EXACC DBNU plugins base dir prefix '/u01/downloads/exadata/'
+2022-10-17 09:57:41-0700 - INFO - Dom0Handler - INFO - TargetHandler
+2022-10-17 09:57:41-0700 - INFO - Dom0Handler - INFO - Dom0Handler
+2022-10-17 09:57:41-0700 - INFO - Dom0Handler - INFO - 
+---------------> Starting patch_prereq_check on dom0s <---------------
+
+2022-10-17 09:57:41-0700 - INFO - Dom0Handler - INFO - Dom0Repository KVM file is /u01/downloads/exadata/PatchPayloads/22.1.2.0.0.220816/Dom0YumRepository/exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip 
+2022-10-17 09:57:41-0700 - INFO - Dom0Handler - INFO - Reading collect_dom0_time_stats parameter from infrapatching.conf.
+2022-10-17 09:57:41-0700 - INFO - Dom0Handler - INFO - Dom0 local patch zip file name /u01/downloads/exadata/PatchPayloads/22.1.2.0.0.220816/DBPatchFile/dbserver.patch.zip
+2022-10-17 09:57:41-0700 - INFO - Dom0Handler - INFO - Dom0 local patch zip-2 file name /u01/downloads/exadata/PatchPayloads/22.1.2.0.0.220816/Dom0YumRepository/exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip
+2022-10-17 09:57:41-0700 - INFO - Dom0Handler - INFO - Set Launch Node for Dom0 to patch other nodes.
+2022-10-17 09:57:41-0700 - INFO - Dom0Handler - INFO - Launch node candidates: ['scaqan03adm03.us.oracle.com', 'scaqan03adm04.us.oracle.com']
+2022-10-17 09:57:41-0700 - INFO - Dom0Handler - INFO - Configurable parameter for parallel execution timeout in Infrapatching.conf currently set to 600 seconds
+2022-10-17 09:57:41-0700 - INFO - Dom0Handler - INFO - Configurable parameter for parallel execution timeout in Infrapatching.conf currently set to 600 seconds
+2022-10-17 09:57:41-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com
+2022-10-17 09:57:41-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com
+2022-10-17 09:57:42-0700 - INFO - Dom0Handler - INFO - Active image version fetched to purge patches : 22.1.1.0.0.220814
+2022-10-17 09:57:42-0700 - INFO - Dom0Handler - INFO - Active image version fetched to purge patches : 22.1.1.0.0.220814
+2022-10-17 09:57:53-0700 - INFO - Dom0Handler - INFO - Inactive image version fetched to purge patches : 
+2022-10-17 09:57:53-0700 - INFO - Dom0Handler - INFO - Inactive image version fetched to purge patches : 
+2022-10-17 09:57:53-0700 - INFO - Dom0Handler - INFO - Passwdless ssh connectivity is validated between Exacloud/CPS nodes to target launch nodes.
+2022-10-17 09:57:53-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com
+2022-10-17 09:57:53-0700 - INFO - ebCluPatchHealthCheck - INFO - Validating to check if scaqan03adm03.us.oracle.com is accessible from localhost via ssh.
+2022-10-17 09:57:53-0700 - INFO - ebCluPatchHealthCheck - INFO - Node : scaqan03adm03.us.oracle.com is accessible from scaqan03dv0811m.us.oracle.com(Exacloud Node) during Pre-Patch operation.
+2022-10-17 09:57:53-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com
+2022-10-17 09:57:53-0700 - INFO - ebCluPatchHealthCheck - INFO - Validating to check if scaqan03adm04.us.oracle.com is accessible from localhost via ssh.
+2022-10-17 09:57:53-0700 - INFO - ebCluPatchHealthCheck - INFO - Node : scaqan03adm04.us.oracle.com is accessible from scaqan03dv0811m.us.oracle.com(Exacloud Node) during Pre-Patch operation.
+2022-10-17 09:57:53-0700 - INFO - Dom0Handler - INFO - 
+*** Generating checksum for the patch file : /u01/downloads/exadata/PatchPayloads/22.1.2.0.0.220816/DBPatchFile/dbserver.patch.zip ***
+2022-10-17 09:57:54-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com
+2022-10-17 09:57:54-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com
+2022-10-17 09:57:54-0700 - INFO - Dom0Handler - INFO - Sufficient space available to stage patches on Node : scaqan03adm03.us.oracle.com, Location : /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/, Required : 2360, Available Space : 6144592
+2022-10-17 09:57:54-0700 - INFO - Dom0Handler - INFO - Sufficient space available to stage patches on Node : scaqan03adm04.us.oracle.com, Location : /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/, Required : 2360, Available Space : 6228300
+2022-10-17 09:57:54-0700 - INFO - Dom0Handler - INFO - Patch file 'dbserver.patch.zip' with the same checksum and size as source is already staged on remote node = scaqan03adm03.us.oracle.com
+2022-10-17 09:57:54-0700 - INFO - Dom0Handler - INFO - Patch file 'dbserver.patch.zip' with the same checksum and size as source is already staged on remote node = scaqan03adm04.us.oracle.com
+2022-10-17 09:57:54-0700 - INFO - Dom0Handler - INFO - Passwdless ssh connectivity is validated between Exacloud/CPS nodes to target launch nodes.
+2022-10-17 09:57:54-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com
+2022-10-17 09:57:54-0700 - INFO - ebCluPatchHealthCheck - INFO - Validating to check if scaqan03adm03.us.oracle.com is accessible from localhost via ssh.
+2022-10-17 09:57:54-0700 - INFO - ebCluPatchHealthCheck - INFO - Node : scaqan03adm03.us.oracle.com is accessible from scaqan03dv0811m.us.oracle.com(Exacloud Node) during Pre-Patch operation.
+2022-10-17 09:57:54-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com
+2022-10-17 09:57:54-0700 - INFO - ebCluPatchHealthCheck - INFO - Validating to check if scaqan03adm04.us.oracle.com is accessible from localhost via ssh.
+2022-10-17 09:57:54-0700 - INFO - ebCluPatchHealthCheck - INFO - Node : scaqan03adm04.us.oracle.com is accessible from scaqan03dv0811m.us.oracle.com(Exacloud Node) during Pre-Patch operation.
+2022-10-17 09:57:54-0700 - INFO - Dom0Handler - INFO - 
+*** Generating checksum for the patch file : /u01/downloads/exadata/PatchPayloads/22.1.2.0.0.220816/Dom0YumRepository/exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip ***
+2022-10-17 09:57:56-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com
+2022-10-17 09:57:56-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com
+2022-10-17 09:57:57-0700 - INFO - Dom0Handler - INFO - Sufficient space available to stage patches on Node : scaqan03adm03.us.oracle.com, Location : /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/, Required : 2360, Available Space : 6144592
+2022-10-17 09:57:57-0700 - INFO - Dom0Handler - INFO - Sufficient space available to stage patches on Node : scaqan03adm04.us.oracle.com, Location : /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/, Required : 2360, Available Space : 6228300
+2022-10-17 09:57:57-0700 - INFO - Dom0Handler - INFO - Patch file 'exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip' with the same checksum and size as source is already staged on remote node = scaqan03adm03.us.oracle.com
+2022-10-17 09:57:57-0700 - INFO - Dom0Handler - INFO - Patch file 'exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip' with the same checksum and size as source is already staged on remote node = scaqan03adm04.us.oracle.com
+2022-10-17 09:57:57-0700 - INFO - Dom0Handler - INFO - Selecting scaqan03adm03.us.oracle.com as a patch base for other DOM0. patchmgr is at /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr
+2022-10-17 09:57:57-0700 - INFO - Dom0Handler - INFO - Configurable parameter for parallel execution timeout in Infrapatching.conf currently set to 600 seconds
+2022-10-17 09:57:57-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com
+2022-10-17 09:57:58-0700 - INFO - Dom0Handler - INFO - Active image version fetched to purge patches : 22.1.1.0.0.220814
+2022-10-17 09:58:09-0700 - INFO - Dom0Handler - INFO - Inactive image version fetched to purge patches : 
+2022-10-17 09:58:09-0700 - INFO - Dom0Handler - INFO - Passwdless ssh connectivity is validated between Exacloud/CPS nodes to target launch nodes.
+2022-10-17 09:58:09-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com
+2022-10-17 09:58:09-0700 - INFO - ebCluPatchHealthCheck - INFO - Validating to check if scaqan03adm04.us.oracle.com is accessible from localhost via ssh.
+2022-10-17 09:58:09-0700 - INFO - ebCluPatchHealthCheck - INFO - Node : scaqan03adm04.us.oracle.com is accessible from scaqan03dv0811m.us.oracle.com(Exacloud Node) during Pre-Patch operation.
+2022-10-17 09:58:09-0700 - INFO - Dom0Handler - INFO - 
+*** Generating checksum for the patch file : /u01/downloads/exadata/PatchPayloads/22.1.2.0.0.220816/DBPatchFile/dbserver.patch.zip ***
+2022-10-17 09:58:10-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com
+2022-10-17 09:58:10-0700 - INFO - Dom0Handler - INFO - Sufficient space available to stage patches on Node : scaqan03adm04.us.oracle.com, Location : /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/, Required : 2360, Available Space : 6228300
+2022-10-17 09:58:10-0700 - INFO - Dom0Handler - INFO - Patch file 'dbserver.patch.zip' with the same checksum and size as source is already staged on remote node = scaqan03adm04.us.oracle.com
+2022-10-17 09:58:10-0700 - INFO - Dom0Handler - INFO - Passwdless ssh connectivity is validated between Exacloud/CPS nodes to target launch nodes.
+2022-10-17 09:58:10-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com
+2022-10-17 09:58:10-0700 - INFO - ebCluPatchHealthCheck - INFO - Validating to check if scaqan03adm04.us.oracle.com is accessible from localhost via ssh.
+2022-10-17 09:58:10-0700 - INFO - ebCluPatchHealthCheck - INFO - Node : scaqan03adm04.us.oracle.com is accessible from scaqan03dv0811m.us.oracle.com(Exacloud Node) during Pre-Patch operation.
+2022-10-17 09:58:10-0700 - INFO - Dom0Handler - INFO - 
+*** Generating checksum for the patch file : /u01/downloads/exadata/PatchPayloads/22.1.2.0.0.220816/Dom0YumRepository/exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip ***
+2022-10-17 09:58:12-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com
+2022-10-17 09:58:13-0700 - INFO - Dom0Handler - INFO - Sufficient space available to stage patches on Node : scaqan03adm04.us.oracle.com, Location : /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/, Required : 2360, Available Space : 6228300
+2022-10-17 09:58:13-0700 - INFO - Dom0Handler - INFO - Patch file 'exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip' with the same checksum and size as source is already staged on remote node = scaqan03adm04.us.oracle.com
+2022-10-17 09:58:13-0700 - INFO - Dom0Handler - INFO - Selecting scaqan03adm04.us.oracle.com as a patch base for the initial DOM0 patcher. patchmgr is at /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr
+2022-10-17 09:58:13-0700 - INFO - Dom0Handler - INFO - Selected launch nodes ['scaqan03adm03.us.oracle.com', 'scaqan03adm04.us.oracle.com']
+2022-10-17 09:58:13-0700 - INFO - Dom0Handler - INFO - Patch manager Log Path on Launch Node is /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5
+2022-10-17 09:58:13-0700 - INFO - Dom0Handler - INFO - Patch metadata file = /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patch_states_data/b672ecab-2688-4b75-95b4-ece7398992b5_patch_progress_report.json
+2022-10-17 09:58:13-0700 - INFO - Obtained SSH public key for host scaqan03adm03.us.oracle.com
+2022-10-17 09:58:14-0700 - INFO - *** Invoking Callback for Process ID:e3d1c07e-4e3c-11ed-9dbc-52540094717e
+2022-10-17 09:58:14-0700 - INFO - Obtained SSH public key for host scaqan03adm04.us.oracle.com
+2022-10-17 09:58:15-0700 - INFO - *** Invoking Callback for Process ID:e4949ce8-4e3c-11ed-9dbc-52540094717e
+2022-10-17 09:58:16-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com
+2022-10-17 09:58:16-0700 - INFO - ebCluPatchHealthCheck - INFO - Validating to check if scaqan03adm04.us.oracle.com is accessible from scaqan03adm03.us.oracle.com via ssh.
+2022-10-17 09:58:16-0700 - INFO - ebCluPatchHealthCheck - INFO - Node : scaqan03adm04.us.oracle.com is accessible from scaqan03adm03.us.oracle.com during Pre-Patch operation.
+2022-10-17 09:58:16-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com
+2022-10-17 09:58:16-0700 - INFO - ebCluPatchHealthCheck - INFO - Validating to check if scaqan03adm03.us.oracle.com is accessible from scaqan03adm04.us.oracle.com via ssh.
+2022-10-17 09:58:17-0700 - INFO - ebCluPatchHealthCheck - INFO - Node : scaqan03adm03.us.oracle.com is accessible from scaqan03adm04.us.oracle.com during Pre-Patch operation.
+2022-10-17 09:58:17-0700 - INFO - Dom0Handler - INFO - Finished Setting up Environment for Dom0
+2022-10-17 09:58:17-0700 - WARNING - Dom0Handler - WARN - Step filter_nodes_dom0 not in list
+2022-10-17 09:58:18-0700 - INFO - ebCluPatchHealthCheck - INFO - Image version retrieved = 22.1.1.0.0.220814
+2022-10-17 09:58:18-0700 - INFO - Dom0Handler - INFO - Current Image version on Node scaqan03adm03.us.oracle.com is 22.1.1.0.0.220814 
+2022-10-17 09:58:19-0700 - INFO - ebCluPatchHealthCheck - INFO - Image version retrieved = 22.1.1.0.0.220814
+2022-10-17 09:58:20-0700 - INFO - Dom0Handler - INFO - Node scaqan03adm03.us.oracle.com will be upgraded/patched to Image Version 22.1.2.0.0.220816 
+2022-10-17 09:58:20-0700 - INFO - Dom0Handler - INFO - Adding scaqan03adm03.us.oracle.com to available nodes list
+2022-10-17 09:58:21-0700 - INFO - ebCluPatchHealthCheck - INFO - Image version retrieved = 22.1.1.0.0.220814
+2022-10-17 09:58:21-0700 - INFO - Dom0Handler - INFO - Current Image version on Node scaqan03adm04.us.oracle.com is 22.1.1.0.0.220814 
+2022-10-17 09:58:22-0700 - INFO - ebCluPatchHealthCheck - INFO - Image version retrieved = 22.1.1.0.0.220814
+2022-10-17 09:58:23-0700 - INFO - Dom0Handler - INFO - Node scaqan03adm04.us.oracle.com will be upgraded/patched to Image Version 22.1.2.0.0.220816 
+2022-10-17 09:58:23-0700 - INFO - Dom0Handler - INFO - Adding scaqan03adm04.us.oracle.com to available nodes list
+2022-10-17 09:58:23-0700 - INFO - Dom0Handler - INFO - Updating patch status JSON with Node Progressing status to Exacloud DB.
+2022-10-17 09:58:23-0700 - INFO - Dom0Handler - INFO - Starting patch notification service
+2022-10-17 09:58:23-0700 - INFO - Dom0Handler - INFO - mMonitorPatchReqForCNS: Patchmgr_old_xml_loc = /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5/notification_patchxml_old
+2022-10-17 09:58:23-0700 - INFO - Write initial metadata with file location '/EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patch_states_data/b672ecab-2688-4b75-95b4-ece7398992b5_patch_progress_report.json' on all launch nodes = '['scaqan03adm03.us.oracle.com', 'scaqan03adm04.us.oracle.com']'
+2022-10-17 09:58:23-0700 - INFO - ebCluPatchStateInfo - INFO - Writing patch states JSON to file : /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patch_states_data/b672ecab-2688-4b75-95b4-ece7398992b5_patch_progress_report.json
+2022-10-17 09:58:24-0700 - INFO - ebCluPatchStateInfo - INFO - Writing patch states JSON to file : /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patch_states_data/b672ecab-2688-4b75-95b4-ece7398992b5_patch_progress_report.json
+2022-10-17 09:58:24-0700 - INFO - ebCluPatchHealthCheck - INFO - KVM environment
+2022-10-17 09:58:24-0700 - INFO - ebCluPatchHealthCheck - INFO - Performing DomU Auto startup validations on scaqan03adm03.us.oracle.com
+2022-10-17 09:58:25-0700 - INFO - ebCluPatchHealthCheck - INFO - KVM environment
+2022-10-17 09:58:25-0700 - INFO - ebCluPatchHealthCheck - INFO - Performing DomU Auto startup validations on scaqan03adm04.us.oracle.com
+2022-10-17 09:58:25-0700 - INFO - Dom0Handler - INFO - Preparing Node List to Check for Stale Mounts
+2022-10-17 09:58:25-0700 - INFO - Dom0Handler - INFO - *** Final _stale_mount_check_node_list ['scaqan03adm03.us.oracle.com', 'scaqan03adm04.us.oracle.com'] ***
+2022-10-17 09:58:25-0700 - INFO - Dom0Handler - INFO - Check for Stale Mounts and get the Mount List.
+2022-10-17 09:58:25-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com
+2022-10-17 09:58:25-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com
+2022-10-17 09:58:26-0700 - INFO - Dom0Handler - INFO - Mount List on host scaqan03adm03.us.oracle.com is ['/\n', '/boot\n', '/boot/efi\n', '/dev\n', '/dev/hugepages\n', '/dev/mqueue\n', '/dev/pts\n', '/dev/shm\n', '/EXAVMIMAGES\n', '/home\n', '/proc\n', '/proc/sys/fs/binfmt_misc\n', '/run\n', '/run/user/0\n', '/sys\n', '/sys/firmware/efi/efivars\n', '/sys/fs/cgroup\n', '/sys/fs/cgroup/blkio\n', '/sys/fs/cgroup/cpu,cpuacct\n', '/sys/fs/cgroup/cpuset\n', '/sys/fs/cgroup/devices\n', '/sys/fs/cgroup/freezer\n', '/sys/fs/cgroup/hugetlb\n', '/sys/fs/cgroup/memory\n', '/sys/fs/cgroup/net_cls,net_prio\n', '/sys/fs/cgroup/perf_event\n', '/sys/fs/cgroup/pids\n', '/sys/fs/cgroup/rdma\n', '/sys/fs/cgroup/systemd\n', '/sys/fs/fuse/connections\n', '/sys/fs/pstore\n', '/sys/kernel/config\n', '/sys/kernel/debug\n', '/sys/kernel/debug/tracing\n', '/sys/kernel/security\n', '/tmp\n', '/var\n', '/var/log\n', '/var/log/audit\n'] 
+2022-10-17 09:58:26-0700 - INFO - Dom0Handler - INFO - Mount List on host scaqan03adm04.us.oracle.com is ['/\n', '/boot\n', '/boot/efi\n', '/dev\n', '/dev/hugepages\n', '/dev/mqueue\n', '/dev/pts\n', '/dev/shm\n', '/EXAVMIMAGES\n', '/home\n', '/proc\n', '/proc/sys/fs/binfmt_misc\n', '/run\n', '/run/user/0\n', '/sys\n', '/sys/firmware/efi/efivars\n', '/sys/fs/cgroup\n', '/sys/fs/cgroup/blkio\n', '/sys/fs/cgroup/cpu,cpuacct\n', '/sys/fs/cgroup/cpuset\n', '/sys/fs/cgroup/devices\n', '/sys/fs/cgroup/freezer\n', '/sys/fs/cgroup/hugetlb\n', '/sys/fs/cgroup/memory\n', '/sys/fs/cgroup/net_cls,net_prio\n', '/sys/fs/cgroup/perf_event\n', '/sys/fs/cgroup/pids\n', '/sys/fs/cgroup/rdma\n', '/sys/fs/cgroup/systemd\n', '/sys/fs/fuse/connections\n', '/sys/fs/pstore\n', '/sys/kernel/config\n', '/sys/kernel/debug\n', '/sys/kernel/debug/tracing\n', '/sys/kernel/security\n', '/tmp\n', '/var\n', '/var/log\n', '/var/log/audit\n'] 
+2022-10-17 09:58:28-0700 - INFO - Dom0Handler - INFO - Fetched all mounts
+2022-10-17 09:58:28-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com-/
+2022-10-17 09:58:28-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com-/
+2022-10-17 09:58:28-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com-/boot
+2022-10-17 09:58:28-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com-/boot
+2022-10-17 09:58:28-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com-/boot/efi
+2022-10-17 09:58:28-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com-/boot/efi
+2022-10-17 09:58:28-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com-/dev
+2022-10-17 09:58:28-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com-/dev
+2022-10-17 09:58:28-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com-/dev/hugepages
+2022-10-17 09:58:28-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com-/dev/hugepages
+2022-10-17 09:58:28-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com-/dev/mqueue
+2022-10-17 09:58:28-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com-/dev/mqueue
+2022-10-17 09:58:28-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com-/dev/pts
+2022-10-17 09:58:28-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com-/dev/pts
+2022-10-17 09:58:28-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com-/dev/shm
+2022-10-17 09:58:28-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com-/dev/shm
+2022-10-17 09:58:28-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com-/EXAVMIMAGES
+2022-10-17 09:58:28-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com-/EXAVMIMAGES
+2022-10-17 09:58:28-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com-/home
+2022-10-17 09:58:28-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com-/home
+2022-10-17 09:58:28-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com-/proc
+2022-10-17 09:58:29-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com-/proc
+2022-10-17 09:58:29-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com-/proc/sys/fs/binfmt_misc
+2022-10-17 09:58:29-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com-/proc/sys/fs/binfmt_misc
+2022-10-17 09:58:29-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com-/run
+2022-10-17 09:58:29-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com-/run
+2022-10-17 09:58:29-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com-/run/user/0
+2022-10-17 09:58:29-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com-/run/user/0
+2022-10-17 09:58:29-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com-/sys
+2022-10-17 09:58:29-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com-/sys
+2022-10-17 09:58:29-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com-/sys/firmware/efi/efivars
+2022-10-17 09:58:29-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com-/sys/firmware/efi/efivars
+2022-10-17 09:58:29-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com-/sys/fs/cgroup
+2022-10-17 09:58:29-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com-/sys/fs/cgroup
+2022-10-17 09:58:29-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com-/sys/fs/cgroup/blkio
+2022-10-17 09:58:29-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com-/sys/fs/cgroup/blkio
+2022-10-17 09:58:29-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com-/sys/fs/cgroup/cpu,cpuacct
+2022-10-17 09:58:30-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com-/sys/fs/cgroup/cpu,cpuacct
+2022-10-17 09:58:30-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com-/sys/fs/cgroup/cpuset
+2022-10-17 09:58:30-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com-/sys/fs/cgroup/cpuset
+2022-10-17 09:58:30-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com-/sys/fs/cgroup/devices
+2022-10-17 09:58:30-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com-/sys/fs/cgroup/devices
+2022-10-17 09:58:30-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com-/sys/fs/cgroup/freezer
+2022-10-17 09:58:30-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com-/sys/fs/cgroup/freezer
+2022-10-17 09:58:30-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com-/sys/fs/cgroup/hugetlb
+2022-10-17 09:58:30-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com-/sys/fs/cgroup/hugetlb
+2022-10-17 09:58:30-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com-/sys/fs/cgroup/memory
+2022-10-17 09:58:30-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com-/sys/fs/cgroup/memory
+2022-10-17 09:58:30-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com-/sys/fs/cgroup/net_cls,net_prio
+2022-10-17 09:58:30-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com-/sys/fs/cgroup/net_cls,net_prio
+2022-10-17 09:58:30-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com-/sys/fs/cgroup/perf_event
+2022-10-17 09:58:31-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com-/sys/fs/cgroup/perf_event
+2022-10-17 09:58:31-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com-/sys/fs/cgroup/pids
+2022-10-17 09:58:31-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com-/sys/fs/cgroup/pids
+2022-10-17 09:58:31-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com-/sys/fs/cgroup/rdma
+2022-10-17 09:58:31-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com-/sys/fs/cgroup/rdma
+2022-10-17 09:58:31-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com-/sys/fs/cgroup/systemd
+2022-10-17 09:58:31-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com-/sys/fs/cgroup/systemd
+2022-10-17 09:58:31-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com-/sys/fs/fuse/connections
+2022-10-17 09:58:31-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com-/sys/fs/fuse/connections
+2022-10-17 09:58:32-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com-/sys/fs/pstore
+2022-10-17 09:58:32-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com-/sys/fs/pstore
+2022-10-17 09:58:32-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com-/sys/kernel/config
+2022-10-17 09:58:32-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com-/sys/kernel/config
+2022-10-17 09:58:32-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com-/sys/kernel/debug
+2022-10-17 09:58:32-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com-/sys/kernel/debug
+2022-10-17 09:58:32-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com-/sys/kernel/debug/tracing
+2022-10-17 09:58:32-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com-/sys/kernel/debug/tracing
+2022-10-17 09:58:32-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com-/sys/kernel/security
+2022-10-17 09:58:32-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com-/sys/kernel/security
+2022-10-17 09:58:32-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com-/tmp
+2022-10-17 09:58:32-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com-/tmp
+2022-10-17 09:58:32-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com-/var
+2022-10-17 09:58:32-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com-/var
+2022-10-17 09:58:32-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com-/var/log
+2022-10-17 09:58:32-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com-/var/log
+2022-10-17 09:58:32-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm03.us.oracle.com-/var/log/audit
+2022-10-17 09:58:33-0700 - INFO - *** Invoking Callback for Process ID:scaqan03adm04.us.oracle.com-/var/log/audit
+2022-10-17 09:58:33-0700 - INFO - Dom0Handler - INFO - Checked all stale mounts
+2022-10-17 09:58:33-0700 - INFO - Dom0Handler - INFO - *** No Stale Mounts Detected ***
+2022-10-17 09:58:33-0700 - INFO - Dom0Handler - INFO - System consistency check started.
+2022-10-17 09:58:33-0700 - INFO - Dom0Handler - INFO - System consistency check started on node = scaqan03adm03.us.oracle.com
+2022-10-17 09:58:34-0700 - INFO - Dom0Handler - INFO - Command for duplicate rpm validation = rpm -qa --queryformat '%{ARCH} %{NAME}
+' | sort | uniq -c | sed -e 's/^ *//g'| egrep -v "^1|kernel-uek|uptrack-updates"
+2022-10-17 09:58:34-0700 - INFO - Dom0Handler - INFO - Command for incomplete yum transaction = find /var/lib/yum -maxdepth 1 -type f -name 'transaction-all*' -not -name '*disabled'
+2022-10-17 09:58:34-0700 - INFO - Dom0Handler - INFO - System consistency check completed on node = scaqan03adm03.us.oracle.com
+2022-10-17 09:58:34-0700 - INFO - Dom0Handler - INFO - System consistency check started on node = scaqan03adm04.us.oracle.com
+2022-10-17 09:58:34-0700 - INFO - Dom0Handler - INFO - Command for duplicate rpm validation = rpm -qa --queryformat '%{ARCH} %{NAME}
+' | sort | uniq -c | sed -e 's/^ *//g'| egrep -v "^1|kernel-uek|uptrack-updates"
+2022-10-17 09:58:35-0700 - INFO - Dom0Handler - INFO - Command for incomplete yum transaction = find /var/lib/yum -maxdepth 1 -type f -name 'transaction-all*' -not -name '*disabled'
+2022-10-17 09:58:35-0700 - INFO - Dom0Handler - INFO - System consistency check completed on node = scaqan03adm04.us.oracle.com
+2022-10-17 09:58:35-0700 - INFO - Dom0Handler - INFO - System consistency check completed.
+2022-10-17 09:58:35-0700 - INFO - Dom0Handler - INFO - _node_to_patch_nodes = scaqan03adm03.us.oracle.com, _node_to_patch_initial_node = scaqan03adm04.us.oracle.com
+2022-10-17 09:58:35-0700 - INFO - Dom0Handler - INFO - _nodes_to_patch_except_initial = ['scaqan03adm04.us.oracle.com'], _initial_node_list= ['scaqan03adm03.us.oracle.com']
+2022-10-17 09:58:35-0700 - WARNING - Dom0Handler - WARN - Step filter_nodes_dom0 not in list
+2022-10-17 09:58:36-0700 - INFO - ebCluPatchHealthCheck - INFO - Image version retrieved = 22.1.1.0.0.220814
+2022-10-17 09:58:36-0700 - INFO - Dom0Handler - INFO - Current Image version on Node scaqan03adm03.us.oracle.com is 22.1.1.0.0.220814 
+2022-10-17 09:58:37-0700 - INFO - ebCluPatchHealthCheck - INFO - Image version retrieved = 22.1.1.0.0.220814
+2022-10-17 09:58:38-0700 - INFO - Dom0Handler - INFO - Node scaqan03adm03.us.oracle.com will be upgraded/patched to Image Version 22.1.2.0.0.220816 
+2022-10-17 09:58:38-0700 - INFO - Dom0Handler - INFO - Adding scaqan03adm03.us.oracle.com to available nodes list
+2022-10-17 09:58:39-0700 - INFO - ebCluPatchHealthCheck - INFO - Image version retrieved = 22.1.1.0.0.220814
+2022-10-17 09:58:39-0700 - INFO - Dom0Handler - INFO - Current Image version on Node scaqan03adm04.us.oracle.com is 22.1.1.0.0.220814 
+2022-10-17 09:58:40-0700 - INFO - ebCluPatchHealthCheck - INFO - Image version retrieved = 22.1.1.0.0.220814
+2022-10-17 09:58:41-0700 - INFO - Dom0Handler - INFO - Node scaqan03adm04.us.oracle.com will be upgraded/patched to Image Version 22.1.2.0.0.220816 
+2022-10-17 09:58:41-0700 - INFO - Dom0Handler - INFO - Adding scaqan03adm04.us.oracle.com to available nodes list
+2022-10-17 09:58:41-0700 - INFO - Dom0Handler - INFO - Critical hardware alerts verification started.
+2022-10-17 09:58:41-0700 - INFO - Infra known alerts dom0: ['No link detected on required Ethernet', 'alert.chassis.fw.fpga-upgrade-blocked', 'Attribute Name : DiskFirmwareVersion *Required *: *ORAB']
+2022-10-17 09:58:43-0700 - INFO - Dom0Handler - INFO - Critical hardware alerts verification completed.
+2022-10-17 09:58:43-0700 - INFO - Infra known alerts dom0: ['No link detected on required Ethernet', 'alert.chassis.fw.fpga-upgrade-blocked', 'Attribute Name : DiskFirmwareVersion *Required *: *ORAB']
+2022-10-17 09:58:45-0700 - INFO - Dom0Handler - INFO - Allow active networks mounts option is passed to patchmgr command.
+2022-10-17 09:58:45-0700 - INFO - Dom0Handler - INFO - Launch node = scaqan03adm03.us.oracle.com, List of Nodes to work on = ['scaqan03adm04.us.oracle.com']
+2022-10-17 09:58:45-0700 - INFO - ebCluPatchHealthCheck - INFO - Checking connection to scaqan03adm04.us.oracle.com.
+2022-10-17 09:58:47-0700 - INFO - ebCluPatchHealthCheck - INFO - Image version retrieved = 22.1.1.0.0.220814
+2022-10-17 09:58:47-0700 - INFO - Dom0Handler - INFO - ebCluPatchControl._mPatchDom0UsPreChecks: _dom0Us_count = 1, aListOfNodesToPatch = 1, doums_count_on_same_target_version = 0
+2022-10-17 09:58:47-0700 - INFO - Dom0Handler - INFO - Creating patch input file: /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/node_list
+2022-10-17 09:58:47-0700 - INFO - Dom0Handler - INFO - Create node list: ['scaqan03adm04.us.oracle.com']
+2022-10-17 09:58:47-0700 - INFO - Dom0Handler - INFO - *** Checking for existence of patchmgr/dbnodeupdate.sh sessions in the cluster.
+2022-10-17 09:58:47-0700 - INFO - Dom0Handler - INFO - 
+Patchmgr Command running in the background : 
+
+cd /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/; nohup ./patchmgr -dbnodes node_list -precheck  -iso_repo exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip -target_version 22.1.2.0.0.220816 -log_dir /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5 -allow_active_network_mounts </dev/null &> /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5/PatchmgrConsole.out &
+
+2022-10-17 09:58:48-0700 - INFO - Dom0Handler - INFO - mCreateDummyPatchmgrXml: __patchmgr_old_xml_loc /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5/notification_patchxml_old
+2022-10-17 09:58:48-0700 - INFO - Dom0Handler - INFO - mCreateDummyPatchmgrXml: mGetPatchmgrLogPathOnLaunchNode(). Before Update = /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5
+2022-10-17 09:58:48-0700 - INFO - Dom0Handler - INFO - mCreateDummyPatchmgrXml: mGetPatchmgrLogPathOnLaunchNode(). After Update = /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5
+2022-10-17 09:58:48-0700 - WARNING - Dom0Handler - WARN - Patch notification log location : '/EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5/notifications' does not exist. Checking again after 10 seconds
+2022-10-17 09:58:48-0700 - INFO - Dom0Handler - INFO - mCreateDummyPatchmgrXml: __patchmgr_old_xml_loc /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5/notification_patchxml_old
+2022-10-17 09:58:48-0700 - INFO - Dom0Handler - INFO - mCreateDummyPatchmgrXml: mGetPatchmgrLogPathOnLaunchNode(). Before Update = /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5
+2022-10-17 09:58:48-0700 - INFO - Dom0Handler - INFO - mCreateDummyPatchmgrXml: mGetPatchmgrLogPathOnLaunchNode(). After Update = /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5
+2022-10-17 09:58:54-0700 - INFO - Dom0Handler - INFO - Fetching Patch List Details using child request uuid bceca276-4e3c-11ed-a829-52540094717e 
+2022-10-17 09:58:54-0700 - INFO - Dom0Handler - INFO - Master request uuid for cnsjson in success case bc1a81ba-4e3c-11ed-a829-52540094717e
+2022-10-17 09:58:54-0700 - WARNING - Dom0Handler - WARN - json_report error code is not populated in mParsePatchmgrXml
+2022-10-17 09:58:54-0700 - INFO - Dom0Handler - INFO - Found Json patch report data.
+2022-10-17 09:58:54-0700 - INFO - Dom0Handler - INFO - mUpdateCnsJsonPayload - Save the patch notification JSON to database
+2022-10-17 09:58:58-0700 - INFO - Dom0Handler - INFO - Patch notification log location exists : /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5/notifications
+2022-10-17 09:58:58-0700 - INFO - Dom0Handler - INFO - mUpdateInfrapatchingTimeStatsForUnfilledStages : Updating timestat details for the child_uuid bceca276-4e3c-11ed-a829-52540094717e 
+2022-10-17 09:58:58-0700 - INFO - Dom0Handler - INFO - Fetching Patch List Details using child request uuid bceca276-4e3c-11ed-a829-52540094717e 
+2022-10-17 09:58:58-0700 - INFO - Dom0Handler - INFO - mCreateInfrapatchingTimeStatsEntry : Updating timestat details for PATCH_MGR and nodes ['scaqan03adm04.us.oracle.com']
+2022-10-17 09:58:58-0700 - INFO - Dom0Handler - INFO - Read patchmgr console from node = scaqan03adm03.us.oracle.com and log loc = /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5
+2022-10-17 09:58:58-0700 - INFO - Dom0Handler - INFO - 
+
+--------> Patchmgr output starts here <--------
+
+2022-10-17 09:58:58-0700 - INFO - PatchmgrHandler - INFO - Initiate precheck on 1 node(s)
+2022-10-17 09:59:12-0700 - INFO - PatchmgrHandler - INFO - Check free space on scaqan03adm04.us.oracle.com
+2022-10-17 09:59:17-0700 - INFO - PatchmgrHandler - INFO - Preparing nodes: scaqan03adm04.us.oracle.com
+2022-10-17 09:59:38-0700 - INFO - PatchmgrHandler - INFO - dbnodeupdate.sh running a precheck for the conventional update on node(s).
+2022-10-17 09:59:54-0700 - INFO - Dom0Handler - INFO - Fetching Patch List Details using child request uuid bceca276-4e3c-11ed-a829-52540094717e 
+2022-10-17 09:59:54-0700 - INFO - Dom0Handler - INFO - Master request uuid for cnsjson in success case bc1a81ba-4e3c-11ed-a829-52540094717e
+2022-10-17 09:59:54-0700 - WARNING - Dom0Handler - WARN - json_report error code is not populated in mParsePatchmgrXml
+2022-10-17 09:59:54-0700 - INFO - Dom0Handler - INFO - Found Json patch report data.
+2022-10-17 09:59:54-0700 - WARNING - Dom0Handler - WARN - Current state of patch notification is not available as of now. Displaying last updated status.
+2022-10-17 09:59:54-0700 - INFO - Dom0Handler - INFO - mUpdateCnsJsonPayload - Save the patch notification JSON to database
+2022-10-17 10:01:17-0700 - INFO - PatchmgrHandler - INFO - Initiate precheck on node(s).
+2022-10-17 10:01:19-0700 - INFO - PatchmgrHandler - INFO - Completed run of command: ./patchmgr -dbnodes node_list -precheck -iso_repo exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip -target_version 22.1.2.0.0.220816 -log_dir /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5 -allow_active_network_mounts
+2022-10-17 10:01:19-0700 - INFO - PatchmgrHandler - INFO - - patchmgr.trc
+2022-10-17 10:01:19-0700 - INFO - PatchmgrHandler - INFO - 0m
+2022-10-17 10:01:19-0700 - INFO - PatchmgrHandler - INFO - 0m Your patchmgr is more than 60 days old. Check MOS 1553103.1 and make sure you have the most recent version.
+2022-10-17 10:01:19-0700 - INFO - PatchmgrHandler - INFO - Checking hosts connectivity via ICMP/ping
+2022-10-17 10:01:19-0700 - INFO - PatchmgrHandler - INFO - Hosts Reachable: [scaqan03adm04.us.oracle.com->
+2022-10-17 10:01:19-0700 - INFO - PatchmgrHandler - INFO - All hosts are reachable via ping/ICMP
+2022-10-17 10:01:19-0700 - INFO - PatchmgrHandler - INFO - Verify SSH equivalence for the root user to scaqan03adm04.us.oracle.com
+2022-10-17 10:01:19-0700 - INFO - PatchmgrHandler - INFO - --
+2022-10-17 10:01:19-0700 - INFO - PatchmgrHandler - INFO - For details, check the following files in /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.2.0.0.220816_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_b672ecab-2688-4b75-95b4-ece7398992b5:
+2022-10-17 10:01:19-0700 - INFO - PatchmgrHandler - INFO - - <dbnode_name>_dbnodeupdate.log
+2022-10-17 10:01:19-0700 - INFO - PatchmgrHandler - INFO - - patchmgr.log
+2022-10-17 10:01:19-0700 - INFO - PatchmgrHandler - INFO - - patchmgr.trc
+2022-10-17 10:01:19-0700 - INFO - PatchmgrHandler - INFO - Collected dbnodeupdate diag in file: Diag_patchmgr_dbnode_precheck_171022095848.tbz
+2022-10-17 10:01:19-0700 - INFO - PatchmgrHandler - INFO - 2022-10-17 10:01:19 -0700        :

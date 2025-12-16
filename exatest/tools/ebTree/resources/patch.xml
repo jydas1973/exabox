@@ -1,0 +1,2849 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<engineeredSystem filetype="Vswitch" oedaversion="17.089.19:00" xmlns="model">
+  <customerName>scaqab10adm0102</customerName>
+  <exacloudVersion>1</exacloudVersion>
+  <machines>
+    <machine id="scaqab10adm01.us.oracle.com_id">
+      <hostName>scaqab10adm01.us.oracle.com</hostName>
+      <TimeZone>America/Los_Angeles</TimeZone>
+      <osType>LinuxDom0</osType>
+      <DefaultGatewayNet>scaqab10adm01.us.oracle.com_admin</DefaultGatewayNet>
+      <machine id="scaqab10adm01vm01.us.oracle.com_id"/>
+      <machine id="scaqab10adm01vm02.us.oracle.com_id"/>
+      <machine id="scaqab10adm01vm03.us.oracle.com_id"/>
+      <machine id="scaqab10adm01vm04.us.oracle.com_id"/>
+      <machine id="scaqab10adm01vm05.us.oracle.com_id"/>
+      <machine id="scaqab10adm01vm06.us.oracle.com_id"/>
+      <machine id="scaqab10adm01vm07.us.oracle.com_id"/>
+      <machine id="scaqab10adm01vm08.us.oracle.com_id"/>
+      <networks>
+        <network id="scaqab10adm01.us.oracle.com_admin"/>
+        <network id="scaqab10adm01.us.oracle.com_priv1"/>
+        <network id="scaqab10adm01.us.oracle.com_priv2"/>
+      </networks>
+      <dnsServers>
+        <dnsServer>
+          <ipAddress>10.210.255.250</ipAddress>
+        </dnsServer>
+        <dnsServer>
+          <ipAddress>10.231.225.65</ipAddress>
+        </dnsServer>
+        <dnsServer>
+          <ipAddress>192.135.82.4</ipAddress>
+        </dnsServer>
+      </dnsServers>
+      <ntpServers>
+        <ntpServer>
+          <ipAddress>10.210.176.28</ipAddress>
+        </ntpServer>
+        <ntpServer>
+          <ipAddress>10.132.0.122</ipAddress>
+        </ntpServer>
+      </ntpServers>
+    </machine>
+    <machine id="scaqab10adm02.us.oracle.com_id">
+      <hostName>scaqab10adm02.us.oracle.com</hostName>
+      <TimeZone>America/Los_Angeles</TimeZone>
+      <osType>LinuxDom0</osType>
+      <DefaultGatewayNet>scaqab10adm02.us.oracle.com_admin</DefaultGatewayNet>
+      <machine id="scaqab10adm02vm01.us.oracle.com_id"/>
+      <machine id="scaqab10adm02vm02.us.oracle.com_id"/>
+      <machine id="scaqab10adm02vm03.us.oracle.com_id"/>
+      <machine id="scaqab10adm02vm04.us.oracle.com_id"/>
+      <machine id="scaqab10adm02vm05.us.oracle.com_id"/>
+      <machine id="scaqab10adm02vm06.us.oracle.com_id"/>
+      <machine id="scaqab10adm02vm07.us.oracle.com_id"/>
+      <machine id="scaqab10adm02vm08.us.oracle.com_id"/>
+      <networks>
+        <network id="scaqab10adm02.us.oracle.com_admin"/>
+        <network id="scaqab10adm02.us.oracle.com_priv1"/>
+        <network id="scaqab10adm02.us.oracle.com_priv2"/>
+      </networks>
+      <dnsServers>
+        <dnsServer>
+          <ipAddress>10.210.255.250</ipAddress>
+        </dnsServer>
+        <dnsServer>
+          <ipAddress>10.231.225.65</ipAddress>
+        </dnsServer>
+        <dnsServer>
+          <ipAddress>192.135.82.4</ipAddress>
+        </dnsServer>
+      </dnsServers>
+      <ntpServers>
+        <ntpServer>
+          <ipAddress>10.210.176.28</ipAddress>
+        </ntpServer>
+        <ntpServer>
+          <ipAddress>10.132.0.122</ipAddress>
+        </ntpServer>
+      </ntpServers>
+    </machine>
+    <machine id="scaqab10celadm01.us.oracle.com_id">
+      <hostName>scaqab10celadm01.us.oracle.com</hostName>
+      <TimeZone>America/Los_Angeles</TimeZone>
+      <osType>LinuxPhysical</osType>
+      <storage>
+        <localDisks>
+          <localDisk id="scaqab10celadm01_CD_00"/>
+          <localDisk id="scaqab10celadm01_CD_01"/>
+          <localDisk id="scaqab10celadm01_CD_02"/>
+          <localDisk id="scaqab10celadm01_CD_03"/>
+          <localDisk id="scaqab10celadm01_CD_04"/>
+          <localDisk id="scaqab10celadm01_CD_05"/>
+          <localDisk id="scaqab10celadm01_CD_06"/>
+          <localDisk id="scaqab10celadm01_CD_07"/>
+          <localDisk id="scaqab10celadm01_CD_08"/>
+          <localDisk id="scaqab10celadm01_CD_09"/>
+          <localDisk id="scaqab10celadm01_CD_10"/>
+          <localDisk id="scaqab10celadm01_CD_11"/>
+        </localDisks>
+      </storage>
+      <networks>
+        <network id="scaqab10celadm01.us.oracle.com_admin"/>
+        <network id="scaqab10celadm01.us.oracle.com_priv1"/>
+        <network id="scaqab10celadm01.us.oracle.com_priv2"/>
+      </networks>
+      <dnsServers>
+        <dnsServer>
+          <ipAddress>10.210.255.250</ipAddress>
+        </dnsServer>
+        <dnsServer>
+          <ipAddress>10.231.225.65</ipAddress>
+        </dnsServer>
+        <dnsServer>
+          <ipAddress>192.135.82.4</ipAddress>
+        </dnsServer>
+      </dnsServers>
+      <ntpServers>
+        <ntpServer>
+          <ipAddress>10.210.176.28</ipAddress>
+        </ntpServer>
+        <ntpServer>
+          <ipAddress>10.132.0.122</ipAddress>
+        </ntpServer>
+      </ntpServers>
+    </machine>
+    <machine id="scaqab10celadm02.us.oracle.com_id">
+      <hostName>scaqab10celadm02.us.oracle.com</hostName>
+      <TimeZone>America/Los_Angeles</TimeZone>
+      <osType>LinuxPhysical</osType>
+      <storage>
+        <localDisks>
+          <localDisk id="scaqab10celadm02_CD_00"/>
+          <localDisk id="scaqab10celadm02_CD_01"/>
+          <localDisk id="scaqab10celadm02_CD_02"/>
+          <localDisk id="scaqab10celadm02_CD_03"/>
+          <localDisk id="scaqab10celadm02_CD_04"/>
+          <localDisk id="scaqab10celadm02_CD_05"/>
+          <localDisk id="scaqab10celadm02_CD_06"/>
+          <localDisk id="scaqab10celadm02_CD_07"/>
+          <localDisk id="scaqab10celadm02_CD_08"/>
+          <localDisk id="scaqab10celadm02_CD_09"/>
+          <localDisk id="scaqab10celadm02_CD_10"/>
+          <localDisk id="scaqab10celadm02_CD_11"/>
+        </localDisks>
+      </storage>
+      <networks>
+        <network id="scaqab10celadm02.us.oracle.com_admin"/>
+        <network id="scaqab10celadm02.us.oracle.com_priv1"/>
+        <network id="scaqab10celadm02.us.oracle.com_priv2"/>
+      </networks>
+      <dnsServers>
+        <dnsServer>
+          <ipAddress>10.210.255.250</ipAddress>
+        </dnsServer>
+        <dnsServer>
+          <ipAddress>10.231.225.65</ipAddress>
+        </dnsServer>
+        <dnsServer>
+          <ipAddress>192.135.82.4</ipAddress>
+        </dnsServer>
+      </dnsServers>
+      <ntpServers>
+        <ntpServer>
+          <ipAddress>10.210.176.28</ipAddress>
+        </ntpServer>
+        <ntpServer>
+          <ipAddress>10.132.0.122</ipAddress>
+        </ntpServer>
+      </ntpServers>
+    </machine>
+    <machine id="scaqab10celadm03.us.oracle.com_id">
+      <hostName>scaqab10celadm03.us.oracle.com</hostName>
+      <TimeZone>America/Los_Angeles</TimeZone>
+      <osType>LinuxPhysical</osType>
+      <storage>
+        <localDisks>
+          <localDisk id="scaqab10celadm03_CD_00"/>
+          <localDisk id="scaqab10celadm03_CD_01"/>
+          <localDisk id="scaqab10celadm03_CD_02"/>
+          <localDisk id="scaqab10celadm03_CD_03"/>
+          <localDisk id="scaqab10celadm03_CD_04"/>
+          <localDisk id="scaqab10celadm03_CD_05"/>
+          <localDisk id="scaqab10celadm03_CD_06"/>
+          <localDisk id="scaqab10celadm03_CD_07"/>
+          <localDisk id="scaqab10celadm03_CD_08"/>
+          <localDisk id="scaqab10celadm03_CD_09"/>
+          <localDisk id="scaqab10celadm03_CD_10"/>
+          <localDisk id="scaqab10celadm03_CD_11"/>
+        </localDisks>
+      </storage>
+      <networks>
+        <network id="scaqab10celadm03.us.oracle.com_admin"/>
+        <network id="scaqab10celadm03.us.oracle.com_priv1"/>
+        <network id="scaqab10celadm03.us.oracle.com_priv2"/>
+      </networks>
+      <dnsServers>
+        <dnsServer>
+          <ipAddress>10.210.255.250</ipAddress>
+        </dnsServer>
+        <dnsServer>
+          <ipAddress>10.231.225.65</ipAddress>
+        </dnsServer>
+        <dnsServer>
+          <ipAddress>192.135.82.4</ipAddress>
+        </dnsServer>
+      </dnsServers>
+      <ntpServers>
+        <ntpServer>
+          <ipAddress>10.210.176.28</ipAddress>
+        </ntpServer>
+        <ntpServer>
+          <ipAddress>10.132.0.122</ipAddress>
+        </ntpServer>
+      </ntpServers>
+    </machine>
+    <machine id="scaqab10adm01vm01.us.oracle.com_id">
+      <hostName>scaqab10client01vm01.us.oracle.com</hostName>
+      <TimeZone>America/Los_Angeles</TimeZone>
+      <osType>LinuxGuest</osType>
+      <DefaultGatewayNet>c0_scaqab10adm01vm01.us.oracle.com_client</DefaultGatewayNet>
+      <software>
+        <clusters>
+          <cluster id="c0_clusterHome"/>
+        </clusters>
+        <databaseHomes>
+          <databaseHome id="c0_databaseHome"/>
+        </databaseHomes>
+      </software>
+      <networks>
+        <network id="c0_scaqab10adm01vm01-bk.us.oracle.com_backup"/>
+        <network id="c0_scaqab10adm01vm01.us.oracle.com_client"/>
+        <network id="c0_scaqab10adm01vm01.us.oracle.com_priv1"/>
+        <network id="c0_scaqab10adm01vm01.us.oracle.com_priv2"/>
+        <network id="c0_scaqab10db01vmclu01-priv.us.oracle.com_clusterpriv1"/>
+        <network id="c0_scaqab10db01vmclu01-priv.us.oracle.com_clusterpriv2"/>
+      </networks>
+      <dnsServers>
+        <dnsServer>
+          <ipAddress>10.210.255.250</ipAddress>
+        </dnsServer>
+        <dnsServer>
+          <ipAddress>10.231.225.65</ipAddress>
+        </dnsServer>
+        <dnsServer>
+          <ipAddress>192.135.82.4</ipAddress>
+        </dnsServer>
+      </dnsServers>
+      <ntpServers>
+        <ntpServer>
+          <ipAddress>10.132.0.122</ipAddress>
+        </ntpServer>
+        <ntpServer>
+          <ipAddress>10.210.176.28</ipAddress>
+        </ntpServer>
+      </ntpServers>
+      <vmSizeName id="Small"/>
+    </machine>
+    <machine id="scaqab10adm02vm01.us.oracle.com_id">
+      <hostName>scaqab10client02vm01.us.oracle.com</hostName>
+      <TimeZone>America/Los_Angeles</TimeZone>
+      <osType>LinuxGuest</osType>
+      <DefaultGatewayNet>c0_scaqab10adm02vm01.us.oracle.com_client</DefaultGatewayNet>
+      <software>
+        <clusters>
+          <cluster id="c0_clusterHome"/>
+        </clusters>
+        <databaseHomes>
+          <databaseHome id="c0_databaseHome"/>
+        </databaseHomes>
+      </software>
+      <networks>
+        <network id="c0_scaqab10adm02vm01-bk.us.oracle.com_backup"/>
+        <network id="c0_scaqab10adm02vm01.us.oracle.com_client"/>
+        <network id="c0_scaqab10adm02vm01.us.oracle.com_priv1"/>
+        <network id="c0_scaqab10adm02vm01.us.oracle.com_priv2"/>
+        <network id="c0_scaqab10db02vmclu01-priv.us.oracle.com_clusterpriv1"/>
+        <network id="c0_scaqab10db02vmclu01-priv.us.oracle.com_clusterpriv2"/>
+      </networks>
+      <dnsServers>
+        <dnsServer>
+          <ipAddress>10.210.255.250</ipAddress>
+        </dnsServer>
+        <dnsServer>
+          <ipAddress>10.231.225.65</ipAddress>
+        </dnsServer>
+        <dnsServer>
+          <ipAddress>192.135.82.4</ipAddress>
+        </dnsServer>
+      </dnsServers>
+      <ntpServers>
+        <ntpServer>
+          <ipAddress>10.132.0.122</ipAddress>
+        </ntpServer>
+        <ntpServer>
+          <ipAddress>10.210.176.28</ipAddress>
+        </ntpServer>
+      </ntpServers>
+      <vmSizeName id="Small"/>
+    </machine>
+    <machine id="scaqab10adm01vm02.us.oracle.com_id">
+      <hostName>scaqab10client01vm02.us.oracle.com</hostName>
+      <TimeZone>America/Los_Angeles</TimeZone>
+      <osType>LinuxGuest</osType>
+      <DefaultGatewayNet>c1_scaqab10adm01vm02.us.oracle.com_client</DefaultGatewayNet>
+      <software>
+        <clusters>
+          <cluster id="c1_clusterHome"/>
+        </clusters>
+        <databaseHomes>
+          <databaseHome id="c1_databaseHome"/>
+        </databaseHomes>
+      </software>
+      <networks>
+        <network id="c1_scaqab10adm01vm02-bk.us.oracle.com_backup"/>
+        <network id="c1_scaqab10adm01vm02.us.oracle.com_client"/>
+        <network id="c1_scaqab10adm01vm02.us.oracle.com_priv1"/>
+        <network id="c1_scaqab10adm01vm02.us.oracle.com_priv2"/>
+        <network id="c1_scaqab10db01vmclu02-priv.us.oracle.com_clusterpriv1"/>
+        <network id="c1_scaqab10db01vmclu02-priv.us.oracle.com_clusterpriv2"/>
+      </networks>
+      <dnsServers>
+        <dnsServer>
+          <ipAddress>10.210.255.250</ipAddress>
+        </dnsServer>
+        <dnsServer>
+          <ipAddress>10.231.225.65</ipAddress>
+        </dnsServer>
+        <dnsServer>
+          <ipAddress>192.135.82.4</ipAddress>
+        </dnsServer>
+      </dnsServers>
+      <ntpServers>
+        <ntpServer>
+          <ipAddress>10.132.0.122</ipAddress>
+        </ntpServer>
+        <ntpServer>
+          <ipAddress>10.210.176.28</ipAddress>
+        </ntpServer>
+      </ntpServers>
+      <vmSizeName id="Small"/>
+    </machine>
+    <machine id="scaqab10adm02vm02.us.oracle.com_id">
+      <hostName>scaqab10client02vm02.us.oracle.com</hostName>
+      <TimeZone>America/Los_Angeles</TimeZone>
+      <osType>LinuxGuest</osType>
+      <DefaultGatewayNet>c1_scaqab10adm02vm02.us.oracle.com_client</DefaultGatewayNet>
+      <software>
+        <clusters>
+          <cluster id="c1_clusterHome"/>
+        </clusters>
+        <databaseHomes>
+          <databaseHome id="c1_databaseHome"/>
+        </databaseHomes>
+      </software>
+      <networks>
+        <network id="c1_scaqab10adm02vm02-bk.us.oracle.com_backup"/>
+        <network id="c1_scaqab10adm02vm02.us.oracle.com_client"/>
+        <network id="c1_scaqab10adm02vm02.us.oracle.com_priv1"/>
+        <network id="c1_scaqab10adm02vm02.us.oracle.com_priv2"/>
+        <network id="c1_scaqab10db02vmclu02-priv.us.oracle.com_clusterpriv1"/>
+        <network id="c1_scaqab10db02vmclu02-priv.us.oracle.com_clusterpriv2"/>
+      </networks>
+      <dnsServers>
+        <dnsServer>
+          <ipAddress>10.210.255.250</ipAddress>
+        </dnsServer>
+        <dnsServer>
+          <ipAddress>10.231.225.65</ipAddress>
+        </dnsServer>
+        <dnsServer>
+          <ipAddress>192.135.82.4</ipAddress>
+        </dnsServer>
+      </dnsServers>
+      <ntpServers>
+        <ntpServer>
+          <ipAddress>10.132.0.122</ipAddress>
+        </ntpServer>
+        <ntpServer>
+          <ipAddress>10.210.176.28</ipAddress>
+        </ntpServer>
+      </ntpServers>
+      <vmSizeName id="Small"/>
+    </machine>
+    <machine id="scaqab10adm01vm03.us.oracle.com_id">
+      <hostName>scaqab10client01vm03.us.oracle.com</hostName>
+      <TimeZone>America/Los_Angeles</TimeZone>
+      <osType>LinuxGuest</osType>
+      <DefaultGatewayNet>c2_scaqab10adm01vm03.us.oracle.com_client</DefaultGatewayNet>
+      <software>
+        <clusters>
+          <cluster id="c2_clusterHome"/>
+        </clusters>
+        <databaseHomes>
+          <databaseHome id="c2_databaseHome"/>
+        </databaseHomes>
+      </software>
+      <networks>
+        <network id="c2_scaqab10adm01vm03-bk.us.oracle.com_backup"/>
+        <network id="c2_scaqab10adm01vm03.us.oracle.com_client"/>
+        <network id="c2_scaqab10adm01vm03.us.oracle.com_priv1"/>
+        <network id="c2_scaqab10adm01vm03.us.oracle.com_priv2"/>
+        <network id="c2_scaqab10db01vmclu03-priv.us.oracle.com_clusterpriv1"/>
+        <network id="c2_scaqab10db01vmclu03-priv.us.oracle.com_clusterpriv2"/>
+      </networks>
+      <dnsServers>
+        <dnsServer>
+          <ipAddress>10.210.255.250</ipAddress>
+        </dnsServer>
+        <dnsServer>
+          <ipAddress>10.231.225.65</ipAddress>
+        </dnsServer>
+        <dnsServer>
+          <ipAddress>192.135.82.4</ipAddress>
+        </dnsServer>
+      </dnsServers>
+      <ntpServers>
+        <ntpServer>
+          <ipAddress>10.132.0.122</ipAddress>
+        </ntpServer>
+        <ntpServer>
+          <ipAddress>10.210.176.28</ipAddress>
+        </ntpServer>
+      </ntpServers>
+      <vmSizeName id="Small"/>
+    </machine>
+    <machine id="scaqab10adm02vm03.us.oracle.com_id">
+      <hostName>scaqab10client02vm03.us.oracle.com</hostName>
+      <TimeZone>America/Los_Angeles</TimeZone>
+      <osType>LinuxGuest</osType>
+      <DefaultGatewayNet>c2_scaqab10adm02vm03.us.oracle.com_client</DefaultGatewayNet>
+      <software>
+        <clusters>
+          <cluster id="c2_clusterHome"/>
+        </clusters>
+        <databaseHomes>
+          <databaseHome id="c2_databaseHome"/>
+        </databaseHomes>
+      </software>
+      <networks>
+        <network id="c2_scaqab10adm02vm03-bk.us.oracle.com_backup"/>
+        <network id="c2_scaqab10adm02vm03.us.oracle.com_client"/>
+        <network id="c2_scaqab10adm02vm03.us.oracle.com_priv1"/>
+        <network id="c2_scaqab10adm02vm03.us.oracle.com_priv2"/>
+        <network id="c2_scaqab10db02vmclu03-priv.us.oracle.com_clusterpriv1"/>
+        <network id="c2_scaqab10db02vmclu03-priv.us.oracle.com_clusterpriv2"/>
+      </networks>
+      <dnsServers>
+        <dnsServer>
+          <ipAddress>10.210.255.250</ipAddress>
+        </dnsServer>
+        <dnsServer>
+          <ipAddress>10.231.225.65</ipAddress>
+        </dnsServer>
+        <dnsServer>
+          <ipAddress>192.135.82.4</ipAddress>
+        </dnsServer>
+      </dnsServers>
+      <ntpServers>
+        <ntpServer>
+          <ipAddress>10.132.0.122</ipAddress>
+        </ntpServer>
+        <ntpServer>
+          <ipAddress>10.210.176.28</ipAddress>
+        </ntpServer>
+      </ntpServers>
+      <vmSizeName id="Small"/>
+    </machine>
+    <machine id="scaqab10adm01vm04.us.oracle.com_id">
+      <hostName>scaqab10client01vm04.us.oracle.com</hostName>
+      <TimeZone>America/Los_Angeles</TimeZone>
+      <osType>LinuxGuest</osType>
+      <DefaultGatewayNet>c3_scaqab10adm01vm04.us.oracle.com_client</DefaultGatewayNet>
+      <software>
+        <clusters>
+          <cluster id="c3_clusterHome"/>
+        </clusters>
+        <databaseHomes>
+          <databaseHome id="c3_databaseHome"/>
+        </databaseHomes>
+      </software>
+      <networks>
+        <network id="c3_scaqab10adm01vm04-bk.us.oracle.com_backup"/>
+        <network id="c3_scaqab10adm01vm04.us.oracle.com_client"/>
+        <network id="c3_scaqab10adm01vm04.us.oracle.com_priv1"/>
+        <network id="c3_scaqab10adm01vm04.us.oracle.com_priv2"/>
+        <network id="c3_scaqab10db01vmclu04-priv.us.oracle.com_clusterpriv1"/>
+        <network id="c3_scaqab10db01vmclu04-priv.us.oracle.com_clusterpriv2"/>
+      </networks>
+      <dnsServers>
+        <dnsServer>
+          <ipAddress>10.210.255.250</ipAddress>
+        </dnsServer>
+        <dnsServer>
+          <ipAddress>10.231.225.65</ipAddress>
+        </dnsServer>
+        <dnsServer>
+          <ipAddress>192.135.82.4</ipAddress>
+        </dnsServer>
+      </dnsServers>
+      <ntpServers>
+        <ntpServer>
+          <ipAddress>10.132.0.122</ipAddress>
+        </ntpServer>
+        <ntpServer>
+          <ipAddress>10.210.176.28</ipAddress>
+        </ntpServer>
+      </ntpServers>
+      <vmSizeName id="Small"/>
+    </machine>
+    <machine id="scaqab10adm02vm04.us.oracle.com_id">
+      <hostName>scaqab10client02vm04.us.oracle.com</hostName>
+      <TimeZone>America/Los_Angeles</TimeZone>
+      <osType>LinuxGuest</osType>
+      <DefaultGatewayNet>c3_scaqab10adm02vm04.us.oracle.com_client</DefaultGatewayNet>
+      <software>
+        <clusters>
+          <cluster id="c3_clusterHome"/>
+        </clusters>
+        <databaseHomes>
+          <databaseHome id="c3_databaseHome"/>
+        </databaseHomes>
+      </software>
+      <networks>
+        <network id="c3_scaqab10adm02vm04-bk.us.oracle.com_backup"/>
+        <network id="c3_scaqab10adm02vm04.us.oracle.com_client"/>
+        <network id="c3_scaqab10adm02vm04.us.oracle.com_priv1"/>
+        <network id="c3_scaqab10adm02vm04.us.oracle.com_priv2"/>
+        <network id="c3_scaqab10db02vmclu04-priv.us.oracle.com_clusterpriv1"/>
+        <network id="c3_scaqab10db02vmclu04-priv.us.oracle.com_clusterpriv2"/>
+      </networks>
+      <dnsServers>
+        <dnsServer>
+          <ipAddress>10.210.255.250</ipAddress>
+        </dnsServer>
+        <dnsServer>
+          <ipAddress>10.231.225.65</ipAddress>
+        </dnsServer>
+        <dnsServer>
+          <ipAddress>192.135.82.4</ipAddress>
+        </dnsServer>
+      </dnsServers>
+      <ntpServers>
+        <ntpServer>
+          <ipAddress>10.132.0.122</ipAddress>
+        </ntpServer>
+        <ntpServer>
+          <ipAddress>10.210.176.28</ipAddress>
+        </ntpServer>
+      </ntpServers>
+      <vmSizeName id="Small"/>
+    </machine>
+    <machine id="scaqab10adm01vm05.us.oracle.com_id">
+      <hostName>scaqab10client01vm05.us.oracle.com</hostName>
+      <TimeZone>America/Los_Angeles</TimeZone>
+      <osType>LinuxGuest</osType>
+      <DefaultGatewayNet>c4_scaqab10adm01vm05.us.oracle.com_client</DefaultGatewayNet>
+      <software>
+        <clusters>
+          <cluster id="c4_clusterHome"/>
+        </clusters>
+        <databaseHomes>
+          <databaseHome id="c4_databaseHome"/>
+        </databaseHomes>
+      </software>
+      <networks>
+        <network id="c4_scaqab10adm01vm05-bk.us.oracle.com_backup"/>
+        <network id="c4_scaqab10adm01vm05.us.oracle.com_client"/>
+        <network id="c4_scaqab10adm01vm05.us.oracle.com_priv1"/>
+        <network id="c4_scaqab10adm01vm05.us.oracle.com_priv2"/>
+        <network id="c4_scaqab10db01vmclu05-priv.us.oracle.com_clusterpriv1"/>
+        <network id="c4_scaqab10db01vmclu05-priv.us.oracle.com_clusterpriv2"/>
+      </networks>
+      <dnsServers>
+        <dnsServer>
+          <ipAddress>10.210.255.250</ipAddress>
+        </dnsServer>
+        <dnsServer>
+          <ipAddress>10.231.225.65</ipAddress>
+        </dnsServer>
+        <dnsServer>
+          <ipAddress>192.135.82.4</ipAddress>
+        </dnsServer>
+      </dnsServers>
+      <ntpServers>
+        <ntpServer>
+          <ipAddress>10.132.0.122</ipAddress>
+        </ntpServer>
+        <ntpServer>
+          <ipAddress>10.210.176.28</ipAddress>
+        </ntpServer>
+      </ntpServers>
+      <vmSizeName id="Small"/>
+    </machine>
+    <machine id="scaqab10adm02vm05.us.oracle.com_id">
+      <hostName>scaqab10client02vm05.us.oracle.com</hostName>
+      <TimeZone>America/Los_Angeles</TimeZone>
+      <osType>LinuxGuest</osType>
+      <DefaultGatewayNet>c4_scaqab10adm02vm05.us.oracle.com_client</DefaultGatewayNet>
+      <software>
+        <clusters>
+          <cluster id="c4_clusterHome"/>
+        </clusters>
+        <databaseHomes>
+          <databaseHome id="c4_databaseHome"/>
+        </databaseHomes>
+      </software>
+      <networks>
+        <network id="c4_scaqab10adm02vm05-bk.us.oracle.com_backup"/>
+        <network id="c4_scaqab10adm02vm05.us.oracle.com_client"/>
+        <network id="c4_scaqab10adm02vm05.us.oracle.com_priv1"/>
+        <network id="c4_scaqab10adm02vm05.us.oracle.com_priv2"/>
+        <network id="c4_scaqab10db02vmclu05-priv.us.oracle.com_clusterpriv1"/>
+        <network id="c4_scaqab10db02vmclu05-priv.us.oracle.com_clusterpriv2"/>
+      </networks>
+      <dnsServers>
+        <dnsServer>
+          <ipAddress>10.210.255.250</ipAddress>
+        </dnsServer>
+        <dnsServer>
+          <ipAddress>10.231.225.65</ipAddress>
+        </dnsServer>
+        <dnsServer>
+          <ipAddress>192.135.82.4</ipAddress>
+        </dnsServer>
+      </dnsServers>
+      <ntpServers>
+        <ntpServer>
+          <ipAddress>10.132.0.122</ipAddress>
+        </ntpServer>
+        <ntpServer>
+          <ipAddress>10.210.176.28</ipAddress>
+        </ntpServer>
+      </ntpServers>
+      <vmSizeName id="Small"/>
+    </machine>
+    <machine id="scaqab10adm01vm06.us.oracle.com_id">
+      <hostName>scaqab10client01vm06.us.oracle.com</hostName>
+      <TimeZone>America/Los_Angeles</TimeZone>
+      <osType>LinuxGuest</osType>
+      <DefaultGatewayNet>c5_scaqab10adm01vm06.us.oracle.com_client</DefaultGatewayNet>
+      <software>
+        <clusters>
+          <cluster id="c5_clusterHome"/>
+        </clusters>
+        <databaseHomes>
+          <databaseHome id="c5_databaseHome"/>
+        </databaseHomes>
+      </software>
+      <networks>
+        <network id="c5_scaqab10adm01vm06-bk.us.oracle.com_backup"/>
+        <network id="c5_scaqab10adm01vm06.us.oracle.com_client"/>
+        <network id="c5_scaqab10adm01vm06.us.oracle.com_priv1"/>
+        <network id="c5_scaqab10adm01vm06.us.oracle.com_priv2"/>
+        <network id="c5_scaqab10db01vmclu06-priv.us.oracle.com_clusterpriv1"/>
+        <network id="c5_scaqab10db01vmclu06-priv.us.oracle.com_clusterpriv2"/>
+      </networks>
+      <dnsServers>
+        <dnsServer>
+          <ipAddress>10.210.255.250</ipAddress>
+        </dnsServer>
+        <dnsServer>
+          <ipAddress>10.231.225.65</ipAddress>
+        </dnsServer>
+        <dnsServer>
+          <ipAddress>192.135.82.4</ipAddress>
+        </dnsServer>
+      </dnsServers>
+      <ntpServers>
+        <ntpServer>
+          <ipAddress>10.132.0.122</ipAddress>
+        </ntpServer>
+        <ntpServer>
+          <ipAddress>10.210.176.28</ipAddress>
+        </ntpServer>
+      </ntpServers>
+      <vmSizeName id="Small"/>
+    </machine>
+    <machine id="scaqab10adm02vm06.us.oracle.com_id">
+      <hostName>scaqab10client02vm06.us.oracle.com</hostName>
+      <TimeZone>America/Los_Angeles</TimeZone>
+      <osType>LinuxGuest</osType>
+      <DefaultGatewayNet>c5_scaqab10adm02vm06.us.oracle.com_client</DefaultGatewayNet>
+      <software>
+        <clusters>
+          <cluster id="c5_clusterHome"/>
+        </clusters>
+        <databaseHomes>
+          <databaseHome id="c5_databaseHome"/>
+        </databaseHomes>
+      </software>
+      <networks>
+        <network id="c5_scaqab10adm02vm06-bk.us.oracle.com_backup"/>
+        <network id="c5_scaqab10adm02vm06.us.oracle.com_client"/>
+        <network id="c5_scaqab10adm02vm06.us.oracle.com_priv1"/>
+        <network id="c5_scaqab10adm02vm06.us.oracle.com_priv2"/>
+        <network id="c5_scaqab10db02vmclu06-priv.us.oracle.com_clusterpriv1"/>
+        <network id="c5_scaqab10db02vmclu06-priv.us.oracle.com_clusterpriv2"/>
+      </networks>
+      <dnsServers>
+        <dnsServer>
+          <ipAddress>10.210.255.250</ipAddress>
+        </dnsServer>
+        <dnsServer>
+          <ipAddress>10.231.225.65</ipAddress>
+        </dnsServer>
+        <dnsServer>
+          <ipAddress>192.135.82.4</ipAddress>
+        </dnsServer>
+      </dnsServers>
+      <ntpServers>
+        <ntpServer>
+          <ipAddress>10.132.0.122</ipAddress>
+        </ntpServer>
+        <ntpServer>
+          <ipAddress>10.210.176.28</ipAddress>
+        </ntpServer>
+      </ntpServers>
+      <vmSizeName id="Small"/>
+    </machine>
+    <machine id="scaqab10adm01vm07.us.oracle.com_id">
+      <hostName>scaqab10client01vm07.us.oracle.com</hostName>
+      <TimeZone>America/Los_Angeles</TimeZone>
+      <osType>LinuxGuest</osType>
+      <DefaultGatewayNet>c6_scaqab10adm01vm07.us.oracle.com_client</DefaultGatewayNet>
+      <software>
+        <clusters>
+          <cluster id="c6_clusterHome"/>
+        </clusters>
+        <databaseHomes>
+          <databaseHome id="c6_databaseHome"/>
+        </databaseHomes>
+      </software>
+      <networks>
+        <network id="c6_scaqab10adm01vm07-bk.us.oracle.com_backup"/>
+        <network id="c6_scaqab10adm01vm07.us.oracle.com_client"/>
+        <network id="c6_scaqab10adm01vm07.us.oracle.com_priv1"/>
+        <network id="c6_scaqab10adm01vm07.us.oracle.com_priv2"/>
+        <network id="c6_scaqab10db01vmclu07-priv.us.oracle.com_clusterpriv1"/>
+        <network id="c6_scaqab10db01vmclu07-priv.us.oracle.com_clusterpriv2"/>
+      </networks>
+      <dnsServers>
+        <dnsServer>
+          <ipAddress>10.210.255.250</ipAddress>
+        </dnsServer>
+        <dnsServer>
+          <ipAddress>10.231.225.65</ipAddress>
+        </dnsServer>
+        <dnsServer>
+          <ipAddress>192.135.82.4</ipAddress>
+        </dnsServer>
+      </dnsServers>
+      <ntpServers>
+        <ntpServer>
+          <ipAddress>10.132.0.122</ipAddress>
+        </ntpServer>
+        <ntpServer>
+          <ipAddress>10.210.176.28</ipAddress>
+        </ntpServer>
+      </ntpServers>
+      <vmSizeName id="Small"/>
+    </machine>
+    <machine id="scaqab10adm02vm07.us.oracle.com_id">
+      <hostName>scaqab10client02vm07.us.oracle.com</hostName>
+      <TimeZone>America/Los_Angeles</TimeZone>
+      <osType>LinuxGuest</osType>
+      <DefaultGatewayNet>c6_scaqab10adm02vm07.us.oracle.com_client</DefaultGatewayNet>
+      <software>
+        <clusters>
+          <cluster id="c6_clusterHome"/>
+        </clusters>
+        <databaseHomes>
+          <databaseHome id="c6_databaseHome"/>
+        </databaseHomes>
+      </software>
+      <networks>
+        <network id="c6_scaqab10adm02vm07-bk.us.oracle.com_backup"/>
+        <network id="c6_scaqab10adm02vm07.us.oracle.com_client"/>
+        <network id="c6_scaqab10adm02vm07.us.oracle.com_priv1"/>
+        <network id="c6_scaqab10adm02vm07.us.oracle.com_priv2"/>
+        <network id="c6_scaqab10db02vmclu07-priv.us.oracle.com_clusterpriv1"/>
+        <network id="c6_scaqab10db02vmclu07-priv.us.oracle.com_clusterpriv2"/>
+      </networks>
+      <dnsServers>
+        <dnsServer>
+          <ipAddress>10.210.255.250</ipAddress>
+        </dnsServer>
+        <dnsServer>
+          <ipAddress>10.231.225.65</ipAddress>
+        </dnsServer>
+        <dnsServer>
+          <ipAddress>192.135.82.4</ipAddress>
+        </dnsServer>
+      </dnsServers>
+      <ntpServers>
+        <ntpServer>
+          <ipAddress>10.132.0.122</ipAddress>
+        </ntpServer>
+        <ntpServer>
+          <ipAddress>10.210.176.28</ipAddress>
+        </ntpServer>
+      </ntpServers>
+      <vmSizeName id="Small"/>
+    </machine>
+    <machine id="scaqab10adm01vm08.us.oracle.com_id">
+      <hostName>scaqab10client01vm08.us.oracle.com</hostName>
+      <TimeZone>America/Los_Angeles</TimeZone>
+      <osType>LinuxGuest</osType>
+      <DefaultGatewayNet>c7_scaqab10adm01vm08.us.oracle.com_client</DefaultGatewayNet>
+      <software>
+        <clusters>
+          <cluster id="c7_clusterHome"/>
+        </clusters>
+        <databaseHomes>
+          <databaseHome id="c7_databaseHome"/>
+          <databaseHome id="cA_databaseHome"/>
+          <databaseHome id="cB_databaseHome"/>
+        </databaseHomes>
+      </software>
+      <networks>
+        <network id="c7_scaqab10adm01vm08-bk.us.oracle.com_backup"/>
+        <network id="c7_scaqab10adm01vm08.us.oracle.com_client"/>
+        <network id="c7_scaqab10adm01vm08.us.oracle.com_priv1"/>
+        <network id="c7_scaqab10adm01vm08.us.oracle.com_priv2"/>
+        <network id="c7_scaqab10db01vmclu08-priv.us.oracle.com_clusterpriv1"/>
+        <network id="c7_scaqab10db01vmclu08-priv.us.oracle.com_clusterpriv2"/>
+      </networks>
+      <dnsServers>
+        <dnsServer>
+          <ipAddress>10.210.255.250</ipAddress>
+        </dnsServer>
+        <dnsServer>
+          <ipAddress>10.231.225.65</ipAddress>
+        </dnsServer>
+        <dnsServer>
+          <ipAddress>192.135.82.4</ipAddress>
+        </dnsServer>
+      </dnsServers>
+      <ntpServers>
+        <ntpServer>
+          <ipAddress>10.132.0.122</ipAddress>
+        </ntpServer>
+        <ntpServer>
+          <ipAddress>10.210.176.28</ipAddress>
+        </ntpServer>
+      </ntpServers>
+      <vmSizeName id="Small"/>
+    </machine>
+    <machine id="scaqab10adm02vm08.us.oracle.com_id">
+      <hostName>scaqab10client02vm08.us.oracle.com</hostName>
+      <TimeZone>America/Los_Angeles</TimeZone>
+      <osType>LinuxGuest</osType>
+      <DefaultGatewayNet>c7_scaqab10adm02vm08.us.oracle.com_client</DefaultGatewayNet>
+      <software>
+        <clusters>
+          <cluster id="c7_clusterHome"/>
+        </clusters>
+        <databaseHomes>
+          <databaseHome id="c7_databaseHome"/>
+          <databaseHome id="cA_databaseHome"/>
+          <databaseHome id="cB_databaseHome"/>
+        </databaseHomes>
+      </software>
+      <networks>
+        <network id="c7_scaqab10adm02vm08-bk.us.oracle.com_backup"/>
+        <network id="c7_scaqab10adm02vm08.us.oracle.com_client"/>
+        <network id="c7_scaqab10adm02vm08.us.oracle.com_priv1"/>
+        <network id="c7_scaqab10adm02vm08.us.oracle.com_priv2"/>
+        <network id="c7_scaqab10db02vmclu08-priv.us.oracle.com_clusterpriv1"/>
+        <network id="c7_scaqab10db02vmclu08-priv.us.oracle.com_clusterpriv2"/>
+      </networks>
+      <dnsServers>
+        <dnsServer>
+          <ipAddress>10.210.255.250</ipAddress>
+        </dnsServer>
+        <dnsServer>
+          <ipAddress>10.231.225.65</ipAddress>
+        </dnsServer>
+        <dnsServer>
+          <ipAddress>192.135.82.4</ipAddress>
+        </dnsServer>
+      </dnsServers>
+      <ntpServers>
+        <ntpServer>
+          <ipAddress>10.132.0.122</ipAddress>
+        </ntpServer>
+        <ntpServer>
+          <ipAddress>10.210.176.28</ipAddress>
+        </ntpServer>
+      </ntpServers>
+      <vmSizeName id="Small"/>
+    </machine>
+  </machines>
+  <networks>
+    <network id="scaqab10adm01.us.oracle.com_priv1">
+      <networkName>scaqab10adm01.us.oracle.com Priv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10adm01-priv1</hostName>
+      <ipAddress>192.168.128.3</ipAddress>
+      <netMask>255.255.248.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <master>ib0</master>
+      <slave/>
+    </network>
+    <network id="scaqab10adm01.us.oracle.com_priv2">
+      <networkName>scaqab10adm01.us.oracle.com Priv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10adm01-priv2</hostName>
+      <ipAddress>192.168.128.4</ipAddress>
+      <netMask>255.255.248.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <master>ib1</master>
+      <slave/>
+    </network>
+    <network id="scaqab10adm01.us.oracle.com_admin">
+      <networkName>scaqab10adm01.us.oracle.com Admin</networkName>
+      <networkType>admin</networkType>
+      <version>version1</version>
+      <hostName>scaqab10adm01</hostName>
+      <ipAddress>10.31.112.4</ipAddress>
+      <netMask>255.255.255.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.112.1</gateway>
+      <master>eth0</master>
+      <slave/>
+    </network>
+    <network id="scaqab10adm01.us.oracle.com_ilom">
+      <networkName>scaqab10adm01.us.oracle.com ILOM</networkName>
+      <networkType>Ilom</networkType>
+      <version>version1</version>
+      <hostName>scaqab10adm01-c</hostName>
+      <ipAddress>10.31.16.103</ipAddress>
+      <netMask>255.255.255.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.112.1</gateway>
+    </network>
+    <network id="scaqab10adm02.us.oracle.com_priv1">
+      <networkName>scaqab10adm02.us.oracle.com Priv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10adm02-priv1</hostName>
+      <ipAddress>192.168.128.5</ipAddress>
+      <netMask>255.255.248.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <master>ib0</master>
+      <slave/>
+    </network>
+    <network id="scaqab10adm02.us.oracle.com_priv2">
+      <networkName>scaqab10adm02.us.oracle.com Priv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10adm02-priv2</hostName>
+      <ipAddress>192.168.128.6</ipAddress>
+      <netMask>255.255.248.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <master>ib1</master>
+      <slave/>
+    </network>
+    <network id="scaqab10adm02.us.oracle.com_admin">
+      <networkName>scaqab10adm02.us.oracle.com Admin</networkName>
+      <networkType>admin</networkType>
+      <version>version1</version>
+      <hostName>scaqab10adm02</hostName>
+      <ipAddress>10.31.112.5</ipAddress>
+      <netMask>255.255.255.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.112.1</gateway>
+      <master>eth0</master>
+      <slave/>
+    </network>
+    <network id="scaqab10adm02.us.oracle.com_ilom">
+      <networkName>scaqab10adm02.us.oracle.com ILOM</networkName>
+      <networkType>Ilom</networkType>
+      <version>version1</version>
+      <hostName>scaqab10adm02-c</hostName>
+      <ipAddress>10.31.16.104</ipAddress>
+      <netMask>255.255.255.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.112.1</gateway>
+    </network>
+    <network id="scaqab10celadm01.us.oracle.com_priv1">
+      <networkName>scaqab10celadm01.us.oracle.com Priv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10cell01vmclu01-priv1</hostName>
+      <ipAddress>192.168.12.115</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xaa12</pkey>
+      <pkeyName>stib0</pkeyName>
+      <master>ib0</master>
+      <slave/>
+    </network>
+    <network id="scaqab10celadm01.us.oracle.com_priv2">
+      <networkName>scaqab10celadm01.us.oracle.com Priv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10cell01vmclu01-priv2</hostName>
+      <ipAddress>192.168.12.116</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xaa12</pkey>
+      <pkeyName>stib1</pkeyName>
+      <master>ib1</master>
+      <slave/>
+    </network>
+    <network id="scaqab10celadm01.us.oracle.com_admin">
+      <networkName>scaqab10celadm01.us.oracle.com Admin</networkName>
+      <networkType>admin</networkType>
+      <version>version1</version>
+      <hostName>scaqab10celadm01</hostName>
+      <ipAddress>10.31.112.12</ipAddress>
+      <netMask>255.255.255.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.112.1</gateway>
+      <master>eth0</master>
+      <slave/>
+    </network>
+    <network id="scaqab10celadm01.us.oracle.com_ilom">
+      <networkName>scaqab10celadm01.us.oracle.com ILOM</networkName>
+      <networkType>Ilom</networkType>
+      <version>version1</version>
+      <hostName>scaqab10celadm01-c</hostName>
+      <ipAddress>10.31.16.111</ipAddress>
+      <netMask>255.255.255.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.112.1</gateway>
+    </network>
+    <network id="scaqab10celadm02.us.oracle.com_priv1">
+      <networkName>scaqab10celadm02.us.oracle.com Priv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10cell02vmclu01-priv1</hostName>
+      <ipAddress>192.168.12.117</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xaa12</pkey>
+      <pkeyName>stib0</pkeyName>
+      <master>ib0</master>
+      <slave/>
+    </network>
+    <network id="scaqab10celadm02.us.oracle.com_priv2">
+      <networkName>scaqab10celadm02.us.oracle.com Priv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10cell02vmclu01-priv2</hostName>
+      <ipAddress>192.168.12.118</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xaa12</pkey>
+      <pkeyName>stib1</pkeyName>
+      <master>ib1</master>
+      <slave/>
+    </network>
+    <network id="scaqab10celadm02.us.oracle.com_admin">
+      <networkName>scaqab10celadm02.us.oracle.com Admin</networkName>
+      <networkType>admin</networkType>
+      <version>version1</version>
+      <hostName>scaqab10celadm02</hostName>
+      <ipAddress>10.31.112.13</ipAddress>
+      <netMask>255.255.255.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.112.1</gateway>
+      <master>eth0</master>
+      <slave/>
+    </network>
+    <network id="scaqab10celadm02.us.oracle.com_ilom">
+      <networkName>scaqab10celadm02.us.oracle.com ILOM</networkName>
+      <networkType>Ilom</networkType>
+      <version>version1</version>
+      <hostName>scaqab10celadm02-c</hostName>
+      <ipAddress>10.31.16.112</ipAddress>
+      <netMask>255.255.255.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.112.1</gateway>
+    </network>
+    <network id="scaqab10celadm03.us.oracle.com_priv1">
+      <networkName>scaqab10celadm03.us.oracle.com Priv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10cell03vmclu01-priv1</hostName>
+      <ipAddress>192.168.12.119</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xaa12</pkey>
+      <pkeyName>stib0</pkeyName>
+      <master>ib0</master>
+      <slave/>
+    </network>
+    <network id="scaqab10celadm03.us.oracle.com_priv2">
+      <networkName>scaqab10celadm03.us.oracle.com Priv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10cell03vmclu01-priv2</hostName>
+      <ipAddress>192.168.12.120</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xaa12</pkey>
+      <pkeyName>stib1</pkeyName>
+      <master>ib1</master>
+      <slave/>
+    </network>
+    <network id="scaqab10celadm03.us.oracle.com_admin">
+      <networkName>scaqab10celadm03.us.oracle.com Admin</networkName>
+      <networkType>admin</networkType>
+      <version>version1</version>
+      <hostName>scaqab10celadm03</hostName>
+      <ipAddress>10.31.112.14</ipAddress>
+      <netMask>255.255.255.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.112.1</gateway>
+      <master>eth0</master>
+      <slave/>
+    </network>
+    <network id="scaqab10celadm03.us.oracle.com_ilom">
+      <networkName>scaqab10celadm03.us.oracle.com ILOM</networkName>
+      <networkType>Ilom</networkType>
+      <version>version1</version>
+      <hostName>scaqab10celadm03-c</hostName>
+      <ipAddress>10.31.16.113</ipAddress>
+      <netMask>255.255.255.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.112.1</gateway>
+    </network>
+    <network id="scaqab10sw-adm0.us.oracle.com_admin">
+      <networkName>scaqab10sw-adm0.us.oracle.com Admin</networkName>
+      <networkType>admin</networkType>
+      <version>version1</version>
+      <hostName>scaqab10sw-adm0</hostName>
+      <ipAddress>10.31.16.125</ipAddress>
+      <netMask>255.255.255.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.112.1</gateway>
+      <master>eth0</master>
+      <slave/>
+    </network>
+    <network id="scaqab10sw-iba0.us.oracle.com_admin">
+      <networkName>scaqab10sw-iba0.us.oracle.com Admin</networkName>
+      <networkType>admin</networkType>
+      <version>version1</version>
+      <hostName>scaqab10sw-iba0</hostName>
+      <ipAddress>10.31.112.25</ipAddress>
+      <netMask>255.255.255.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.112.1</gateway>
+      <master>eth0</master>
+      <slave/>
+    </network>
+    <network id="scaqab10sw-ibb0.us.oracle.com_admin">
+      <networkName>scaqab10sw-ibb0.us.oracle.com Admin</networkName>
+      <networkType>admin</networkType>
+      <version>version1</version>
+      <hostName>scaqab10sw-ibb0</hostName>
+      <ipAddress>10.31.112.26</ipAddress>
+      <netMask>255.255.255.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.112.1</gateway>
+      <master>eth0</master>
+      <slave/>
+    </network>
+    <network id="scaqab10sw-pdua0.us.oracle.com_admin">
+      <networkName>scaqab10sw-pdua0.us.oracle.com Admin</networkName>
+      <networkType>admin</networkType>
+      <version>version1</version>
+      <hostName>scaqab10sw-pdua0</hostName>
+      <ipAddress>10.31.16.123</ipAddress>
+      <netMask>255.255.255.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.112.1</gateway>
+      <master>eth0</master>
+      <slave/>
+    </network>
+    <network id="scaqab10sw-pdub0.us.oracle.com_admin">
+      <networkName>scaqab10sw-pdub0.us.oracle.com Admin</networkName>
+      <networkType>admin</networkType>
+      <version>version1</version>
+      <hostName>scaqab10sw-pdub0</hostName>
+      <ipAddress>10.31.16.124</ipAddress>
+      <netMask>255.255.255.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.112.1</gateway>
+      <master>eth0</master>
+      <slave/>
+    </network>
+    <network id="scaqab10sw-ibs0.us.oracle.com_admin">
+      <networkName>scaqab10sw-ibs0.us.oracle.com Admin</networkName>
+      <networkType>admin</networkType>
+      <version>version1</version>
+      <hostName>scaqab10sw-ibs0</hostName>
+      <ipAddress>10.31.112.24</ipAddress>
+      <netMask>255.255.255.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.112.1</gateway>
+      <master>eth0</master>
+      <slave/>
+    </network>
+    <network id="c0_scaqab10adm01vm01.us.oracle.com_client">
+      <networkName>scaqab10adm01vm01 Client</networkName>
+      <networkType>client</networkType>
+      <version>version1</version>
+      <hostName>scaqab10client01vm01</hostName>
+      <ipAddress>10.31.124.21</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.124.1</gateway>
+      <master>bondeth0</master>
+      <slave>eth1 eth2</slave>
+      <macAddress/>
+      <vswitchNetworkParams/>
+      <natnetMask>255.255.255.0</natnetMask>
+      <natdomainName>us.oracle.com</natdomainName>
+      <nathostName>scaqab10adm01nat01</nathostName>
+      <natipAddress>10.31.112.27</natipAddress>
+    </network>
+    <network id="c0_scaqab10adm01vm01.us.oracle.com_priv1">
+      <networkName>scaqab10adm01vm01 Priv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db01vm01str-priv1</hostName>
+      <ipAddress>192.168.12.1</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xaa12</pkey>
+      <pkeyName>stib0</pkeyName>
+      <master>ib0</master>
+      <slave/>
+    </network>
+    <network id="c0_scaqab10adm01vm01.us.oracle.com_priv2">
+      <networkName>scaqab10adm01vm01 Priv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db01vm01str-priv2</hostName>
+      <ipAddress>192.168.12.2</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xaa12</pkey>
+      <pkeyName>stib1</pkeyName>
+      <master>ib1</master>
+      <slave/>
+    </network>
+    <network id="c0_scaqab10db01vmclu01-priv.us.oracle.com_clusterpriv1">
+      <networkName>scaqab10adm01vm01 ClusterPriv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db01vmclu01-priv1</hostName>
+      <ipAddress>192.168.112.1</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xa121</pkey>
+      <pkeyName>clib0</pkeyName>
+      <master>ib0</master>
+      <slave/>
+    </network>
+    <network id="c0_scaqab10db01vmclu01-priv.us.oracle.com_clusterpriv2">
+      <networkName>scaqab10adm01vm01 ClusterPriv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db01vmclu01-priv2</hostName>
+      <ipAddress>192.168.112.2</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xa121</pkey>
+      <pkeyName>clib1</pkeyName>
+      <master>ib1</master>
+      <slave/>
+    </network>
+    <network id="c0_scaqab10adm01vm01-bk.us.oracle.com_backup">
+      <networkName>scaqab10adm01vm01-bk Backup</networkName>
+      <networkType>backup</networkType>
+      <version>version1</version>
+      <hostName>scaqab10adm01vm01-bk</hostName>
+      <ipAddress>10.31.127.2</ipAddress>
+      <netMask>255.255.255.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.127.1</gateway>
+      <master>bondeth1</master>
+      <slave>eth4 eth5</slave>
+      <macAddress/>
+      <vswitchNetworkParams/>
+    </network>
+    <network id="c0_scaqab10adm02vm01.us.oracle.com_client">
+      <networkName>scaqab10adm02vm01 Client</networkName>
+      <networkType>client</networkType>
+      <version>version1</version>
+      <hostName>scaqab10client02vm01</hostName>
+      <ipAddress>10.31.124.22</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.124.1</gateway>
+      <master>bondeth0</master>
+      <slave>eth1 eth2</slave>
+      <macAddress/>
+      <vswitchNetworkParams/>
+      <natnetMask>255.255.255.0</natnetMask>
+      <natdomainName>us.oracle.com</natdomainName>
+      <nathostName>scaqab10adm02nat01</nathostName>
+      <natipAddress>10.31.112.35</natipAddress>
+    </network>
+    <network id="c0_scaqab10adm02vm01.us.oracle.com_priv1">
+      <networkName>scaqab10adm02vm01 Priv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db02vm01str-priv1</hostName>
+      <ipAddress>192.168.12.3</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xaa12</pkey>
+      <pkeyName>stib0</pkeyName>
+      <master>ib0</master>
+      <slave/>
+    </network>
+    <network id="c0_scaqab10adm02vm01.us.oracle.com_priv2">
+      <networkName>scaqab10adm02vm01 Priv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db02vm01str-priv2</hostName>
+      <ipAddress>192.168.12.4</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xaa12</pkey>
+      <pkeyName>stib1</pkeyName>
+      <master>ib1</master>
+      <slave/>
+    </network>
+    <network id="c0_scaqab10db02vmclu01-priv.us.oracle.com_clusterpriv1">
+      <networkName>scaqab10adm02vm01 ClusterPriv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db02vmclu01-priv1</hostName>
+      <ipAddress>192.168.112.3</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xa121</pkey>
+      <pkeyName>clib0</pkeyName>
+      <master>ib0</master>
+      <slave/>
+    </network>
+    <network id="c0_scaqab10db02vmclu01-priv.us.oracle.com_clusterpriv2">
+      <networkName>scaqab10adm02vm01 ClusterPriv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db02vmclu01-priv2</hostName>
+      <ipAddress>192.168.112.4</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xa121</pkey>
+      <pkeyName>clib1</pkeyName>
+      <master>ib1</master>
+      <slave/>
+    </network>
+    <network id="c0_scaqab10adm02vm01-bk.us.oracle.com_backup">
+      <networkName>scaqab10adm02vm01-bk Backup</networkName>
+      <networkType>backup</networkType>
+      <version>version1</version>
+      <hostName>scaqab10adm02vm01-bk</hostName>
+      <ipAddress>10.31.127.3</ipAddress>
+      <netMask>255.255.255.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.127.1</gateway>
+      <master>bondeth1</master>
+      <slave>eth4 eth5</slave>
+      <macAddress/>
+      <vswitchNetworkParams/>
+    </network>
+    <network id="c1_scaqab10adm01vm02.us.oracle.com_client">
+      <networkName>scaqab10adm01vm02 Client</networkName>
+      <networkType>client</networkType>
+      <version>version1</version>
+      <hostName>scaqab10client01vm02</hostName>
+      <ipAddress>10.31.124.28</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.124.1</gateway>
+      <master>bondeth0</master>
+      <slave>eth1 eth2</slave>
+      <macAddress/>
+      <vswitchNetworkParams/>
+      <natnetMask>255.255.255.0</natnetMask>
+      <natdomainName>us.oracle.com</natdomainName>
+      <nathostName>scaqab10adm01nat02</nathostName>
+      <natipAddress>10.31.112.28</natipAddress>
+    </network>
+    <network id="c1_scaqab10adm01vm02.us.oracle.com_priv1">
+      <networkName>scaqab10adm01vm02 Priv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db01vm02str-priv1</hostName>
+      <ipAddress>192.168.12.5</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xaa12</pkey>
+      <pkeyName>stib0</pkeyName>
+      <master>ib0</master>
+      <slave/>
+    </network>
+    <network id="c1_scaqab10adm01vm02.us.oracle.com_priv2">
+      <networkName>scaqab10adm01vm02 Priv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db01vm02str-priv2</hostName>
+      <ipAddress>192.168.12.6</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xaa12</pkey>
+      <pkeyName>stib1</pkeyName>
+      <master>ib1</master>
+      <slave/>
+    </network>
+    <network id="c1_scaqab10db01vmclu02-priv.us.oracle.com_clusterpriv1">
+      <networkName>scaqab10adm01vm02 ClusterPriv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db01vmclu02-priv1</hostName>
+      <ipAddress>192.168.114.1</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xa122</pkey>
+      <pkeyName>clib0</pkeyName>
+      <master>ib0</master>
+      <slave/>
+    </network>
+    <network id="c1_scaqab10db01vmclu02-priv.us.oracle.com_clusterpriv2">
+      <networkName>scaqab10adm01vm02 ClusterPriv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db01vmclu02-priv2</hostName>
+      <ipAddress>192.168.114.2</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xa122</pkey>
+      <pkeyName>clib1</pkeyName>
+      <master>ib1</master>
+      <slave/>
+    </network>
+    <network id="c1_scaqab10adm01vm02-bk.us.oracle.com_backup">
+      <networkName>scaqab10adm01vm02-bk Backup</networkName>
+      <networkType>backup</networkType>
+      <version>version1</version>
+      <hostName>scaqab10adm01vm02-bk</hostName>
+      <ipAddress>10.31.127.4</ipAddress>
+      <netMask>255.255.255.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.127.1</gateway>
+      <master>bondeth1</master>
+      <slave>eth4 eth5</slave>
+      <macAddress/>
+      <vswitchNetworkParams/>
+    </network>
+    <network id="c1_scaqab10adm02vm02.us.oracle.com_client">
+      <networkName>scaqab10adm02vm02 Client</networkName>
+      <networkType>client</networkType>
+      <version>version1</version>
+      <hostName>scaqab10client02vm02</hostName>
+      <ipAddress>10.31.124.29</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.124.1</gateway>
+      <master>bondeth0</master>
+      <slave>eth1 eth2</slave>
+      <macAddress/>
+      <vswitchNetworkParams/>
+      <natnetMask>255.255.255.0</natnetMask>
+      <natdomainName>us.oracle.com</natdomainName>
+      <nathostName>scaqab10adm02nat02</nathostName>
+      <natipAddress>10.31.112.36</natipAddress>
+    </network>
+    <network id="c1_scaqab10adm02vm02.us.oracle.com_priv1">
+      <networkName>scaqab10adm02vm02 Priv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db02vm02str-priv1</hostName>
+      <ipAddress>192.168.12.7</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xaa12</pkey>
+      <pkeyName>stib0</pkeyName>
+      <master>ib0</master>
+      <slave/>
+    </network>
+    <network id="c1_scaqab10adm02vm02.us.oracle.com_priv2">
+      <networkName>scaqab10adm02vm02 Priv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db02vm02str-priv2</hostName>
+      <ipAddress>192.168.12.8</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xaa12</pkey>
+      <pkeyName>stib1</pkeyName>
+      <master>ib1</master>
+      <slave/>
+    </network>
+    <network id="c1_scaqab10db02vmclu02-priv.us.oracle.com_clusterpriv1">
+      <networkName>scaqab10adm02vm02 ClusterPriv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db02vmclu02-priv1</hostName>
+      <ipAddress>192.168.114.3</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xa122</pkey>
+      <pkeyName>clib0</pkeyName>
+      <master>ib0</master>
+      <slave/>
+    </network>
+    <network id="c1_scaqab10db02vmclu02-priv.us.oracle.com_clusterpriv2">
+      <networkName>scaqab10adm02vm02 ClusterPriv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db02vmclu02-priv2</hostName>
+      <ipAddress>192.168.114.4</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xa122</pkey>
+      <pkeyName>clib1</pkeyName>
+      <master>ib1</master>
+      <slave/>
+    </network>
+    <network id="c1_scaqab10adm02vm02-bk.us.oracle.com_backup">
+      <networkName>scaqab10adm02vm02-bk Backup</networkName>
+      <networkType>backup</networkType>
+      <version>version1</version>
+      <hostName>scaqab10adm02vm02-bk</hostName>
+      <ipAddress>10.31.127.5</ipAddress>
+      <netMask>255.255.255.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.127.1</gateway>
+      <master>bondeth1</master>
+      <slave>eth4 eth5</slave>
+      <macAddress/>
+      <vswitchNetworkParams/>
+    </network>
+    <network id="c2_scaqab10adm01vm03.us.oracle.com_client">
+      <networkName>scaqab10adm01vm03 Client</networkName>
+      <networkType>client</networkType>
+      <version>version1</version>
+      <hostName>scaqab10client01vm03</hostName>
+      <ipAddress>10.31.124.35</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.124.1</gateway>
+      <master>bondeth0</master>
+      <slave>eth1 eth2</slave>
+      <macAddress/>
+      <vswitchNetworkParams/>
+      <natnetMask>255.255.255.0</natnetMask>
+      <natdomainName>us.oracle.com</natdomainName>
+      <nathostName>scaqab10adm01nat03</nathostName>
+      <natipAddress>10.31.112.29</natipAddress>
+    </network>
+    <network id="c2_scaqab10adm01vm03.us.oracle.com_priv1">
+      <networkName>scaqab10adm01vm03 Priv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db01vm03str-priv1</hostName>
+      <ipAddress>192.168.12.9</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xaa12</pkey>
+      <pkeyName>stib0</pkeyName>
+      <master>ib0</master>
+      <slave/>
+    </network>
+    <network id="c2_scaqab10adm01vm03.us.oracle.com_priv2">
+      <networkName>scaqab10adm01vm03 Priv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db01vm03str-priv2</hostName>
+      <ipAddress>192.168.12.10</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xaa12</pkey>
+      <pkeyName>stib1</pkeyName>
+      <master>ib1</master>
+      <slave/>
+    </network>
+    <network id="c2_scaqab10db01vmclu03-priv.us.oracle.com_clusterpriv1">
+      <networkName>scaqab10adm01vm03 ClusterPriv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db01vmclu03-priv1</hostName>
+      <ipAddress>192.168.116.1</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xa123</pkey>
+      <pkeyName>clib0</pkeyName>
+      <master>ib0</master>
+      <slave/>
+    </network>
+    <network id="c2_scaqab10db01vmclu03-priv.us.oracle.com_clusterpriv2">
+      <networkName>scaqab10adm01vm03 ClusterPriv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db01vmclu03-priv2</hostName>
+      <ipAddress>192.168.116.2</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xa123</pkey>
+      <pkeyName>clib1</pkeyName>
+      <master>ib1</master>
+      <slave/>
+    </network>
+    <network id="c2_scaqab10adm01vm03-bk.us.oracle.com_backup">
+      <networkName>scaqab10adm01vm03-bk Backup</networkName>
+      <networkType>backup</networkType>
+      <version>version1</version>
+      <hostName>scaqab10adm01vm03-bk</hostName>
+      <ipAddress>10.31.127.6</ipAddress>
+      <netMask>255.255.255.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.127.1</gateway>
+      <master>bondeth1</master>
+      <slave>eth4 eth5</slave>
+      <macAddress/>
+      <vswitchNetworkParams/>
+    </network>
+    <network id="c2_scaqab10adm02vm03.us.oracle.com_client">
+      <networkName>scaqab10adm02vm03 Client</networkName>
+      <networkType>client</networkType>
+      <version>version1</version>
+      <hostName>scaqab10client02vm03</hostName>
+      <ipAddress>10.31.124.36</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.124.1</gateway>
+      <master>bondeth0</master>
+      <slave>eth1 eth2</slave>
+      <macAddress/>
+      <vswitchNetworkParams/>
+      <natnetMask>255.255.255.0</natnetMask>
+      <natdomainName>us.oracle.com</natdomainName>
+      <nathostName>scaqab10adm02nat03</nathostName>
+      <natipAddress>10.31.112.37</natipAddress>
+    </network>
+    <network id="c2_scaqab10adm02vm03.us.oracle.com_priv1">
+      <networkName>scaqab10adm02vm03 Priv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db02vm03str-priv1</hostName>
+      <ipAddress>192.168.12.11</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xaa12</pkey>
+      <pkeyName>stib0</pkeyName>
+      <master>ib0</master>
+      <slave/>
+    </network>
+    <network id="c2_scaqab10adm02vm03.us.oracle.com_priv2">
+      <networkName>scaqab10adm02vm03 Priv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db02vm03str-priv2</hostName>
+      <ipAddress>192.168.12.12</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xaa12</pkey>
+      <pkeyName>stib1</pkeyName>
+      <master>ib1</master>
+      <slave/>
+    </network>
+    <network id="c2_scaqab10db02vmclu03-priv.us.oracle.com_clusterpriv1">
+      <networkName>scaqab10adm02vm03 ClusterPriv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db02vmclu03-priv1</hostName>
+      <ipAddress>192.168.116.3</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xa123</pkey>
+      <pkeyName>clib0</pkeyName>
+      <master>ib0</master>
+      <slave/>
+    </network>
+    <network id="c2_scaqab10db02vmclu03-priv.us.oracle.com_clusterpriv2">
+      <networkName>scaqab10adm02vm03 ClusterPriv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db02vmclu03-priv2</hostName>
+      <ipAddress>192.168.116.4</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xa123</pkey>
+      <pkeyName>clib1</pkeyName>
+      <master>ib1</master>
+      <slave/>
+    </network>
+    <network id="c2_scaqab10adm02vm03-bk.us.oracle.com_backup">
+      <networkName>scaqab10adm02vm03-bk Backup</networkName>
+      <networkType>backup</networkType>
+      <version>version1</version>
+      <hostName>scaqab10adm02vm03-bk</hostName>
+      <ipAddress>10.31.127.7</ipAddress>
+      <netMask>255.255.255.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.127.1</gateway>
+      <master>bondeth1</master>
+      <slave>eth4 eth5</slave>
+      <macAddress/>
+      <vswitchNetworkParams/>
+    </network>
+    <network id="c3_scaqab10adm01vm04.us.oracle.com_client">
+      <networkName>scaqab10adm01vm04 Client</networkName>
+      <networkType>client</networkType>
+      <version>version1</version>
+      <hostName>scaqab10client01vm04</hostName>
+      <ipAddress>10.31.124.42</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.124.1</gateway>
+      <master>bondeth0</master>
+      <slave>eth1 eth2</slave>
+      <macAddress/>
+      <vswitchNetworkParams/>
+      <natnetMask>255.255.255.0</natnetMask>
+      <natdomainName>us.oracle.com</natdomainName>
+      <nathostName>scaqab10adm01nat04</nathostName>
+      <natipAddress>10.31.112.30</natipAddress>
+    </network>
+    <network id="c3_scaqab10adm01vm04.us.oracle.com_priv1">
+      <networkName>scaqab10adm01vm04 Priv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db01vm04str-priv1</hostName>
+      <ipAddress>192.168.12.13</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xaa12</pkey>
+      <pkeyName>stib0</pkeyName>
+      <master>ib0</master>
+      <slave/>
+    </network>
+    <network id="c3_scaqab10adm01vm04.us.oracle.com_priv2">
+      <networkName>scaqab10adm01vm04 Priv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db01vm04str-priv2</hostName>
+      <ipAddress>192.168.12.14</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xaa12</pkey>
+      <pkeyName>stib1</pkeyName>
+      <master>ib1</master>
+      <slave/>
+    </network>
+    <network id="c3_scaqab10db01vmclu04-priv.us.oracle.com_clusterpriv1">
+      <networkName>scaqab10adm01vm04 ClusterPriv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db01vmclu04-priv1</hostName>
+      <ipAddress>192.168.118.1</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xa124</pkey>
+      <pkeyName>clib0</pkeyName>
+      <master>ib0</master>
+      <slave/>
+    </network>
+    <network id="c3_scaqab10db01vmclu04-priv.us.oracle.com_clusterpriv2">
+      <networkName>scaqab10adm01vm04 ClusterPriv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db01vmclu04-priv2</hostName>
+      <ipAddress>192.168.118.2</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xa124</pkey>
+      <pkeyName>clib1</pkeyName>
+      <master>ib1</master>
+      <slave/>
+    </network>
+    <network id="c3_scaqab10adm01vm04-bk.us.oracle.com_backup">
+      <networkName>scaqab10adm01vm04-bk Backup</networkName>
+      <networkType>backup</networkType>
+      <version>version1</version>
+      <hostName>scaqab10adm01vm04-bk</hostName>
+      <ipAddress>10.31.127.8</ipAddress>
+      <netMask>255.255.255.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.127.1</gateway>
+      <master>bondeth1</master>
+      <slave>eth4 eth5</slave>
+      <macAddress/>
+      <vswitchNetworkParams/>
+    </network>
+    <network id="c3_scaqab10adm02vm04.us.oracle.com_client">
+      <networkName>scaqab10adm02vm04 Client</networkName>
+      <networkType>client</networkType>
+      <version>version1</version>
+      <hostName>scaqab10client02vm04</hostName>
+      <ipAddress>10.31.124.43</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.124.1</gateway>
+      <master>bondeth0</master>
+      <slave>eth1 eth2</slave>
+      <macAddress/>
+      <vswitchNetworkParams/>
+      <natnetMask>255.255.255.0</natnetMask>
+      <natdomainName>us.oracle.com</natdomainName>
+      <nathostName>scaqab10adm02nat04</nathostName>
+      <natipAddress>10.31.112.38</natipAddress>
+    </network>
+    <network id="c3_scaqab10adm02vm04.us.oracle.com_priv1">
+      <networkName>scaqab10adm02vm04 Priv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db02vm04str-priv1</hostName>
+      <ipAddress>192.168.12.15</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xaa12</pkey>
+      <pkeyName>stib0</pkeyName>
+      <master>ib0</master>
+      <slave/>
+    </network>
+    <network id="c3_scaqab10adm02vm04.us.oracle.com_priv2">
+      <networkName>scaqab10adm02vm04 Priv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db02vm04str-priv2</hostName>
+      <ipAddress>192.168.12.16</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xaa12</pkey>
+      <pkeyName>stib1</pkeyName>
+      <master>ib1</master>
+      <slave/>
+    </network>
+    <network id="c3_scaqab10db02vmclu04-priv.us.oracle.com_clusterpriv1">
+      <networkName>scaqab10adm02vm04 ClusterPriv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db02vmclu04-priv1</hostName>
+      <ipAddress>192.168.118.3</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xa124</pkey>
+      <pkeyName>clib0</pkeyName>
+      <master>ib0</master>
+      <slave/>
+    </network>
+    <network id="c3_scaqab10db02vmclu04-priv.us.oracle.com_clusterpriv2">
+      <networkName>scaqab10adm02vm04 ClusterPriv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db02vmclu04-priv2</hostName>
+      <ipAddress>192.168.118.4</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xa124</pkey>
+      <pkeyName>clib1</pkeyName>
+      <master>ib1</master>
+      <slave/>
+    </network>
+    <network id="c3_scaqab10adm02vm04-bk.us.oracle.com_backup">
+      <networkName>scaqab10adm02vm04-bk Backup</networkName>
+      <networkType>backup</networkType>
+      <version>version1</version>
+      <hostName>scaqab10adm02vm04-bk</hostName>
+      <ipAddress>10.31.127.9</ipAddress>
+      <netMask>255.255.255.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.127.1</gateway>
+      <master>bondeth1</master>
+      <slave>eth4 eth5</slave>
+      <macAddress/>
+      <vswitchNetworkParams/>
+    </network>
+    <network id="c4_scaqab10adm01vm05.us.oracle.com_client">
+      <networkName>scaqab10adm01vm05 Client</networkName>
+      <networkType>client</networkType>
+      <version>version1</version>
+      <hostName>scaqab10client01vm05</hostName>
+      <ipAddress>10.31.124.49</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.124.1</gateway>
+      <master>bondeth0</master>
+      <slave>eth1 eth2</slave>
+      <macAddress/>
+      <vswitchNetworkParams/>
+      <natnetMask>255.255.255.0</natnetMask>
+      <natdomainName>us.oracle.com</natdomainName>
+      <nathostName>scaqab10adm01nat05</nathostName>
+      <natipAddress>10.31.112.31</natipAddress>
+    </network>
+    <network id="c4_scaqab10adm01vm05.us.oracle.com_priv1">
+      <networkName>scaqab10adm01vm05 Priv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db01vm05str-priv1</hostName>
+      <ipAddress>192.168.12.17</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xaa12</pkey>
+      <pkeyName>stib0</pkeyName>
+      <master>ib0</master>
+      <slave/>
+    </network>
+    <network id="c4_scaqab10adm01vm05.us.oracle.com_priv2">
+      <networkName>scaqab10adm01vm05 Priv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db01vm05str-priv2</hostName>
+      <ipAddress>192.168.12.18</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xaa12</pkey>
+      <pkeyName>stib1</pkeyName>
+      <master>ib1</master>
+      <slave/>
+    </network>
+    <network id="c4_scaqab10db01vmclu05-priv.us.oracle.com_clusterpriv1">
+      <networkName>scaqab10adm01vm05 ClusterPriv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db01vmclu05-priv1</hostName>
+      <ipAddress>192.168.120.1</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xa125</pkey>
+      <pkeyName>clib0</pkeyName>
+      <master>ib0</master>
+      <slave/>
+    </network>
+    <network id="c4_scaqab10db01vmclu05-priv.us.oracle.com_clusterpriv2">
+      <networkName>scaqab10adm01vm05 ClusterPriv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db01vmclu05-priv2</hostName>
+      <ipAddress>192.168.120.2</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xa125</pkey>
+      <pkeyName>clib1</pkeyName>
+      <master>ib1</master>
+      <slave/>
+    </network>
+    <network id="c4_scaqab10adm01vm05-bk.us.oracle.com_backup">
+      <networkName>scaqab10adm01vm05-bk Backup</networkName>
+      <networkType>backup</networkType>
+      <version>version1</version>
+      <hostName>scaqab10adm01vm05-bk</hostName>
+      <ipAddress>10.31.127.10</ipAddress>
+      <netMask>255.255.255.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.127.1</gateway>
+      <master>bondeth1</master>
+      <slave>eth4 eth5</slave>
+      <macAddress/>
+      <vswitchNetworkParams/>
+    </network>
+    <network id="c4_scaqab10adm02vm05.us.oracle.com_client">
+      <networkName>scaqab10adm02vm05 Client</networkName>
+      <networkType>client</networkType>
+      <version>version1</version>
+      <hostName>scaqab10client02vm05</hostName>
+      <ipAddress>10.31.124.50</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.124.1</gateway>
+      <master>bondeth0</master>
+      <slave>eth1 eth2</slave>
+      <macAddress/>
+      <vswitchNetworkParams/>
+      <natnetMask>255.255.255.0</natnetMask>
+      <natdomainName>us.oracle.com</natdomainName>
+      <nathostName>scaqab10adm02nat05</nathostName>
+      <natipAddress>10.31.112.39</natipAddress>
+    </network>
+    <network id="c4_scaqab10adm02vm05.us.oracle.com_priv1">
+      <networkName>scaqab10adm02vm05 Priv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db02vm05str-priv1</hostName>
+      <ipAddress>192.168.12.19</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xaa12</pkey>
+      <pkeyName>stib0</pkeyName>
+      <master>ib0</master>
+      <slave/>
+    </network>
+    <network id="c4_scaqab10adm02vm05.us.oracle.com_priv2">
+      <networkName>scaqab10adm02vm05 Priv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db02vm05str-priv2</hostName>
+      <ipAddress>192.168.12.20</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xaa12</pkey>
+      <pkeyName>stib1</pkeyName>
+      <master>ib1</master>
+      <slave/>
+    </network>
+    <network id="c4_scaqab10db02vmclu05-priv.us.oracle.com_clusterpriv1">
+      <networkName>scaqab10adm02vm05 ClusterPriv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db02vmclu05-priv1</hostName>
+      <ipAddress>192.168.120.3</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xa125</pkey>
+      <pkeyName>clib0</pkeyName>
+      <master>ib0</master>
+      <slave/>
+    </network>
+    <network id="c4_scaqab10db02vmclu05-priv.us.oracle.com_clusterpriv2">
+      <networkName>scaqab10adm02vm05 ClusterPriv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db02vmclu05-priv2</hostName>
+      <ipAddress>192.168.120.4</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xa125</pkey>
+      <pkeyName>clib1</pkeyName>
+      <master>ib1</master>
+      <slave/>
+    </network>
+    <network id="c4_scaqab10adm02vm05-bk.us.oracle.com_backup">
+      <networkName>scaqab10adm02vm05-bk Backup</networkName>
+      <networkType>backup</networkType>
+      <version>version1</version>
+      <hostName>scaqab10adm02vm05-bk</hostName>
+      <ipAddress>10.31.127.11</ipAddress>
+      <netMask>255.255.255.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.127.1</gateway>
+      <master>bondeth1</master>
+      <slave>eth4 eth5</slave>
+      <macAddress/>
+      <vswitchNetworkParams/>
+    </network>
+    <network id="c5_scaqab10adm01vm06.us.oracle.com_client">
+      <networkName>scaqab10adm01vm06 Client</networkName>
+      <networkType>client</networkType>
+      <version>version1</version>
+      <hostName>scaqab10client01vm06</hostName>
+      <ipAddress>10.31.124.56</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.124.1</gateway>
+      <master>bondeth0</master>
+      <slave>eth1 eth2</slave>
+      <macAddress/>
+      <vswitchNetworkParams/>
+      <natnetMask>255.255.255.0</natnetMask>
+      <natdomainName>us.oracle.com</natdomainName>
+      <nathostName>scaqab10adm01nat06</nathostName>
+      <natipAddress>10.31.112.32</natipAddress>
+    </network>
+    <network id="c5_scaqab10adm01vm06.us.oracle.com_priv1">
+      <networkName>scaqab10adm01vm06 Priv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db01vm06str-priv1</hostName>
+      <ipAddress>192.168.12.21</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xaa12</pkey>
+      <pkeyName>stib0</pkeyName>
+      <master>ib0</master>
+      <slave/>
+    </network>
+    <network id="c5_scaqab10adm01vm06.us.oracle.com_priv2">
+      <networkName>scaqab10adm01vm06 Priv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db01vm06str-priv2</hostName>
+      <ipAddress>192.168.12.22</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xaa12</pkey>
+      <pkeyName>stib1</pkeyName>
+      <master>ib1</master>
+      <slave/>
+    </network>
+    <network id="c5_scaqab10db01vmclu06-priv.us.oracle.com_clusterpriv1">
+      <networkName>scaqab10adm01vm06 ClusterPriv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db01vmclu06-priv1</hostName>
+      <ipAddress>192.168.122.1</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xa126</pkey>
+      <pkeyName>clib0</pkeyName>
+      <master>ib0</master>
+      <slave/>
+    </network>
+    <network id="c5_scaqab10db01vmclu06-priv.us.oracle.com_clusterpriv2">
+      <networkName>scaqab10adm01vm06 ClusterPriv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db01vmclu06-priv2</hostName>
+      <ipAddress>192.168.122.2</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xa126</pkey>
+      <pkeyName>clib1</pkeyName>
+      <master>ib1</master>
+      <slave/>
+    </network>
+    <network id="c5_scaqab10adm01vm06-bk.us.oracle.com_backup">
+      <networkName>scaqab10adm01vm06-bk Backup</networkName>
+      <networkType>backup</networkType>
+      <version>version1</version>
+      <hostName>scaqab10adm01vm06-bk</hostName>
+      <ipAddress>10.31.127.12</ipAddress>
+      <netMask>255.255.255.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.127.1</gateway>
+      <master>bondeth1</master>
+      <slave>eth4 eth5</slave>
+      <macAddress/>
+      <vswitchNetworkParams/>
+    </network>
+    <network id="c5_scaqab10adm02vm06.us.oracle.com_client">
+      <networkName>scaqab10adm02vm06 Client</networkName>
+      <networkType>client</networkType>
+      <version>version1</version>
+      <hostName>scaqab10client02vm06</hostName>
+      <ipAddress>10.31.124.57</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.124.1</gateway>
+      <master>bondeth0</master>
+      <slave>eth1 eth2</slave>
+      <macAddress/>
+      <vswitchNetworkParams/>
+      <natnetMask>255.255.255.0</natnetMask>
+      <natdomainName>us.oracle.com</natdomainName>
+      <nathostName>scaqab10adm02nat06</nathostName>
+      <natipAddress>10.31.112.40</natipAddress>
+    </network>
+    <network id="c5_scaqab10adm02vm06.us.oracle.com_priv1">
+      <networkName>scaqab10adm02vm06 Priv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db02vm06str-priv1</hostName>
+      <ipAddress>192.168.12.23</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xaa12</pkey>
+      <pkeyName>stib0</pkeyName>
+      <master>ib0</master>
+      <slave/>
+    </network>
+    <network id="c5_scaqab10adm02vm06.us.oracle.com_priv2">
+      <networkName>scaqab10adm02vm06 Priv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db02vm06str-priv2</hostName>
+      <ipAddress>192.168.12.24</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xaa12</pkey>
+      <pkeyName>stib1</pkeyName>
+      <master>ib1</master>
+      <slave/>
+    </network>
+    <network id="c5_scaqab10db02vmclu06-priv.us.oracle.com_clusterpriv1">
+      <networkName>scaqab10adm02vm06 ClusterPriv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db02vmclu06-priv1</hostName>
+      <ipAddress>192.168.122.3</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xa126</pkey>
+      <pkeyName>clib0</pkeyName>
+      <master>ib0</master>
+      <slave/>
+    </network>
+    <network id="c5_scaqab10db02vmclu06-priv.us.oracle.com_clusterpriv2">
+      <networkName>scaqab10adm02vm06 ClusterPriv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db02vmclu06-priv2</hostName>
+      <ipAddress>192.168.122.4</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xa126</pkey>
+      <pkeyName>clib1</pkeyName>
+      <master>ib1</master>
+      <slave/>
+    </network>
+    <network id="c5_scaqab10adm02vm06-bk.us.oracle.com_backup">
+      <networkName>scaqab10adm02vm06-bk Backup</networkName>
+      <networkType>backup</networkType>
+      <version>version1</version>
+      <hostName>scaqab10adm02vm06-bk</hostName>
+      <ipAddress>10.31.127.13</ipAddress>
+      <netMask>255.255.255.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.127.1</gateway>
+      <master>bondeth1</master>
+      <slave>eth4 eth5</slave>
+      <macAddress/>
+      <vswitchNetworkParams/>
+    </network>
+    <network id="c6_scaqab10adm01vm07.us.oracle.com_client">
+      <networkName>scaqab10adm01vm07 Client</networkName>
+      <networkType>client</networkType>
+      <version>version1</version>
+      <hostName>scaqab10client01vm07</hostName>
+      <ipAddress>10.31.124.63</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.124.1</gateway>
+      <master>bondeth0</master>
+      <slave>eth1 eth2</slave>
+      <macAddress/>
+      <vswitchNetworkParams/>
+      <natnetMask>255.255.255.0</natnetMask>
+      <natdomainName>us.oracle.com</natdomainName>
+      <nathostName>scaqab10adm01nat07</nathostName>
+      <natipAddress>10.31.112.33</natipAddress>
+    </network>
+    <network id="c6_scaqab10adm01vm07.us.oracle.com_priv1">
+      <networkName>scaqab10adm01vm07 Priv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db01vm07str-priv1</hostName>
+      <ipAddress>192.168.12.25</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xaa12</pkey>
+      <pkeyName>stib0</pkeyName>
+      <master>ib0</master>
+      <slave/>
+    </network>
+    <network id="c6_scaqab10adm01vm07.us.oracle.com_priv2">
+      <networkName>scaqab10adm01vm07 Priv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db01vm07str-priv2</hostName>
+      <ipAddress>192.168.12.26</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xaa12</pkey>
+      <pkeyName>stib1</pkeyName>
+      <master>ib1</master>
+      <slave/>
+    </network>
+    <network id="c6_scaqab10db01vmclu07-priv.us.oracle.com_clusterpriv1">
+      <networkName>scaqab10adm01vm07 ClusterPriv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db01vmclu07-priv1</hostName>
+      <ipAddress>192.168.124.1</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xa127</pkey>
+      <pkeyName>clib0</pkeyName>
+      <master>ib0</master>
+      <slave/>
+    </network>
+    <network id="c6_scaqab10db01vmclu07-priv.us.oracle.com_clusterpriv2">
+      <networkName>scaqab10adm01vm07 ClusterPriv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db01vmclu07-priv2</hostName>
+      <ipAddress>192.168.124.2</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xa127</pkey>
+      <pkeyName>clib1</pkeyName>
+      <master>ib1</master>
+      <slave/>
+    </network>
+    <network id="c6_scaqab10adm01vm07-bk.us.oracle.com_backup">
+      <networkName>scaqab10adm01vm07-bk Backup</networkName>
+      <networkType>backup</networkType>
+      <version>version1</version>
+      <hostName>scaqab10adm01vm07-bk</hostName>
+      <ipAddress>10.31.127.14</ipAddress>
+      <netMask>255.255.255.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.127.1</gateway>
+      <master>bondeth1</master>
+      <slave>eth4 eth5</slave>
+      <macAddress/>
+      <vswitchNetworkParams/>
+    </network>
+    <network id="c6_scaqab10adm02vm07.us.oracle.com_client">
+      <networkName>scaqab10adm02vm07 Client</networkName>
+      <networkType>client</networkType>
+      <version>version1</version>
+      <hostName>scaqab10client02vm07</hostName>
+      <ipAddress>10.31.124.64</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.124.1</gateway>
+      <master>bondeth0</master>
+      <slave>eth1 eth2</slave>
+      <macAddress/>
+      <vswitchNetworkParams/>
+      <natnetMask>255.255.255.0</natnetMask>
+      <natdomainName>us.oracle.com</natdomainName>
+      <nathostName>scaqab10adm02nat07</nathostName>
+      <natipAddress>10.31.112.41</natipAddress>
+    </network>
+    <network id="c6_scaqab10adm02vm07.us.oracle.com_priv1">
+      <networkName>scaqab10adm02vm07 Priv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db02vm07str-priv1</hostName>
+      <ipAddress>192.168.12.27</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xaa12</pkey>
+      <pkeyName>stib0</pkeyName>
+      <master>ib0</master>
+      <slave/>
+    </network>
+    <network id="c6_scaqab10adm02vm07.us.oracle.com_priv2">
+      <networkName>scaqab10adm02vm07 Priv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db02vm07str-priv2</hostName>
+      <ipAddress>192.168.12.28</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xaa12</pkey>
+      <pkeyName>stib1</pkeyName>
+      <master>ib1</master>
+      <slave/>
+    </network>
+    <network id="c6_scaqab10db02vmclu07-priv.us.oracle.com_clusterpriv1">
+      <networkName>scaqab10adm02vm07 ClusterPriv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db02vmclu07-priv1</hostName>
+      <ipAddress>192.168.124.3</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xa127</pkey>
+      <pkeyName>clib0</pkeyName>
+      <master>ib0</master>
+      <slave/>
+    </network>
+    <network id="c6_scaqab10db02vmclu07-priv.us.oracle.com_clusterpriv2">
+      <networkName>scaqab10adm02vm07 ClusterPriv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db02vmclu07-priv2</hostName>
+      <ipAddress>192.168.124.4</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xa127</pkey>
+      <pkeyName>clib1</pkeyName>
+      <master>ib1</master>
+      <slave/>
+    </network>
+    <network id="c6_scaqab10adm02vm07-bk.us.oracle.com_backup">
+      <networkName>scaqab10adm02vm07-bk Backup</networkName>
+      <networkType>backup</networkType>
+      <version>version1</version>
+      <hostName>scaqab10adm02vm07-bk</hostName>
+      <ipAddress>10.31.127.15</ipAddress>
+      <netMask>255.255.255.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.127.1</gateway>
+      <master>bondeth1</master>
+      <slave>eth4 eth5</slave>
+      <macAddress/>
+      <vswitchNetworkParams/>
+    </network>
+    <network id="c7_scaqab10adm01vm08.us.oracle.com_client">
+      <networkName>scaqab10adm01vm08 Client</networkName>
+      <networkType>client</networkType>
+      <version>version1</version>
+      <hostName>scaqab10client01vm08</hostName>
+      <ipAddress>10.31.124.70</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.124.1</gateway>
+      <master>bondeth0</master>
+      <slave>eth1 eth2</slave>
+      <macAddress/>
+      <vswitchNetworkParams/>
+      <natnetMask>255.255.255.0</natnetMask>
+      <natdomainName>us.oracle.com</natdomainName>
+      <nathostName>scaqab10adm01nat08</nathostName>
+      <natipAddress>10.31.112.34</natipAddress>
+    </network>
+    <network id="c7_scaqab10adm01vm08.us.oracle.com_priv1">
+      <networkName>scaqab10adm01vm08 Priv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db01vm08str-priv1</hostName>
+      <ipAddress>192.168.12.29</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xaa12</pkey>
+      <pkeyName>stib0</pkeyName>
+      <master>ib0</master>
+      <slave/>
+    </network>
+    <network id="c7_scaqab10adm01vm08.us.oracle.com_priv2">
+      <networkName>scaqab10adm01vm08 Priv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db01vm08str-priv2</hostName>
+      <ipAddress>192.168.12.30</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xaa12</pkey>
+      <pkeyName>stib1</pkeyName>
+      <master>ib1</master>
+      <slave/>
+    </network>
+    <network id="c7_scaqab10db01vmclu08-priv.us.oracle.com_clusterpriv1">
+      <networkName>scaqab10adm01vm08 ClusterPriv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db01vmclu08-priv1</hostName>
+      <ipAddress>192.168.126.1</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xa128</pkey>
+      <pkeyName>clib0</pkeyName>
+      <master>ib0</master>
+      <slave/>
+    </network>
+    <network id="c7_scaqab10db01vmclu08-priv.us.oracle.com_clusterpriv2">
+      <networkName>scaqab10adm01vm08 ClusterPriv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db01vmclu08-priv2</hostName>
+      <ipAddress>192.168.126.2</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xa128</pkey>
+      <pkeyName>clib1</pkeyName>
+      <master>ib1</master>
+      <slave/>
+    </network>
+    <network id="c7_scaqab10adm01vm08-bk.us.oracle.com_backup">
+      <networkName>scaqab10adm01vm08-bk Backup</networkName>
+      <networkType>backup</networkType>
+      <version>version1</version>
+      <hostName>scaqab10adm01vm08-bk</hostName>
+      <ipAddress>10.31.127.16</ipAddress>
+      <netMask>255.255.255.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.127.1</gateway>
+      <master>bondeth1</master>
+      <slave>eth4 eth5</slave>
+      <macAddress/>
+      <vswitchNetworkParams/>
+    </network>
+    <network id="c7_scaqab10adm02vm08.us.oracle.com_client">
+      <networkName>scaqab10adm02vm08 Client</networkName>
+      <networkType>client</networkType>
+      <version>version1</version>
+      <hostName>scaqab10client02vm08</hostName>
+      <ipAddress>10.31.124.72</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.124.1</gateway>
+      <master>bondeth0</master>
+      <slave>eth1 eth2</slave>
+      <macAddress/>
+      <vswitchNetworkParams/>
+      <natnetMask>255.255.255.0</natnetMask>
+      <natdomainName>us.oracle.com</natdomainName>
+      <nathostName>scaqab10adm02nat08</nathostName>
+      <natipAddress>10.31.112.42</natipAddress>
+    </network>
+    <network id="c7_scaqab10adm02vm08.us.oracle.com_priv1">
+      <networkName>scaqab10adm02vm08 Priv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db02vm08str-priv1</hostName>
+      <ipAddress>192.168.12.31</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xaa12</pkey>
+      <pkeyName>stib0</pkeyName>
+      <master>ib0</master>
+      <slave/>
+    </network>
+    <network id="c7_scaqab10adm02vm08.us.oracle.com_priv2">
+      <networkName>scaqab10adm02vm08 Priv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db02vm08str-priv2</hostName>
+      <ipAddress>192.168.12.32</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xaa12</pkey>
+      <pkeyName>stib1</pkeyName>
+      <master>ib1</master>
+      <slave/>
+    </network>
+    <network id="c7_scaqab10db02vmclu08-priv.us.oracle.com_clusterpriv1">
+      <networkName>scaqab10adm02vm08 ClusterPriv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db02vmclu08-priv1</hostName>
+      <ipAddress>192.168.126.3</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xa128</pkey>
+      <pkeyName>clib0</pkeyName>
+      <master>ib0</master>
+      <slave/>
+    </network>
+    <network id="c7_scaqab10db02vmclu08-priv.us.oracle.com_clusterpriv2">
+      <networkName>scaqab10adm02vm08 ClusterPriv</networkName>
+      <networkType>private</networkType>
+      <version>version1</version>
+      <hostName>scaqab10db02vmclu08-priv2</hostName>
+      <ipAddress>192.168.126.4</ipAddress>
+      <netMask>255.255.254.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <pkey>0xa128</pkey>
+      <pkeyName>clib1</pkeyName>
+      <master>ib1</master>
+      <slave/>
+    </network>
+    <network id="c7_scaqab10adm02vm08-bk.us.oracle.com_backup">
+      <networkName>scaqab10adm02vm08-bk Backup</networkName>
+      <networkType>backup</networkType>
+      <version>version1</version>
+      <hostName>scaqab10adm02vm08-bk</hostName>
+      <ipAddress>10.31.127.17</ipAddress>
+      <netMask>255.255.255.0</netMask>
+      <domainName>us.oracle.com</domainName>
+      <vlanId/>
+      <gateway>10.31.127.1</gateway>
+      <master>bondeth1</master>
+      <slave>eth4 eth5</slave>
+      <macAddress/>
+      <vswitchNetworkParams/>
+    </network>
+  </networks>
+  <switches>
+    <switch id="scaqab10sw-adm0.us.oracle.com_id">
+      <networks>
+        <network id="scaqab10sw-adm0.us.oracle.com_admin"/>
+      </networks>
+    </switch>
+    <switch id="scaqab10sw-iba0.us.oracle.com_id">
+      <networks>
+        <network id="scaqab10sw-iba0.us.oracle.com_admin"/>
+      </networks>
+    </switch>
+    <switch id="scaqab10sw-ibb0.us.oracle.com_id">
+      <networks>
+        <network id="scaqab10sw-ibb0.us.oracle.com_admin"/>
+      </networks>
+    </switch>
+    <switch id="scaqab10sw-pdua0.us.oracle.com_id">
+      <networks>
+        <network id="scaqab10sw-pdua0.us.oracle.com_admin"/>
+      </networks>
+    </switch>
+    <switch id="scaqab10sw-pdub0.us.oracle.com_id">
+      <networks>
+        <network id="scaqab10sw-pdub0.us.oracle.com_admin"/>
+      </networks>
+    </switch>
+    <switch id="scaqab10sw-ibs0.us.oracle.com_id">
+      <networks>
+        <network id="scaqab10sw-ibs0.us.oracle.com_admin"/>
+      </networks>
+    </switch>
+  </switches>
+  <software>
+    <clusters>
+      <cluster id="c7_clusterHome">
+        <clusterName>clu8-128</clusterName>
+        <clusterHome>/u01/app/12.2.0.1/grid</clusterHome>
+        <clusterVersion>12.2.0.1.180417</clusterVersion>
+        <clusterOwner>c7_grid</clusterOwner>
+        <inventoryLocation>/u01/app/oraInventory</inventoryLocation>
+        <clusterScans>
+          <clusterScan id="c7_clusterScan_client"/>
+        </clusterScans>
+        <diskGroups>
+          <diskGroup id="c7_dbfsdg"/>
+          <diskGroup id="c7_datadg"/>
+          <diskGroup id="c7_recodg"/>
+        </diskGroups>
+        <clusterVips>
+          <clusterVip id="c7_scaqab10adm01vm08_vip">
+            <vipName>scaqab10client01vm08-vip</vipName>
+            <domainName>us.oracle.com</domainName>
+            <vipIpAddress>10.31.124.71</vipIpAddress>
+            <machines>
+              <machine id="scaqab10adm01vm08.us.oracle.com_id"/>
+            </machines>
+          </clusterVip>
+          <clusterVip id="c7_scaqab10adm02vm08_vip">
+            <vipName>scaqab10client02vm08-vip</vipName>
+            <domainName>us.oracle.com</domainName>
+            <vipIpAddress>10.31.124.73</vipIpAddress>
+            <machines>
+              <machine id="scaqab10adm02vm08.us.oracle.com_id"/>
+            </machines>
+          </clusterVip>
+        </clusterVips>
+      </cluster>
+      <clusterScans>
+        <clusterScan id="c0_clusterScan_client">
+          <scanName>scaqab10vm01-scan1</scanName>
+        </clusterScan>
+        <clusterScan id="c1_clusterScan_client">
+          <scanName>scaqab10vm02-scan1</scanName>
+        </clusterScan>
+        <clusterScan id="c2_clusterScan_client">
+          <scanName>scaqab10vm03-scan1</scanName>
+        </clusterScan>
+        <clusterScan id="c3_clusterScan_client">
+          <scanName>scaqab10vm04-scan1</scanName>
+        </clusterScan>
+        <clusterScan id="c4_clusterScan_client">
+          <scanName>scaqab10vm05-scan1</scanName>
+        </clusterScan>
+        <clusterScan id="c5_clusterScan_client">
+          <scanName>scaqab10vm06-scan1</scanName>
+        </clusterScan>
+        <clusterScan id="c6_clusterScan_client">
+          <scanName>scaqab10vm07-scan1</scanName>
+        </clusterScan>
+        <clusterScan id="c7_clusterScan_client">
+          <scanName>scaqab10vm08-scan1</scanName>
+        </clusterScan>
+      </clusterScans>
+    </clusters>
+    <databaseHomes>
+      <databaseHome id="c7_databaseHome">
+        <databaseHomeName>c7_DbHome_0</databaseHomeName>
+        <databaseHomeLoc>/u01/app/oracle/product/12.2.0.1/dbhome_1</databaseHomeLoc>
+        <patches/>
+        <databaseVersion>12.2.0.1.180417</databaseVersion>
+        <databaseSwOwner>c7_oracle</databaseSwOwner>
+        <cluster id="c7_clusterHome"/>
+        <machines>
+          <machine id="scaqab10adm01vm08.us.oracle.com_id"/>
+          <machine id="scaqab10adm02vm08.us.oracle.com_id"/>
+        </machines>
+      </databaseHome>
+      <databaseHome id="cA_databaseHome">
+        <databaseHomeName>cA_dbHome_0</databaseHomeName>
+        <databaseHomeLoc>/u01/app/oracle/product/12.1.0.2/dbhome_1</databaseHomeLoc>
+        <patches>
+          <patch>
+            <patchNumber>25433352</patchNumber>
+          </patch>
+        </patches>
+        <databaseVersion>12.1.0.2.170418</databaseVersion>
+        <databaseSwOwner>c7_oracle</databaseSwOwner>
+        <cluster id="c7_clusterHome"/>
+        <machines>
+          <machine id="scaqab10adm01vm08.us.oracle.com_id"/>
+          <machine id="scaqab10adm02vm08.us.oracle.com_id"/>
+        </machines>
+      </databaseHome>
+      <databaseHome id="cB_databaseHome">
+        <databaseHomeName>cB_dbHome_0</databaseHomeName>
+        <databaseHomeLoc>/u01/app/oracle/product/11.2.0.4/dbhome_1</databaseHomeLoc>
+        <patches>
+          <patch>
+            <patchNumber>25440411</patchNumber>
+          </patch>
+          <patch>
+            <patchNumber>25434033</patchNumber>
+          </patch>
+        </patches>
+        <databaseVersion>11.2.0.4.170418</databaseVersion>
+        <databaseSwOwner>c7_oracle</databaseSwOwner>
+        <cluster id="c7_clusterHome"/>
+        <machines>
+          <machine id="scaqab10adm01vm08.us.oracle.com_id"/>
+          <machine id="scaqab10adm02vm08.us.oracle.com_id"/>
+        </machines>
+      </databaseHome>
+    </databaseHomes>
+  </software>
+  <databases>
+    <database id="c7_pdb08">
+      <databaseType>pdb</databaseType>
+      <cdbId>c7_cdbm08</cdbId>
+      <databaseHome id="c7_databaseHome"/>
+      <databaseSid>pdb08</databaseSid>
+      <databaseOwner>c7_oracle</databaseOwner>
+    </database>
+    <database id="c7_cdbm08">
+      <databaseType>cdb</databaseType>
+      <databaseHome id="c7_databaseHome"/>
+      <databaseSid>cdbm08</databaseSid>
+      <databaseOwner>c7_oracle</databaseOwner>
+    </database>
+  </databases>
+  <storage>
+    <diskGroups>
+      <diskGroup id="c7_dbfsdg">
+        <sliceSize>12G</sliceSize>
+        <diskGroupSize>216G</diskGroupSize>
+        <redundancy>NORMAL</redundancy>
+        <ocrVote>true</ocrVote>
+        <diskGroupName>DBFSDG8</diskGroupName>
+        <machines>
+          <machine id="scaqab10celadm01.us.oracle.com_id"/>
+          <machine id="scaqab10celadm02.us.oracle.com_id"/>
+          <machine id="scaqab10celadm03.us.oracle.com_id"/>
+        </machines>
+      </diskGroup>
+      <diskGroup id="c7_datadg">
+        <sliceSize>51G</sliceSize>
+        <diskGroupSize>612G</diskGroupSize>
+        <redundancy>HIGH</redundancy>
+        <ocrVote>false</ocrVote>
+        <diskGroupName>DATAC8</diskGroupName>
+        <machines>
+          <machine id="scaqab10celadm01.us.oracle.com_id"/>
+          <machine id="scaqab10celadm02.us.oracle.com_id"/>
+          <machine id="scaqab10celadm03.us.oracle.com_id"/>
+        </machines>
+      </diskGroup>
+      <diskGroup id="c7_recodg">
+        <sliceSize>51G</sliceSize>
+        <diskGroupSize>612G</diskGroupSize>
+        <redundancy>HIGH</redundancy>
+        <ocrVote>false</ocrVote>
+        <diskGroupName>RECOC8</diskGroupName>
+        <machines>
+          <machine id="scaqab10celadm01.us.oracle.com_id"/>
+          <machine id="scaqab10celadm02.us.oracle.com_id"/>
+          <machine id="scaqab10celadm03.us.oracle.com_id"/>
+        </machines>
+      </diskGroup>
+    </diskGroups>
+  </storage>
+  <esRacks>
+    <esRack id="rack_0">
+      <esRackItem id="scaqab10adm01.us.oracle.com_id">
+        <rackItemDescription>Exadata X6-2 Compute Node</rackItemDescription>
+      </esRackItem>
+      <esRackItem id="scaqab10adm02.us.oracle.com_id">
+        <rackItemDescription>Exadata X6-2 Compute Node</rackItemDescription>
+      </esRackItem>
+      <esRackItem id="scaqab10celadm01.us.oracle.com_id">
+        <rackItemDescription>Exadata Cell Node HC 8TB</rackItemDescription>
+      </esRackItem>
+      <esRackItem id="scaqab10celadm02.us.oracle.com_id">
+        <rackItemDescription>Exadata Cell Node HC 8TB</rackItemDescription>
+      </esRackItem>
+      <esRackItem id="scaqab10celadm03.us.oracle.com_id">
+        <rackItemDescription>Exadata Cell Node HC 8TB</rackItemDescription>
+      </esRackItem>
+      <esRackItem id="scaqab10sw-adm0.us.oracle.com_id">
+        <rackItemDescription>Exadata Admin Switch</rackItemDescription>
+      </esRackItem>
+      <esRackItem id="scaqab10sw-iba0.us.oracle.com_id">
+        <rackItemDescription>Exadata Leaf Switch</rackItemDescription>
+      </esRackItem>
+      <esRackItem id="scaqab10sw-ibb0.us.oracle.com_id">
+        <rackItemDescription>Exadata Leaf Switch</rackItemDescription>
+      </esRackItem>
+      <esRackItem id="scaqab10sw-pdua0.us.oracle.com_id">
+        <rackItemDescription>Exadata PDU Switch</rackItemDescription>
+      </esRackItem>
+      <esRackItem id="scaqab10sw-pdub0.us.oracle.com_id">
+        <rackItemDescription>Exadata PDU Switch</rackItemDescription>
+      </esRackItem>
+      <esRackItem id="scaqab10sw-ibs0.us.oracle.com_id">
+        <rackItemDescription>Exadata Spine Switch</rackItemDescription>
+      </esRackItem>
+      <rackDescription>X6-2 Quarter Rack HC 8TB</rackDescription>
+    </esRack>
+  </esRacks>
+  <storageDesc>
+    <stAttribute id="TotalStorageSize">Total_Storage_Size_Undefined</stAttribute>
+  </storageDesc>
+  <vmSizes>
+    <vmSizeName id="Small">
+      <vmAttribute id="cpuCount">4</vmAttribute>
+      <vmAttribute id="DiskSize">20Gb</vmAttribute>
+      <vmAttribute id="MemSize">240GB</vmAttribute>
+    </vmSizeName>
+    <vmSizeName id="Medium">
+      <vmAttribute id="cpuCount">4</vmAttribute>
+      <vmAttribute id="DiskSize">20Gb</vmAttribute>
+      <vmAttribute id="MemSize">240GB</vmAttribute>
+    </vmSizeName>
+    <vmSizeName id="Large">
+      <vmAttribute id="cpuCount">4</vmAttribute>
+      <vmAttribute id="DiskSize">20Gb</vmAttribute>
+      <vmAttribute id="MemSize">240GB</vmAttribute>
+    </vmSizeName>
+  </vmSizes>
+</engineeredSystem>

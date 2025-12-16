@@ -1,0 +1,940 @@
+#
+# $Header: ecs/exacloud/exabox/infrapatching/test/test_infrapatching_cell.txt /main/39 2025/12/04 04:10:46 araghave Exp $
+#
+# test_infrapatching_cell.py
+#
+# Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+#
+#    NAME
+#      test_infrapatching_cell.py - Unit test case script for all cell operations.
+#
+#    DESCRIPTION
+#      Unit test case script for all cell operations.
+#
+#    NOTES
+#      Unit test case script for all cell operations.
+#
+#    MODIFIED   (MM/DD/YY)
+#    araghave    10/03/25 - Enhancement Request 38444755 - INFRAPATCHING TEST
+#                           AUTOMATION - TEST ADDITION TO PERFORM DOMU ELU
+#                           PATCH OPERATIONS
+#    sdevasek    10/13/25 - ENH 38437135 - IMPLEMENT ADDITION OF SCRIPTNAME
+#                           SCRIPTBUNLDENAME AND SCRIPTBUNDLEHASH ATTRIBUTES
+#                           TO ECRA REGISTERED PLUGINS METADATA REGISTRATION
+#    apotluri    08/11/25 - Enhancement Request 38260898 - INFRAPATCH TEST
+#                           AUTOMATION CLUSTERLESS : CREATE TEST FOR PATCHMGR
+#                           FAILURE CASE FOR CELL/DOM0
+#    antamil     07/04/25   Bug 37994044 - Testscript changes to verify
+#                           node_state during clusterless patching
+#    sdevasek    06/20/25 - Enh 38059211  - ENHANCE TESTS MAINTENABILITY BY
+#                           SEPARATING OUT CLUSTERLESS TESTS AND SINGLE VM
+#                           TESTS INTO SEPARATE FILES
+#    sdevasek    06/11/25   Enh 38037644 - ADD TESTS TO VALIDATE MULTIPLE PATCH
+#                           SESSIONS ON EXTERNAL LAUNCHNODE
+#    antamil     05/19/25   Bug 37866030 - Testscript development for
+#                           clusterless patching
+#    antamil     04/23/25 - Enable cell test for clusterless patching
+#    apotluri    04/02/25 - Enhancement Request 37780245 - INFRAPATCH TEST
+#                           AUTOMATION : DISABLE DCS AGENT SANITY CHECKS
+#    apotluri    02/21/25 - Enhancement Request 37606857 - INFRAPATCHING TEST
+#                           AUTOMATION - TEST ADDITION TO VALIDATE BY UPDATING
+#                           SHELL_CMD_DEFAULT_TIMEOUT_IN_SECONDS TO LOWER VALUE
+#                           IN CONSTANTS.PY
+#    apotluri    02/20/25 - Enhancement Request 37606932 - INFRAPATCH TEST
+#                           AUTOMATION - CREATE TEST BY FILLING UP EXACLOUD DIR
+#    araghave    02/12/25 - Enh 37547016 - TEST CODE CHANGES TO RUN EXACLOUD
+#                           PLUGINS VALIDATIONS DURING CELL PATCHING
+#    apotluri    12/27/24 - Enhancement Request 35976327 - INFRAPATCHING TEST
+#                           AUTOMATION : ADDITION OF TEST TO VALIDATE
+#                           NON-ROLLING CELL PATCH FAILURE SCENARIO FOR
+#                           INCREASING CODE COVERAGE
+#    sdevasek    11/12/24 - Enh 36994135 -TEST ADDITION FOR CELL NONROLLING
+#                           WITH INCLUDENODELIST TO CATER GMR  
+#    sdevasek    11/06/24 - Enh 36843686 - TEST ADDITION TO CATER CELLCOUNT
+#                           DURING CELL PATCHING
+#    sdevasek    08/07/24 - Enh 36874008 - EXPOSE ECRA ENDPOINT TO LIST 
+#                           SOFTWARE VERSIONS FOR A GIVEN INFRAOCID
+#    araghave    07/15/24 - Enh 36830077 - CLEANUP KSPLICE CODE FROM
+#                           INFRAPATCHING FILES
+#    sdevasek    03/25/24 - Enh 36317237 - TEST AUTOMATION - ADD TEST FOR
+#                           ONEOFF V2 IMPLEMENTATION
+#    sdevasek    12/15/23 - Enh 36097928 - ADDITION OF TESTS TO MODIFY DEFAULT
+#                           INFRAPATCHING.CONF PARAMS TO INCREASE CODE COVERAGE
+#    emekala     11/20/23 - ENH 35706149 - Changes required in infrapatching
+#                           test auomation files to support Pipeline execution
+#    emekala     05/16/23 - ENH 35330659 - Infrapatching Test Automation -
+#                           Tracking ticket to enable Exasplice test suite in
+#                           Jenkins for periodical execution
+#    apotluri    05/10/23 - Enh 35371736 - INFRAPATCHING TEST AUTOMATION : MOVE
+#                           CLEAN UP SPACE TASK TO A GENERIC PLACE INSTEAD OF
+#                           DOING FOR EVERY TEST
+#    emekala     04/20/23 - Enh 35000319 - TEST ADDITION TO VALIDATE EXASPLICE
+#                           SCENARIO IN INFRAPATCHING AUTOMATION
+#    emekala     04/14/23 - ENH 35204492 - HEARTBEAT FAILURE ERROR CODE IS
+#                           GETTING OVERRIDDEN WITH GENERIC ERROR CODE
+#                           0X03010007 FOR DOM0 POSTCHECK FAILURE
+#    apotluri    02/16/23 - ENH 34292618 - INFRAPATCHING AUTOMATION STABILITY -
+#                           CLEAR UP SPACE IN THE NODES IN AUTOMATION RACK
+#    emekala     02/15/23 - Enh 35027349 - ENABLE POSTCHECK AND BACKUP_IMAGE
+#                           TESTS IN INFRAPATCHING AUTOMATION
+#    sdevasek    12/20/22 - ENH 33893463 - UPDATE INFRAPATCH TEST AUTOMATION TO
+#                           PROVIDE DIFFS OF TIME PROFILE FOR MAJOR OPERATIONS
+#                           ACROSS CURRENT AND PREVIOUS RUNS
+#    antamil     12/05/22 - ENH 34564371-IGNORE VALIDATION OF
+#                           TIME PROFILE DATA AND PLUGIN CONSOLE LOG FOR
+#                           ALREADY PATCHED NODE
+#    sdevasek    09/14/22 - ENH 33924998 - TEST ADDITION TO DELETE ANY PENDING
+#                           RACK_PATCH_UPDATE OPERATIONS USING ABORT REQUEST
+#    sdevasek    08/11/22 - ENH 34465298 - TEST ADDITION TO AUTOMATION TO LOOK
+#                           FOR TIME_PROFILE_DATA IN STATUS REPORT
+#    sdevasek    04/25/22 - ENH 34088744 - ENABLE TESTS FOR KSPLICE AND ONEOFF
+#                           OPERATIONS IN INFRAPTACHING AUTOMATION
+#    sdevasek    04/07/22 - ENH 33999815 - DISABLE EXACLOUD PLUGIN EXECUTION
+#                           IN AUTOMATION
+#    sdevasek    03/07/22 - Bug-33928270 - STAGE CUSTOM DOM0DOMU SCRIPT FOR
+#                           NON-ROLLING DOM0 PATCH TEST DURING CELL PATCH TEST
+#    sdevasek    02/18/22 - Enh-33737906 - TEST ADDITION TO THE INFRAPATCHING
+#                           AUTOMATION FOR EXACLOUD PLUGINS
+#    sdevasek    02/04/22 - Enh-33819329 - TEST ADDITION TO THE INFRAPATCHING
+#                           AUTOMATION FOR INCLUDELIST FEATURE
+#    sdevasek    12/03/21 - Enh-33310641 - TEST ADDITION TO THE INFRAPATCHING
+#                           AUTOMATION FOR DCS AGENT BASED SANITY CHECKS
+#    sdevasek    10/28/21 - Enh 33511506 - Run cell rollback_precheck before
+#                           rollback for rolling and non-rolling testcases
+#    nmallego    10/23/21 - Bug-33310632 - Test for non-rolling upgrade
+#    sdevasek    09/13/21 - Enh 32929805 - Infrapatching CI/CD pipeline
+#                           implementation
+#    araghave    05/27/21 - Enh 32929805 - INFRA PATCHING TEST FRAMEWORK
+#    rkhemcha    08/28/20 - Creation
+#
+
+import pytest
+import unittest
+import re
+from utils import *
+from constants import *
+
+
+# Class which defines unit tests with cells as target
+@pytest.mark.cell
+class Test_cell_class(unittest.TestCase):
+    # Class level variables
+    __cells = []
+    __dom0s = []
+    __target_name = PATCH_CELL
+
+    @classmethod
+    def setUpClass(cls):
+        cls.__cells = mGetInfraPatchingTestConfigParam('cells')
+        cls.__dom0s = mGetInfraPatchingTestConfigParam('dom0s')
+        plugin_meta_data_handler = InfrapatchPluginMetadataHandler()
+        plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScripts(PATCH_CELL, ONEOFF_PLUGIN)
+        plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScripts(PATCH_CELL, EXACLOUD_PLUGIN, "Pre")
+        plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScripts(PATCH_CELL, EXACLOUD_PLUGIN, "Post")
+
+    @classmethod
+    def tearDownClass(cls):
+        plugin_meta_data_handler = InfrapatchPluginMetadataHandler()
+        plugin_meta_data_handler.mDeleteRegisteredInfrapatchPlugineMetadataScripts(
+            "script_%s_%s" % (PATCH_CELL, ONEOFF_PLUGIN), PATCH_CELL, ONEOFF_PLUGIN)
+        plugin_meta_data_handler.mDeleteRegisteredInfrapatchPlugineMetadataScripts(
+            "script_%s_%s_pre" % (PATCH_CELL, EXACLOUD_PLUGIN), PATCH_CELL, EXACLOUD_PLUGIN)
+        plugin_meta_data_handler.mDeleteRegisteredInfrapatchPlugineMetadataScripts(
+            "script_%s_%s_post" % (PATCH_CELL, EXACLOUD_PLUGIN), PATCH_CELL, EXACLOUD_PLUGIN)
+        mUpdateInfrapatchingConfParam("disable_exacloud_plugin_execution", "False")
+        mDeleteAdditionalOptionsFromPayload('LaunchNode')
+        mDeleteAdditionalOptionsFromPayload('LaunchNodeType')
+
+
+    def __init__(self, *initial_data, **kwargs):
+        super(Test_cell_class, self).__init__(*initial_data, **kwargs)
+        self.__operation = ""
+        self.__operation_style = OP_STYLE_AUTO
+        self.__required_nodes_in_node_progress_status = []
+        self.__non_required_nodes_in_node_progress_status = []
+        self.__patch_node_list = []
+        self.__patch_operation_status_result = False
+        self.__patch_operation_status_output = ""
+
+    # This method is to run something similar before every test execution.
+    def setUp(self):
+        self.__required_nodes_in_node_progress_status = Test_cell_class.__cells
+        self.__non_required_nodes_in_node_progress_status = []
+        self.__patch_node_list = []
+        mUpdateAdditionalOptionsInPayload("IncludeNodeList", "none")
+        mUpdateAdditionalOptionsInPayload("OneoffCustomPluginFile", "none")
+        mUpdateAdditionalOptionsInPayload("OneoffScriptArgs", "none")
+        mUpdateAdditionalOptionsInPayload("exasplice", "no")
+        mUpdateAdditionalOptionsInPayload("CellCountFromCP", 0)
+        mUpdateParamInPayload("EnablePlugins", "no")
+        mUpdateParamInPayload("BackupMode", "yes")
+        mUpdateParamInPayload("PluginTypes", "none")
+        mDeletePendingFailedECRARequest()
+
+    @pytest.mark.cell_patch_prereq_check
+    def test_cell_patch_prereq_check(self):
+        _result, _status_output = mExecuteInfraPatchCommandWithDCSAgentChecks(TASK_PREREQ_CHECK,
+                                                                              PATCH_CELL, OP_STYLE_AUTO)
+        self.assertTrue(_result, "Precheck operation failed.")
+        _copy_time_profile_diff_data = mCopyTimeStatsFileForTimeDiffAnalysis(_status_output)
+        self.assertEqual(_copy_time_profile_diff_data, EXIT_SUCCESS, "Copying time profile data failed.")
+
+    @pytest.mark.cell_one_off
+    def test_cell_one_off(self):
+        self.__operation = TASK_ONEOFF
+        self.__operation_style = OP_STYLE_AUTO
+        self.mValidatePatchOperationWithIncludeNodeList()
+
+    @pytest.mark.cell_software_version_list_validator
+    def test_cell_software_version_list_validator(self):
+        """
+        This test is to validate endpoint infrapatch/imageversions/{exacOcid}
+
+        This validated the following 3 scenarios
+        1. Validate software version list when correct infraocid is passed as path param and no query parameters are passed
+           infrapatch/imageversions/{exacOcid}
+        2. Validate software version list when incorrect infraocid is passed as path param but correct rackName
+           is passed as query parameter
+           infrapatch/imageversions/{exacOcid}?rackName={rackName}
+        3.Validate software version list output when both infraocid path param and query param are wrong
+
+        Note: This is run only on x9m env where hw_nodes table data is present
+        """
+
+        if mGetInfraPatchingTestConfigParam("is_r1_env") == "True":
+            """
+            curl command used to get softwareversion list is
+            curl --silent  -u user_name:*** -i -k -X POST --header 'Content-Type: application/json' --header
+            'Accept: application/json'  http://{hostname}/ecra/endpoint/infrapatch/imageversions/{exacOcid}
+
+            output expected is
+            -------------------
+                {
+                  "softwareVersions": [
+                    {
+                      "hostName": "sea201309exdcl03.sea2xx2xx0061qf.adminsea2.oraclevcn.com",
+                      "targetType": "cell",
+                      "rackName": "sea2-d3-cl4-c1981188-b4db-4a28-9900-62d6a99d797a-clu01",
+                      "imageVersion": "23.1.10.0.0.240119"
+                    },
+                    {
+                      "hostName": "sea201323exdd011.sea2xx2xx0061qf.adminsea2.oraclevcn.com",
+                      "targetType": "dom0",
+                      "exaspliceVersion": "240501",
+                      "rackName": "sea2-d3-cl4-c1981188-b4db-4a28-9900-62d6a99d797a-clu01",
+                      "imageVersion": "23.1.10.0.0.240119"
+                    }
+                  ],
+                  "status": 200,
+                  "op": "infrapatch_nodes_imageversions_GET",
+                  "status-detail": "success"
+                }
+            """
+
+            _curl_req = CurlRequest()
+            _rack_infraocid = mGetInfraPatchingTestConfigParam('rack_infraocid')
+
+            """
+            scenario1:
+            Validate software version list when correct infraocid is passed as path param and no query parameters are passed
+               infrapatch/imageversions/{exacOcid} 
+            """
+
+            _ret, _output = _curl_req.mExecute("infrapatch/imageversions/%s" % (_rack_infraocid), "GET", {})
+            if _ret == 0:
+                _output = _output.strip().splitlines()[-1]
+            _swversions_json = json.loads(_output)
+            _require_keys = {'hostName', 'targetType', 'rackName', 'imageVersion'}
+            # Validate the keys in the first element of the list with required keys
+            self.assertTrue(_require_keys.issubset(_swversions_json["softwareVersions"][0].keys()),
+                            "All the required attributes are not present in software version list output.")
+
+            """
+            scenario2:
+             Validate software version list when incorrect infraocid is passed as path param but correct rackName
+               is passed as query parameter
+               infrapatch/imageversions/{exacOcid}?rackName={rackName}
+            """
+
+            _rackname = mGetInfraPatchingTestConfigParam('cluster')
+            _ret, _output = _curl_req.mExecute("infrapatch/imageversions/infraocid?rackName=%s" % _rackname, "GET", {})
+            if _ret == 0:
+                _output = _output.strip().splitlines()[-1]
+            _swversions_json = json.loads(_output)
+            self.assertTrue(_require_keys.issubset(_swversions_json["softwareVersions"][0].keys()),
+                            "All the required attributes are not present in software version list output.")
+
+            """
+            scenario3:
+            Validate software version list output when both infraocid path param and query param are wrong
+            """
+            _ret, _output = _curl_req.mExecute("infrapatch/imageversions/infraocid?rackName=rackName", "GET", {})
+            if _ret == 0:
+                _output = _output.strip().splitlines()[-1]
+            _swversions_json = json.loads(_output)
+            self.assertTrue(len(_swversions_json["softwareVersions"]) == 0, "Software version list is not empty")
+
+    @pytest.mark.cell_one_off_v2
+    def test_cell_one_off_v2(self):
+        # step1: Validate plugin is executed and plugin files are present
+        self.__operation = TASK_ONEOFFV2
+        self.__operation_style = OP_STYLE_AUTO
+
+        mUpdateParamInPayload("OneoffScriptAlias", "script_%s_%s" % (PATCH_CELL, ONEOFF_PLUGIN))
+        self.mValidatePatchOperationWithIncludeNodeList()
+        
+        # step2: When FailOnError is set to Yes, operation should fail
+        _scrip_alias = "script_%s_%s" % (PATCH_CELL, ONEOFF_PLUGIN)
+        plugin_meta_data_handler = InfrapatchPluginMetadataHandler()
+        _data = '{"ScriptName": "%s.sh", "ScriptAlias": "%s", "ChangeRequestID": "CRID-4567", "Description": ' \
+                '"sample", "PluginType": "%s", "PluginTarget": "%s", "FailOnError":"Yes"}' % (
+                    _scrip_alias,
+                    _scrip_alias, ONEOFF_PLUGIN,
+                    PATCH_CELL)
+        _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
+
+        _result, _status_output = mExecuteInfraPatchCommandWithDCSAgentChecks(TASK_ONEOFFV2, PATCH_CELL)
+        self.assertFalse(_result, "Oneoffv2 operation should have failed.")
+
+        # step3: When IsEnabled is set to No, oneoff plugin script should not get executed, execution oneoff fails
+        # since there is no script to execute which is provided as input
+        plugin_meta_data_handler = InfrapatchPluginMetadataHandler()
+        _data = '{"ScriptName": "%s.sh", "ScriptAlias": "%s", "ChangeRequestID": "CRID-4567", "Description": ' \
+                '"sample", "PluginType": "%s", "PluginTarget": "%s", "FailOnError":"No","IsEnabled":"No"}' % (
+                    _scrip_alias,
+                    _scrip_alias, ONEOFF_PLUGIN,
+                    PATCH_CELL)
+        _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
+
+        _result, _status_output = mExecuteInfraPatchCommandWithDCSAgentChecks(TASK_ONEOFFV2, PATCH_CELL)
+        self.assertFalse(_result, "Oneoffv2 operation should have failed.")
+
+    @pytest.mark.cell_one_off_v2_plugin_metadata_validator
+    def test_cell_one_off_v2_plugin_metadata_validator(self):
+        # 1. Validate ECRA endpoint for get registered plugin metadata is working or not
+        plugin_meta_data_handler = InfrapatchPluginMetadataHandler()
+        _scrip_alias = "script_%s_%s" % (PATCH_CELL, ONEOFF_PLUGIN)
+        _ret, _out = plugin_meta_data_handler.mGetRegisteredInfrapatchPlugineMetadataScripts()
+        if _ret != 0:
+            self.assertTrue(False, "Failed to get plugin metadata from ECRA.")
+
+        _plugin_meta_data_json = json.loads(_out)
+        _plugin_meta_data_list = _plugin_meta_data_json["InfraPatchPluginMetaData"]
+        _found_meta_data = False
+        for _plugin_meta_data in _plugin_meta_data_list:
+            if _plugin_meta_data["ScriptAlias"] == _scrip_alias:
+                _found_meta_data = True
+        self.assertTrue(_found_meta_data, "Getting infrapatch plugin metadata failed.")
+
+        # 2. Validate for invalid plugin type is specified for infrapatch plugin metadata registration
+        _data = '{ "ScriptAlias": "ScriptAlias",  "PluginType": "oneoff", "PluginTarget": "cell1"}'
+        _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
+
+        _response = json.loads(_out)
+        self.assertEqual(_response["errorCode"], "0x030E0011", "Even though an invalid PluginType is specified, "
+                                                               "the expected error has not occurred.")
+
+        # 3. Validate for exacloud plugin type for cell
+        _data = '{ "ScriptAlias": "ScriptAlias",  "PluginType": "exacloud", "PluginTarget": "cell"}'
+        _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
+        _response = json.loads(_out)
+        self.assertEqual(_response["status"], 500, "Exacloud plugin is not applicable for cell.")
+
+        # 4. Missing ScriptAlias parameter
+        _data = '{ "PluginType": "oneoff", "PluginTarget": "cell"}'
+        _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
+        _response = json.loads(_out)
+        self.assertEqual(_response["errorCode"], "0x030E0014",
+                         "Script alias is missing for plugin metadata registration.")
+
+        # 5. Description value can not be empty
+        _data = '{ "ScriptAlias": "ScriptAlias",  "PluginType": "oneoff", "PluginTarget": "cell" ,"Description" :""}'
+        _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
+        _response = json.loads(_out)
+        self.assertEqual(_response["errorCode"], "0x030E0013", "Invalid parameter value is specified for plugin "
+                                                               "metadata registration.")
+
+        # 6. ChangeRequestID value can not be empty
+        _data = '{ "ScriptAlias": "ScriptAlias",  "PluginType": "oneoff", "PluginTarget": "cell" ,"Description": ' \
+                '"desc",,"ChangeRequestID" :""} '
+        _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
+        _response = json.loads(_out)
+        self.assertEqual(_response["errorCode"], "0x0100000A", "ChangeRequestID parameter value can not be empty for "
+                                                               "plugin metadata registration.")
+
+        # 7. Validate for other required params, here Description, ChangeRequestID are missing
+        _data = '{ "ScriptAlias": "ScriptAlias",  "PluginType": "oneoff", "PluginTarget": "cell"}'
+        _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
+        _response = json.loads(_out)
+        self.assertEqual(_response["errorCode"], "0x0100000A",
+                         "Other required parameters are missing for plugin metadata "
+                         "registration.")
+
+        # 8. Missing PluginType parameter
+        _data = '{ "ScriptAlias": "ScriptAlias",  "PluginTarget": "cell" ,"Description" :"desc"}'
+        _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
+        _response = json.loads(_out)
+        self.assertEqual(_response["message"], "Mandatory parameter(s) are missing for infrapatch plugin metadata "
+                                               "registration.{}")
+        # 9. Missing PluginType PluginTarget
+        _data = '{ "ScriptAlias": "ScriptAlias",  "PluginType": "oneoff" ,"Description" :"desc"}'
+        _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
+        _response = json.loads(_out)
+        self.assertEqual(_response["errorCode"], "0x030E0014",
+                         "PluginTarget is missing for plugin metadata registration.")
+
+        # 10. ScriptAlias can not be empty
+        _data = '{ "ScriptAlias": "",  "PluginType": "oneoff", "PluginTarget": "cell"}'
+        _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
+        _response = json.loads(_out)
+        self.assertEqual(_response["errorCode"], "0x030E0013",
+                         "ScriptAlias can not be empty for plugin metadata registration.")
+
+        # 11. dbnu plugin is not applicable for PluginTarget cell
+        _data = '{ "ScriptAlias": "ScriptAlias",  "PluginType": "dbnu", "PluginTarget": "cell"}'
+        _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
+        _response = json.loads(_out)
+        self.assertEqual(_response["errorCode"], "0x030E0013", "Dbnu plugin is not applicable for cell.")
+
+        # 12. PluginType can not be empty
+        _data = '{ "ScriptAlias": "ScriptAlias",  "PluginType": "", "PluginTarget": "cell"}'
+        _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
+        _response = json.loads(_out)
+        self.assertEqual(_response["errorCode"], "0x030E0013",
+                         "PluginType can not be empty for plugin metadata registration.")
+
+        # 13. PluginTarget can not be empty
+        _data = '{ "ScriptAlias": "ScriptAlias",  "PluginType": "oneoff", "PluginTarget": ""}'
+        _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
+        _response = json.loads(_out)
+        self.assertEqual(_response["errorCode"], "0x030E0013",
+                         "PluginTarget can not be empty for plugin metadata registration.")
+
+        # 14. PluginTarget can not be empty
+        _data = '{ "ScriptAlias": "ScriptAlias", "PluginType": "oneoff", "PluginTarget": "dom0,cell"}'
+        _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
+        _response = json.loads(_out)
+        self.assertEqual(_response["errorCode"], "0x030E0011",
+                         "PluginTarget can not have dom0,cell  as value for plugin metadata registration.")
+
+        # 15. ScriptName can not be empty
+        _data = '{ "ScriptAlias": "ScriptAlias", "PluginType": "oneoff", "PluginTarget": "cell","ScriptName":"",' \
+                '"Description" :"desc","ChangeRequestID" :"ChangeRequestID"} '
+        _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
+        _response = json.loads(_out)
+        self.assertEqual(_response["errorCode"], "0x030E0013",
+                         "ScriptName can not be empty for plugin metadata registration.")
+
+        # 16. IsEnabled can have Yes or No only
+        _data = '{ "ScriptAlias": "ScriptAlias", "PluginType": "oneoff", "PluginTarget": "cell","IsEnabled":"n"} '
+        _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
+        _response = json.loads(_out)
+        self.assertEqual(_response["errorCode"], "0x030E0013",
+                         "IsEnabled can have Yes or No only as value for plugin metadata registration.")
+
+        # 17. FailOnError can have Yes or No only
+        _data = '{ "ScriptAlias": "ScriptAlias", "PluginType": "oneoff", "PluginTarget": "cell","IsEnabled":"Yes", ' \
+                '"FailOnError":"true"} '
+        _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
+        _response = json.loads(_out)
+        self.assertEqual(_response["errorCode"], "0x030E0013",
+                         "FailOnError can have Yes or No only as value for plugin metadata registration.")
+
+        # 18. RebootNode can have Yes or No only
+        _data = '{ "ScriptAlias": "ScriptAlias", "PluginType": "oneoff", "PluginTarget": "cell", "RebootNode":"false"} '
+        _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
+        _response = json.loads(_out)
+        self.assertEqual(_response["errorCode"], "0x030E0013",
+                         "RebootNode can have Yes or No only as value for plugin metadata registration.")
+
+        # 19. Phase is mandatory for cell exacloud plugin
+        _data = '{ "ScriptAlias": "ScriptAlias", "PluginType": "exacloud", "PluginTarget": "cell",' \
+                '"Description":"decs","ChangeRequestID":"crid","ScriptName" : "syslens.sh"} '
+        _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
+        _response = json.loads(_out)
+        print(_out)
+        self.assertEqual(_response["errorCode"], "0x030E0013",
+                         "Phase is mandatory for cell exacloud plugin for plugin metadata registration.")
+
+        # 20. Phase has to be either pre or post
+        _data = '{ "ScriptAlias": "ScriptAlias", "PluginType": "exacloud", "PluginTarget": "cell",' \
+                '"Description":"decs","ChangeRequestID":"crid","ScriptName" : "syslens.sh", ' \
+                '"Phase":"prepost"} '
+
+        _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
+        _response = json.loads(_out)
+        print(_out)
+        self.assertEqual(_response["errorCode"], "0x030E0013",
+                         "Phase can have Pre or Post for cell exacloud plugin as value for plugin metadata "
+                         "registration.")
+
+        # 21. ScriptAlias is mandatory for plugin metadata deletion
+        _ret, _out = plugin_meta_data_handler.mDeleteRegisteredInfrapatchPlugineMetadataScripts("", "cell", "oneoff")
+
+        self.assertEqual(_ret, 1, "ScriptAlias parameter is required for plugin metadata registration deletion.")
+
+        # 22. PluginType is mandatory for plugin metadata deletion
+        _ret, _out = plugin_meta_data_handler.mDeleteRegisteredInfrapatchPlugineMetadataScripts("ScriptAlias", "cell",
+                                                                                                "")
+        _response = json.loads(_out)
+        self.assertEqual(_response["errorCode"], "0x030E0014",
+                         "PluginType parameter is required for plugin metadata registration deletion.")
+
+    @pytest.mark.cell_patch_prereq_check_exacloud_thread_log_space_check
+    def test_cell_patch_prereq_check_exacloud_thread_log_space_check(self):
+        """
+        This test is to simulate Insufficient space issue for exacloud thread dir
+        
+        Note: If the test fails at any point, ensure that the value of exacloud_patch_working_space_mb in exabox.conf is reverted to 500
+              if not already reverted and restart exacloud
+        """
+        # variables
+        _exabox_conf = "%s/config/exabox.conf" % mGetExacloudInstallPath()
+        _test_location = "%s/exabox/infrapatching/test" % mGetExacloudInstallPath()
+
+        # get current value
+        _get_current_value_cmd = "grep exacloud_patch_working_space_mb %s | awk -F '\"' '{print $4}'" % _exabox_conf
+        _current_value, _stat = mExecuteLocal(_get_current_value_cmd)
+        self.assertEqual(_stat, 0, "Failed to get value for exacloud_patch_working_space_mb from exabox.conf.")
+
+        # update exacloud_patch_working_space_mb to some higher value in exabox.conf
+        _update_exabox_conf_cmd = "sed -i 's/exacloud_patch_working_space_mb.*/exacloud_patch_working_space_mb\" : \"5000000\",/g' %s" % _exabox_conf
+        _out, _stat = mExecuteLocal(_update_exabox_conf_cmd)
+        self.assertEqual(_stat, 0,"Update of exabox.conf failed.")
+
+        # restart exacloud
+        mPatchLogInfo("Restarting exacloud in code coverage mode")
+        _restart_exacloud_cmd = "python3 %s/infrapatching_coverage_executor.py --enable_exacloud_agent_in_code_coverage_mode" % _test_location
+        _out, _stat = mExecuteLocal(_restart_exacloud_cmd)
+        mPatchLogInfo(_out)
+        self.assertEqual(_stat, 0,"Restart of exacloud failed.")
+
+        # run precheck
+        _result, _status_output = mExecuteInfraPatchCommand(TASK_PREREQ_CHECK, PATCH_CELL, OP_STYLE_ROLLING)
+        _status_json = json.loads(_status_output)
+        _error_code = _status_json["errorCode"]
+
+        # revert back to original value
+        _update_exabox_conf_cmd = "sed -i 's/exacloud_patch_working_space_mb.*/exacloud_patch_working_space_mb\" : \"%s\",/g' %s" % (_current_value, _exabox_conf)
+        _out, _stat = mExecuteLocal(_update_exabox_conf_cmd)
+        self.assertEqual(_stat, 0,"Update of exabox.conf failed.")
+
+        # restart exacloud
+        mPatchLogInfo("Restarting exacloud in code coverage mode")
+        _out, _stat = mExecuteLocal(_restart_exacloud_cmd)
+        mPatchLogInfo(_out)
+        self.assertEqual(_stat, 0,"Restart of exacloud failed.")
+
+        # check the exit code
+        self.assertEqual(_error_code, "0x03010009", " cell precheck didn't fail with expected error code.")
+
+    @pytest.mark.cell_patch_prereq_check_verify_cmd_timeout
+    def test_cell_patch_prereq_check_verify_cmd_timeout(self):
+        """
+        This test is to simulate command timout
+
+        Note: If the test fails at any point, ensure that the value of SHELL_CMD_DEFAULT_TIMEOUT_IN_SECONDS in constants.py is reverted to 180 
+              if not already reverted and restart exacloud
+        """
+        # variables
+        _constants_py = "%s/exabox/infrapatching/utils/constants.py" % mGetExacloudInstallPath()
+        _test_location = "%s/exabox/infrapatching/test" % mGetExacloudInstallPath()
+
+        # get current value
+        _get_current_value_cmd = "grep SHELL_CMD_DEFAULT_TIMEOUT_IN_SECONDS %s | awk '{print $NF}'" % _constants_py
+        _current_value, _stat = mExecuteLocal(_get_current_value_cmd)
+        self.assertEqual(_stat, 0, "Failed to get value for SHELL_CMD_DEFAULT_TIMEOUT_IN_SECONDS from constants.py.")
+
+        # update exacloud_patch_working_space_mb to some higher value in exabox.conf
+        _update_constants_py_cmd = "sed -i 's/SHELL_CMD_DEFAULT_TIMEOUT_IN_SECONDS.*/SHELL_CMD_DEFAULT_TIMEOUT_IN_SECONDS = 1/g' %s" % _constants_py
+        _out, _stat = mExecuteLocal(_update_constants_py_cmd)
+        self.assertEqual(_stat, 0, "Update of constants.py failed.")
+
+        # restart exacloud
+        _restart_exacloud_cmd = "python3 %s/infrapatching_coverage_executor.py --enable_exacloud_agent_in_code_coverage_mode" % _test_location
+        _out, _stat = mExecuteLocal(_restart_exacloud_cmd)
+        self.assertEqual(_stat, 0, "Restart of exacloud failed.")
+
+        # run precheck
+        _result, _status_output = mExecuteInfraPatchCommand(TASK_PREREQ_CHECK, PATCH_CELL, OP_STYLE_ROLLING)
+        _status_json = json.loads(_status_output)
+        _error_code = _status_json["errorCode"]
+
+        # revert back to original value
+        _update_constants_py_cmd = "sed -i 's/SHELL_CMD_DEFAULT_TIMEOUT_IN_SECONDS.*/SHELL_CMD_DEFAULT_TIMEOUT_IN_SECONDS = %s/g' %s" % (_current_value, _constants_py)
+        _out, _stat = mExecuteLocal(_update_constants_py_cmd)
+        self.assertEqual(_stat, 0, "Update of constants.py failed.")
+
+        # restart exacloud
+        _out, _stat = mExecuteLocal(_restart_exacloud_cmd)
+        self.assertEqual(_stat, 0, "Restart of exacloud failed.")
+
+        # check the exit code
+        self.assertEqual(_error_code, "0x03010067", " cell precheck didn't fail with expected error code.")
+
+    @pytest.mark.cell_patch
+    def test_cell_patch(self):
+        updated_patch_list = []
+        self.__operation = TASK_PATCH
+        self.__operation_style = OP_STYLE_ROLLING
+        self.__patch_node_list = Test_cell_class.__cells
+        self.__patch_operation_status_result, self.__patch_operation_status_output = \
+            mExecuteInfraPatchCommandWithDCSAgentChecks(self.__operation, Test_cell_class.__target_name,
+                                                        self.__operation_style)
+        self.assertTrue(self.__patch_operation_status_result, "Patch operation failed.")
+
+        updated_patch_list = mGetNodesWithPatchOperation(self.__patch_operation_status_output)
+
+        _time_profile_data_validator = TimeProfileDataValidator(Test_cell_class.__target_name,
+                                                                self.__operation, self.__operation_style)
+        self.assertTrue(_time_profile_data_validator.mValidate(self.__patch_operation_status_output,
+                                                               updated_patch_list, []),
+                        "time_profile_data validation failed.")
+
+    @pytest.mark.cell_postcheck
+    def test_cell_postcheck(self):
+        _result, _status_output = mExecuteInfraPatchCommandWithDCSAgentChecks(TASK_POSTCHECK, PATCH_CELL)
+        self.assertTrue(_result, "Postcheck operation failed.")
+
+    @pytest.mark.cell_patch_non_rolling
+    def test_cell_patch_non_rolling(self):
+        updated_patch_list = []
+        _disable_exacloud_plugin_execution = (
+                mGetInfraPatchingTestConfigParam('disable_exacloud_plugin_execution') == 'True')
+        if not _disable_exacloud_plugin_execution:
+            # During non-rolling patching operation, domus are brought down during cell and are brought up only
+            # after dom0 patch completion, so custom scripts required for exacloud plugins are copied during cell patch test
+            self.assertTrue(mStageCustomPluginScripts(PATCH_DOM0),
+                            "Staging custom scripts failed required for exacloud plugin execution in compute node patching.")
+        self.__operation = TASK_PATCH
+        self.__operation_style = OP_STYLE_NON_ROLLING
+        self.__patch_node_list = Test_cell_class.__cells
+        self.__patch_operation_status_result, self.__patch_operation_status_output = \
+            mExecuteInfraPatchCommandWithDCSAgentChecks(self.__operation, Test_cell_class.__target_name,
+                                                        self.__operation_style)
+        self.assertTrue(self.__patch_operation_status_result, "Non-rolling patch operation failed.")
+        updated_patch_list = mGetNodesWithPatchOperation(self.__patch_operation_status_output)
+        _time_profile_data_validator = TimeProfileDataValidator(Test_cell_class.__target_name,
+                                                                self.__operation, self.__operation_style)
+        self.assertTrue(_time_profile_data_validator.mValidate(self.__patch_operation_status_output,
+                                                               updated_patch_list, []),
+                        "time_profile_data validation failed.")
+        _copy_time_profile_diff_data = mCopyTimeStatsFileForTimeDiffAnalysis(self.__patch_operation_status_output)
+        self.assertEqual(_copy_time_profile_diff_data, EXIT_SUCCESS, "Copying time profile data failed.")
+
+    @pytest.mark.cell_rollback_prereq_check
+    def test_cell_rollback_prereq_check(self):
+        _result, _status_output = mExecuteInfraPatchCommandWithDCSAgentChecks(TASK_ROLLBACK_PREREQ_CHECK, PATCH_CELL,
+                                                                              OP_STYLE_AUTO)
+        self.assertTrue(_result, "Rollback_prereq_check operation failed.")
+        _copy_time_profile_diff_data = mCopyTimeStatsFileForTimeDiffAnalysis(_status_output)
+        self.assertEqual(_copy_time_profile_diff_data, EXIT_SUCCESS, "Copying time profile data failed.")
+
+    @pytest.mark.cell_rollback
+    def test_cell_rollback(self):
+        updated_patch_list = []
+        self.__operation = TASK_ROLLBACK
+        self.__operation_style = OP_STYLE_ROLLING
+        self.__patch_node_list = Test_cell_class.__cells
+        self.__patch_operation_status_result, self.__patch_operation_status_output = \
+            mExecuteInfraPatchCommandWithDCSAgentChecks(self.__operation, Test_cell_class.__target_name,
+                                                        self.__operation_style)
+        self.assertTrue(self.__patch_operation_status_result, "Rollback operation failed.")
+        updated_patch_list = mGetNodesWithPatchOperation(self.__patch_operation_status_output)
+        _time_profile_data_validator = TimeProfileDataValidator(Test_cell_class.__target_name,
+                                                                self.__operation, self.__operation_style)
+        self.assertTrue(_time_profile_data_validator.mValidate(self.__patch_operation_status_output,
+                                                               updated_patch_list, []),
+                        "time_profile_data validation failed.")
+
+    @pytest.mark.cell_rollback_non_rolling
+    def test_cell_rollback_non_rolling(self):
+        updated_patch_list = []
+        _disable_exacloud_plugin_execution = (
+                mGetInfraPatchingTestConfigParam('disable_exacloud_plugin_execution') == 'True')
+        if not _disable_exacloud_plugin_execution:
+            # During non-rolling patching operation, domus are brought down during cell and are brought up only
+            # after dom0 patch completion, so custom scripts required for exacloud plugins are copied during cell patch test
+            self.assertTrue(mStageCustomPluginScripts(PATCH_DOM0),
+                            "Staging custom scripts failed required for exacloud plugin execution in compute node patching.")
+        self.__operation = TASK_ROLLBACK
+        self.__operation_style = OP_STYLE_NON_ROLLING
+        self.__patch_node_list = Test_cell_class.__cells
+        self.__patch_operation_status_result, self.__patch_operation_status_output = \
+            mExecuteInfraPatchCommandWithDCSAgentChecks(self.__operation, Test_cell_class.__target_name,
+                                                        self.__operation_style)
+
+        self.assertTrue(self.__patch_operation_status_result, "Non-rolling Rollback operation failed.")
+        updated_patch_list = mGetNodesWithPatchOperation(self.__patch_operation_status_output)
+        _time_profile_data_validator = TimeProfileDataValidator(Test_cell_class.__target_name,
+                                                                self.__operation, self.__operation_style)
+        self.assertTrue(_time_profile_data_validator.mValidate(self.__patch_operation_status_output,
+                                                               updated_patch_list, []),
+                        "time_profile_data validation failed.")
+
+        _copy_time_profile_diff_data = mCopyTimeStatsFileForTimeDiffAnalysis(self.__patch_operation_status_output)
+        self.assertEqual(_copy_time_profile_diff_data, EXIT_SUCCESS, "Copying time profile data failed.")
+
+    @pytest.mark.cell_patch_prereq_check_with_include_list
+    def test_cell_patch_prereq_check_with_include_list(self):
+        # Enabling space validation
+        self.assertTrue(mUpdateInfrapatchingConfParam("free_space_check_validation_enabled_on_cell", "True"),
+                        "parameter updation in infrapatching.conf failed.")
+        self.__operation = TASK_PREREQ_CHECK
+        self.__operation_style = OP_STYLE_ROLLING
+        self.mValidatePatchOperationWithIncludeNodeList()
+
+    @pytest.mark.cell_patch_with_include_list
+    def test_cell_patch_with_include_list(self):
+        _cells = Test_cell_class.__cells
+        _is_clusterless = mGetInfraPatchingTestConfigParam('is_clusterless')
+        if _is_clusterless == "True":
+            _sql = f"update ecs_hw_nodes set node_state='FREE' where oracle_hostname in ('{_cells[0].split('.')[0]}','{_cells[1].split('.')[0]}');\ncommit;\n"
+            mExecuteSqlonEcraDb(_sql)
+        self.__operation = TASK_PATCH
+        self.__operation_style = OP_STYLE_ROLLING
+        self.mValidatePatchOperationWithIncludeNodeList()
+        if _is_clusterless == "True":
+            _sql = f"select node_state from ecs_hw_nodes where oracle_hostname in ('{_cells[0].split('.')[0]}','{_cells[1].split('.')[0]}');"
+            _sqlout = mExecuteSqlonEcraDb(_sql)
+            _match = False
+            for _s in _sqlout:
+                _match =  re.search(str("FREE_MAINTENANCE"), str(_s))
+                if _match:
+                    break
+            self.assertFalse(_match, "Post patching node state is not back to FREE state")
+
+
+    @pytest.mark.cell_postcheck_with_include_list
+    def test_cell_postcheck_with_include_list(self):
+        self.__operation = TASK_POSTCHECK
+        self.__operation_style = OP_STYLE_ROLLING
+        self.mValidatePatchOperationWithIncludeNodeList()
+
+    @pytest.mark.cell_rollback_prereq_check_with_include_list
+    def test_cell_rollback_prereq_check_with_include_list(self):
+        self.__operation = TASK_ROLLBACK_PREREQ_CHECK
+        self.__operation_style = OP_STYLE_ROLLING
+        self.mValidatePatchOperationWithIncludeNodeList()
+
+    @pytest.mark.cell_patch_failure_pre_patchmgr_with_include_list
+    def test_cell_patch_failure_pre_patchmgr_with_include_list(self):
+        """
+        This test is to simulate patch error for cells and validate error code with the expected code
+        
+        The following are done in this test
+        1. Create a file with 3G under root partition
+        2. Execute cell patch with include list
+        3. Validate cell patch operation for expected error code
+        """
+    
+        fallocate_binary = "/usr/bin/fallocate"
+        sample_file = "/root/3G_test_file"
+        mExecuteRemoteExasshCmd("%s -l 3G %s" % (fallocate_binary, sample_file),
+                                [Test_cell_class.__cells[0]])
+        
+        # Execute patch and make it to fail
+        _result, _status_output = mExecuteInfraPatchCommand(TASK_PATCH, PATCH_CELL, OP_STYLE_NON_ROLLING)
+        
+        # Remove the created file
+        mExecuteRemoteExasshCmd("rm -f %s" % sample_file,
+                                [Test_cell_class.__cells[0]])
+
+        # Verify if it failed with expected error code
+        _status_json = json.loads(_status_output)
+        _error_code = _status_json["errorCode"]
+        self.assertEqual(_error_code, "0x03010054", "Cell patch didn't fail with expected error code")
+
+    @pytest.mark.cell_rollback_with_include_list
+    def test_cell_rollback_with_include_list(self):
+        _cells = Test_cell_class.__cells
+        _is_clusterless = mGetInfraPatchingTestConfigParam('is_clusterless')
+        if _is_clusterless == "True":
+            _sql = f"update ecs_hw_nodes set node_state='FREE' where oracle_hostname in ('{_cells[0].split('.')[0]}','{_cells[1].split('.')[0]}');\ncommit;\n"
+            mExecuteSqlonEcraDb(_sql)
+
+        self.__operation = TASK_ROLLBACK
+        self.__operation_style = OP_STYLE_ROLLING
+        self.mValidatePatchOperationWithIncludeNodeList()
+        if _is_clusterless == "True":
+            _sql = f"select node_state from ecs_hw_nodes where oracle_hostname in ('{_cells[0].split('.')[0]}','{_cells[1].split('.')[0]}');"
+            _sqlout = mExecuteSqlonEcraDb(_sql)
+            _match = False
+            for _s in _sqlout:
+                _match =  re.search(str("FREE_MAINTENANCE"), str(_s))
+                if _match:
+                    break
+            self.assertFalse(_match, "Post patching node state is not back to FREE state")
+
+    @pytest.mark.cell_patch_prereq_check_smr
+    def test_cell_patch_prereq_check_smr(self):
+        mUpdateAdditionalOptionsInPayload("exasplice", "yes")
+        _result, _status_output = mExecuteInfraPatchCommandWithRetry(TASK_PREREQ_CHECK, PATCH_CELL, OP_STYLE_AUTO)
+        self.assertTrue(_result, "Cell SMR precheck operation failed.")
+
+    @pytest.mark.cell_patch_smr
+    def test_cell_patch_smr(self):
+        mUpdateAdditionalOptionsInPayload("exasplice", "yes")
+        _result, _status_output = mExecuteInfraPatchCommandWithRetry(TASK_PATCH, PATCH_CELL, OP_STYLE_AUTO)
+        self.assertTrue(_result, "Cell SMR patch operation failed.")
+
+    @pytest.mark.cell_rollback_prereq_check_smr
+    def test_cell_rollback_prereq_check_smr(self):
+        mUpdateAdditionalOptionsInPayload("exasplice", "yes")
+        _result, _status_output = mExecuteInfraPatchCommandWithRetry(TASK_ROLLBACK_PREREQ_CHECK, PATCH_CELL,
+                                                                     OP_STYLE_AUTO)
+        self.assertTrue(_result, "Cell SMR rollback prereq check operation failed.")
+
+    @pytest.mark.cell_rollback_smr
+    def test_cell_rollback_smr(self):
+        mUpdateAdditionalOptionsInPayload("exasplice", "yes")
+        _result, _status_output = mExecuteInfraPatchCommandWithRetry(TASK_ROLLBACK, PATCH_CELL, OP_STYLE_AUTO)
+        self.assertTrue(_result, "Cell SMR rollback operation failed.")
+
+    @pytest.mark.cell_patch_non_rolling_with_gmr
+    def test_cell_patch_non_rolling_with_gmr(self):
+        self.__operation = TASK_PATCH
+        self.__operation_style = OP_STYLE_NON_ROLLING
+        mUpdateAdditionalOptionsInPayload("CellCountFromCP", len(Test_cell_class.__cells))
+        _op_result, _status_output = mExecuteInfraPatchCommandWithRetry(self.__operation, Test_cell_class.__target_name,
+                                                        self.__operation_style)
+        self.assertTrue(_op_result, "non rolling patch with granular maintenance style is failed.")
+        _updated_patch_list = mGetNodesWithPatchOperation(_status_output)
+        self.assertEqual(len(_updated_patch_list), len(Test_cell_class.__cells), f"{self.__operation} operation does not have correct no of nodes.")
+
+    @pytest.mark.cell_patch_with_cell_count
+    def test_cell_patch_with_cell_count(self):
+        """
+        Here in this test two cells are patched by passing cell count as 1.
+        In the first run, node_progress_data contains 1 node and in teh second run two nodes
+        but one node is already patched in the first run.
+        
+        Test validates node_progress_data to have always single node in the patched list          
+        """
+        self.__operation = TASK_PATCH
+        self.__operation_style = OP_STYLE_ROLLING
+        self.mExecuteCellPatchOperationsWithCellCountValue(1)
+        self.mExecuteCellPatchOperationsWithCellCountValue(1)
+
+    def mValidatePatchOperationWithIncludeNodeList(self):
+        """
+        First run patch operation in first two cells and then run patch operation in all cells.
+        The second iteration is to cover the scenario of filter node list in infrapatching backend.
+        """
+        _cells = Test_cell_class.__cells
+        # Run patch operation with first two cells
+
+        _include_node_list = ",".join(_cells[:2])
+        mUpdateAdditionalOptionsInPayload("IncludeNodeList", _include_node_list)
+        self.__required_nodes_in_node_progress_status = _cells[:2]
+        self.__non_required_nodes_in_node_progress_status = [_cells[2]]
+        # First two cell nodes gets patched
+        self.__patch_node_list = _cells[:2]
+        if self.__operation in [TASK_ONEOFF, TASK_ONEOFFV2]:
+            # Need to check script execution console logs only in includenodelist
+            # Use custom script in first iteration and default script in second iteration, so default script here.
+            self.mExecuteAndValidateOneoffOperation()
+        else:
+            self.__mExecuteAndValidatePatchOperation()
+
+            # Postchecks are internal infra tests and not execute via patchmgr cmds
+            # hence time profile details won't be available
+            if not self.__operation == TASK_POSTCHECK:
+                # Capturing time profile diff only for single cell
+                _copy_time_profile_diff_data = mCopyTimeStatsFileForTimeDiffAnalysis(
+                    self.__patch_operation_status_output)
+                self.assertEqual(_copy_time_profile_diff_data, EXIT_SUCCESS, "Copying time profile data failed.")
+
+        _include_node_list = "none"
+        mUpdateAdditionalOptionsInPayload("IncludeNodeList", _include_node_list)
+        # Run patch operation in all the cells
+        self.__required_nodes_in_node_progress_status = _cells
+        self.__non_required_nodes_in_node_progress_status = []
+
+        if self.__operation in [TASK_ONEOFF, TASK_ONEOFFV2]:
+            # Need to check script execution console logs in all nodes
+            # Use custom script in first iteration and default script in second iteration, so custom script here.
+            self.mExecuteAndValidateOneoffOperation(aUseDefaultScript=False)
+        else:
+            # last cell nodes gets patched
+            self.__mExecuteAndValidatePatchOperation()
+
+    # Private method to execute and validate patch operation
+    def __mExecuteAndValidatePatchOperation(self):
+        updated_patch_list = []
+        _disable_exacloud_plugin_execution = (
+                mGetInfraPatchingTestConfigParam('disable_exacloud_plugin_execution') == 'True')
+
+        if not _disable_exacloud_plugin_execution:
+            # plugin execution need to be done only for patch operation
+            # In case of non-rolling, custom scripts are staged to dom0/domus before even start of cell patching test
+            if self.__operation in [TASK_PATCH] and self.__operation_style != OP_STYLE_NON_ROLLING:
+                self.assertTrue(mStageCustomPluginScripts(Test_dom0_class.__target_name),
+                                "Staging custom scripts failed for exacloud plugin execution.")
+
+        self.__patch_operation_status_result, self.__patch_operation_status_output = \
+            mExecuteInfraPatchCommandWithDCSAgentChecks(self.__operation, Test_cell_class.__target_name,
+                                                        self.__operation_style)
+        self.assertTrue(self.__patch_operation_status_result,
+                        "%s operation failed." % (self.__operation.capitalize()))
+
+        # Postchecks are internal infra tests and not execute via patchmgr cmds
+        if not self.__operation == TASK_POSTCHECK:
+            updated_patch_list = mGetNodesWithPatchOperation(self.__patch_operation_status_output)
+            if not _disable_exacloud_plugin_execution:
+                # plugin execution need to be done only for patch and rollback operation
+                if self.__operation in [TASK_PATCH, TASK_ROLLBACK]:
+                    _exacloud_plugin_script_execution_validator = ExacloudPluginScriptExecutionValidator(
+                        Test_cell_class.__target_name,
+                        self.__operation,
+                        self.__operation_style)
+                    self.assertTrue(
+                        _exacloud_plugin_script_execution_validator.mValidate(self.__patch_operation_status_output,
+                                                                              updated_patch_list),
+                        "Exacloud plugin execution failed.")
+
+            # Node progress is currently not there in prod, when management host is used as launch node
+            self.assertTrue(
+                mCheckNodesPresenceInNodeProgressStatus(self.__patch_operation_status_output,
+                                                        updated_patch_list,
+                                                        self.__non_required_nodes_in_node_progress_status),
+                "Either expected nodes are not present or unexpected nodes are present in node_progress_status.")
+
+            _time_profile_data_validator = TimeProfileDataValidator(Test_cell_class.__target_name,
+                                                                    self.__operation, self.__operation_style)
+            # Need to pass nodes where actual patching happens and nodes where patching does not happen (Test_cell_class.__cells-self.__patch_node_list)
+            self.assertTrue(
+                _time_profile_data_validator.mValidate(self.__patch_operation_status_output, updated_patch_list,
+                                                       [i for i in Test_cell_class.__cells if
+                                                        i not in updated_patch_list]),
+                "time_profile_data validation failed.")
+
+    def mExecuteAndValidateOneoffOperation(self, aUseDefaultScript=True):
+        if not aUseDefaultScript and self.__operation != TASK_ONEOFFV2:
+            _one_off_script_file_path = mCreateOneOffScriptFile(self.__operation)
+            if not _one_off_script_file_path:
+                self.assertTrue(False, "Failed to create one-off script file.")
+            mUpdateAdditionalOptionsInPayload("OneoffCustomPluginFile", _one_off_script_file_path)
+        mUpdateAdditionalOptionsInPayload("OneoffScriptArgs", "stage=Pre,EXACS=yes,root_access=True")
+
+        mUpdateParamInPayload("BackupMode", "no")
+        self.__patch_operation_status_result, self.__patch_operation_status_output = \
+            mExecuteInfraPatchCommandWithDCSAgentChecks(self.__operation, Test_cell_class.__target_name,
+                                                        self.__operation_style)
+        self.assertTrue(self.__patch_operation_status_result,
+                        "%s operation failed." % (self.__operation.capitalize()))
+
+        _script_execution_validator = OneOffPluginScriptExecutionValidator(Test_cell_class.__target_name,
+                                                                                  self.__operation,
+                                                                                  self.__operation_style)
+        self.assertTrue(_script_execution_validator.mValidate(self.__patch_operation_status_output,
+                                                              self.__required_nodes_in_node_progress_status),
+                        "One-off script execution failed.")
+
+    def mExecuteCellPatchOperationsWithCellCountValue(self, aCellCount):
+        mUpdateAdditionalOptionsInPayload("CellCountFromCP", aCellCount)
+        _result, _status_output = mExecuteInfraPatchCommandWithRetry(self.__operation, Test_cell_class.__target_name,
+                                                                     self.__operation_style)
+        self.assertTrue(_result, f"{self.__operation} operation failed.")
+        _updated_patch_list = mGetNodesWithPatchOperation(_status_output)
+        self.assertEqual(len(_updated_patch_list), aCellCount, f"{self.__operation} operation does not have expected no of cells in node_progress_data.")

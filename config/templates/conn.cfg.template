@@ -1,0 +1,7 @@
+{
+    "exacloud": {
+        "unix_socket": "_REPLACE_EXACLOUD_METADATA_PATH_/mysql__REPLACE_MYSQL_ID_.sock",
+        "db": "requests",
+        "user": "_REPLACE_MYSQL_USER_"
+   }
+}

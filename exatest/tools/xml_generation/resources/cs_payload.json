@@ -1,0 +1,134 @@
+{
+    "atp": {
+        "AutonomousDb": "Y",
+        "casperIp": "134.70.0.0/17",
+        "omvcnSubnet": "192.144.75.120/29",
+        "reserved_subnets": [
+            "192.144.75.64/29",
+            "192.144.75.32/29",
+            "192.144.75.24/29",
+            "192.144.75.16/29",
+            "192.144.75.72/29",
+            "192.144.75.8/29",
+            "192.144.75.0/29"
+        ],
+        "whitelist": {
+            "client": {
+                "protocol": {
+                    "tcp": [
+                        "@1521@in",
+                        "@1521@out",
+                        "@2484@in",
+                        "@2484@out",
+                        "@443@in",
+                        "@443@out",
+                        "@6200@in",
+                        "s169.254.169.254@7060@in"
+                    ]
+                }
+            }
+        }
+    },
+    "customer_network": {
+        "backup_scans": {
+            "hostname": "nshqaw12vm07-scanbk",
+            "ips": [
+                "10.31.124.65"
+            ],
+            "port": "1522"
+        },
+        "network_services": {
+            "dns": [
+                "10.31.138.25",
+                "10.231.225.65",
+                "206.223.27.1"
+            ],
+            "ntp": [
+                "10.31.138.20",
+                "10.246.6.36"
+            ]
+        },
+        "nodes": [
+            {
+                "backup": {
+                    "dom0_oracle_name": "nshqaw12adm03",
+                    "domainname": "us.oracle.com",
+                    "domu_oracle_name": "nshqaw12adm03vm01",
+                    "gateway": "10.31.127.1",
+                    "hostname": "nshqaw12adm03vm01",
+                    "hw_node_id": 1,
+                    "ip": "10.91.200.195",
+                    "mac": "02:bb:2e:59:f8:a0",
+                    "netmask": "255.255.254.0",
+                    "vlantag": "2"
+                },
+                "client": {
+                    "dom0_oracle_name": "nshqaw12adm03",
+                    "domainname": "us.oracle.com",
+                    "domu_oracle_name": "nshqaw12client01vm01",
+                    "gateway": "10.31.124.1",
+                    "hostname": "nshqaw12adm03vm01",
+                    "hw_node_id": 1,
+                    "ip": "10.31.124.63",
+                    "mac": "02:bb:2e:59:f8:a0",
+                    "natip": "discover",
+                    "nathostname": "nshqaw12client01vm01",
+                    "natdomain": "us.oracle.com",
+                    "natnetmask": "255.255.255.0",
+                    "netmask": "255.255.254.0",
+                    "vlantag": "1"
+                },
+                "vip": {
+                    "domainname": "us.oracle.com",
+                    "hostname": "nshqaw12client01vm01-vip",
+                    "ip": "10.31.124.65"
+                }
+            },
+            {
+                "backup": {
+                    "dom0_oracle_name": "nshqaw12adm04",
+                    "domainname": "us.oracle.com",
+                    "domu_oracle_name": "nshqaw12adm04vm01",
+                    "gateway": "10.31.127.1",
+                    "hostname": "nshqaw12adm04vm01-bk",
+                    "hw_node_id": 1,
+                    "ip": "10.31.127.15",
+                    "mac": "02:bb:2e:59:f8:a0",
+                    "netmask": "255.255.254.0",
+                    "vlantag": null
+                },
+                "client": {
+                    "dom0_oracle_name": "nshqaw12adm04",
+                    "domainname": "us.oracle.com",
+                    "domu_oracle_name": "nshqaw12client02vm01",
+                    "gateway": "10.31.124.1",
+                    "hostname": "nshqaw12adm04vm01",
+                    "hw_node_id": 1,
+                    "ip": "10.31.124.64",
+                    "mac": "02:bb:2e:59:f8:a0",
+                    "netmask": "255.255.254.0",
+                    "vlantag": null
+                },
+                "vip": {
+                    "domainname": "us.oracle.com",
+                    "hostname": "nshqaw12client02vm01-vip",
+                    "ip": "10.31.124.66"
+                }
+            }
+        ],
+        "scan": {
+            "hostname": "nshqaw12vm01-scan1",
+            "ips": [
+                "10.31.124.67",
+                "10.31.124.68",
+                "10.31.124.69"
+            ],
+            "port": 1531
+        }
+    },
+    "vm": {
+        "size": "Large",
+        "cores": 8,
+        "gb_memory": 64
+    }
+}

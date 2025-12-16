@@ -1,0 +1,16 @@
+{
+    "properties": {
+        "usercmd": {
+            "type": "string"
+        },
+        "commonParameters": {
+            "type": "object"
+        }
+    },
+    "required": [
+        "usercmd",
+        "commonParameters"
+    ],
+    "type": "object"
+}
+

@@ -1,0 +1,383 @@
+{
+    "reshaped_node_subset": {
+        "ostype": "kvm",
+        "added_computes": [
+            {
+                "compute_node_alias": "nshqaw12adm03",
+                "compute_node_hostname": "nshqaw12adm03.us.oracle.com",
+                "network_info": {
+                    "computenetworks": [
+                        {
+                            "admin": [
+                                {
+                                    "fqdn": "nshqaw12adm03.us.oracle.com",
+                                    "ipaddr": "10.31.112.4",
+                                    "gateway": "10.31.112.1",
+                                    "master": "eth0",
+                                    "netmask": "255.255.255.0"
+                                }
+                            ]
+                        },
+                        {
+                            "private": [
+                                {
+                                    "fqdn": "nshqaw12adm03-priv1.us.oracle.com",
+                                    "netmask": "255.255.255.0",
+                                    "ipaddr": "192.168.128.3"
+                                },
+                                {
+                                    "fqdn": "nshqaw12adm03-priv2.us.oracle.com",
+                                    "netmask": "255.255.255.0",
+                                    "ipaddr": "192.168.128.4"
+                                }
+                            ]
+                        },
+                        {
+                            "ilom": [
+                                {
+                                    "fqdn": "nshqaw12adm03-c.us.oracle.com",
+                                    "ipaddr": "10.31.16.103",
+                                    "gateway": "10.31.16.1",
+                                    "netmask": "255.255.255.0"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "virtual_compute_info": {
+                    "network_info": {
+                        "virtualcomputenetworks": [
+                            {
+                                "private": [
+                                    {
+                                        "ipaddr": "192.168.124.1",
+                                        "netmask": "255.255.255.0",
+                                        "fqdn": "nshqaw12db01vmclu01-priv1.us.oracle.com"
+                                    },
+                                    {
+                                        "ipaddr": "192.168.124.2",
+                                        "netmask": "255.255.255.0",
+                                        "fqdn": "nshqaw12db01vmclu01-priv2.us.oracle.com"
+                                    }
+                                ]
+                            },
+                            {
+                                "client": [
+                                    {
+                                        "ipaddr": "10.31.124.63",
+                                        "fqdn": "nshqaw12client01vm01.us.oracle.com",
+                                        "vlantag": null,
+                                        "gateway": "10.31.124.1",
+                                        "netmask": "255.255.254.0",
+                                        "natip": "10.31.124.63",
+                                        "nathostname": "nshqaw12client01vm01",
+                                        "natdomain": "us.oracle.com",
+                                        "natnetmask": "255.255.255.0",
+                                        "slave": "eth5 eth6"
+                                    }
+                                ]
+                            },
+                            {
+                                "backup": [
+                                    {
+                                        "ipaddr": "10.31.127.14",
+                                        "fqdn": "nshqaw12adm03vm01-bk.us.oracle.com",
+                                        "vlantag": null,
+                                        "gateway": "10.31.127.1",
+                                        "netmask": "255.255.255.0",
+                                        "slave": "eth7 eth8"
+                                    }
+                                ]
+                            },
+                            {
+                                "interconnect": [
+                                    {
+                                        "ipaddr": "192.168.12.25",
+                                        "netmask": "255.255.255.0",
+                                        "fqdn": "nshqaw12db01vm01str-priv1.us.oracle.com"
+                                    },
+                                    {
+                                        "ipaddr": "192.168.12.26",
+                                        "netmask": "255.255.255.0",
+                                        "fqdn": "nshqaw12db01vm01str-priv2.us.oracle.com"
+                                    }
+                                ]
+                            },
+                            {
+                                "vip": [
+                                    {
+                                        "ipaddr": "10.31.124.65",
+                                        "netmask": "255.255.255.0",
+                                        "fqdn": "nshqaw12client01vm01-vip.us.oracle.com"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    "compute_node_hostname": "nshqaw12adm03vm01.us.oracle.com"
+                },
+                "rack_info": {
+                    "uloc": 2,
+                    "uheight": 1
+                }
+            },
+            {
+                "compute_node_alias": "nshqaw12adm04",
+                "compute_node_hostname": "nshqaw12adm04.us.oracle.com",
+                "network_info": {
+                    "computenetworks": [
+                        {
+                            "admin": [
+                                {
+                                    "fqdn": "nshqaw12adm04.us.oracle.com",
+                                    "ipaddr": "10.31.112.5",
+                                    "gateway": "10.31.112.1",
+                                    "master": "eth0",
+                                    "netmask": "255.255.255.0"
+                                }
+                            ]
+                        },
+                        {
+                            "private": [
+                                {
+                                    "fqdn": "nshqaw12adm04-priv1.us.oracle.com",
+                                    "netmask": "255.255.255.0",
+                                    "ipaddr": "192.168.128.5"
+                                },
+                                {
+                                    "fqdn": "nshqaw12adm04-priv2.us.oracle.com",
+                                    "netmask": "255.255.255.0",
+                                    "ipaddr": "192.168.128.6"
+                                }
+                            ]
+                        },
+                        {
+                            "ilom": [
+                                {
+                                    "fqdn": "nshqaw12adm04-c.us.oracle.com",
+                                    "ipaddr": "10.31.16.104",
+                                    "gateway": "10.31.16.1",
+                                    "netmask": "255.255.255.0"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "virtual_compute_info": {
+                    "network_info": {
+                        "virtualcomputenetworks": [
+                            {
+                                "private": [
+                                    {
+                                        "ipaddr": "192.168.124.3",
+                                        "netmask": "255.255.255.0",
+                                        "fqdn": "nshqaw12db02vmclu01-priv1.us.oracle.com"
+                                    },
+                                    {
+                                        "ipaddr": "192.168.124.4",
+                                        "netmask": "255.255.255.0",
+                                        "fqdn": "nshqaw12db02vmclu01-priv2.us.oracle.com"
+                                    }
+                                ]
+                            },
+                            {
+                                "client": [
+                                    {
+                                        "ipaddr": "10.31.124.64",
+                                        "fqdn": "nshqaw12client02vm01.us.oracle.com",
+                                        "vlantag": null,
+                                        "gateway": "10.31.124.1",
+                                        "netmask": "255.255.254.0",
+                                        "natip": "10.31.124.64",
+                                        "nathostname": "nshqaw12client02vm01",
+                                        "natdomain": "us.oracle.com",
+                                        "natnetmask": "255.255.255.0",
+                                        "slave": "eth5 eth6"
+                                    }
+                                ]
+                            },
+                            {
+                                "backup": [
+                                    {
+                                        "ipaddr": "10.31.127.15",
+                                        "fqdn": "nshqaw12adm04vm01-bk.us.oracle.com",
+                                        "vlantag": null,
+                                        "gateway": "10.31.127.1",
+                                        "netmask": "255.255.255.0",
+                                        "slave": "eth7 eth8"
+                                    }
+                                ]
+                            },
+                            {
+                                "interconnect": [
+                                    {
+                                        "ipaddr": "192.168.12.27",
+                                        "netmask": "255.255.255.0",
+                                        "fqdn": "nshqaw12db02vm01str-priv1.us.oracle.com"
+                                    },
+                                    {
+                                        "ipaddr": "192.168.12.28",
+                                        "netmask": "255.255.255.0",
+                                        "fqdn": "nshqaw12db02vm01str-priv2.us.oracle.com"
+                                    }
+                                ]
+                            },
+                            {
+                                "vip": [
+                                    {
+                                        "ipaddr": "10.31.124.66",
+                                        "netmask": "255.255.255.0",
+                                        "fqdn": "nshqaw12client02vm01-vip.us.oracle.com"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    "compute_node_hostname": "nshqaw12adm04vm01.us.oracle.com"
+                },
+                "rack_info": {
+                    "uloc": 2,
+                    "uheight": 1
+                }
+            }
+        ],
+        "added_cells": [
+            {
+                "network_info": {
+                    "cellnetworks": [
+                        {
+                            "admin": [
+                                {
+                                    "ipaddr": "10.31.112.12",
+                                    "fqdn": "nshqaw12celadm04.us.oracle.com",
+                                    "gateway": "10.31.112.1",
+                                    "netmask": "255.255.255.0"
+                                }
+                            ]
+                        },
+                        {
+                            "private": [
+                                {
+                                    "ipaddr": "192.168.12.115",
+                                    "netmask": "255.255.255.0",
+                                    "fqdn": "nshqaw12cell04vmclu01-priv1.us.oracle.com"
+                                },
+                                {
+                                    "ipaddr": "192.168.12.116",
+                                    "netmask": "255.255.255.0",
+                                    "fqdn": "nshqaw12cell04vmclu01-priv2.us.oracle.com"
+                                }
+                            ]
+                        },
+                        {
+                            "ilom": [
+                                {
+                                    "ipaddr": "10.31.16.111",
+                                    "fqdn": "nshqaw12celadm04-c.us.oracle.com",
+                                    "gateway": "10.31.16.1",
+                                    "netmask": "255.255.255.0"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "cell_hostname": "nshqaw12celadm04.us.oracle.com",
+                "rack_info": {
+                    "uloc": 2,
+                    "uheight": 1
+                }
+            },
+            {
+                "network_info": {
+                    "cellnetworks": [
+                        {
+                            "admin": [
+                                {
+                                    "ipaddr": "10.31.112.13",
+                                    "fqdn": "nshqaw12celadm05.us.oracle.com",
+                                    "gateway": "10.31.112.1",
+                                    "netmask": "255.255.255.0"
+                                }
+                            ]
+                        },
+                        {
+                            "private": [
+                                {
+                                    "ipaddr": "192.168.12.117",
+                                    "netmask": "255.255.255.0",
+                                    "fqdn": "nshqaw12cell05vmclu01-priv1.us.oracle.com"
+                                },
+                                {
+                                    "ipaddr": "192.168.12.118",
+                                    "netmask": "255.255.255.0",
+                                    "fqdn": "nshqaw12cell05vmclu01-priv2.us.oracle.com"
+                                }
+                            ]
+                        },
+                        {
+                            "ilom": [
+                                {
+                                    "ipaddr": "10.31.16.112",
+                                    "fqdn": "nshqaw12celadm05-c.us.oracle.com",
+                                    "gateway": "10.31.16.1",
+                                    "netmask": "255.255.255.0"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "cell_hostname": "nshqaw12celadm05.us.oracle.com",
+                "rack_info": {
+                    "uloc": 2,
+                    "uheight": 1
+                }
+            },
+            {
+                "network_info": {
+                    "cellnetworks": [
+                        {
+                            "admin": [
+                                {
+                                    "ipaddr": "10.31.112.14",
+                                    "fqdn": "nshqaw12celadm06.us.oracle.com",
+                                    "gateway": "10.31.112.1",
+                                    "netmask": "255.255.255.0"
+                                }
+                            ]
+                        },
+                        {
+                            "private": [
+                                {
+                                    "ipaddr": "192.168.12.119",
+                                    "netmask": "255.255.255.0",
+                                    "fqdn": "nshqaw12cell06vmclu01-priv1.us.oracle.com"
+                                },
+                                {
+                                    "ipaddr": "192.168.12.120",
+                                    "netmask": "255.255.255.0",
+                                    "fqdn": "nshqaw12cell06vmclu01-priv2.us.oracle.com"
+                                }
+                            ]
+                        },
+                        {
+                            "ilom": [
+                                {
+                                    "ipaddr": "10.31.16.113",
+                                    "fqdn": "nshqaw12celadm06-c.us.oracle.com",
+                                    "gateway": "10.31.16.1",
+                                    "netmask": "255.255.255.0"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "cell_hostname": "nshqaw12celadm06.us.oracle.com",
+                "rack_info": {
+                    "uloc": 2,
+                    "uheight": 1
+                }
+            }
+        ]
+    }
+}
+

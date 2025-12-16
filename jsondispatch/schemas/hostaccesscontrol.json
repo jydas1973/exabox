@@ -1,0 +1,20 @@
+{
+    "properties": {
+        "hostnames": {
+            "type": "array"
+        },
+        "cidrs": {
+            "type": "array"
+        },
+        "operation": {
+            "type": "string"
+        },
+        "hosttype": {
+            "type": "string"
+        }
+    },
+    "required": [
+        "hostnames", "cidrs", "operation", "hosttype"
+    ],
+    "type": "object"
+}

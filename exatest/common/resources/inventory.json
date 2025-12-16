@@ -1,0 +1,375 @@
+{
+    "db-klones": [
+        {
+            "files": [
+                {
+                    "path": "db-klone-Linux-x86-64-11204201020.zip", 
+                    "type": "klone", 
+                    "sha256sum": "fb68e9344f45713af0c17cbb4594b74538eb0a25f4ea33221772434f58897c67"
+                }
+            ], 
+            "bpname": "OCT2020", 
+            "service": [
+                "EXACS", 
+                "ATP"
+            ], 
+            "cdate": "201020", 
+            "version": "11.2.0.4", 
+            "xmeta": {
+                "oeda_version": "2020.294"
+            }
+        }, 
+        {
+            "files": [
+                {
+                    "path": "db-klone-Linux-x86-64-12102201020.zip", 
+                    "type": "klone", 
+                    "sha256sum": "65f9a792ea4119bbfdd843ba5ad475b5e782ffdbdcd265debd15aaa203cb89fe"
+                }
+            ], 
+            "bpname": "OCT2020", 
+            "service": [
+                "EXACS", 
+                "ATP"
+            ], 
+            "cdate": "201020", 
+            "version": "12.1.0.2", 
+            "xmeta": {
+                "oeda_version": "2020.294"
+            }
+        }, 
+        {
+            "files": [
+                {
+                    "path": "db-klone-Linux-x86-64-12201201020.zip", 
+                    "type": "klone", 
+                    "sha256sum": "bfda60b5177eb59f225e8e98113b524b2ceb374410c2c91c748a8d220c86b941"
+                }
+            ], 
+            "bpname": "OCT2020", 
+            "service": [
+                "EXACS", 
+                "ATP"
+            ], 
+            "cdate": "201020", 
+            "version": "12.2.0.1", 
+            "xmeta": {
+                "oeda_version": "2020.294"
+            }
+        }, 
+        {
+            "files": [
+                {
+                    "path": "db-klone-Linux-x86-64-18000201020.zip", 
+                    "type": "klone", 
+                    "sha256sum": "c309bac838a5a0b15e1a52b5ae1c3122830c0ed4b316e954625dfd3e575ec28d"
+                }
+            ], 
+            "bpname": "OCT2020", 
+            "service": [
+                "EXACS", 
+                "ATP"
+            ], 
+            "cdate": "201020", 
+            "version": "18.1.0.0", 
+            "xmeta": {
+                "oeda_version": "2020.294"
+            }
+        }, 
+        {
+            "files": [
+                {
+                    "path": "db-klone-Linux-x86-64-19000201020.zip", 
+                    "type": "klone", 
+                    "sha256sum": "b5d3e97a0de1a9a85daf3f8338ab4f65bb02c8d8ead524cb04ee5ee4c5d50b9f"
+                }
+            ], 
+            "bpname": "OCT2020", 
+            "service": [
+                "EXACS"
+            ], 
+            "cdate": "201020", 
+            "version": "19.0.0.0", 
+            "xmeta": {
+                "oeda_version": "2020.294"
+            }
+        }, 
+        {
+            "files": [
+                {
+                    "path": "db-klone-Linux-x86-64-19000201020.zip", 
+                    "type": "klone", 
+                    "sha256sum": "b5d3e97a0de1a9a85daf3f8338ab4f65bb02c8d8ead524cb04ee5ee4c5d50b9f"
+                }
+            ], 
+            "bpname": "OCT2020", 
+            "service": [
+                "ATP"
+            ], 
+            "cdate": "201020", 
+            "version": "19.0.0.0", 
+            "xmeta": {
+                "oeda_version": "2020.294"
+            }
+        }
+    ], 
+    "grid-klones": [
+        {
+            "files": [], 
+            "bpname": "OCT2020", 
+            "service": [
+                "EXACS", 
+                "ATP"
+            ], 
+            "cdate": "201020", 
+            "version": "12.1.0.2", 
+            "xmeta": {
+                "supported_db": [
+                    "121", 
+                    "112"
+                ], 
+                "default": false, 
+                "virtual": true, 
+                "ol7_required": false, 
+                "oeda_date": "180116", 
+                "oeda_version": "2018.016", 
+                "latest": false
+            }
+        }, 
+        {
+            "files": [], 
+            "bpname": "OCT2020", 
+            "service": [
+                "EXACS", 
+                "ATP"
+            ], 
+            "cdate": "201020", 
+            "version": "12.2.0.1", 
+            "xmeta": {
+                "supported_db": [
+                    "122", 
+                    "121", 
+                    "112"
+                ], 
+                "default": false, 
+                "virtual": true, 
+                "ol7_required": false, 
+                "oeda_date": "180717", 
+                "oeda_version": "2018.198", 
+                "latest": false
+            }
+        }, 
+        {
+            "files": [
+                {
+                    "path": "grid-klone-Linux-x86-64-18000201020.zip", 
+                    "type": "grid", 
+                    "sha256sum": "ccedb1db25b81270689124ce99e38b343f3524b6315285d70a0e0e4d57b7a475"
+                }
+            ], 
+            "bpname": "OCT2020", 
+            "service": [
+                "EXACS", 
+                "ATP"
+            ], 
+            "cdate": "201020", 
+            "version": "18.1.0.0", 
+            "xmeta": {
+                "default": true, 
+                "ol7_required": false, 
+                "supported_db": [
+                    "181", 
+                    "122", 
+                    "121", 
+                    "112"
+                ], 
+                "oeda_version": "2020.294", 
+                "latest": false
+            }
+        }, 
+        {
+            "files": [
+                {
+                    "path": "grid-klone-Linux-x86-64-19000201020.zip", 
+                    "type": "grid", 
+                    "sha256sum": "61c791cbd775f0aa9dbf8024c1b8ab6f88c6c9cd8514bee276336c92841ce191"
+                }
+            ], 
+            "bpname": "OCT2020", 
+            "service": [
+                "EXACS", 
+                "ATP"
+            ], 
+            "cdate": "201020", 
+            "version": "19.0.0.0", 
+            "xmeta": {
+                "default": false, 
+                "ol7_required": true, 
+                "supported_db": [
+                    "190", 
+                    "181", 
+                    "122", 
+                    "121", 
+                    "112"
+                ], 
+                "oeda_version": "2020.294", 
+                "latest": true
+            }
+        }
+    ], 
+    "gendate": "2020-12-09 09:50:25.256900", 
+    "dbnid": [
+        {
+            "files": [
+                {
+                    "path": "OCT2020/db11204_bits_EXA.zip", 
+                    "type": "bits", 
+                    "sha256sum": "fb68e9344f45713af0c17cbb4594b74538eb0a25f4ea33221772434f58897c67"
+                }, 
+                {
+                    "path": "OCT2020/exadbf_11204.tar.gz", 
+                    "type": "nid", 
+                    "sha256sum": "b65ed51cfe06f4878f6fde5eb3684e3efb4795fea2d8d941dfe28abbb6f5c086"
+                }
+            ], 
+            "bpname": "OCT2020", 
+            "service": [
+                "EXACS", 
+                "ATP"
+            ], 
+            "cdate": "201020", 
+            "version": "11.2.0.4", 
+            "xmeta": {
+                "oeda_version": "2020.294"
+            }
+        }, 
+        {
+            "files": [
+                {
+                    "path": "OCT2020/db12102_bits_EXA.zip", 
+                    "type": "bits", 
+                    "sha256sum": "65f9a792ea4119bbfdd843ba5ad475b5e782ffdbdcd265debd15aaa203cb89fe"
+                }, 
+                {
+                    "path": "OCT2020/exadbf_12102.tar.gz", 
+                    "type": "nid", 
+                    "sha256sum": "f2e2dee314e1d6a1026eacc87f40882bc3332b7a4a14a58bc5c2b34535d7ec42"
+                }, 
+                {
+                    "path": "OCT2020/exadbf_non_cdb_12102.tar.gz", 
+                    "type": "nid_non_cdb", 
+                    "sha256sum": "28ee7fe90981cbeb6776623818ebb768322d95ecba1d0570e0632c6cbd153b9f"
+                }
+            ], 
+            "bpname": "OCT2020", 
+            "service": [
+                "EXACS", 
+                "ATP"
+            ], 
+            "cdate": "201020", 
+            "version": "12.1.0.2", 
+            "xmeta": {
+                "oeda_version": "2020.294"
+            }
+        }, 
+        {
+            "files": [
+                {
+                    "path": "OCT2020/db12201_bits_EXA.zip", 
+                    "type": "bits", 
+                    "sha256sum": "bfda60b5177eb59f225e8e98113b524b2ceb374410c2c91c748a8d220c86b941"
+                }, 
+                {
+                    "path": "OCT2020/exadbf_12201.tar.gz", 
+                    "type": "nid", 
+                    "sha256sum": "8810077217c6918040efa519b784d2f64da3944322b79d69f5c4b978abcb7518"
+                }
+            ], 
+            "bpname": "OCT2020", 
+            "service": [
+                "EXACS", 
+                "ATP"
+            ], 
+            "cdate": "201020", 
+            "version": "12.2.0.1", 
+            "xmeta": {
+                "oeda_version": "2020.294"
+            }
+        }, 
+        {
+            "files": [
+                {
+                    "path": "OCT2020/db18000_bits_EXA.zip", 
+                    "type": "bits", 
+                    "sha256sum": "c309bac838a5a0b15e1a52b5ae1c3122830c0ed4b316e954625dfd3e575ec28d"
+                }, 
+                {
+                    "path": "OCT2020/exadbf_18000.tar.gz", 
+                    "type": "nid", 
+                    "sha256sum": "ef2846434111ce506c1f3e7a76f85741902a6ce23a27400d8120adcc5faa9863"
+                }
+            ], 
+            "bpname": "OCT2020", 
+            "service": [
+                "EXACS", 
+                "ATP"
+            ], 
+            "cdate": "201020", 
+            "version": "18.1.0.0", 
+            "xmeta": {
+                "oeda_version": "2020.294"
+            }
+        }, 
+        {
+            "files": [
+                {
+                    "path": "OCT2020/db19000_bits_EXA.zip", 
+                    "type": "bits", 
+                    "sha256sum": "b5d3e97a0de1a9a85daf3f8338ab4f65bb02c8d8ead524cb04ee5ee4c5d50b9f"
+                }, 
+                {
+                    "path": "OCT2020/exadbf_19000.tar.gz", 
+                    "type": "nid", 
+                    "sha256sum": "d80b208ecf0d1e3e5d74bce8a84ee31a82a05ba3b38e8801b6c8328cb85afa57"
+                }, 
+                {
+                    "path": "OCT2020/exadbf_non_cdb_19000.tar.gz", 
+                    "type": "nid_non_cdb", 
+                    "sha256sum": "502c8a460689bac0ed83c0ed2bccf49d3c6490b6f06f19736f15da1b204326f3"
+                }
+            ], 
+            "bpname": "OCT2020", 
+            "service": [
+                "EXACS"
+            ], 
+            "cdate": "201020", 
+            "version": "19.0.0.0", 
+            "xmeta": {
+                "oeda_version": "2020.294"
+            }
+        }, 
+        {
+            "files": [
+                {
+                    "path": "ATP_1990/db19000_bits_EXA.zip", 
+                    "type": "bits", 
+                    "sha256sum": "bd49381f7327e9c4cd82e2b5f943802f3ffa5567522137e874103111c6df7877"
+                }, 
+                {
+                    "path": "ATP_1990/exadbf_19000_atp.tar.gz", 
+                    "type": "nid", 
+                    "sha256sum": "5758ffbed1a069737a5487c5663f10a0deb4a6fb0d792c0a5cb05efac8132d22"
+                }
+            ], 
+            "bpname": "OCT2020", 
+            "service": [
+                "ATP"
+            ], 
+            "cdate": "201020", 
+            "version": "19.0.0.0", 
+            "xmeta": {
+                "oeda_version": "2020.294"
+            }
+        }
+    ]
+}

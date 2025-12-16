@@ -1,0 +1,2 @@
+scaqab10adm01vm08.us.oracle.com(16)       : running
+scaqab10adm02vm08.us.oracle.com(17)       : running

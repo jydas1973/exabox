@@ -1,0 +1,45 @@
+{
+    "clu01": {
+        "SLA": 0,
+        "timestamp": "",
+        "details": {
+            "success_overall": false,
+            "success_network&compute": false,
+            "success_network": false,
+            "success_compute": true,
+            "success_cells": true
+        },
+        "errors": [
+            "Network check failed on dom0 clu01adm01",
+            "Network check failed on dom0 clu01adm02"
+        ]
+    },
+    "clu02": {
+        "SLA": 0,
+        "timestamp": "",
+        "details": {
+            "success_overall": false,
+            "success_network&compute": true,
+            "success_network": true,
+            "success_compute": true,
+            "success_cells": false
+        },
+        "errors": [
+            "Cell check failed for cell clu02cel01",
+            "Cell check failed for cell clu02cel02"
+        ]
+    },
+    "clu03": {
+        "SLA": 1,
+        "timestamp": "",
+        "details": {
+            "success_overall": true,
+            "success_network&compute": true,
+            "success_network": true,
+            "success_compute": true,
+            "success_cells": true
+        },
+        "errors": [
+        ]
+    }
+}

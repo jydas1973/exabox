@@ -1,0 +1,189 @@
+{
+    "bonding_operation": "add-compute",
+    "reshaped_node_subset": {
+        "removed_computes": [],
+        "participating_computes": [
+            {
+                "compute_node_alias": "node-1",
+                "compute_node_hostname": "iad103716exdd015.iad103716exd.adminiad1.oraclevcn.com"
+            },
+            {
+                "compute_node_alias": "node-2",
+                "compute_node_hostname": "iad103716exdd016.iad103716exd.adminiad1.oraclevcn.com"
+            }
+            ],
+            "full_compute_to_virtualcompute_list": [
+            {
+                "compute_node_hostname": "iad103716exdd015.iad103716exd.adminiad1.oraclevcn.com",
+                "compute_node_virtual_hostname": "iad103716exddu1501.iad103716exd.adminiad1.oraclevcn.com"
+            },
+            {
+                "compute_node_hostname": "iad103716exdd016.iad103716exd.adminiad1.oraclevcn.com",
+                "compute_node_virtual_hostname": "iad103716exddu1601.iad103716exd.adminiad1.oraclevcn.com"
+            }
+        ],
+        "added_computes": [
+            {
+                "compute_node_alias": "dbserver-3",
+                "compute_node_hostname": "iad103716exdd017.iad103716exd.adminiad1.oraclevcn.com",
+                "model": "X8M-2",
+                "network_info": {
+                    "computenetworks": [
+                        {
+                            "admin": [
+                                {
+                                    "fqdn": "iad103716exdd017.iad103716exd.adminiad1.oraclevcn.com",
+                                    "gateway": "10.0.7.129",
+                                    "ipaddr": "10.0.7.146",
+                                    "netmask": "255.255.255.128"
+                                }
+                            ]
+                        },
+                        {
+                            "private": [
+                                {
+                                    "fqdn": "iad103716exdd017-priv1.iad103716exd.adminiad1.oraclevcn.com",
+                                    "ipaddr": "192.168.132.4"
+                                },
+                                {
+                                    "fqdn": "iad103716exdd017-priv2.iad103716exd.adminiad1.oraclevcn.com",
+                                    "ipaddr": "192.168.132.5"
+                                }
+                            ]
+                        },
+                        {
+                            "ilom": [
+                                {
+                                    "fqdn": "iad103716exdd017lo.iad103716exd.adminiad1.oraclevcn.com",
+                                    "gateway": "10.0.7.129",
+                                    "ipaddr": "10.0.7.164",
+                                    "netmask": "255.255.255.128"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "rack_info": {
+                    "uheight": 1,
+                    "uloc": "17"
+                },
+                "racktype": "1035",
+                "virtual_compute_info": {
+                    "compute_node_hostname": "iad103716x8mcompexpn17c.clientsubnet.devx8melastic.oraclevcn.com",
+                    "network_info": {
+                        "virtualcomputenetworks": [
+                            {
+                                "private": [
+                                    {
+                                        "fqdn": "iad103716exddu1701-stre0.iad103716exd.adminiad1.oraclevcn.com",
+                                        "ipaddr": "100.106.123.16"
+                                    },
+                                    {
+                                        "fqdn": "iad103716exddu1701-stre1.iad103716exd.adminiad1.oraclevcn.com",
+                                        "ipaddr": "100.106.123.17"
+                                    }
+                                ]
+                            },
+                            {
+                                "admin": [
+                                    {
+                                        "fqdn": "iad103716x8mcompexpn17c.clientsubnet.devx8melastic.oraclevcn.com"
+                                    }
+                                ]
+                            },
+                            {
+                                "client": [
+                                    {
+                                        "fqdn": "iad103716x8mcompexpn17c.clientsubnet.devx8melastic.oraclevcn.com",
+                                        "gateway": "10.0.0.1",
+                                        "ipaddr": "10.0.0.84",
+                                        "mac": "00:10:C9:C8:D4:CA",
+                                        "natdomain": "iad103716exd.adminiad1.oraclevcn.com",
+                                        "nathostname": "iad103716exddu1701",
+                                        "natip": "10.0.7.191",
+                                        "natnetmask": "255.255.255.128",
+                                        "netmask": "255.255.224.0",
+                                        "slaves": "eth1 eth2",
+                                        "vlantag": null
+                                    }
+                                ]
+                            },
+                            {
+                                "backup": [
+                                    {
+                                        "fqdn": "iad103716x8mcompexpn17b.backupsubnet.devx8melastic.oraclevcn.com",
+                                        "gateway": "10.0.32.1",
+                                        "ipaddr": "10.0.32.35",
+                                        "mac": "00:00:17:00:52:1A",
+                                        "netmask": "255.255.224.0",
+                                        "slaves": "eth1 eth2",
+                                        "vlantag": "1"
+                                    }
+                                ]
+                            },
+                            {
+                                "interconnect": [
+                                    {
+                                        "fqdn": "iad103716exddu1701-clre0.iad103716exd.adminiad1.oraclevcn.com",
+                                        "ipaddr": "100.107.181.16"
+                                    },
+                                    {
+                                        "fqdn": "iad103716exddu1701-clre1.iad103716exd.adminiad1.oraclevcn.com",
+                                        "ipaddr": "100.107.181.17"
+                                    }
+                                ]
+                            },
+                            {
+                                "vip": [
+                                    {
+                                        "fqdn": "iad103716exddu1701-vip.clientsubnet.devx8melastic.oraclevcn.com",
+                                        "ipaddr": "10.0.0.90"
+                                    }
+                                ]
+                            },
+                            {
+                                "monitoring": {
+                                    "bond0": {
+                                        "cavium_ids": [
+                                            {
+                                                "id": "JCN2126A20590",
+                                                "networkinterface": "eth2"
+                                            },
+                                            {
+                                                "id": "JCN2126A20929",
+                                                "networkinterface": "eth1"
+                                            }
+                                        ],
+                                        "gateway": "192.168.0.1",
+                                        "ip": "192.168.1.18",
+                                        "netmask": "255.255.252.0",
+                                        "preferred_interface": "eth2",
+                                        "vlantag": 0
+                                    }
+                                }
+                            }
+                        ]
+                    },
+                    "vm": {
+                        "cores": 24,
+                        "size": "Large"
+                    }
+                }
+            }
+        ]
+    },
+    "customer_network": {
+        "customvip": [
+            {
+                "interfacetype": "client",
+                "ip": "10.0.0.7",
+                "standby_vnic_mac": "00:09:A9:78:69"
+            },
+            {
+                "interfacetype": "backup",
+                "ip": "10.0.0.8",
+                "standby_vnic_mac": "00:09:A9:78:6A"
+            }
+        ]
+    }
+}

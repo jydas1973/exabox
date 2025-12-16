@@ -1,0 +1,1898 @@
+#!/opt/oci/exacc/exacloud/bin/python
+
+"""
+ Copyright (c) 2014, 2025, Oracle and/or its affiliates.
+
+NAME:
+    CPS nodes patch management - Basic Functionality
+
+FUNCTION:
+    Provide basic/core API for perform precheck,patch,backup,rollback
+    on CPS environments.
+
+    THIS VERSION OF cps-os-upgrader IS COMPATIBLE WITH PYTHON 3 ONLY.
+    FOR PYTHON 2 VERSIONS, PLEASE USE THE TARBALL SCRIPT IN /u01/downloads
+    location.
+
+NOTE:
+    None
+
+History:
+    MODIFIED (MM/DD/YY)
+    kdas     11/22/25 - ER 38674811 - EXACC GEN2 | CPS-OS PATCHING | USE THE
+                        LATEST DBNU FOR CPS-OS PATCHING
+    sdevasek 11/19/25 - Enh 38662063 -SKIP BACKUP IN CASE OF SYSTEM
+                        CONSISTENCY CHECK FAILURE DURING CPS OS PATCHING
+    mirrodri 09/11/25 - Bug 37185967 - Perform string interpolation using
+                        F-strings.
+    cagaray  05/20/25 - Bug 37933322 - Permit SELinux enforced CPS for fedramp
+    josedelg 09/19/24 - Bug 34587052 - Get exasplice parameter value properly
+    josedelg 07/22/24 - Bug 36852222 - Configure podman-bridge file only
+                        migration from 0l7 to 0l8
+    josedelg 04/06/24 - Enh 36451501 - Enable/Disable service state of CPS ilom
+    josedelg 11/15/23 - Bug 35641087 - Create file for checking if patch
+                        operation is running
+    josedelg 04/25/23 - Bug 34989435: Copy 87-podman-bridge.conflist file used
+                        by podman in ol7 to ol8 migration
+    josedelg 01/18/23 - Bug 34872218: add functionality for handle bad
+                        remoteec response
+    josedelg 01/11/23 - Bug 34946372 Send allow_active_network_mounts in test
+                        env (CPS in VM)
+    diguma   10/21/22 - bug33857501: addtl options to patchmgr need double
+                        hyphen
+    josedelg 10/14/22 - BUG 34696208 - Fix rollback operation getting backup
+                        version
+    araghave 09/05/22 - BUG 34567760 - EXACC-GEN2 : CPS OS UPGRADE FAILED
+                        PRE-CHECK FAILING WITH IMPORTERROR: CANNOT IMPORT NAME
+                        EBPATCHFORMATBUILDERROR
+    araghave 11/22/21 - Enh 33338757 - REMOVE MODIFY_AT_PREREQ AND MODIFY
+                        INFRA PATCHING CONF CHANGES IN CPS OS UPGRADER SCRIPT
+    araghave 11/09/21 - Bug 33553874 - Add Firmware upgrade message to the
+                        filter list to bypass Firmware related patching errors.
+    araghave 10/20/21 - Enh 33486853 - MOVE TIMEOUT AND OTHER CONSTANTS OUT OF
+                        CODE INTO CONFIG/CONSTANT FILES
+    araghave 08/02/21 - Enh 33182904 - Move all configurable parameters from
+                        constants.py to Infrapatching.conf
+    josedelg 06/08/21 - ER 31378940 - Support exasplice for CPS OS
+    josedelg 04/15/21 - Bug 32711562 - Patch failed/stuck due to corrupted rpm
+                        database
+    araghave 03/06/21 - ER 32489351 - Refactor cps os patching code inline with
+                        Infra patching
+    araghave 01/03/21 - Enh 31869399 - Introduce specific error code in cps os
+                        upgrader tool.
+    nmallego 12/16/20 - Bug32295668 - validate _additional_options
+    nmallego 12/14/20 - ER 32245824 - Extend Ignore Alert Logic here
+    araghave 12/01/20 - BUG 32216482 - EXACC: RETRY CPS SWITCHOVER DURING CPS
+                        OS UPGRADE
+    araghave 10/14/20 - Bug 32014222 - CPS OS CODE MUST PERFORM AN EXIT RATHER
+                        THAN RETURN AT THE END OF PATCH OPERATION.
+    araghave 10/08/20 - Bug 31992619 - CPS OS VERSION RETURNS NONE DURING
+                        ROLLBACK TARGET VERSION CHECK
+    araghave 09/21/20 - ER 31913347 - Add new validations for cps os RemoteEC
+                        switchoverstatus
+    araghave 09/09/20 - Bug 31862758 - NEED TO DE-SUPPORT ROLLBACK_PREREQ_CHECK
+                        ON CPS OS UPGRADE
+    araghave 07/07/20 - Bug 31522719 - FORTIFY: COMMAND INJECTION -
+                        /ECS/ECRA/EXACM/TOOLS/CPS-OS-UPGRADER.PY
+    araghave 04/17/20 - Bug 31178177 - Support additional options for cps
+                        upgrade and rollback operations
+    araghave 11/15/19 - Bug 30494350 - IMAGEMGMT RSYNC MISSING FILES DUE TO
+                        PERMISSION DENIED
+    araghave 11/17/19 - Bug30548668 - CPS PATCH BACKUP_MODE=NO DOES NOT PREVENT
+                        BACKUP
+    araghave 11/05/19 - Bug30489846 - Formatted patchmgr log output
+    nmallego 08/07/19 - Bug30149698 - fixing Indentation error
+    araghave 07/19/19 - Enh 30072631 - CPS OS PATCHING
+    araghave 07/19/19 - Creation
+"""
+
+import os
+import re
+import subprocess
+import sys
+import shlex
+from datetime import datetime
+import traceback
+import time
+from collections import OrderedDict
+import json
+import zipfile
+
+CPS_OSUPGRADE_IS_RUNNING = 'cps_os_upgrade_running'
+EXACC_ROOT_PATCH =  '/opt/oci/exacc'
+EXACLOUD_ROOT_PATH = f"{EXACC_ROOT_PATCH}/exacloud/"
+EXADATA_PATCHPAYLOADS_DIR = "/u01/downloads/exadata/PatchPayloads/"
+sys.path.append(EXACLOUD_ROOT_PATH)
+from exabox.infrapatching.utils.constants import *
+from exabox.infrapatching.core.infrapatcherror import *
+from exabox.tools.AttributeWrapper import wrapStrBytesFunctions
+from exabox.utils.common import version_compare
+
+# The next constant are used to identify if the CPS is a Virtual Machine
+# used in TEST/DEV env or Bare Metal used in production envs.
+
+# Test/Dev environments uses virtual manchine
+CPS_VM = "VM"
+# Bare metals are used by Production environments
+CPS_BM = "BM"
+
+class CpsosPatch:
+    """
+    Class to perform all the below defined patching operations on the CPS nodes.
+    patch_prereq, patch, rollback, backup and patch without
+    backup
+    """
+
+    def __init__( self, aPatchmgr, aTargetVersion , aExasplice, aNodeListFile, aBundleDir, aStandbyNode, aBackupMode, aPatchOption, aPatchLog ,aAdditionalOptions):
+        self.__patchmgr = aPatchmgr
+        self.__targetversion = aTargetVersion
+        self.__exasplice = aExasplice
+        self.__nodelistfile = aNodeListFile
+        self.__bundledir = aBundleDir
+        self.__standbynode = aStandbyNode
+        self.__backupmode = aBackupMode
+        self.__patchoption = aPatchOption
+        self.__patchlog = aPatchLog
+        self.__additionaloptions = aAdditionalOptions
+
+        if self.__patchoption not in [ TASK_POSTCHECK, TASK_SWITCHOVER, TASK_SWITCHOVER_STATUS ]:
+            mPatchLogInfo(f"Patchmgr log location: {self.__patchlog}\n")
+            mPatchLogInfo(f"Target version: {self.__targetversion}\n")
+
+            if self.__additionaloptions is not None:
+                mPatchLogInfo(f"Additional options specified are: {self.__additionaloptions}\n")
+
+        if self.__patchoption in [ TASK_PATCH ]:
+            if self.__exasplice == "yes":
+                mPatchLogInfo("Monthly patching will be executed")
+            if self.__backupmode == "no":
+                mPatchLogInfo("Backup mode is disabled")
+
+    def mExecuteAsyncCmd(self, aCmd):
+        """
+         Common method for all patchmgr commands executions that
+         run in nohup mode in background. This method does not
+         explicilty return values.
+
+         We will wait for either "Exit status" from patchmgr console
+         output and consider taking success or failure or will wait
+         for patchmgr timeout to exit.
+        """
+
+        # Thread log file generated for each command execution for
+        # monitoring and analysis in case issues are observed.
+
+        mPatchLogPrint(f"\n ----------> Starting {self.__patchoption} on {self.__standbynode} <---------- \n")
+
+        mPatchLogInfo(f" Patchmgr Cmd : sudo {aCmd}\n")
+        _sudo_cmd = "sudo " + aCmd
+        os.popen(_sudo_cmd)
+
+    def mReadPatchmgrConsoleOut(self):
+        """
+          Here we try to check for progress reading Patchmgr Console
+	  out file. It returns:
+
+             zero     --> when patchmgr end with success
+             non-zero --> when patchmgr end with failure
+
+          Since the patchmgr is run in the background, the below section of code
+          monitors the log file for completion and returns the exit status of the
+          patchmgr command.
+        """
+
+        _patch_mgr_run = True
+        _patchmgr_prev = None
+        _current_time_in_sec = 0
+        _exit_code = PATCHMGR_READ_CONSOLE_ERROR
+
+        _patchmgr_find = f"egrep -i 'Working|SUCCESS|INFO' {self.__patchlog}/PatchmgrConsole.out | tail -1| cut -d'[' -f1,2,3,4 | cut -d':' -f1,2,3,4,5 | sed -E 's/\]/->/g;/^$/d'"
+        _patchmgr_seek = f'grep -i "Exit status" {self.__patchlog}/PatchmgrConsole.out'
+        _cmd_get_summary = f"egrep -i 'ERROR|WARNING' -A 5 {self.__patchlog}/PatchmgrConsole.out | grep -v 'Do not interrupt' | cut -d'[' -f1,2,3,4 | cut -d':' -f1,2,3,4,5 | sed -E 's/\]/->/g;/^$/d'"
+        _patchmgr_start_time = datetime.now()
+
+        while _patch_mgr_run and _current_time_in_sec < int(mGetInfraPatchingConfigParam('cps_patchmgr_console_read_timeout_sec')):
+
+            _output = None
+            _output, _status = mExecuteLocal(_patchmgr_find)
+            if _patchmgr_prev != _output:
+                mPatchLogPrint(_output)
+                _patchmgr_prev = None
+                _patchmgr_prev = _output
+
+            _out, _stat = mExecuteLocal(_patchmgr_seek)
+            if _stat == 0:
+                _patch_mgr_run = False
+                if "Exit status:0" in _out:
+                    _exit_code = PATCH_SUCCESS_EXIT_CODE
+
+                _o, _s = mExecuteLocal(_cmd_get_summary)
+                if _s == 0:
+                    mPatchLogPrint(_o)
+                mPatchLogPrint(_out)
+
+                _patch_progress_time = datetime.now()
+                _current_time_in_sec = int((_patch_progress_time - _patchmgr_start_time).total_seconds())
+
+        return _exit_code
+
+    def mPatch(self):
+        """
+         This method performs the actual patch on the standby cps node.
+         It suppose to be called only if patch precheck method returns True.
+
+         It returns:
+
+             If success --> 0x00000000
+             If failure --> Json, which has detailed error description.
+        """
+
+        _exit_code = PATCH_SUCCESS_EXIT_CODE
+        _ret = PATCH_SUCCESS_EXIT_CODE
+
+        # Check for existing patchmgr sessions.
+        _exit_code, _ret = self.mCheckPatchmgrSessionExistence()
+        if _exit_code != PATCH_SUCCESS_EXIT_CODE:
+            return _ret
+
+        # Validate Target version and current version.
+        _exit_code, _output_json = self.mCheckTargetVersion()
+
+        if _exit_code == TARGET_VERSION_SAME_NO_ACTION_REQUIRED or _exit_code != PATCH_SUCCESS_EXIT_CODE:
+            return _output_json
+
+        # When there is inconsistency in the system, _is_system_valid_state returns False; otherwise, it returns True
+        _is_system_valid_state, _ = self.mCheckSystemConsistency()
+        _repo_param = "--iso_repo"
+        if self.__exasplice == "yes":
+            _repo_param = "--exasplice_repo"
+        _patch_cmd = f"nohup {self.__patchmgr} --dbnodes {self.__nodelistfile} --upgrade --log_dir {self.__patchlog} --target_version {self.__targetversion} {_repo_param} {self.__bundledir}"
+
+        # Disable backup if backup mode is 'no' or when system_consistency_check fails
+        if self.__backupmode == "no" or not _is_system_valid_state :
+            _patch_cmd += " --nobackup"
+            if not _is_system_valid_state:
+                mPatchLogInfo(
+                    f"Taking backup is skipped because system is in partially updated state on node {self.__standbynode}")
+            else:
+                mPatchLogInfo(f"Taking backup is skipped on node {self.__standbynode} as backup mode is set to 'no'")
+
+        # add extra hyphen for some parameters
+        if self.__additionaloptions is not None:
+            _tmp_add_options = self.__additionaloptions.replace(",", " ")
+            _additional_options_list = _tmp_add_options.split(" ")
+            if mPatchAddHyphen([ "-ignore_alerts", "-force_remove_custom_rpms", "-allow_active_network_mounts",
+                                 "-modify_at_prereq" ], _additional_options_list):
+                # if the list has to be rebuilt to keep compatibility
+                _tmp_add_options = ','.join(_additional_options_list)
+            else:
+                _tmp_add_options = self.__additionaloptions
+
+            _patch_cmd += " "+_tmp_add_options
+
+        _patch_cmd += f" </dev/null > {self.__patchlog}/PatchmgrConsole.out 2>&1 &"
+
+        # Execute Patch Command
+        self.mExecuteAsyncCmd(_patch_cmd)
+
+        # Read console output from log file.
+        _exit_code = self.mReadPatchmgrConsoleOut()
+        if _exit_code == PATCH_SUCCESS_EXIT_CODE:
+
+            '''
+             If the postcheck method return is a success, then set the exit_status to success,
+             else pass the same exit_status as that of the post check.
+            '''
+            _exit_code = self.mPostCpsPatchCheck()
+            return _exit_code
+        else:
+            _exit_code = CPS_PATCH_OPERATION_FAILED
+            mPatchLogError(f" - Patch operation failed on CPS : {self.__standbynode}, Error Code - {_exit_code}\n")
+            _err_msg = f"ERROR - Patch operation failed on CPS : {self.__standbynode}"
+            _ret = mAddCpsInformation(self.__standbynode, _exit_code, _err_msg)
+            return _ret
+
+    def mRollback(self):
+        """
+         This method performs the rollback on the standby node.
+         It suppose to be called only if rollback precheck method returns True.
+
+         It returns:
+
+            If success --> 0x00000000
+            If failure --> Json, which has detailed error description.
+        """
+
+        _exit_code = PATCH_SUCCESS_EXIT_CODE
+        _ret = PATCH_SUCCESS_EXIT_CODE
+
+        # Check for existing patchmgr sessions.
+        _exit_code, _ret = self.mCheckPatchmgrSessionExistence()
+        if _exit_code != PATCH_SUCCESS_EXIT_CODE:
+            return _ret
+
+        # Validate Target version and current version.
+        _exit_code, _output_json = self.mCheckTargetVersion(True)
+
+        if _exit_code != PATCH_SUCCESS_EXIT_CODE:
+            return _output_json
+
+        _rollback_cmd = f"nohup {self.__patchmgr} -dbnodes {self.__nodelistfile} -rollback -target_version {self.__targetversion} --log_dir {self.__patchlog}"
+
+        if self.__additionaloptions is not None:
+            _rollback_cmd += " "+self.__additionaloptions
+
+        _rollback_cmd += f" </dev/null > {self.__patchlog}/PatchmgrConsole.out 2>&1 &"
+
+        # Execute Patch Command
+        self.mExecuteAsyncCmd(_rollback_cmd)
+
+        # Read console output from log file.
+        _exit_code = self.mReadPatchmgrConsoleOut()
+        if _exit_code == PATCH_SUCCESS_EXIT_CODE:
+
+            '''
+             If the postcheck method return is a success, then set the exit_status to success,
+             else pass the same exit_status as that of the post check.
+            '''
+            _exit_code = self.mPostCpsPatchCheck()
+            return _exit_code
+
+        else:
+            _exit_code = CPS_ROLLBACK_FAILED
+            mPatchLogError(f" - Rollback operation failed on CPS : {self.__standbynode}, Error Code - {_exit_code}\n")
+            _err_msg = f"ERROR - Rollback operation failed on CPS : {self.__standbynode}"
+            _ret = mAddCpsInformation(self.__standbynode, _exit_code, _err_msg)
+            return _ret
+
+    def mBackup(self):
+        """
+         This method takes a backup of the standby node before a
+         patch is applied.
+
+         It returns:
+
+           If success --> 0x00000000
+           If failure --> Json, which has detailed error description.
+        """
+
+        _exit_code = PATCH_SUCCESS_EXIT_CODE
+        _ret = PATCH_SUCCESS_EXIT_CODE
+
+        # Check for existing patchmgr sessions.
+        _exit_code, _ret = self.mCheckPatchmgrSessionExistence()
+        if _exit_code != PATCH_SUCCESS_EXIT_CODE:
+            return _ret
+
+        _backup_cmd = f"nohup {self.__patchmgr} -dbnodes {self.__nodelistfile} -backup --log_dir {self.__patchlog}"
+
+        if self.__additionaloptions is not None:
+            _backup_cmd += " "+self.__additionaloptions
+
+        _backup_cmd += f" </dev/null > {self.__patchlog}/PatchmgrConsole.out 2>&1 &"
+
+        # Execute Patch Command
+        self.mExecuteAsyncCmd(_backup_cmd)
+
+        # Read console output from log file.
+        _exit_code = self.mReadPatchmgrConsoleOut()
+        if _exit_code == PATCH_SUCCESS_EXIT_CODE:
+            _err_msg = f"INFO - Backup operation successful on {self.__standbynode}"
+            mAddCpsInformation(self.__standbynode, _exit_code, _err_msg)
+        else:
+            _exit_code = CPS_BACKUP_FAILED
+            mPatchLogError(f" Backup failed on CPS node : {self.__standbynode}, Error Code -{_exit_code}")
+            _err_msg = f"ERROR - Backup operation failed on CPS : {self.__standbynode}"
+            _ret = mAddCpsInformation(self.__standbynode, _exit_code, _err_msg)
+
+        return _ret
+
+    def mPrecheck(self):
+        """
+         This method checks if there is any issues or errors
+         encountered before patch.
+
+         It returns:
+
+            If success --> 0x00000000
+            If failure --> Json, which has detailed error description.
+        """
+
+        _exit_code = PATCH_SUCCESS_EXIT_CODE
+        _ret = PATCH_SUCCESS_EXIT_CODE
+
+        # Check for existing patchmgr sessions.
+        _exit_code, _ret = self.mCheckPatchmgrSessionExistence()
+        if _exit_code != PATCH_SUCCESS_EXIT_CODE:
+            return _ret
+
+        # Validate Target version and current version.
+        _exit_status, _output_json = self.mCheckTargetVersion()
+
+        if _exit_status == TARGET_VERSION_SAME_NO_ACTION_REQUIRED or _exit_status != PATCH_SUCCESS_EXIT_CODE:
+            return _output_json
+
+        # When there is inconsistency in the system, _is_system_valid_state returns False; otherwise, it returns True
+        _is_system_valid_state, _node_error_msg = self.mCheckSystemConsistency()
+        if not _is_system_valid_state:
+            _exit_code = CPS_SYSTEM_CONSISTENCY_CHECK_FAILED
+            mPatchLogError(f" - Precheck operation failed on CPS : {self.__standbynode}, Error Code - {_exit_code}\n")
+            _ret = mAddCpsInformation(self.__standbynode, _exit_code, _node_error_msg)
+            return _ret
+
+        _repo_param = "--iso_repo"
+        if self.__exasplice == "yes":
+            _repo_param = "--exasplice_repo"
+        _precheck_cmd = f"nohup {self.__patchmgr} --dbnodes {self.__nodelistfile} --precheck --log_dir {self.__patchlog} --target_version {self.__targetversion} {_repo_param} {self.__bundledir}"
+
+        if self.__additionaloptions is not None:
+            _precheck_cmd += " "+self.__additionaloptions
+
+        _precheck_cmd += f" </dev/null > {self.__patchlog}/PatchmgrConsole.out 2>&1 &"
+
+        # Execute Patch Command
+        self.mExecuteAsyncCmd(_precheck_cmd)
+
+        # Read console output from log file.
+        _exit_code = self.mReadPatchmgrConsoleOut()
+        if _exit_code == PATCH_SUCCESS_EXIT_CODE:
+
+            '''
+             If the postcheck method return is a success, then set the exit_status to success,
+             else pass the same exit_status as that of the post check.
+            '''
+            _ret_msg = self.mPostCpsPatchCheck()
+            return _ret_msg
+        else:
+            _exit_code = CPS_PATCH_PREREQ_CHECK_FAILED
+            mPatchLogError(f" - Patch Prereqcheck operation failed on CPS : {self.__standbynode}. Error Code - {_exit_code}\n")
+            _err_msg =f"ERROR - Patch Precheck operation failed on CPS : {self.__standbynode}"
+            _ret = mAddCpsInformation(self.__standbynode, _exit_code, _err_msg)
+
+        return _ret
+
+    def mPostCpsPatchCheck(self):
+        """
+         Returns True if all checks pass, False if any of the checks failed.
+         checks currently done:
+         *verify the image is listed as sucess
+         *verify new version is what we expected for upgrade or rollback
+
+         It returns Json output based on below validations.
+        """
+
+        if self.__patchoption == TASK_POSTCHECK:
+            mPatchLogPrint(f"\n ----------> Starting {self.__patchoption} on {self.__standbynode} <---------- \n")
+
+        _exit_code = PATCH_SUCCESS_EXIT_CODE
+        _err_msg = f"INFO - Post-patch check: Successful on CPS : {self.__standbynode}"
+        _ret = mAddCpsInformation(self.__standbynode, _exit_code, _err_msg)
+
+        #check that the image is seen as success
+        _exit_status = self.mCheckImageSuccess()
+        if int(_exit_status) != 0:
+            mPatchLogError(f" Post-patch check: CPS {self.__standbynode} image is NOT seen as "
+                       "success via imageinfo command\n")
+            _err_msg = f"ERROR - Post-patch check: CPS {self.__standbynode} image is NOT seen as success via imageinfo command"
+            _exit_code = CPS_POSTCHECK_FAILED
+            _ret = mAddCpsInformation(self.__standbynode, _exit_code, _err_msg)
+            return _ret
+
+        else:
+            mPatchLogInfo(f" Post-patch check: CPS {self.__standbynode} image is seen as "
+                       "success via imageinfo command\n")
+
+        # check that db services are up in case of independent
+        _services, _exit_status = self.mCheckDBServices()
+        _services = _services.strip()
+        if int(_exit_status) != 0:
+            mPatchLogError(f"\nServices related to dbserverd were not up on CPS : {self.__standbynode}. Error Code - {DBSERVERD_SERVICE_DOWN}\n")
+            mPatchLogPrint(_services)
+            _exit_code = DBSERVERD_SERVICE_DOWN
+            _err_msg = f"ERROR - Services related to dbserverd were not up on CPS : {self.__standbynode}"
+            _ret = mAddCpsInformation(self.__standbynode, _exit_code, _err_msg)
+            return _ret
+        else:
+            mPatchLogInfo(f" Services related to dbserverd are up and running on CPS : {self.__standbynode}\n")
+            mPatchLogPrint(_services + "\n")
+
+        # Validate Target version and current version.
+        _ret, _output_json = self.mCheckTargetVersion()
+        if _ret == TARGET_VERSION_SAME_NO_ACTION_REQUIRED or _ret != PATCH_SUCCESS_EXIT_CODE:
+            return _output_json
+
+        return _ret
+
+    def mSwitchover(self):
+
+        """
+         This method performs the task of migrating all the services from
+         the current/master node to the node specified.
+
+         It returns:
+
+            If success --> 0x00000000
+            If failure --> Json, which has detailed error description.
+        """
+
+        mPatchLogPrint(f"\n ----------> Starting {TASK_SWITCHOVER} to {self.__standbynode} <---------- \n")
+
+        mPatchLogInfo(" Initiating CPS node Switchover.\n")
+        _exit_code = PATCH_SUCCESS_EXIT_CODE
+        _ret_code = PATCH_SUCCESS_EXIT_CODE
+
+        _log_file = os.path.join(self.__patchlog,"Switchover.out")
+        _switchover_cmd = f"/etc/keepalived/manual-switchover.sh --switchover &> {_log_file}"
+        mPatchLogPrint(f"Switchover Command : sudo {_switchover_cmd} \n")
+        _output, _status = mExecuteLocal(_switchover_cmd)
+        if int(_status) != 0:
+            _exit_code = CPS_SWITCHOVER_FAILED
+            mPatchLogError(f" Switchover to CPS node : {self.__standbynode} failed. Please refer to log for more details. Error Code - {_exit_code}\n")
+            _err_msg = f"ERROR - Switchover to CPS node : {self.__standbynode} failed. Please refer to log for more details.\n"
+            _ret_code = mAddCpsInformation(self.__standbynode, _exit_code, _err_msg)
+            return _ret_code
+
+        '''
+         Based on the exit status of the previous switchover script,
+         we monitor the status of master node for the switchover to be
+         complete, there is a timeout of 600 seconds before exit in case
+         the status is not received with the timeout period.
+        '''
+        _switchover_wait = True
+        _switchover_connection_timeout = int(mGetInfraPatchingConfigParam('switchover_connection_timeout_cps_in_seconds'))
+        _switchover_wait_in_sec = 0
+        # Running node is always master node
+        _master_node_check_file_cmd = f"ls -ld {CPS_MASTER_NODE_FILE}"
+
+        '''
+         After the switchover script is complete, we will try polling
+         the new primary node for existence of /etc/keepalived/MASTER
+         file for a time period of 10 mins, if the file is not found
+         within 10 mins, script exits with error.
+        '''
+        while _switchover_wait and _switchover_wait_in_sec < _switchover_connection_timeout:
+            _out, _exit_status = mExecuteRemoteCmd(_master_node_check_file_cmd, self.__standbynode)
+            if int(_exit_status) == 0:
+                mPatchLogInfo(f"Switchover to CPS node : {self.__standbynode} successful.\n")
+                _switchover_wait = False
+            else:
+                _switchover_wait_in_sec += 1
+                time.sleep(1)
+                if (_switchover_wait_in_sec % 3 == 0):
+                    mPatchLogInfo("Detecting primary CPS node...\n")
+
+            '''
+             /etc/keepalived/MASTER must exist only on primary node,
+             if it is found on the standby node, switchover did not
+             succeed.
+            '''
+            _out_stby, _status_stby = mExecuteLocal(_master_node_check_file_cmd)
+            if _switchover_wait_in_sec == _switchover_connection_timeout or _status_stby == 0:
+                _exit_code = CPS_SWITCHOVER_FAILED
+                mPatchLogError(f" Switchover to CPS node : {self.__standbynode} failed with connection timeout after {_switchover_connection_timeout} seconds. Error Code - {_exit_code}\n")
+                _err_msg = f"ERROR - Switchover to CPS node : {self.__standbynode} failed with connection timeout after {_switchover_connection_timeout} seconds."
+                _ret_code = mAddCpsInformation(self.__standbynode, _exit_code, _err_msg)
+
+        _switchover_display_cmd = f"cat {_log_file}"
+        _output, _status = mExecuteLocal(_switchover_display_cmd)
+        mPatchLogPrint("{_output}\n")
+        return _ret_code
+
+    def mSwitchoverStatus(self):
+        """
+         This method gets the master and standby
+	 cps nodes
+        """
+
+        mPatchLogPrint(f"\n ----------> Starting {TASK_SWITCHOVER_STATUS} on {self.__standbynode} <---------- \n")
+        # Running node is always master node
+
+        if os.path.exists("/etc/keepalived/MASTER"):
+            mPatchLogInfo(f" Master  CPS Node = {_master_node}\n")
+            _exit_code = PATCH_SUCCESS_EXIT_CODE
+            _err_msg = f"INFO - Master  CPS Node = {_master_node}, previous switchover command was successful."
+        else:
+            _exit_code = CPS_SWITCHOVER_STATUS_FAILED
+            mPatchLogError(f" Error in confirming Master CPS Node : {_master_node}. Error Code - {_exit_code}\n")
+            _err_msg = f"ERROR - Error in confirming Master CPS Node : {_master_node}.\n"
+
+        _ret_code = mAddCpsInformation(self.__standbynode, _exit_code, _err_msg)
+        return _ret_code
+
+    def mCompareVersions(self, aCurrentVersion):
+        """
+        Compare current and target version and return based on the comparison.
+        Return 0, if aCurrentVersion and aTargetVersion are equal,
+        return -1, if aCurrentVersion is lesser than aTargetVersion,
+        return 1, if aCurrentVersion is greater than aTargetVersion.
+        This function is expected to work for oracle version format and
+        also for any two given strings.
+
+        """
+
+        # if the given input versions are numbers, do the number camparision
+        if type(aCurrentVersion) == int and type(self.__targetversion) == int:
+            if aCurrentVersion == self.__targetversion:
+                return 0
+            elif aCurrentVersion > self.__targetversion:
+                return 1
+            else:
+                return -1
+
+        _ver1, _ver2 = aCurrentVersion, self.__targetversion
+        try:
+            # IBSWITCH version can have format like 2.1.8-1 and needs to be
+            # taken care
+            _ver1 = (re.sub('[-]', '.', _ver1))
+            _ver2 = (re.sub('[-]', '.', _ver2))
+
+            _ver1 = _ver1.split(".")
+            _ver2 = _ver2.split(".")
+
+            _comp_count_to_cmp = min(len(_ver1), len(_ver2))
+
+            for i in range (_comp_count_to_cmp):
+                # Do the numeric comparison
+                if _ver1[i].isdigit() and _ver2[i].isdigit():
+                     if int(_ver1[i]) == int(_ver2[i]):
+                        continue
+                     elif int(_ver1[i]) > int(_ver2[i]):
+                        return 1
+                     else:
+                        return -1
+                # Do the alphanumeric comparison
+                elif _ver1[i].isalnum() or _ver2[i].isalnum():
+                     if _ver1[i] == _ver2[i]:
+                        continue
+                     elif _ver1[i] > _ver2[i]:
+                        return 1
+                     else:
+                        return -1
+
+            if ((i + 1) == _comp_count_to_cmp):
+                if (len(_ver1) == len(_ver2)):
+                    return 0
+                elif (len(_ver1) > len(_ver2)):
+                    return 1
+                else:
+                    return -1
+        except Exception as err:
+            mPatchLogWarn(" Version error: " + str(err))
+            return None
+
+    def mCheckTargetVersion( self, aRollback=False ):
+        """
+          It returns 2 values
+           -> Hexadecimal error code which could be a success of a failure.
+           -> Json fomat output from each of the validation checks.
+        """
+
+        self.__inactive_imageversion = None
+        self.__current_image_version = None
+        if aRollback:
+            if self.__exasplice == "no":
+                _cmd = ("/opt/oracle.SupportTools/dbserver_backup.sh --check-rollback --get-backup-version")
+
+                '''
+                  - check rollback availability. Returns
+                  - 0 - rollback is available.
+                  - 1 - some error is occurred.
+                  - 2 - rollback is available with the same version as an active partition has.
+                  - 3 - rollback is not available.
+                '''
+
+                _cmd_image = 'imageinfo -ver'
+                self.__current_image_version, _exit_image_status = mExecuteRemoteCmd(_cmd_image, self.__standbynode)
+
+                _output = None
+                _exit_status = 0
+                _output, _exit_status = mExecuteRemoteCmd(_cmd, self.__standbynode)
+
+                if int(_exit_status) == 0 or int(_exit_status) == 2:
+                    self.__inactive_imageversion = _output.splitlines()[-1]
+                    mPatchLogInfo(f' Image version when parsing enabled = {self.__inactive_imageversion}.\n')
+                else:
+                    _exit_code = IMAGE_VERSION_EMPTY_OR_INVALID
+                    mPatchLogError(f'ERROR - Image version is either empty or undefined. Rollback is not possible. Error Code - {_exit_code} \n')
+                    _err_msg = "ERROR - Image version is either empty or undefined. Rollback is not possible."
+                    _ret = mAddCpsInformation(self.__standbynode, _exit_code, _err_msg)
+                    return _exit_code, _ret
+
+                if self.__current_image_version == self.__inactive_imageversion:
+                    _exit_code = ACTIVE_INACTIVE_PARTITION_VERSION_MATCH
+                    mPatchLogError(f" Both Active image version : {self.__current_image_version} and Inactive image version : {self.__inactive_imageversion} are same, Rollback cannot be performed. Error Code - {_exit_code}\n")
+                    _err_msg = f"ERROR - Both Active image version : {self.__current_image_version} and Inactive image version : {self.__inactive_imageversion} are same, Rollback cannot be performed"
+                    _ret = mAddCpsInformation(self.__standbynode, _exit_code, _err_msg)
+                    return _exit_code, _ret
+            else:
+                _cmd = 'imageinfo -verexasplice'
+                _o, _e = mExecuteRemoteCmd(_cmd, self.__standbynode)
+                if _o:
+                    if not _o.strip().lower().startswith('undefined'):
+                        _re_out = re.match('Invalid command line option -verexasplice', _o.strip())
+                        # Fresh install, assign '000000' to current_version so that it allow exasplice
+                        # patch simply.
+                        if _re_out:
+                            mPatchLogInfo( 'Not found exasplice upgrade. Allowing exasplice upgrade.')
+                            self.__current_image_version = "000000"
+                        # It has exasplice version. Example: 201025
+                        else:
+                            self.__current_image_version = _o.strip()
+                    else:
+                        _exit_code = IMAGE_VERSION_EMPTY_OR_INVALID
+                        mPatchLogError(f'ERROR - Image version is undefined. Rollback is not possible. Error Code - {_exit_code} \n')
+                        _err_msg = "ERROR - Image version is undefined. Rollback is not possible."
+                        _ret = mAddCpsInformation(self.__standbynode, _exit_code, _err_msg)
+                        return _exit_code, _ret
+                else:
+                    mPatchLogInfo('mCheckTargetVersion: No Exasplice patches found.')
+                    self.__current_image_version = "000000"
+
+            _exit_status = PATCH_SUCCESS_EXIT_CODE
+            if self.__targetversion is None:
+                _exit_status = TARGET_VERSION_EMPTY
+                _error = "Input target version details are empty"
+            else:
+                if self.mRollbackIsAvailable():
+                    if self.__exasplice == "no":
+                        if (self.mCompareVersions(self.__inactive_imageversion) < 0):
+                            _exit_status = ROLLBACK_CANNOT_BE_PERFORMED
+                            _error = "cannot be rolled back, its version is lower than the target version"
+                    else:
+                        if self.mCompareVersions(self.__current_image_version) < 0:
+                            _exit_status = ROLLBACK_CANNOT_BE_PERFORMED
+                            _error = "cannot be rolled back, its version is lower than the target version"
+                else:
+                    _exit_status = ROLLBACK_CANNOT_BE_PERFORMED
+                    _error = "cannot be rolled back, rollback is not available"
+
+            if _exit_status == PATCH_SUCCESS_EXIT_CODE:
+                _err_msg = f"INFO - CPS Target version validation successful for the node: {self.__standbynode} are same."
+            else:
+                mPatchLogError(f" [{self.__standbynode}] {_error}. Error Code - {_exit_status}\n")
+                _err_msg = f"ERROR - [{self.__standbynode}] {_error}."
+            _ret = mAddCpsInformation(self.__standbynode, _exit_status, _err_msg)
+            return _exit_status, _ret
+        else:
+            _cmd = 'imageinfo -ver'
+            self.__current_image_version, _exit_status = mExecuteRemoteCmd(_cmd, self.__standbynode)
+
+        if self.__targetversion is None:
+            _exit_status = TARGET_VERSION_EMPTY
+            mPatchLogError(f" Input target version details are empty : {self.__targetversion}, Patch operation not possible. Error Code - {_exit_status}\n")
+            _err_msg = f"ERROR - Input target version details are empty : {self.__targetversion}, Patch operation not possible."
+            _ret = mAddCpsInformation(self.__standbynode, _exit_status, _err_msg)
+            return _exit_status, _ret
+
+        if str(self.__targetversion) == str(self.__current_image_version):
+            mPatchLogInfo(f' CPS target and current version for the host: {self.__standbynode} are same.\n')
+            _exit_status = TARGET_VERSION_SAME_NO_ACTION_REQUIRED
+            _err_msg = f"INFO - CPS target and current version for the host: {self.__standbynode} are same."
+            _ret = mAddCpsInformation(self.__standbynode, PATCH_SUCCESS_EXIT_CODE, _err_msg)
+            return _exit_status, _ret
+
+        # Regular patch Upgrade.
+        _ret = self.mCompareVersions(self.__current_image_version)
+        if _ret >= 0:
+            mPatchLogInfo(f" {self.__patchoption} [{self.__standbynode}] is already at the relevant version {self.__current_image_version}, no further action required.\n")
+            _exit_status = TARGET_VERSION_SAME_NO_ACTION_REQUIRED
+            _err_msg = f"{self.__patchoption} [{self.__standbynode}] is already at the relevant version : {self.__current_image_version}, no further action required\n"
+            _ret = mAddCpsInformation(self.__standbynode, PATCH_SUCCESS_EXIT_CODE, _err_msg)
+            return _exit_status, _ret
+
+        _exit_status = PATCH_SUCCESS_EXIT_CODE
+        _err_msg = f"INFO - CPS Target version validation successful for the node: {self.__standbynode} are same."
+        _ret = mAddCpsInformation(self.__standbynode, _exit_status, _err_msg)
+        return _exit_status, _ret
+
+    def mGetRpmExcludeList(self):
+        try:
+            return mGetInfraPatchingConfigParam('system_consistiency_check_exclude_rpm_list')
+        except:
+            return {}
+
+    def mCheckSystemConsistency(self):
+        """
+        Check whether system is in partially updated or not. If system is in
+        bad state, then stop the patching so that we avoid taking bad backup.
+        Returns:
+            tuple: A tuple containing a boolean indicating whether the system is in a valid state and an error message.
+
+        """
+
+        _is_system_valid_state = True
+        _error_msg = ""
+
+        mPatchLogInfo("\n\n***System consistency check started.***\n")
+
+        _node_name = self.__standbynode
+        _duplicate_rpm_found = False
+        _incomplete_yum_txn_found = False
+
+        mPatchLogInfo(f"System consistency check started on node = {_node_name}")
+
+        # Read the infrapatching.conf to fetch the list of rpms to be excluded from duplicate rpm check
+        _rpm_list = ""
+        _exclude_dup_rpmchk_list = self.mGetRpmExcludeList()
+        if _exclude_dup_rpmchk_list and 'cps' in _exclude_dup_rpmchk_list:
+            _rpm_list = _exclude_dup_rpmchk_list['cps']
+        else:
+            # add default values
+            _rpm_list = ["(none)", "kernel", "kernel-uptrack"]
+        _dup_rpmchk_list = '|'.join(_rpm_list)
+
+        # Command for duplicate rpm validation.
+        _cmd_dup_rpm = f"'rpm -qa --queryformat \"%{{ARCH}} %{{NAME}}\\n\" | sort | uniq -c | sed -e \"s/^ *//g\" | egrep -v \"^1 | {_dup_rpmchk_list}\"'"
+        mPatchLogInfo(f"Command for duplicate rpm validation = {_cmd_dup_rpm}")
+        '''
+         Example of above command output:
+            [root@slcs16adm04 ~]# rpm -qa --queryformat '%{ARCH} %{NAME}\n' | sort | uniq -c | sed -e 's/^ *//g'| egrep -v "^1 | kernel-uek|uptrack-updates|gpg-pubkey"
+            2 x86_64 kernel-ueknano
+        '''
+        _output, _exit_status = mExecuteRemoteCmd(_cmd_dup_rpm, _node_name)
+        if _output:
+            mPatchLogError(f"Following duplicate RPMs found on {_node_name}:")
+            mPatchLogError(f"{_output}")
+            _duplicate_rpm_found = True
+
+        # Command to find incomplete yum transactions
+        _cmd_pending_yum_trans = "'find /var/lib/yum -maxdepth 1 -type f -name \"transaction-all*\" -not -name \"*disabled\"'"
+        mPatchLogInfo(f"Command for incomplete yum transaction = {_cmd_pending_yum_trans}")
+        _output, _exit_status = mExecuteRemoteCmd(_cmd_pending_yum_trans, _node_name)
+        if _output:
+            mPatchLogError(f"\nFollowing incomplete yum transactions found on node {_node_name}:")
+            mPatchLogError(f"{_output}")
+            _incomplete_yum_txn_found = True
+
+        # initialize _msg1 and _ms2 for node validation.
+        _msg1 = _msg2 = ""
+
+        # If system is in bad state, stop the patching with appropriate error for the user to take action.
+        if _duplicate_rpm_found and _incomplete_yum_txn_found:
+            _msg1 = f"System is in a partially upgraded state on node {_node_name}. Backup cannot be taken in this state."
+            mPatchLogError(_msg1)
+            _is_system_valid_state = False
+
+            _cmd_exit_code_checker = f"/opt/oracle.SupportTools/dbserver_backup.sh --ignore-nfs-smbfs-mounts --check-rollback --get-backup-version"
+
+            _output, _exit_status = mExecuteRemoteCmd(_cmd_exit_code_checker, _node_name)
+
+            if int(_exit_status) == 0:
+                _msg2 = " Contact Oracle Support and rollback to a previous good backup."
+            elif int(_exit_status) == 1:
+                _msg2 = " Failed to get the rollback detail. Fix the active system image rpms and retry patching."
+            elif int(_exit_status) == 2:
+                _msg2 = " Rollback version is same as the active partition. Fix the active system image rpms."
+            elif int(_exit_status) == 3:
+                _msg2 = " Rollback is not available. Fix the active system images rpm and retry patching."
+            else:
+                _msg2 = " Received invalid error code from get-backup-version command."
+
+        _error_msg = _msg1 + _msg2
+
+        mPatchLogInfo(f"System consistency check completed on node = {_node_name}")
+        mPatchLogInfo("***System consistency check completed.***\n")
+
+        return _is_system_valid_state, _error_msg
+
+    def mRollbackIsAvailable(self):
+        """
+         This method looks for an available image to rollback on the standby CPS node.
+        """
+
+        def _mRunCheckRollbackCmd():
+            check_rollback_cmd = ('/opt/oracle.SupportTools/dbserver_backup.sh --ignore-nfs-smbfs-mounts --check-rollback')
+            _output, _exit_status = mExecuteRemoteCmd(check_rollback_cmd, self.__standbynode)
+            if _output and _output.strip().lower().find("rollback is available") > -1:
+                return True
+            else:
+                return False
+
+        # Check if Rollback is possible or not for the current CPS node
+        return _mRunCheckRollbackCmd()
+
+    def mCheckImageSuccess(self):
+        """
+        Checks the image installation status.
+        """
+
+        _cmd = "/usr/local/bin/imageinfo -status"
+        _out, _exit_status = mExecuteRemoteCmd(_cmd, self.__standbynode)
+        if "success" in _out:
+            _exit_status = 0
+        else:
+            _exit_status = 1
+
+        return _exit_status
+
+    def mCheckIfComputeNode(self):
+        """
+         dbmcli command and dbserverd service will run only
+         if the node type is 'COMPUTE' or 'GUEST' or 'KVMHOST'
+        """
+
+        _cmd = "imageinfo -node"
+        _out, _exit_status = mExecuteRemoteCmd(_cmd, self.__standbynode)
+        _output = _out.strip()
+        if _output in [ "COMPUTE", "GUEST", "KVMHOST" ]:
+            return True
+        else:
+            return False
+
+    def mCheckDBServices(self):
+        """
+         Checks the dbserverd services status. if aCheckRunning is set to True,
+         it checks if services are up. If aOrigState provided, then it compares the
+         current services state with the ones from the input.
+         If aOrigState is no specified, then it returns the current services status.
+        """
+        _services = None
+        _exit_status = 0
+        if not self.mCheckIfComputeNode():
+            _exit_status = 3
+            return _services, _exit_status
+
+        _cmd_dbmcli = "dbmcli -e 'list dbserver detail' | grep sStatus"
+        _services, _exit_code = mExecuteRemoteCmd(_cmd_dbmcli, self.__standbynode)
+
+        _cmd = "service dbserverd status | grep active | grep exited"
+        _out, _exit_status = mExecuteRemoteCmd(_cmd, self.__standbynode)
+
+        return _services, _exit_status
+
+    def mCheckAndRebuildRPMDatabase(self):
+        """
+         This method checks for rmp database healthy.
+
+         Return two values:
+          1) Hexadecimal value return based on success or
+             failure of below command.
+          2) Json output with the relevant information
+             returned to Ecra.
+          3) Hexadecimal value of PATCH_SUCCESS_EXIT_CODE
+             indicate RPM database is healthy.
+        """
+        _exit_code = PATCH_SUCCESS_EXIT_CODE
+        _ret = {}
+        _err_msg = f"INFO - RPM database is healthy in : {self.__standbynode}."
+        mPatchLogInfo(f"Checking RPM database state in : {self.__standbynode}.\n")
+
+        _cmd_script_exists = "test -f /opt/oci/exacc/prechecks/cps_host_rpm_db/rebuild_rpm_db.py;" \
+                             " echo $? "
+        _output, _status = mExecuteRemoteCmd(_cmd_script_exists, self.__standbynode)
+        if _status == 0:
+            _cmd_run_script = "/opt/oci/exacc/prechecks/cps_host_rpm_db/rebuild_rpm_db.py; echo $? "
+            _output, _status = mExecuteRemoteCmd(_cmd_run_script, self.__standbynode)
+            if _status != 0:
+                _exit_code = CPS_RPM_DATABASE_CORRUPTED
+                _err_msg = "ERROR - RPM database is corrupted. Please rebuild the RPM database manually and re-try patch."
+                _ret = mAddCpsInformation(self.__standbynode, _exit_code, _err_msg)
+            else:
+                mPatchLogInfo(f"RPM database is healthy in : {self.__standbynode}.\n")
+
+        return _exit_code, _ret
+
+    def mCheckPatchmgrSessionExistence(self):
+        """
+         This method checks for existing of patchmgr session.
+
+         Return two values:
+          1) Hexadecimal value return based on success or
+             failure of below command.
+          2) Json output with the relevant information
+             returned to Ecra.
+          3) Hexadecimal value of PATCH_SUCCESS_EXIT_CODE
+             indicate no patchmgr session is currently
+             active and can proceed with new patchmgr
+             operation.
+        """
+
+        _exit_code = PATCH_SUCCESS_EXIT_CODE
+        _err_msg = f"INFO - No active patchmgr sessions running on : {self.__standbynode}."
+        ret = mAddCpsInformation(self.__standbynode, _exit_code, _err_msg)
+
+        # Search of 'patchmgr -' in the grep command.
+        _cmd_patchmgr = "ps -ef | egrep -i 'patchmgr -' | egrep -vi 'grep|tail'"
+        _output, _status = mExecuteLocal(_cmd_patchmgr)
+        if _status == 0:
+            _exit_code = PATCHMGR_SESSION_ACTIVE
+            _err_msg = "ERROR - patchmgr session is active on the primary CPS node. Please perform cleanup and re-try patch."
+
+        ret = mAddCpsInformation(self.__standbynode, _exit_code, _err_msg)
+        return _exit_code, ret
+
+    def mCheckAlert(self, aCheckCriticalHwAlert = False):
+        """
+         This method checks for the existence of real hardware alert or known alert on
+         remote/stand cps node.
+         Return:
+            True  --> if genuine hardware or known alerts found
+            False --> if no genuine hardware or known alerts found
+        """
+        _alerts_tobe_ignored = ["No link detected on required Ethernet", "Attribute Name : DiskFirmwareVersion *Required *: *ORAB"]
+        _cmd = ""
+
+        mPatchLogPrint(f"\n{'Critical Hardware' if aCheckCriticalHwAlert else 'Known'} Alert verification started.")
+        # Known and ignorable alerts.
+        if aCheckCriticalHwAlert:
+            _dbmcli_cmd = "dbmcli -e 'LIST ALERTHISTORY WHERE endtime=null AND alerttype=stateful and alertShortName=Hardware and severity=Critical'"
+            _cps_filter = '|'.join(_dom0_filter for _dom0_filter in _alerts_tobe_ignored)
+            _filter_cmd = f" | grep -vE '\"{_cps_filter}\"'"
+            _cmd = _dbmcli_cmd + _filter_cmd
+        # Look for known alerts.
+        else:
+            _dbmcli_cmd = "dbmcli -e 'LIST ALERTHISTORY WHERE endtime=null AND alerttype=stateful'"
+            _cps_filter = '|'.join(_dom0_filter for _dom0_filter in _alerts_tobe_ignored)
+            _filter_cmd = f" | egrep -i '\"{_cps_filter}\"'"
+            _cmd = _dbmcli_cmd + _filter_cmd
+
+        _alert_found = False
+        _output, _exit_status = mExecuteRemoteCmd(_cmd, self.__standbynode)
+        if _output:
+            mPatchLogError(f" Found {'Critical Hardware' if aCheckCriticalHwAlert else 'Known'} alert on cps node: {self.__standbynode}")
+            mPatchLogPrint(f"Alert Message: {_output}")
+            _alert_found = True
+
+        mPatchLogPrint(f"{'Critical Hardware' if (aCheckCriticalHwAlert) else 'Known'} Alert verification completed.\n")
+        return _alert_found
+
+def mUnzipToBaseLocation(aPatchRepo, aDBPatchFileDir, aPatchBasePatch, aPatchLog, aPatchOption, aExasplice):
+    """
+     Method to extract all of the tar files and stage
+     patches and configuration files at relevant location
+     for patchmgr to work efficiently.
+    """
+
+    _ldir = None
+    _patchmgr = None
+    _bundle_dir = None
+    mPatchLogInfo(f"dbserver patch zip will be picked from: {aDBPatchFileDir}")
+    # Actual patch stage location
+    
+    _bundle_dir = aPatchRepo + '/DomuYumRepository/'
+    if aExasplice == 'yes':
+        _bundle_dir = aPatchRepo + '/ExaspliceRepository/'
+
+    _cmd_mkdir = f"sudo mkdir -p {aPatchLog}"
+    subprocess.check_call(shlex.split(_cmd_mkdir) ,stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+
+    if (aPatchOption in [ "patch_prereq_check", "patch", "rollback", "backup" ]):
+        _cmd_unzip = f"sudo unzip -o {aDBPatchFileDir}dbserver.patch.zip -d {aPatchBasePatch}"
+        subprocess.check_call(shlex.split(_cmd_unzip) ,stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+
+    if aPatchOption in [ "switchover" ]:
+        _cmd_log_create = f"sudo touch {aPatchLog}/Switchover.out"
+    else:
+        _cmd_log_create = f"sudo touch {aPatchLog}/PatchmgrConsole.out"
+
+    _cmd_set_perm_log = f"sudo chown ecra:dba -R {aPatchLog}"
+
+    for _cmd_call in [ _cmd_log_create, _cmd_set_perm_log ]:
+        subprocess.check_call(shlex.split(_cmd_call) ,stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+
+    _ldir = os.listdir(aPatchBasePatch)
+
+    '''
+     Below logic filters out the dbserver_patch_19.191011
+     directory from the log and dbs_grp. Here log and dbs_grp
+     are always constant where as dbserver_patch_<version> is
+     version dependant and is changing.
+
+     [root@slcs27dv0301m ~]# ls -tlr /u01/cpsosupgrade/19.2.7.0.0.191007
+     total 12
+     drwxr-xr-x 18 root root 4096 Nov 20 08:35 log
+     -rw-r--r--  1 root root   13 Nov 20 08:35 dbs_grp
+     drwxrwxr-x  3 root root 4096 Nov 20 08:35 dbserver_patch_19.191011
+     [root@slcs27dv0301m ~]#
+
+    '''
+
+    for _entry in _ldir:
+        if "log" not in _entry and "dbs_grp" not in _entry:
+            _patchmgr = aPatchBasePatch + '/' + _entry + '/patchmgr'
+
+    _ldir = os.listdir(_bundle_dir)
+    for _entry in _ldir:
+        _bundle_dir = _bundle_dir +_entry
+
+    return _patchmgr, _bundle_dir
+
+def mParseInputValues():
+    """
+     This method prepares all the relevant input required for the
+     patch operations to run successfully.
+
+     Input - command line arguments passed to the file.
+     Output will the patch command, standby node, backup
+     mode and additional options(if passed as argument)
+    """
+
+    _backup_mode = "yes"
+    _additional_options = None
+    _patch_option = None
+    _standby_node = None
+    _target_version = None
+    _exasplice = "no"
+
+    # Fetching operation type
+    for _patch_option in [ "patch_prereq_check", "rollback", "patch", "backup", "switchoverstatus", "switchover", "postcheck" ]:
+        '''
+         Previously we did not have a pattern called patch in the argument list,
+         we now parse operation type for the individual patch operation. We pass
+         the absolute path for the cps-os-upgrader as shown below. It is required
+         to check for all of the operations and hence the below change.
+
+          <Exacloud root>/exabox/infrapatching/cps/cps-os-upgrader --remote_cps_host=scaqak01dv0703
+          patch_prereq_check exasplice=yes TargetVersion="21.1.1.0.0.210309"
+
+          <Exacloud root>/exabox/infrapatching/cps/cps-os-upgrader --remote_cps_host=scaqak01dv0704
+          patch exasplice=no TargetVersion="21.1.0.0.0.210104"
+
+          TODO : When a new argument operation_type is introduced, below code can be optimized.
+        '''
+        if _patch_option in str(sys.argv):
+            if "switchoverstatus" in str(sys.argv):
+                _patch_option = "switchoverstatus"
+            elif "patch_prereq_check" in str(sys.argv):
+                _patch_option = "patch_prereq_check"
+            elif "postcheck" in str(sys.argv):
+                _patch_option = "postcheck"
+            elif "rollback" in str(sys.argv):
+                _patch_option = "rollback"
+            elif "backup" in str(sys.argv):
+                _patch_option = "backup"
+            elif "switchover" in str(sys.argv):
+                _patch_option = "switchover"
+            else:
+                # patch operation should be kept at else because of precendence
+                # and as it always take patch as the operation type due to
+                # infrapatching string in the argument list.
+                _patch_option = "patch"
+            break
+
+    '''
+
+      Example :
+         remoteec cps upgrade type="cpsos" bundle="LATEST" args="patch_prereq_check options=-ignore_alerts"
+         all of the above arguments are considered as indivudal arguments when converted in the below command.
+
+         <Exacloud root>/exabox/infrapatching/cps/cps-os-upgrader --remote_cps_host=scaqan03dv0807m postcheck options=_ignore_alerts TargetVersion="21.2.5.0.0_211013"
+
+            >>> import re
+            >>>pattern = re.compile(r'\s*=\s*')
+
+            >>> Input = '<Exacloud root>/exabox/infrapatching/cps/cps-os-upgrader --remote_cps_host = scaqan03dv0807m patch_prereq_check TargetVersion="21.2.5.0.0_211013"'
+            >>> Input = re.sub(pattern, '=', Input)
+            >>> print Input
+            <Exacloud root>/exabox/infrapatching/cps/cps-os-upgrader --remote_cps_host=scaqan03dv0807m patch_prereq_check TargetVersion="21.2.5.0.0_211013"
+
+            >>> Input = '<Exacloud root>/exabox/infrapatching/cps/cps-os-upgrader --remote_cps_host =scaqan03dv0807m patch_prereq_check TargetVersion="21.2.5.0.0_211013"'
+            >>> Input = re.sub(pattern, '=', Input)
+            >>> print Input
+            <Exacloud root>/exabox/infrapatching/cps/cps-os-upgrader --remote_cps_host=scaqan03dv0807m patch_prereq_check TargetVersion="21.2.5.0.0_211013"
+
+            >>> Input = '<Exacloud root>/exabox/infrapatching/cps/cps-os-upgrader --remote_cps_host= scaqan03dv0807m patch_prereq_check TargetVersion="21.2.5.0.0_211013"'
+            >>> Input = re.sub(pattern, '=', Input)
+            >>> print Input
+            <Exacloud root>/exabox/infrapatching/cps/cps-os-upgrader --remote_cps_host=scaqan03dv0807m patch_prereq_check TargetVersion="21.2.5.0.0_211013"
+
+    '''
+
+    _pattern_to_check = re.compile(r'\s*=\s*')
+    _other_options_list = str(sys.argv)
+    _other_options_list = re.sub(_pattern_to_check, '=', _other_options_list)
+    _other_options_list = _other_options_list.split(" ")
+
+    # Fetching remote server details
+    for _other_options_index in range(1, len(_other_options_list)):
+
+        if "--remote_cps_host" in _other_options_list[_other_options_index]:
+            _standby_node  = (_other_options_list[_other_options_index]).split("=")[1].split(" ")[0].replace("['", "").replace("',","").replace("']", "")
+            break
+
+    # Fetching target version details.
+    for _other_options_index in range(1, len(_other_options_list)):
+
+        if "TargetVersion" in (_other_options_list[_other_options_index]):
+            _target_version = (_other_options_list[_other_options_index]).split("=")[1].split(" ")[0].replace("['", "").replace("',","").replace("']", "")
+            break
+
+    # Fetching exasplice option.
+    for _other_options_index in range(1, len(_other_options_list)):
+
+        if "exasplice" in (_other_options_list[_other_options_index]):
+            _exasplice = (_other_options_list[_other_options_index]).split("=")[1].split(" ")[0].replace("['","").replace("',", "").replace("']", "")
+            break
+
+    # Fetching backup_mode and Additional Options if applicable.
+    if _patch_option not in [ "postcheck", "switchover", "switchoverstatus" ]:
+        for _other_options_index in range(1, len(_other_options_list)):
+
+            if "BACKUP_MODE" in (_other_options_list[_other_options_index]) and _patch_option not in [ "backup" ]:
+                _backup_mode  = (_other_options_list[_other_options_index]).split("=")[1].split(" ")[0].replace("['", "").replace("',","").replace("']", "")
+
+            # Managing additional options for patchmgr.
+            # If none of the below 4 additonal options are matched
+            # with the input, None as a string is passed as a
+            # placeholder to CPS OS upgrade python file.
+
+            if "options" in (_other_options_list[_other_options_index]):
+                _additional_options  = str(_other_options_list[_other_options_index]).split("=")[1].split(" ")[0].replace("['", "").replace("',","").replace("']", "")
+
+    return _patch_option, _standby_node, _backup_mode, _additional_options, _target_version, _exasplice
+
+
+def mIsMasterNode():
+    _is_master_node = True
+    _master_node_check_file_cmd = f"ls -ld {CPS_MASTER_NODE_FILE}"
+    _cmd = shlex.split(_master_node_check_file_cmd)
+    proc = subprocess.Popen(_cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    _out, err_str = wrapStrBytesFunctions(proc).communicate()
+    _output = _out.strip()
+    _status = proc.returncode
+    if int(_status) != 0:
+        _is_master_node = False
+    return _is_master_node
+
+
+def mAddCpsPatchreport(_standby_node):
+        """
+        Return patch report with more detail. We try to maintain the same
+        format of patching CNS payload so that it can be read uniformly
+        in ecra side.
+        """
+
+        # fill up the payload json for notificaiton
+        _patch_report_json = {}
+        if mIsMasterNode():
+            _patch_report_json['Primary Node'] = _master_node
+        else:
+            _patch_report_json['Primary Node'] = _standby_node
+        _patch_report_json['component'] = "Patch CPS OS Infrastructure"
+        _patch_report_json['event_post_time'] = datetime.now().strftime("%Y-%m-%d:%H.%M.%S %Z")
+
+        return _patch_report_json
+
+def mAddCpsInformation(aHost, aError, aSuggestion=None, aComment=None):
+    """
+    Generate the patch error report.
+    """
+
+    _json_status = {}
+    aError = aError.strip()
+    _json_status["data"] = {}
+    _code, _name, _description = ebPatchFormatBuildError(aError, aSuggestion, aComment)
+    _json_status["data"] = mAddCpsPatchreport(aHost)
+    if mIsMasterNode():
+        _json_status["data"]["Standby_node"] = aHost
+    else:
+        _json_status["data"]["Standby_node"] = _master_node
+
+    if PATCH_SUCCESS_EXIT_CODE in aError:
+        _ret_code = 0
+        _json_status["_ret_code"] = _ret_code
+        _json_status["data"]["code"] = PATCH_SUCCESS_EXIT_CODE
+    else:
+        _ret_code = 1
+        _json_status["_ret_code"] = _ret_code
+        _json_status["data"]["code"] = _code
+        _json_status["data"]["name"] = _name
+        _json_status["data"]["description"] = _description
+
+    return _json_status
+
+def mPatchLogInfo(msg):
+    print(time.strftime("%Y-%m-%d %H:%M:%S%z"), '- CpsOSPatchHandler -INFO- ' + (msg))
+
+def mPatchLogError(msg):
+    print(time.strftime("%Y-%m-%d %H:%M:%S%z"), '- CpsOSPatchHandler -ERROR- ' + (msg))
+
+def mPatchLogWarn(msg):
+    print(time.strftime("%Y-%m-%d %H:%M:%S%z"), '- CpsOSPatchHandler -WARN- ' + (msg))
+
+def mPatchLogPrint(msg):
+    print(f"{msg}")
+
+def mPatchAddHyphen(check_list, param_list):
+    """
+    It receives a list (param_list) and adds an extra hyphen if the parameter
+    is present in check_list.
+    If there is any change, return True, False otherwise
+    """
+    _changed = False
+    for _element in check_list:
+        if _element in param_list:
+            param_list.remove(_element)
+            param_list.insert(0, '-' + _element)
+            _changed = True
+    return _changed
+
+def mGetInfraPatchingConfigParam(aKey):
+    """
+     This method fetches all the configurable parameters
+     from the infrapatching/config/infrapatching.conf file
+     and returns to the caller.
+
+     Returns :
+       Relevant values if present.
+       None if empty.
+    """
+
+    _infrapatching_config_params = None
+    _ret = None
+    _infra_patching_config_file = f"exabox/infrapatching/config/{INFRA_PATCHING_CONF_FILE}"
+    with open(_infra_patching_config_file) as fd:
+        _infrapatching_config_params = json.load(fd, object_pairs_hook=OrderedDict)
+
+    # Fetch required values from infrapatching.conf
+    if _infrapatching_config_params[aKey]:
+        _ret = _infrapatching_config_params[aKey]
+    else:
+        mPatchLogError(f"Configurable parameter : {aKey} not found or is invalid in {_infra_patching_config_file} file.")
+
+    return _ret
+
+def mExecuteLocal(aCmd):
+    """
+     Common method for all commands executions and generate log to
+     exacloud/log/thread/ location along with remote management log.
+     Example:
+             mgnt-e88c015e-b37d-11e9-8044-0010e0eba926.log
+
+    It returns:
+
+      zero -> if success
+      non-zero -> if failure
+
+    """
+
+    _status = 1
+    _sudo_cmd = "sudo " + aCmd
+    with os.popen('{ ' + _sudo_cmd + '; } 2>&1', 'r') as pipe:
+        try:
+            _output = pipe.read()
+            _status = pipe.close()
+        except:
+            process = pipe._proc
+            process.kill()
+            process.wait()
+            raise
+    if _status is None:
+        _status = 0
+    if _output[-1:] == '\n':
+        _output = _output[:-1]
+    return _output, _status
+
+def mExecuteRemoteCmd(aCmd, aStandByNode,aTimeout=20):
+    """
+     Subprocess method to run commands on remote
+     servers.
+     It returns:
+       zero -> if success
+       non-zero -> if failure
+    """
+
+    aCmd_str = "sudo ssh -T -o StrictHostKeyChecking=no "
+    aCmd_str += f"-o BatchMode=yes -o ConnectTimeout={aTimeout} "
+    aCmd_str += f"-o ServerAliveInterval=30 "
+    aCmd_str += f"-o ServerAliveCountMax=60 root@{aStandByNode} {aCmd}"
+    _cmd = shlex.split(aCmd_str)
+    proc = subprocess.Popen(_cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    _out, err_str = wrapStrBytesFunctions(proc).communicate()
+    _output = _out.strip()
+    _status = proc.returncode
+
+    '''
+     # Commenting below lines, because it gives un-wanted ouput for many remote commands.
+     # However, keeping below lines for debuging purpse, if reqired in future.
+     if err_str:
+         mPatchLogError(f" mExecuteRemoteCmd: Error message: {err_str}")
+
+     if _status:
+         mPatchLogError(f" mExecuteRemoteCmd: Error code: {_status}")
+     '''
+
+    return (_output, _status)
+
+'''
+    Method for getting if the CPS is VM or BM
+    Virtual Machine
+    [root@scaqak01dv0703m util]# /usr/bin/systemd-detect-virt
+    xen
+    [root@scaqak01dv0703m util]# echo $?
+    0
+
+    Barel Metal
+    11:05
+    [root@scaqau02cps02 ~]# /usr/bin/systemd-detect-virt
+    none
+    [root@scaqau02cps02 ~]# echo $?
+    1
+'''
+def mGetCPSType():
+    _systemd_detect_virt_cmd = "/usr/bin/systemd-detect-virt"
+    mPatchLogPrint(f"System Detect Virt Command : {_systemd_detect_virt_cmd}")
+    _output, _status = mExecuteLocal(_systemd_detect_virt_cmd)
+    if int(_status) == 0:
+        return CPS_VM
+    return CPS_BM
+
+
+def mCreateCPSOSUpgradeRunningFile(aStandByNode):
+    _cmd_create_cps_os_running = f"/usr/bin/touch {EXACC_ROOT_PATCH}/{CPS_OSUPGRADE_IS_RUNNING}"
+    _output, _status = mExecuteLocal(_cmd_create_cps_os_running)
+    if _status == 0:
+        mPatchLogInfo(f"{CPS_OSUPGRADE_IS_RUNNING} file was created!")
+    else:
+        mPatchLogWarn(f"Unable to create {CPS_OSUPGRADE_IS_RUNNING} file. Error: {str(_output)}")
+
+    _output_remote, _status_remote = mExecuteRemoteCmd(_cmd_create_cps_os_running, aStandByNode)
+    if _status_remote == 0:
+        mPatchLogInfo(f"{CPS_OSUPGRADE_IS_RUNNING} file was created in standby node {aStandByNode}!")
+    else:
+        mPatchLogWarn(f"Unable to create {CPS_OSUPGRADE_IS_RUNNING} file in the standby node {aStandByNode}. Error: {str(_output)}")
+
+
+def mRemoveCPSOSUpgradeRunningFile(aStandByNode):
+    _cmd_remove_cps_os_running = f"/usr/bin/rm {EXACC_ROOT_PATCH}/{CPS_OSUPGRADE_IS_RUNNING}"
+    _output, _status = mExecuteLocal(_cmd_remove_cps_os_running)
+    if _status == 0:
+        mPatchLogInfo(f"{CPS_OSUPGRADE_IS_RUNNING} file was removed!")
+
+    _output_remote, _status_remote = mExecuteRemoteCmd(_cmd_remove_cps_os_running, aStandByNode)
+    if _status_remote == 0:
+        mPatchLogInfo(f"{CPS_OSUPGRADE_IS_RUNNING} file was removed in standby node {aStandByNode}!")
+
+
+def exit_and_clean(_ret_code, _patch_option =  "", _standby_node = ""):
+    if _patch_option and _patch_option in ["patch", "rollback"]:
+        if _standby_node:
+            mRemoveCPSOSUpgradeRunningFile(_standby_node)
+    exit(_ret_code)
+
+
+def mUpdateServiceStateOnIlom(_phase = "postpatch", _standby_node = ""):
+    """
+     This method takes care of enabling the
+     servicestate prior to patching and disabling
+     the same post patching. It is applicable to
+     CPS. Irrespective of the impact of patch results,
+     values are reset at the end of patching.
+
+     ipmitool servicestate commands sample snippets :
+
+     [ecra@scaqar08cps01 ~]$ sudo ipmitool sunoem getval /SP/services/ipmi/servicestate
+     Target Value: enabled
+
+     [ecra@scaqar08cps01 ~]$ sudo ipmitool sunoem setval /SP/services/ipmi/servicestate disabled
+     Sun OEM setval command successful.
+
+     [ecra@scaqar08cps01 ~]$ sudo ipmitool sunoem getval /SP/services/ipmi/servicestate
+     Target Value: disabled
+
+     [ecra@scaqar08cps01 ~]$ sudo ipmitool sunoem setval /SP/services/ipmi/servicestate enabled
+     Sun OEM setval command successful.
+
+     [ecra@scaqar08cps01 ~]$ sudo ipmitool sunoem getval /SP/services/ipmi/servicestate
+     Target Value: enabled
+    """
+    mPatchLogInfo(f"Update service state on ilom {_phase}")
+    _cmd_ipmi_geteval = "ipmitool sunoem getval /SP/services/ipmi/servicestate"
+    _output_val, _status_val = mExecuteRemoteCmd(_cmd_ipmi_geteval, _standby_node)
+    if _output_val:
+        mPatchLogInfo(f"Service State of ilom on node : {_standby_node} prior to patching, output : {_output_val}.")
+    if _phase == "prepatch":
+        if _output_val.find("disabled") != -1:
+            _cmd_ipmi_enabled = "ipmitool sunoem setval /SP/services/ipmi/servicestate enabled"
+            _output_enabled, _status_enabled = mExecuteRemoteCmd(_cmd_ipmi_enabled, _standby_node)
+            if _status_enabled == 0:
+                _output_val, _status_val = mExecuteRemoteCmd(_cmd_ipmi_geteval, _standby_node)
+                if _output_val:
+                    mPatchLogInfo(f"Service State of ilom on node : {_standby_node} is enabled. Output : {_output_val}.")
+            else:
+                mPatchLogWarn(f"Error in enabling service state value of iloms on node : {_standby_node} during patching.")
+    else:
+        if _output_val.find("enabled") != -1:
+            _cmd_ipmi_disabled = "ipmitool sunoem setval /SP/services/ipmi/servicestate disabled"
+            _output_disabled, _status_disabled = mExecuteRemoteCmd(_cmd_ipmi_disabled, _standby_node)
+            if _status_disabled == 0:
+                _output_val, _status_val = mExecuteRemoteCmd(_cmd_ipmi_geteval, _standby_node)
+                if _output_val:
+                    mPatchLogInfo(f"Service State of ilom on node : {_standby_node} is disabled. Output : {_output_val}.")
+            else:
+                mPatchLogWarn(f"Error in disabling service state value of iloms on node : {_standby_node} during patching.")
+
+
+def mIsSELinuxEnforcing(_standby_node = ""):
+    """
+    This method checks if the CPSes have SELinux with enforcing mode.
+
+    Output of /usr/sbin/getenforce
+    Disabled
+    Permissive
+    Enforcing
+
+    return True if one of the CPSes has enforcing mode set
+    return False if none of the CPSes has enforcing mode set
+    """
+    _enforcing = False
+    _check_selinux_cmd = ('/usr/sbin/getenforce')
+    try:
+        _output, _status = mExecuteLocal(_check_selinux_cmd)
+        if _status == 0 and _output and "enforcing" in _output.lower():
+            _enforcing = True
+            mPatchLogInfo("SELinux mode is set to enforcing")
+            return _enforcing
+
+        _output, _status = mExecuteRemoteCmd(_check_selinux_cmd, _standby_node)      
+        if _status == 0 and _output and "enforcing" in _output.lower():
+            _enforcing = True
+            mPatchLogInfo("SELinux mode is set to enforcing")
+            return _enforcing
+
+    except Exception as e:
+        mPatchLogWarn(f'Failed to obtain SELinux mode from CPS')
+        mPatchLogWarn(traceback.format_exc())
+    return _enforcing
+
+def mCompareDbserverPatchFilesInBaseDir(dbPatchFileBaseDirFromTargetVersion, dbPatchFileBaseDirFromCommon, commonPathToDbServerPatchZip):
+    dbPatchFileFromTargetVersion = dbPatchFileBaseDirFromTargetVersion + commonPathToDbServerPatchZip
+    dbPatchFileFromCommon = dbPatchFileBaseDirFromCommon + commonPathToDbServerPatchZip 
+    latestFile = mCompareDbserverPatchFiles(dbPatchFileFromTargetVersion, dbPatchFileFromCommon)
+    if(latestFile ==  dbPatchFileFromCommon):
+        return dbPatchFileBaseDirFromCommon
+    else:
+        return dbPatchFileBaseDirFromTargetVersion
+
+def mCompareDbserverPatchFiles(aOldDbPatchFile, aNewDbPatchFile):
+        
+        _old_db_patch_file_date_format = None
+        _new_db_patch_file_date_format = None
+        try:
+
+            _old_db_patch_file_date_format = mExtractDbserverPatchDateFromZip(aOldDbPatchFile)
+            _new_db_patch_file_date_format = mExtractDbserverPatchDateFromZip(aNewDbPatchFile)
+
+            if _old_db_patch_file_date_format and _new_db_patch_file_date_format:
+                if int(_old_db_patch_file_date_format) > int(_new_db_patch_file_date_format):
+                    mPatchLogInfo(f"{aOldDbPatchFile} is the LATEST dbserver patch file available based on the date.")
+                    return aOldDbPatchFile
+                elif int(_old_db_patch_file_date_format) < int(_new_db_patch_file_date_format):
+                    mPatchLogInfo(f"{aNewDbPatchFile} is the LATEST dbserver patch file available based on the date.")
+                    return aNewDbPatchFile
+                else:
+                    mPatchLogInfo(f"Both the dbserver patch files have the same date: {_new_db_patch_file_date_format} and either of them can be used for patching Using {aNewDbPatchFile}.")
+                    return aNewDbPatchFile
+            else:
+               
+                if _old_db_patch_file_date_format is not None:
+                   mPatchLogInfo(f"DBPatch file details not found for {aNewDbPatchFile}. Returning {aOldDbPatchFile}")
+                   return aOldDbPatchFile
+                elif _new_db_patch_file_date_format is not None:
+                   mPatchLogInfo(f"DBPatch file details not found for {aOldDbPatchFile}. Returning {aNewDbPatchFile}")
+                   return aNewDbPatchFile
+                else:
+                    mPatchLogInfo(f"DBPatch file not found in neither of the Patch Stage locations.")
+                    return None
+        except Exception as e:
+            mPatchLogWarn("Error in  extracting date from dbserver patch version file. Error: %s" % str(e))
+            return None
+
+def mExtractDbserverPatchDateFromZip(zip_path):
+    """unzip -l dbserver.patch.zip 
+    Archive:  dbserver.patch.zip
+      Length      Date    Time    Name
+    ---------  ---------- -----   ----
+        0  10-23-2025 18:13   dbserver_patch_251020/
+        50247  10-21-2025 02:27   dbserver_patch_251020/imageLogger
+    ...
+    This method returns the associated date, in this case 251020
+    """
+
+    if not os.path.exists(zip_path):
+        mPatchLogWarn(f"File does not exist: {zip_path}")
+        return None
+    try:
+        with zipfile.ZipFile(zip_path, 'r') as zf:
+            for name in zf.namelist():
+                match = re.match(r'dbserver_patch_(\d{6,})/?', name)
+                if match:
+                    mPatchLogInfo(f"Date for  {zip_path} : {match.group(1)}")
+                    return match.group(1)
+        mPatchLogInfo(f"Unable to fetch date for {zip_path}")
+        return None
+    except Exception as e:
+        mPatchLogWarn(f"Unexpected error with {zip_path}: {e}")
+        return None
+
+
+def main():
+    global interactive
+    '''
+      By default additional options are set to None and passed as an argument from the shell script else a valid
+      additional option as below is taken as input and passed.
+
+       --ignore_alerts
+       --force_remove_custom_rpms
+       --allow_active_network_mounts
+       --allow_selinux_enforcing
+
+       Remoteec command Example:
+        ecra {scaqak01cps01.us.oracle.com}> remoteec cps upgrade type="cpsos" bundle="latest" args="patch_prereq_check"
+        ecra {scaqak01cps01.us.oracle.com}> remoteec cps upgrade type="cpsos" bundle="/u01/downloads/cpsos/19.2.4.0.0.190709_190709" args="patch"
+        ecra {scaqak01cps01.us.oracle.com}> remoteec cps upgrade type="cpsos" bundle="/u01/downloads/cpsos/19.2.4.0.0.190709_190709" args="patch BACKUP_MODE=no"
+
+        If additional options are required to be passed.
+         ecra {scaqak01cps01.us.oracle.com}> remoteec cps upgrade type="cpsos" bundle="latest" args="patch options=-ignore_alerts,-force_remove_custom_rpms"
+         ecra {scaqak01cps01.us.oracle.com}> remoteec cps upgrade type="cpsos" bundle="/u01/downloads/cpsos/19.2.4.0.0.190709_190709" args="patch options=-ignore_alerts"
+
+    '''
+
+    _patchmgr = None
+    _exadata_ovs_file = None
+    _patch_local = None
+    _patch_repo = None
+    _db_patch_base_patch = None
+    _node_list = None
+    _ret_code = 0
+    _patch_option = ""
+    _standby_node = ""
+
+    try:
+
+        if "--remote_cps_host" not in str(sys.argv):
+            mPatchLogError("\nERROR - CPS OS Upgrade tool is unable to get standby detail and without which CPS OS upgrade or related tasks cannot be performed. Please Contact Oracle Support.\n")
+            _exit_code = STANDBY_NODE_EMPTY
+            _err_msg = "ERROR - CPS OS Upgrade tool is unable to get standby detail and without which CPS OS upgrade or related tasks cannot be performed."
+
+            _ret_code = mAddCpsInformation(_master_node, _exit_code, _err_msg)
+            mPatchLogInfo(" Error Json details are as follows : \n")
+            exit_and_clean(_ret_code=_ret_code)
+
+        _patch_option, _standby_node, _backup_mode, _additional_options, _target_version, _exasplice = mParseInputValues()
+
+        if _patch_option and _patch_option in [ "patch", "rollback" ]:
+            mCreateCPSOSUpgradeRunningFile(_standby_node)
+
+        _additional_options_list = []
+        if _additional_options is not None and len(_additional_options.strip()) > 0:
+            _additional_options = _additional_options.replace(",", " ")
+
+            # fix _additional_options_list to keep compatibility
+            _additional_options_list = _additional_options.split(" ")
+            if mPatchAddHyphen([ "-ignore_alerts", "-force_remove_custom_rpms", "-allow_active_network_mounts", "-allow_selinux_enforcing" ],
+                               _additional_options_list):
+                # if the list has to be rebuilt to keep compatibility
+                _additional_options = ','.join(_additional_options_list)
+
+            for add_list_value in _additional_options_list:
+                if add_list_value not in [ "--ignore_alerts", "--force_remove_custom_rpms",
+                                           "--allow_active_network_mounts" , "--allow_selinux_enforcing"]:
+                    _exit_code = INVALID_ADDITIONAL_OPTION
+                    mPatchLogError(f" {_additional_options} is not a valid patchmgr option for patchmgr. Error Code - {_exit_code}\n")
+                    _err_msg = f"ERROR - {_additional_options} is not a valid patchmgr option for patchmgr."
+                    _ret_code = mAddCpsInformation(_standby_node, _exit_code, _err_msg)
+                    exit_and_clean(_ret_code, _patch_option, _standby_node)
+
+        if not ( _patch_option ):
+
+            mPatchLogError(" Input <Patch_options> are missing.")
+            mPatchLogError(f" Patch option can be patch or rollback or patch_prereq_check or backup - Error Code - {INVALID_PATCH_OPTION}\n")
+            mPatchLogError(" Backup mode option can be yes or no, If backup_mode is specified 'yes' patchmgr would take backup of the standby node, If set to 'no' patchmgr would skip the backup and proceed with patch.")
+            _exit_code = INVALID_PATCH_OPTION
+            _err_msg = "ERROR - Invalid patch option, options can be patch or rollback or patch_prereq_check or backup or postcheck"
+            _ret_code = mAddCpsInformation(_standby_node, _exit_code, _err_msg)
+            mPatchLogInfo(" Error Json details are as follows : \n")
+            exit_and_clean(_ret_code, _patch_option, _standby_node)
+
+        if not (_target_version):
+            mPatchLogError(" Target version details missing.")
+            _exit_code = TARGET_VERSION_EMPTY
+            _err_msg = "ERROR -Target version details missing."
+            _ret_code = mAddCpsInformation(_standby_node, _exit_code, _err_msg)
+            mPatchLogInfo(" Error Json details are as follows : \n")
+            exit_and_clean(_ret_code, _patch_option, _standby_node)
+
+        # Get 'target_version' from pwd which we assume to have this convention
+        # from remoteec. Example: "/u01/downloads/cpsos/<bpname>_<cdate>"
+        #                         "/u01/downloads/cpsos/19.2.5.0.0_190729"
+
+        _exacloud_log = "/opt/oci/exacc/exacloud/log/threads"
+        _db_patch_base_patch = os.path.join('/u01/cpsosupgrade', _target_version)     
+        _patch_local = os.path.join("/u01/downloads/cpsos", _target_version)
+        _target_version = _patch_local.split('/')[-1].split('_')[1] if _exasplice == 'yes' else _patch_local.split('/')[-1].replace('_','.')
+        _patch_repo = _patch_local + '/PatchPayloads/' + _target_version
+        _patch_start_time = datetime.now()
+        _patchmgr_logdir = "patchmgr_logs_" +  datetime.now().strftime("%d_%m_%Y_%H_%M")
+        _patch_log_dir = _db_patch_base_patch+'/log/'+_patchmgr_logdir
+        
+        _exadata_db_patchfile_base_dir_for_version = EXADATA_PATCHPAYLOADS_DIR +_target_version
+        _dbPatchFileDirName = '/DBPatchFile/'
+        _commonPathToDbServerZip = _dbPatchFileDirName+'dbserver.patch.zip'
+        _latest_db_patchfile_base_dir = mCompareDbserverPatchFilesInBaseDir(
+            _exadata_db_patchfile_base_dir_for_version,
+            EXADATA_PATCHPAYLOADS_DIR,
+            _commonPathToDbServerZip) 
+        if(_latest_db_patchfile_base_dir == EXADATA_PATCHPAYLOADS_DIR):
+          _db_patchfile_dir = EXADATA_PATCHPAYLOADS_DIR + _dbPatchFileDirName
+        else:
+          _db_patchfile_dir = _exadata_db_patchfile_base_dir_for_version + _dbPatchFileDirName
+        
+        _patchmgr, _exadata_ovs_file = mUnzipToBaseLocation(_patch_repo, _db_patchfile_dir, _db_patch_base_patch, _patch_log_dir, _patch_option, _exasplice)
+        if _patch_option not in [ "postcheck", "switchover", "switchoverstatus" ] and (_patchmgr is None or _exadata_ovs_file is None):
+            _exit_code = INSUFFICIENT_SPACE_ON_PRIMARY_NODE
+            _err_msg = "ERROR - Unable to extract patch binaries."
+            _ret_code = mAddCpsInformation(_standby_node, _exit_code, _err_msg)
+            mPatchLogInfo(" Error Json details are as follows : \n")
+            exit_and_clean(_ret_code, _patch_option, _standby_node)
+            mPatchLogError(f" Unable to extract patch binaries. Error Code - {INSUFFICIENT_SPACE_ON_PRIMARY_NODE}\n")
+
+        if _patch_option not in [ "postcheck", "switchover", "switchoverstatus" ]:
+
+            _node_list = os.path.join(_db_patch_base_patch, 'dbs_grp')
+            _cmd_dir_perm_set = f'sudo chown ecra:dba {_db_patch_base_patch} -R'
+            subprocess.check_call(shlex.split(_cmd_dir_perm_set) ,stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+            _node_list = _db_patch_base_patch + '/dbs_grp'
+            with open(_node_list, 'w') as fpatch:
+                fpatch.write(f'{_standby_node}')
+
+            LOG_SPACE_THRESHOLD_IN_GB = 1
+            # Disk utlization check to store patchmgr logs.
+            _df = (subprocess.Popen(["df", "/u01"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL).communicate()[0]).decode("utf-8").split("\n")[1].split()
+            _device, _total_size, _used_space, _available_space, _percent_used, _mountpoint = _df
+
+            if int(_available_space) < int(LOG_SPACE_THRESHOLD_IN_GB):
+                mPatchLogError(f" - Insufficient space available under : {_mountpoint}, to store Patch manager logs. At least {LOG_SPACE_THRESHOLD_IN_GB}(GB) space is required to extract patch bundles and store logs. Make free disk space and re-run cps os upgrade. Exiting\n")
+                mPatchLogPrint("MountPoint : "  + _mountpoint)
+                mPatchLogPrint("Total_space(in GB) : " + str((int(_total_size)/1024/1024)))
+                mPatchLogPrint("Used_space(in GB) : "  + str((int(_used_space)/1024/1024)))
+                mPatchLogPrint("Available_space(in GB) : "   + str((int(_available_space)/1024/1024)))
+                mPatchLogPrint("Percentage_used : " + _percent_used + "\n")
+                mPatchLogPrint(f"Error Code - {INSUFFICIENT_SPACE_TO_STAGE_PATCHES}\n")
+
+                _exit_code = INSUFFICIENT_SPACE_TO_STAGE_PATCHES
+                _err_msg = f"ERROR - Insufficient space available under : {_mountpoint}, to store Patch manager logs."
+                _ret_code = mAddCpsInformation(_standby_node, _exit_code, _err_msg)
+                mPatchLogInfo(" Error Json details are as follows : \n")
+                exit_and_clean(_ret_code, _patch_option, _standby_node)
+
+        # allow_active_network_mounts has to be sent for cps in vms
+        if "--allow_active_network_mounts" not in _additional_options_list:
+            _cps_type = mGetCPSType()
+            mPatchLogPrint(f"CPS Type : {_cps_type}")
+            if _cps_type == CPS_VM:
+                if not _additional_options or _additional_options == None or _additional_options == "":
+                    _additional_options = "--allow_active_network_mounts"
+                else:
+                    _additional_options = _additional_options + " --allow_active_network_mounts"
+
+        # check for cps if enforcing is set on SELinux
+        if "--allow_selinux_enforcing" not in _additional_options_list:
+            if (mIsSELinuxEnforcing(_standby_node)):
+                if not _additional_options or _additional_options == None or _additional_options == "":
+                    _additional_options = "--allow_selinux_enforcing"
+                else:
+                    _additional_options =  _additional_options + " --allow_selinux_enforcing"
+
+        mPatchLogPrint(f"Additional Options : {_additional_options}")
+
+        # Check for the existence of critical hardware and/ known alert on cps node.
+        if "--ignore_alerts" in _additional_options_list:
+            mPatchLogWarn("Ignore alert specified. Ignoring all kinds of errors.")
+        elif _patch_option in [ "patch_prereq_check", "patch", "rollback", "backup"]:
+            cpsIgnoreAlertChk = CpsosPatch(_patchmgr, _target_version, _exasplice, _node_list, _exadata_ovs_file,
+                                           _standby_node, _backup_mode, _patch_option, _patch_log_dir,
+                                           _additional_options)
+
+            # check of critical alert, if found, stop the patching request.
+            _real_hw_alert_found = False
+            _real_hw_alert_found = cpsIgnoreAlertChk.mCheckAlert(aCheckCriticalHwAlert = True)
+
+            if _real_hw_alert_found:
+                mPatchLogError(f"Detected Critical Hardware alert on cps node: {_standby_node}")
+                _exit_code = CPS_HARDWARE_ALERT_DETECTED
+                _err_msg = f"ERROR - Detected Critical Hardware alert on cps node: {_standby_node}"
+                _ret_code = mAddCpsInformation(_standby_node, _exit_code, _err_msg)
+                mPatchLogInfo(" Error Json details are as follows : \n")
+                exit_and_clean(_ret_code, _patch_option, _standby_node)
+            else:
+                mPatchLogInfo(f" No Critical Hardware alert found on cps node: {_standby_node}")
+
+            # Check for known alert, if found, append 'ignore_alert' to patchmgr.
+            _known_alert_found = False
+            _known_alert_found = cpsIgnoreAlertChk.mCheckAlert()
+
+            if _known_alert_found:
+                mPatchLogWarn(f" Ignoring all alerts on specified cps node : {_standby_node} ")
+                if _additional_options or _additional_options == None or _additional_options == "":
+                    _additional_options = "--ignore_alerts"
+                else:
+                    _additional_options = _additional_options + " --ignore_alerts"
+
+            # Check rpm database healthy
+            _exit_code, _ret_code = cpsIgnoreAlertChk.mCheckAndRebuildRPMDatabase()
+            if _exit_code != PATCH_SUCCESS_EXIT_CODE:
+                exit_and_clean(_ret_code, _patch_option, _standby_node)
+
+        cpsospatch = CpsosPatch(_patchmgr, _target_version, _exasplice, _node_list, _exadata_ovs_file, _standby_node, _backup_mode, _patch_option, _patch_log_dir, _additional_options)
+        if _patch_option in [ "patch_prereq_check" ]:
+            _ret_code = cpsospatch.mPrecheck()
+        elif _patch_option == "patch":
+            _enable_service_state_on_ilom = mGetInfraPatchingConfigParam('enable_service_state_on_iloms_priorto_cps_patching')
+            if _enable_service_state_on_ilom and bool(_enable_service_state_on_ilom):
+                mUpdateServiceStateOnIlom("prepatch", _standby_node)
+            _ret_code = cpsospatch.mPatch()
+        elif _patch_option == "rollback":
+            _ret_code = cpsospatch.mRollback()
+        elif _patch_option == "backup":
+            _ret_code = cpsospatch.mBackup()
+        elif _patch_option == "postcheck":
+            # Independent postcheck method, in case of a retry.
+            _ret_code = cpsospatch.mPostCpsPatchCheck()
+        elif _patch_option == "switchover":
+            _ret_code = PATCH_SUCCESS_EXIT_CODE
+            _retry_counter = 3
+            for _retry in range(_retry_counter):
+                mPatchLogInfo(f"\nPerforming a switchover retry with retry_count :{_retry + 1}")
+                _ret_code = cpsospatch.mSwitchover()
+                if _ret_code == PATCH_SUCCESS_EXIT_CODE:
+                    mPatchLogInfo(" Switchover successful with an attempt = {_retry + 1}.\n")
+                    break
+                if _retry == (_retry_counter - 1) and _ret_code != PATCH_SUCCESS_EXIT_CODE:
+                    mPatchLogError(" Switchover failed even after retry.\n")
+        elif _patch_option == "switchoverstatus":
+            _ret_code = cpsospatch.mSwitchoverStatus()
+        else:
+            mPatchLogError(f" Input options <Patch_options> or <secondary_node> missing. Error Code - {INVALID_PATCH_OPTION}\n")
+            mPatchLogError(" Patch option can be patch, rollback, patch_prereq_check, backup, postcheck, switchover, switchoverstatus")
+            _exit_code = INVALID_PATCH_OPTION
+            _err_msg = "ERROR - Patch option can be patch, rollback, patch_prereq_check, backup, postcheck, switchover, switchoverstatus"
+            _ret_code = mAddCpsInformation(_standby_node, _exit_code, _err_msg)
+
+        if PATCH_SUCCESS_EXIT_CODE in _ret_code:
+            _err_msg = f"INFO - Task {_patch_option} on {_standby_node} completed successfully."
+            _ret_code = mAddCpsInformation(_standby_node, PATCH_SUCCESS_EXIT_CODE, _err_msg)
+
+        _patch_end_time = datetime.now()
+        _total_time = (_patch_end_time - _patch_start_time)
+        mPatchLogInfo(f" Patch execution time for Task : {_total_time}\n")
+        mPatchLogInfo(f" Task: {_patch_option} - Node: {_standby_node}\n")
+        # exit(_return_code) will always return the actual return code
+        # return _return_code will return 0
+        exit_and_clean(_ret_code, _patch_option, _standby_node)
+
+    except Exception as e:
+        mPatchLogError(f"\nUnable to process patching request : {e}\n")
+        mPatchLogPrint(traceback.format_exc())
+        # exit(_return_code) will always return the actual return code
+        # for any runtime or unpredicted exception , return 0x030F0006 as error code
+        _exit_code = CPS_PATCH_EXCEPTION
+        _err_msg = "CPS Patch exception detected."
+        _ret_code = mAddCpsInformation(_standby_node, _exit_code, _err_msg)
+        exit_and_clean(_ret_code, _patch_option, _standby_node)
+
+    finally:
+        mPatchLogInfo("CPS Patch operation execution complete.\n")
+        if _patch_option and _patch_option == "patch":
+            _enable_service_state_on_ilom = mGetInfraPatchingConfigParam('enable_service_state_on_iloms_priorto_cps_patching')
+            if _enable_service_state_on_ilom and bool(_enable_service_state_on_ilom):
+                mUpdateServiceStateOnIlom("postpatch", _standby_node)
+        # exit(_return_code) will always return the actual return code
+        # return _return_code will return 0
+        exit_and_clean(_ret_code, _patch_option, _standby_node)
+
+if __name__ == '__main__':
+
+    '''
+     To get the master node details.
+
+     Example :
+
+        >>> import os
+        >>> os.uname()[1].split(".")[0]
+        'den02tny'
+         >>>
+    '''
+    _master_node = os.uname()[1].split(".")[0]
+
+    main()

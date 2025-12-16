@@ -1,0 +1,1447 @@
+{
+    "callbacks": {
+        "add_cluster": {
+            "default_values": {
+                "all": {
+                    "backupLocation": "external",
+                    "basedir": "/u01/app/grid",
+                    "clusterHome": "/u01/app/12.1.0.2/grid",
+                    "clusterName": "<name>",
+                    "clusterOwner": "<name>_grid",
+                    "clusterScans": [],
+                    "clusterVersion": "12.1.0.2.10",
+                    "clusterVips": [],
+                    "diskGroups": [],
+                    "id": "<name>_clusterHome",
+                    "inventoryLocation": "/u01/app/oraInventory",
+                    "language": "all_langs",
+                    "patches": [],
+                    "version": "CloneInstall"
+                },
+                "kvm": {},
+                "xen": {}
+            },
+            "type": "xml_callback",
+            "xml_callback": "cluster_callback"
+        },
+        "add_db": {
+            "code_callbacks": [
+                "remove_empty_children"
+            ],
+            "default_values": {
+                "all": {
+                    "cdbId": "<cdb>_db_id",
+                    "characterset": "AL32UTF8",
+                    "databaseBlockSize": "<block_size>",
+                    "databaseHome": [],
+                    "databaseOwner": "<root/reshaped_node_subset/cluster/name>_<user>",
+                    "databaseSid": "<sid>",
+                    "databaseStype": "ADMIN",
+                    "databaseTemplate": "OLTP",
+                    "databaseType": "<type>",
+                    "diskGroups": [],
+                    "id": "<sid>_db_id",
+                    "language": "all_langs",
+                    "machines": [],
+                    "version": "2"
+                },
+                "kvm": {},
+                "xen": {}
+            },
+            "type": "xml_callback",
+            "xml_callback": "db_callback"
+        },
+        "add_dbhome": {
+            "default_values": {
+                "all": {
+                    "basedir": "/u01/app/<user>",
+                    "cluster": [],
+                    "databaseHomeLoc": "/u01/app/<user>/product/12.1.0.2/dbhome_1",
+                    "databaseHomeName": "<sid>_id",
+                    "databaseSwOwner": "<root/reshaped_node_subset/cluster/name>_<user>",
+                    "databaseVersion": "12.1.0.2.10",
+                    "id": "<root/reshaped_node_subset/cluster/name>_dbhome_id",
+                    "inventoryLocation": "/u01/app/oraInventory",
+                    "language": "all_langs",
+                    "machines": [],
+                    "patches": [],
+                    "useZfs": "false",
+                    "version": "CloneInstall"
+                },
+                "kvm": {},
+                "xen": {}
+            },
+            "type": "xml_callback",
+            "xml_callback": "dbhome_callback"
+        },
+        "add_diskgroup": {
+            "default_values": {
+                "all": {
+                    "cellDisks": "ALL",
+                    "diskGroupName": "<name><root/reshaped_node_subset/exadata_info/rackid>",
+                    "diskGroupSize": "612G",
+                    "id": "<type>dg_id",
+                    "machines": [],
+                    "ocrVote": "false",
+                    "quorumDisk": "false",
+                    "redundancy": "HIGH",
+                    "sliceSize": "51G",
+                    "version": "VirtualLayout"
+                },
+                "kvm": {},
+                "xen": {}
+            },
+            "type": "xml_callback",
+            "xml_callback": "diskgroup_callback"
+        },
+        "add_esrack": {
+            "code_callbacks": [
+                "remove_empty_children"
+            ],
+            "default_values": {
+                "all": {
+                    "esRackItem": [],
+                    "id": "rack_<name>",
+                    "rackDescription": "<root/reshaped_node_subset/exadata_info/description>",
+                    "rackSize": "42",
+                    "rackType": "<root/reshaped_node_subset/exadata_info/racktype>",
+                    "version": "version1"
+                },
+                "kvm": {},
+                "xen": {}
+            },
+            "type": "xml_callback",
+            "xml_callback": "es_rack_callback"
+        },
+        "add_group": {
+            "default_values": {
+                "all": {
+                    "groupId": "<gid>",
+                    "groupName": "<gname>",
+                    "groupType": "<gtype>",
+                    "id": "<root/reshaped_node_subset/cluster/name>_<gid>",
+                    "version": "version1"
+                },
+                "kvm": {},
+                "xen": {}
+            },
+            "type": "xml_callback",
+            "xml_callback": "group_callback"
+        },
+        "add_ilom": {
+            "default_values": {
+                "all": {
+                    "dnsServers": [],
+                    "id": "<parent/parent/parent/.*hostname>_ilom",
+                    "ilomName": "<fqdn> ILOM",
+                    "ilomTimeZone": "America/Los_Angeles",
+                    "networks": [
+                        "<parent/parent/parent/.*hostname>_ilom"
+                    ],
+                    "ntpServers": [],
+                    "version": "12"
+                },
+                "kvm": {
+                    "dnsServers": [],
+                    "ilomTimeZone": "UTC",
+                    "ntpServers": []
+                },
+                "xen": {}
+            },
+            "type": "xml_callback",
+            "xml_callback": "ilom_callback"
+        },
+        "add_scans": {
+            "default_values": {
+                "all": {
+                    "id": "<name>_clusterScan_client",
+                    "scanIps": [],
+                    "scanName": "<name>-scan1",
+                    "scanPort": "1521",
+                    "scanType": "client"
+                },
+                "kvm": {},
+                "xen": {}
+            },
+            "type": "xml_callback",
+            "xml_callback": "scans_callback"
+        },
+        "add_user": {
+            "default_values": {
+                "all": {
+                    "groups": [],
+                    "homedir": "/home/<name>",
+                    "id": "<root/reshaped_node_subset/cluster/name>_<name>",
+                    "userType": "<name>",
+                    "userid": "<uid>",
+                    "username": "<name>",
+                    "version": "version1"
+                },
+                "kvm": {},
+                "xen": {}
+            },
+            "type": "xml_callback",
+            "xml_callback": "user_callback"
+        },
+        "add_vmsize": {
+            "default_values": {
+                "all": {
+                    "id": "<name>",
+                    "vmAttribute": [
+                        "id:MemSize,text:<gb_memory>Gb",
+                        "id:cpuCount,text:<cores>",
+                        "id:DiskSize,text:<disk_size>Gb"
+                    ]
+                },
+                "kvm": {},
+                "xen": {}
+            },
+            "type": "xml_callback",
+            "xml_callback": "vmsize_callback"
+        },
+        "cell_local_disk": {
+            "default_values": {
+                "all": {
+                    "id": "<.*hostname>_CD_<idx>",
+                    "localDiskName": "CD_<idx>",
+                    "localDiskSize": "8000",
+                    "version": "Version12"
+                },
+                "kvm": {},
+                "xen": {}
+            },
+            "type": "xml_callback",
+            "xml_callback": "local_disk_callback"
+        },
+        "cell_machine": {
+            "default_values": {
+                "all": {
+                    "TimeZone": "America/Los_Angeles",
+                    "dnsServers": [],
+                    "hostName": "<cell_hostname>",
+                    "id": "<cell_hostname>_id",
+                    "iloms": [],
+                    "machineType": "storage",
+                    "networks": [],
+                    "ntpServers": [],
+                    "osType": "LinuxPhysical",
+                    "storage:localDisks": [],
+                    "version": "version1",
+                    "virtual": "false",
+                    "writeBackFlashCache": "true"
+                },
+                "kvm": {
+                    "TimeZone": "UTC",
+                    "dnsServers": [],
+                    "ntpServers": [],
+                    "version": "version2",
+                    "writeBckFlashCache": "automatic"
+                }
+            },
+            "type": "xml_callback",
+            "xml_callback": "machine_callback"
+        },
+        "change_env": {
+            "name": "change_env",
+            "type": "code_callback"
+        },
+        "cluster_vips": {
+            "default_values": {
+                "all": {
+                    "domainName": "<domain>",
+                    "id": "<fqdn>_id",
+                    "machines": [
+                        "<parent/parent/parent/.*hostname>_id"
+                    ],
+                    "vipIpAddress": "<ipaddr>",
+                    "vipName": "<host>"
+                },
+                "kvm": {},
+                "xen": {}
+            },
+            "type": "xml_callback",
+            "xml_callback": "cluster_vips_callback"
+        },
+        "cluster_vips_rel": {
+            "relation": {
+                "callback_id": "<parent/parent/parent/parent/parent/cluster/name>_clusterHome",
+                "callback_name": "add_cluster",
+                "insert_key": "clusterVips",
+                "insert_values": [
+                    "self:cluster_vips:<fqdn>_id"
+                ]
+            },
+            "type": "relation_callback"
+        },
+        "create_switch": {
+            "default_values": {
+                "all": {
+                    "id": "<fqdn>_id",
+                    "networks": [],
+                    "switchDescription": "Exadata Admin Switch",
+                    "version": "version2"
+                },
+                "kvm": {},
+                "xen": {
+                    "ibPartitionMembership": "both"
+                }
+            },
+            "type": "xml_callback",
+            "xml_callback": "switch_callback"
+        },
+        "detect_domain": {
+            "name": "detect_domain",
+            "type": "code_callback"
+        },
+        "dom0_machine": {
+            "default_values": {
+                "all": {
+                    "DefaultGatewayNet": "<compute_node_hostname>_admin",
+                    "TimeZone": "America/Los_Angeles",
+                    "dnsServers": [],
+                    "hostName": "<compute_node_hostname>",
+                    "id": "<compute_node_hostname>_id",
+                    "iloms": [],
+                    "machine": [],
+                    "machineType": "compute",
+                    "networks": [],
+                    "ntpServers": [],
+                    "osType": "",
+                    "version": "version1",
+                    "virtual": "false"
+                },
+                "kvm": {
+                    "TimeZone": "UTC",
+                    "dnsServers": [],
+                    "ntpServers": [],
+                    "osType": "LinuxKVM",
+                    "version": "version2"
+                },
+                "xen": {
+                    "osType": "LinuxDom0"
+                }
+            },
+            "type": "xml_callback",
+            "xml_callback": "machine_callback"
+        },
+        "domU_machine": {
+            "default_values": {
+                "all": {
+                    "DefaultGatewayNet": "<compute_node_hostname>_client",
+                    "DomUImageName": "default",
+                    "ImageVersion": "default",
+                    "TimeZone": "America/Los_Angeles",
+                    "dnsServers": [],
+                    "guestCores": "",
+                    "guestLocalDiskSize": "",
+                    "guestMemory": "",
+                    "hostName": "<compute_node_hostname>",
+                    "id": "<compute_node_hostname>_id",
+                    "machineType": "compute",
+                    "networks": [],
+                    "ntpServers": [],
+                    "osType": "",
+                    "software:clusters": [],
+                    "software:databaseHomes": [],
+                    "users": [],
+                    "version": "version1",
+                    "virtual": "true",
+                    "vmSizeName": "id:<root/reshaped_node_subset/vmsize/default>"
+                },
+                "kvm": {
+                    "TimeZone": "UTC",
+                    "dnsServers": [],
+                    "ntpServers": [],
+                    "osType": "LinuxKVMGuest",
+                    "version": "version2"
+                },
+                "xen": {
+                    "osType": "LinuxGuest"
+                }
+            },
+            "type": "xml_callback",
+            "xml_callback": "machine_callback"
+        },
+        "net_admin": {
+            "default_values": {
+                "all": {
+                    "domainName": "<domain>",
+                    "gateway": "<gateway>",
+                    "hostName": "<host>",
+                    "id": "<parent/parent/parent/.*hostname>_admin",
+                    "ipAddress": "<ipaddr>",
+                    "macAddress": "",
+                    "master": "<master>|eth0",
+                    "netMask": "<netmask>",
+                    "networkName": "<fqdn> Admin",
+                    "networkType": "admin",
+                    "slave": "<slave>",
+                    "version": "version1",
+                    "vlanId": "<vlanId>"
+                },
+                "kvm": {
+                    "version": "2"
+                },
+                "xen": {}
+            },
+            "type": "xml_callback",
+            "xml_callback": "network_callback"
+        },
+        "net_backup": {
+            "default_values": {
+                "all": {
+                    "domainName": "<domain>",
+                    "gateway": "<gateway>",
+                    "hostName": "<host>",
+                    "id": "<parent/parent/parent/.*hostname>_backup",
+                    "ipAddress": "<ipaddr>",
+                    "macAddress": "",
+                    "master": "<master>",
+                    "netMask": "<netmask>",
+                    "networkName": "<fqdn> Backup",
+                    "networkType": "backup",
+                    "slave": "<slave>",
+                    "version": "version1",
+                    "vlanId": "<vlanId>"
+                },
+                "kvm": {
+                    "master": "bondeth1",
+                    "version": "2"
+                },
+                "xen": {
+                    "master": "bondeth1"
+                }
+            },
+            "type": "xml_callback",
+            "xml_callback": "network_callback"
+        },
+        "net_client": {
+            "code_callbacks": [
+                "detect_nat_ip"
+            ],
+            "default_values": {
+                "all": {
+                    "domainName": "<domain>",
+                    "gateway": "<gateway>",
+                    "hostName": "<host>",
+                    "id": "<parent/parent/parent/.*hostname>_client",
+                    "ipAddress": "<ipaddr>",
+                    "macAddress": "",
+                    "master": "<master>",
+                    "natdomainName": "<natdomain>",
+                    "nathostName": "<nathostname>",
+                    "natipAddress": "<natip>",
+                    "natnetMask": "<natnetmask>",
+                    "netMask": "<netmask>",
+                    "networkName": "<fqdn> Client",
+                    "networkType": "client",
+                    "slave": "<slave>",
+                    "version": "version1",
+                    "vlanId": "<vlanId>"
+                },
+                "kvm": {
+                    "lacp": "false",
+                    "linkSpeed": "25000",
+                    "master": "bondeth0",
+                    "version": "2"
+                },
+                "xen": {
+                    "master": "bondeth0"
+                }
+            },
+            "type": "xml_callback",
+            "xml_callback": "network_callback"
+        },
+        "net_clusterpriv": {
+            "default_values": {
+                "all": {
+                    "domainName": "<domain>",
+                    "gateway": "<gateway>",
+                    "hostName": "<host>",
+                    "id": "<parent/parent/parent/.*hostname>_clusterpriv<idx1>",
+                    "ipAddress": "<ipaddr>",
+                    "macAddress": "",
+                    "master": "<master>",
+                    "netMask": "<netmask>",
+                    "networkName": "<fqdn> ClusterPriv",
+                    "networkType": "private",
+                    "pkey": "<pkey>",
+                    "pkeyName": "<pkeyname>",
+                    "slave": "<slave>",
+                    "version": "version1"
+                },
+                "kvm": {
+                    "interfaceName": "clre<idx>",
+                    "master": "re<idx>",
+                    "pkey": "erased",
+                    "pkeyName": "erased",
+                    "version": "2"
+                },
+                "xen": {
+                    "master": "ib<idx>",
+                    "pkey": "0xa127",
+                    "pkeyName": "clib<idx>"
+                }
+            },
+            "type": "xml_callback",
+            "xml_callback": "network_callback"
+        },
+        "net_ilom": {
+            "default_values": {
+                "all": {
+                    "domainName": "<domain>",
+                    "gateway": "<gateway>",
+                    "hostName": "<host>",
+                    "id": "<parent/parent/parent/.*hostname>_ilom",
+                    "ipAddress": "<ipaddr>",
+                    "macAddress": "",
+                    "netMask": "<netmask>",
+                    "networkName": "<fqdn> ILOM",
+                    "networkType": "Ilom",
+                    "vlanId": "<vlanId>"
+                },
+                "kvm": {
+                    "version": "2"
+                },
+                "xen": {}
+            },
+            "type": "xml_callback",
+            "xml_callback": "network_callback"
+        },
+        "net_priv_dom0": {
+            "default_values": {
+                "all": {
+                    "domainName": "<domain>",
+                    "gateway": "<gateway>",
+                    "hostName": "<host>",
+                    "id": "<parent/parent/parent/.*hostname>_priv<idx1>",
+                    "ipAddress": "<ipaddr>",
+                    "macAddress": "",
+                    "master": "<master>",
+                    "netMask": "<netmask>",
+                    "networkName": "<fqdn> Priv",
+                    "networkType": "private",
+                    "slave": "<slave>",
+                    "version": "version1",
+                    "vlanId": "<vlanId>"
+                },
+                "kvm": {
+                    "master": "re<idx>",
+                    "version": "2"
+                },
+                "xen": {
+                    "master": "ib<idx>"
+                }
+            },
+            "type": "xml_callback",
+            "xml_callback": "network_callback"
+        },
+        "net_priv_domU_cell": {
+            "default_values": {
+                "all": {
+                    "domainName": "<domain>",
+                    "gateway": "<gateway>",
+                    "hostName": "<host>",
+                    "id": "<parent/parent/parent/.*hostname>_priv<idx1>",
+                    "ipAddress": "<ipaddr>",
+                    "macAddress": "",
+                    "master": "<master>",
+                    "netMask": "<netmask>",
+                    "networkName": "<fqdn> Priv",
+                    "networkType": "private",
+                    "slave": "<slave>",
+                    "version": "version1",
+                    "vlanId": "<vlanId>"
+                },
+                "kvm": {
+                    "interfaceName": "stre<idx>",
+                    "master": "re<idx>",
+                    "pkey": "erased",
+                    "pkeyName": "erased",
+                    "version": "2"
+                },
+                "xen": {
+                    "master": "ib<idx>",
+                    "pkey": "0xaa12",
+                    "pkeyName": "stib<idx>"
+                }
+            },
+            "type": "xml_callback",
+            "xml_callback": "network_callback"
+        },
+        "net_switch_admin": {
+            "default_values": {
+                "all": {
+                    "domainName": "<domain>",
+                    "gateway": "<gateway>",
+                    "hostName": "<host>",
+                    "id": "<fqdn>_admin",
+                    "ipAddress": "<ipaddr>",
+                    "macAddress": "",
+                    "master": "eth0",
+                    "netMask": "<netmask>",
+                    "networkName": "<fqdn> Admin",
+                    "networkType": "admin",
+                    "slave": "<slave>",
+                    "version": "version1",
+                    "vlanId": "<vlanId>"
+                },
+                "kvm": {
+                    "version": "version2"
+                },
+                "xen": {}
+            },
+            "type": "xml_callback",
+            "xml_callback": "network_callback"
+        },
+        "rack_info": {
+            "default_values": {
+                "all": {
+                    "id": "<parent/.*hostname>_id",
+                    "rackItemDescription": "EXADATA <root/reshaped_node_subset/exadata_info/model> <parent/node_type> NODE <parent/storageType> <parent/storageSize>",
+                    "rackItemFamily": "<root/reshaped_node_subset/exadata_info/model>",
+                    "rackItemNumber": "UNKNOWN",
+                    "rackLocation": "UNKNOWN",
+                    "uHeight": "<uheight>",
+                    "uLocation": "<uloc>",
+                    "version": "version1"
+                },
+                "kvm": {},
+                "xen": {}
+            },
+            "type": "xml_callback",
+            "xml_callback": "rack_item_callback"
+        },
+        "rack_name": {
+            "default_values": {
+                "all": {
+                    "id": "<rackid>",
+                    "text": "<rackname>"
+                },
+                "kvm": {},
+                "xen": {}
+            },
+            "type": "xml_callback",
+            "xml_callback": "rackname_callback",
+            "xml_direct_callback": "true"
+        },
+        "rel_cdb_diskgroup": {
+            "relation": {
+                "callback_id": "<root/reshaped_node_subset/cluster/database/cdb/sid>_db_id",
+                "callback_name": "add_db",
+                "insert_key": "diskGroups",
+                "insert_values": [
+                    "<type>dg_id"
+                ]
+            },
+            "type": "relation_callback"
+        },
+        "rel_cell_diskgroup_data": {
+            "relation": {
+                "callback_id": "<root/reshaped_node_subset/cluster/diskgroups/data/type>dg_id",
+                "callback_name": "add_diskgroup",
+                "insert_key": "machines",
+                "insert_values": [
+                    "<.*hostname>_id"
+                ]
+            },
+            "type": "relation_callback"
+        },
+        "rel_cell_diskgroup_reco": {
+            "relation": {
+                "callback_id": "<root/reshaped_node_subset/cluster/diskgroups/reco/type>dg_id",
+                "callback_name": "add_diskgroup",
+                "insert_key": "machines",
+                "insert_values": [
+                    "<.*hostname>_id"
+                ]
+            },
+            "type": "relation_callback"
+        },
+        "rel_cell_local_disk": {
+            "relation": {
+                "callback_id": "<.*hostname>_id",
+                "callback_name": "machine_callback",
+                "insert_key": "storage:localDisks",
+                "insert_values": [
+                    "id:<.*hostname>_CD_<idx>"
+                ]
+            },
+            "type": "relation_callback"
+        },
+        "rel_cluster_diskgroup": {
+            "relation": {
+                "callback_id": "<root/reshaped_node_subset/cluster/name>_clusterHome",
+                "callback_name": "add_cluster",
+                "insert_key": "diskGroups",
+                "insert_values": [
+                    "<type>dg_id"
+                ]
+            },
+            "type": "relation_callback"
+        },
+        "rel_cluster_domU": {
+            "relation": {
+                "callback_id": "<.*hostname>_id",
+                "callback_name": "domU_machine",
+                "insert_key": "software:clusters",
+                "insert_values": [
+                    "<root/reshaped_node_subset/cluster/name>_clusterHome"
+                ]
+            },
+            "type": "relation_callback"
+        },
+        "rel_db_cluster": {
+            "relation": {
+                "callback_id": "<name>_dbhome_id",
+                "callback_name": "add_dbhome",
+                "insert_key": "cluster",
+                "insert_values": [
+                    "id:<name>_clusterHome"
+                ]
+            },
+            "type": "relation_callback"
+        },
+        "rel_db_dbhome": {
+            "relation": {
+                "callback_id": "<sid>_db_id",
+                "callback_name": "add_db",
+                "insert_key": "databaseHome",
+                "insert_values": [
+                    "<root/reshaped_node_subset/cluster/name>_dbhome_id"
+                ]
+            },
+            "type": "relation_callback"
+        },
+        "rel_dbhome_domU": {
+            "relation": {
+                "callback_id": "<.*hostname>_id",
+                "callback_name": "domU_machine",
+                "insert_key": "software:databaseHomes",
+                "insert_values": [
+                    "<root/reshaped_node_subset/cluster/name>_dbhome_id"
+                ]
+            },
+            "type": "relation_callback"
+        },
+        "rel_dom0_domu": {
+            "relation": {
+                "callback_id": "<parent/.*hostname>_id",
+                "callback_name": "dom0_machine",
+                "insert_key": "machine",
+                "insert_values": [
+                    "<.*hostname>_id"
+                ]
+            },
+            "type": "relation_callback"
+        },
+        "rel_domU_db_cdb": {
+            "relation": {
+                "callback_id": "<root/reshaped_node_subset/cluster/database/cdb/sid>_db_id",
+                "callback_name": "add_db",
+                "insert_key": "machines",
+                "insert_values": [
+                    "<.*hostname>_id"
+                ]
+            },
+            "type": "relation_callback"
+        },
+        "rel_domU_db_pdb": {
+            "relation": {
+                "callback_id": "<root/reshaped_node_subset/cluster/database/pdb/sid>_db_id",
+                "callback_name": "add_db",
+                "insert_key": "machines",
+                "insert_values": [
+                    "<.*hostname>_id"
+                ]
+            },
+            "type": "relation_callback"
+        },
+        "rel_domU_dbhome": {
+            "relation": {
+                "callback_id": "<root/reshaped_node_subset/cluster/name>_dbhome_id",
+                "callback_name": "add_dbhome",
+                "insert_key": "machines",
+                "insert_values": [
+                    "<.*hostname>_id"
+                ]
+            },
+            "type": "relation_callback"
+        },
+        "rel_ilom_dns": {
+            "relation": {
+                "callback_id": "<parent/parent/parent/.*hostname>_ilom",
+                "callback_name": "ilom_callback",
+                "insert_key": "dnsServers",
+                "insert_values": [
+                    "<ipaddr>"
+                ]
+            },
+            "type": "relation_callback"
+        },
+        "rel_ilom_ntp": {
+            "relation": {
+                "callback_id": "<parent/parent/parent/.*hostname>_ilom",
+                "callback_name": "ilom_callback",
+                "insert_key": "ntpServers",
+                "insert_values": [
+                    "<ipaddr>"
+                ]
+            },
+            "type": "relation_callback"
+        },
+        "rel_machine_admin_network": {
+            "relation": {
+                "callback_id": "<parent/parent/parent/.*hostname>_id",
+                "callback_name": "machine_callback",
+                "insert_key": "networks",
+                "insert_values": [
+                    "<parent/parent/parent/.*hostname>_admin"
+                ]
+            },
+            "type": "relation_callback"
+        },
+        "rel_machine_backup_network": {
+            "relation": {
+                "callback_id": "<parent/parent/parent/.*hostname>_id",
+                "callback_name": "machine_callback",
+                "insert_key": "networks",
+                "insert_values": [
+                    "<parent/parent/parent/.*hostname>_backup"
+                ]
+            },
+            "type": "relation_callback"
+        },
+        "rel_machine_client_network": {
+            "relation": {
+                "callback_id": "<parent/parent/parent/.*hostname>_id",
+                "callback_name": "machine_callback",
+                "insert_key": "networks",
+                "insert_values": [
+                    "<parent/parent/parent/.*hostname>_client"
+                ]
+            },
+            "type": "relation_callback"
+        },
+        "rel_machine_clusterpriv_network": {
+            "relation": {
+                "callback_id": "<parent/parent/parent/.*hostname>_id",
+                "callback_name": "machine_callback",
+                "insert_key": "networks",
+                "insert_values": [
+                    "<parent/parent/parent/.*hostname>_clusterpriv<idx1>"
+                ]
+            },
+            "type": "relation_callback"
+        },
+        "rel_machine_dns": {
+            "relation": {
+                "callback_id": "<parent/parent/parent/.*hostname>_id",
+                "callback_name": "machine_callback",
+                "insert_key": "dnsServers",
+                "insert_values": [
+                    "<ipaddr>"
+                ]
+            },
+            "type": "relation_callback"
+        },
+        "rel_machine_ilom": {
+            "relation": {
+                "callback_id": "<parent/parent/parent/.*hostname>_id",
+                "callback_name": "machine_callback",
+                "insert_key": "iloms",
+                "insert_values": [
+                    "<parent/parent/parent/.*hostname>_ilom"
+                ]
+            },
+            "type": "relation_callback"
+        },
+        "rel_machine_ilom_network": {
+            "relation": {
+                "callback_id": "<parent/parent/parent/.*hostname>_id",
+                "callback_name": "machine_callback",
+                "insert_key": "networks",
+                "insert_values": [
+                    "<parent/parent/parent/.*hostname>_ilom"
+                ]
+            },
+            "type": "relation_callback"
+        },
+        "rel_machine_ntp": {
+            "relation": {
+                "callback_id": "<parent/parent/parent/.*hostname>_id",
+                "callback_name": "machine_callback",
+                "insert_key": "ntpServers",
+                "insert_values": [
+                    "<ipaddr>"
+                ]
+            },
+            "type": "relation_callback"
+        },
+        "rel_machine_private_network": {
+            "relation": {
+                "callback_id": "<parent/parent/parent/.*hostname>_id",
+                "callback_name": "machine_callback",
+                "insert_key": "networks",
+                "insert_values": [
+                    "<parent/parent/parent/.*hostname>_priv<idx1>"
+                ]
+            },
+            "type": "relation_callback"
+        },
+        "rel_rackinfo_esrack": {
+            "relation": {
+                "callback_id": "rack_<root/reshaped_node_subset/cluster/name>",
+                "callback_name": "add_esrack",
+                "insert_key": "esRackItem",
+                "insert_values": [
+                    "self:rack_info:<parent/.*hostname>_id"
+                ]
+            },
+            "type": "relation_callback"
+        },
+        "rel_scan_cluster": {
+            "relation": {
+                "callback_id": "<name>_clusterHome",
+                "callback_name": "add_cluster",
+                "insert_key": "clusterScans",
+                "insert_values": [
+                    "id:<name>_clusterScan_client"
+                ]
+            },
+            "type": "relation_callback"
+        },
+        "rel_scanip_scan": {
+            "relation": {
+                "callback_id": "<parent/name>_clusterScan_client",
+                "callback_name": "add_scans",
+                "insert_key": "scanIps",
+                "insert_values": [
+                    "text:<ipaddr>"
+                ]
+            },
+            "type": "relation_callback"
+        },
+        "rel_switch_net": {
+            "relation": {
+                "callback_id": "<fqdn>_id",
+                "callback_name": "create_switch",
+                "insert_key": "networks",
+                "insert_values": [
+                    "id:<fqdn>_admin"
+                ]
+            },
+            "type": "relation_callback"
+        },
+        "rel_update_hostname_domU": {
+            "relation": {
+                "callback_id": "<parent/parent/parent/.*hostname>_id",
+                "callback_name": "domU_machine",
+                "insert_key": "hostName",
+                "insert_values": "<fqdn>"
+            },
+            "type": "relation_callback"
+        },
+        "rel_user_group": {
+            "relation": {
+                "callback_id": "<root/reshaped_node_subset/cluster/name>_<parent/name>",
+                "callback_name": "add_user",
+                "insert_key": "groups",
+                "insert_values": [
+                    "id:<root/reshaped_node_subset/cluster/name>_<gid>"
+                ]
+            },
+            "type": "relation_callback"
+        },
+        "user_machine_rel": {
+            "relation": {
+                "callback_id": "<.*hostname>_id",
+                "callback_name": "machine_callback",
+                "insert_key": "users",
+                "insert_values": [
+                    "id:<root/reshaped_node_subset/cluster/name>_grid",
+                    "id:<root/reshaped_node_subset/cluster/name>_oracle"
+                ]
+            },
+            "type": "relation_callback"
+        }
+    },
+    "preprocessor": {
+        "reshaped_node_subset": {
+            "added_cells": {
+                "node_type": "CELL"
+            },
+            "added_computes": {
+                "node_type": "COMPUTE"
+            },
+            "added_switches": {
+                "node_type": "SWITCH"
+            },
+            "cluster": {
+                "database": {
+                    "cdb": {
+                        "block_size": "8192",
+                        "sid": "cdb0",
+                        "type": "cdb",
+                        "user": "oracle"
+                    },
+                    "pdb": {
+                        "cdb": "cdb0",
+                        "sid": "pdb0",
+                        "type": "pdb",
+                        "user": "oracle"
+                    }
+                },
+                "diskgroups": {
+                    "data": {
+                        "name": "DATAC",
+                        "type": "data"
+                    },
+                    "reco": {
+                        "name": "RECOC",
+                        "type": "reco"
+                    }
+                },
+                "name": "c1",
+                "scans": [
+                    {
+                        "ipaddr": "10.31.124.67"
+                    },
+                    {
+                        "ipaddr": "10.31.124.68"
+                    },
+                    {
+                        "ipaddr": "10.31.124.69"
+                    }
+                ]
+            },
+            "exadata_info": {
+                "description": "X8M-2 Elastic Rack HC 14TB",
+                "model": "X8M-2",
+                "rackid": "1",
+                "rackname": "",
+                "racktype": "1035"
+            },
+            "groups": [
+                {
+                    "gid": "1001",
+                    "gname": "oinstall",
+                    "gtype": "OINSTALLGROUP"
+                },
+                {
+                    "gid": "1004",
+                    "gname": "asmdba",
+                    "gtype": "OSDBA"
+                },
+                {
+                    "gid": "1005",
+                    "gname": "asmoper",
+                    "gtype": "OSOPER"
+                },
+                {
+                    "gid": "1006",
+                    "gname": "asmadmin",
+                    "gtype": "OSASM"
+                },
+                {
+                    "gid": "1002",
+                    "gname": "dba",
+                    "gtype": "DBA_GROUP"
+                },
+                {
+                    "gid": "1003",
+                    "gname": "racoper",
+                    "gtype": "OPER_GROUP"
+                }
+            ],
+            "users": [
+                {
+                    "groups": [
+                        {
+                            "gid": "1001"
+                        },
+                        {
+                            "gid": "1002"
+                        },
+                        {
+                            "gid": "1003"
+                        },
+                        {
+                            "gid": "1004"
+                        }
+                    ],
+                    "name": "oracle",
+                    "uid": "1001"
+                },
+                {
+                    "groups": [
+                        {
+                            "gid": "1001"
+                        },
+                        {
+                            "gid": "1004"
+                        },
+                        {
+                            "gid": "1005"
+                        },
+                        {
+                            "gid": "1006"
+                        }
+                    ],
+                    "name": "grid",
+                    "uid": "1000"
+                }
+            ],
+            "vmsize": {
+                "default": "Large",
+                "sizes": [
+                    {
+                        "cores": "16",
+                        "disk_size": "20",
+                        "gb_memory": "32",
+                        "name": "Small"
+                    },
+                    {
+                        "cores": "16",
+                        "disk_size": "20",
+                        "gb_memory": "32",
+                        "name": "Medium"
+                    },
+                    {
+                        "cores": "16",
+                        "disk_size": "20",
+                        "gb_memory": "32",
+                        "name": "Large"
+                    }
+                ]
+            }
+        }
+    },
+    "preprocessor_clusterless": {
+        "reshaped_node_subset": {
+            "added_cells": {
+                "node_type": "CELL"
+            },
+            "added_computes": {
+                "node_type": "COMPUTE"
+            },
+            "added_switches": {
+                "node_type": "SWITCH"
+            },
+            "exadata_info": {
+                "description": "X8M-2 Elastic Rack HC 14TB",
+                "model": "X8M-2",
+                "rackid": "1",
+                "rackname": "",
+                "racktype": "1035"
+            },
+            "vmsize": {
+                "default": "Large",
+                "sizes": [
+                    {
+                        "cores": "16",
+                        "disk_size": "20",
+                        "gb_memory": "32",
+                        "name": "Small"
+                    },
+                    {
+                        "cores": "16",
+                        "disk_size": "20",
+                        "gb_memory": "32",
+                        "name": "Medium"
+                    },
+                    {
+                        "cores": "16",
+                        "disk_size": "20",
+                        "gb_memory": "32",
+                        "name": "Large"
+                    }
+                ]
+            }
+        }
+    },
+    "structure": {
+        "reshaped_node_subset": {
+            "added_cells": {
+                "callbacks": [
+                    "cell_machine",
+                    "rel_cell_diskgroup_reco",
+                    "rel_cell_diskgroup_data",
+                    {
+                        "cb": "cell_local_disk",
+                        "range": "0,12"
+                    },
+                    {
+                        "cb": "rel_cell_local_disk",
+                        "range": "0,12"
+                    }
+                ],
+                "network_info": {
+                    "cellnetworks": {
+                        "admin": {
+                            "callbacks": [
+                                "detect_domain",
+                                "rel_machine_admin_network",
+                                "net_admin"
+                            ]
+                        },
+                        "dns": {
+                            "callbacks": [
+                                "rel_machine_dns",
+                                "rel_ilom_dns"
+                            ]
+                        },
+                        "ilom": {
+                            "callbacks": [
+                                "detect_domain",
+                                "add_ilom",
+                                "rel_machine_ilom",
+                                "net_ilom"
+                            ]
+                        },
+                        "ntp": {
+                            "callbacks": [
+                                "rel_machine_ntp",
+                                "rel_ilom_ntp"
+                            ]
+                        },
+                        "private": {
+                            "callbacks": [
+                                "detect_domain",
+                                "rel_machine_private_network",
+                                "net_priv_domU_cell"
+                            ]
+                        }
+                    }
+                },
+                "rack_info": {
+                    "callbacks": [
+                        "rack_info",
+                        "rel_rackinfo_esrack"
+                    ]
+                }
+            },
+            "added_computes": {
+                "callbacks": [
+                    "dom0_machine"
+                ],
+                "network_info": {
+                    "computenetworks": {
+                        "admin": {
+                            "callbacks": [
+                                "detect_domain",
+                                "rel_machine_admin_network",
+                                "net_admin"
+                            ]
+                        },
+                        "dns": {
+                            "callbacks": [
+                                "rel_machine_dns",
+                                "rel_ilom_dns"
+                            ]
+                        },
+                        "ilom": {
+                            "callbacks": [
+                                "detect_domain",
+                                "add_ilom",
+                                "rel_machine_ilom",
+                                "net_ilom",
+                                "rel_machine_ilom_network"
+                            ]
+                        },
+                        "ntp": {
+                            "callbacks": [
+                                "rel_machine_ntp",
+                                "rel_ilom_ntp"
+                            ]
+                        },
+                        "private": {
+                            "callbacks": [
+                                "detect_domain",
+                                "rel_machine_private_network",
+                                "net_priv_dom0"
+                            ]
+                        }
+                    }
+                },
+                "rack_info": {
+                    "callbacks": [
+                        "rack_info",
+                        "rel_rackinfo_esrack"
+                    ]
+                },
+                "virtual_compute_info": {
+                    "callbacks": [
+                        "domU_machine",
+                        "rel_dom0_domu",
+                        "rel_cluster_domU",
+                        "rel_domU_dbhome",
+                        "rel_domU_db_cdb",
+                        "rel_domU_db_pdb",
+                        "rel_dbhome_domU",
+                        "user_machine_rel"
+                    ],
+                    "network_info": {
+                        "virtualcomputenetworks": {
+                            "admin": {
+                                "callbacks": [
+                                    "detect_domain",
+                                    "rel_machine_admin_network",
+                                    "net_admin"
+                                ]
+                            },
+                            "backup": {
+                                "callbacks": [
+                                    "detect_domain",
+                                    "rel_machine_backup_network",
+                                    "net_backup"
+                                ]
+                            },
+                            "client": {
+                                "callbacks": [
+                                    "detect_domain",
+                                    "rel_machine_client_network",
+                                    "rel_update_hostname_domU",
+                                    "net_client"
+                                ]
+                            },
+                            "dns": {
+                                "callbacks": [
+                                    "rel_machine_dns"
+                                ]
+                            },
+                            "interconnect": {
+                                "callbacks": [
+                                    "detect_domain",
+                                    "rel_machine_clusterpriv_network",
+                                    "net_clusterpriv"
+                                ]
+                            },
+                            "ntp": {
+                                "callbacks": [
+                                    "rel_machine_ntp"
+                                ]
+                            },
+                            "private": {
+                                "callbacks": [
+                                    "detect_domain",
+                                    "rel_machine_private_network",
+                                    "net_priv_domU_cell"
+                                ]
+                            },
+                            "scans": {
+                                "callbacks": [
+                                    "detect_domain",
+                                    "cluster_scans",
+                                    "cluster_scans_rel"
+                                ]
+                            },
+                            "vip": {
+                                "callbacks": [
+                                    "detect_domain",
+                                    "cluster_vips",
+                                    "cluster_vips_rel"
+                                ]
+                            }
+                        }
+                    }
+                }
+            },
+            "added_switches": {
+                "network_info": {
+                    "switchnetworks": {
+                        "admin": {
+                            "callbacks": [
+                                "rel_switch_net",
+                                "create_switch",
+                                "detect_domain",
+                                "net_switch_admin"
+                            ]
+                        }
+                    }
+                },
+                "rack_info": {
+                    "callbacks": [
+                        "rack_info",
+                        "rel_rackinfo_esrack"
+                    ]
+                }
+            },
+            "callbacks": [
+                "change_env"
+            ],
+            "cluster": {
+                "callbacks": [
+                    "add_cluster",
+                    "add_esrack",
+                    "add_scans",
+                    "rel_scan_cluster",
+                    "rel_db_cluster"
+                ],
+                "database": {
+                    "cdb": {
+                        "callbacks": [
+                            "add_db",
+                            "add_dbhome",
+                            "rel_db_dbhome"
+                        ]
+                    },
+                    "pdb": {
+                        "callbacks": [
+                            "add_db",
+                            "rel_db_dbhome"
+                        ]
+                    }
+                },
+                "diskgroups": {
+                    "data": {
+                        "callbacks": [
+                            "add_diskgroup",
+                            "rel_cdb_diskgroup",
+                            "rel_cluster_diskgroup"
+                        ]
+                    },
+                    "reco": {
+                        "callbacks": [
+                            "add_diskgroup",
+                            "rel_cdb_diskgroup",
+                            "rel_cluster_diskgroup"
+                        ]
+                    }
+                },
+                "scans": {
+                    "callbacks": [
+                        "rel_scanip_scan"
+                    ]
+                }
+            },
+            "exadata_info": {
+                "callbacks": [
+                    "rack_name"
+                ]
+            },
+            "groups": {
+                "callbacks": [
+                    "add_group"
+                ]
+            },
+            "users": {
+                "callbacks": [
+                    "add_user"
+                ],
+                "groups": {
+                    "callbacks": [
+                        "rel_user_group"
+                    ]
+                }
+            },
+            "vmsize": {
+                "sizes": {
+                    "callbacks": [
+                        "add_vmsize"
+                    ]
+                }
+            }
+        }
+    }
+}

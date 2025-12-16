@@ -1,0 +1,15 @@
+{
+    "properties": {
+        "hostname": {
+            "type": "string"
+        },
+        "fqdn": {
+            "type": "string"
+        }
+    },
+    "required": [
+        "hostname",
+        "fqdn"
+    ],
+    "type": "object"
+}

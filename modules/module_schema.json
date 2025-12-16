@@ -1,0 +1,268 @@
+{
+    "description": "JSON scheme for modules inside exacloud",
+    "title": "module",
+    "type": "object",
+    "definitions": {
+        "nodes_target": {
+            "title": "nodes_target",
+            "description": "Hosts where the package will be installed",
+            "type": "object",
+            "properties": {
+                "dom0": {
+                    "type": "string",
+                    "enum": ["none", "first", "all"]
+                },
+                "domU": {
+                    "type": "string",
+                    "enum": ["none", "first", "all"]
+                },
+                "cell": {
+                    "type": "string",
+                    "enum": ["none", "first", "all"]
+                }
+            },
+            "required": ["dom0", "domU", "cell"]
+        },
+        "installation_steps": {
+            "title": "installation_steps",
+            "description": "Single step execution",
+            "type": "object",
+            "properties": {
+                "installer_cmd": {
+                    "type": "string"
+                },
+                "timeout": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "nodes": {
+                    "$ref": "#/definitions/nodes_target"
+                }
+            },
+            "required": ["installer_cmd", "timeout", "name", "enabled", "nodes"]
+        },
+        "exec_call": {
+            "title": "exec_call",
+            "description": "Step Base execution",
+            "type": "object",
+            "properties": {
+                "rpminstall": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/installation_steps"
+                    },
+                    "minItems": 1,
+                    "uniqueItems": true
+                },
+                "post_rpminstall": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/installation_steps"
+                    },
+                    "minItems": 1,
+                    "uniqueItems": true
+                }
+            }
+        },
+        "network_node": {
+            "title": "network_node",
+            "description": "Network Node",
+            "type": "object",
+            "properties": {
+                "protocol": {
+                    "type": "string",
+                    "enum": ["TCP", "UDP"]
+                },
+                "name": {
+                    "type": "string"
+                },
+                "network_type": {
+                    "type": "string"
+                },
+                "port": {
+                    "type": "number"
+                },
+                "property_type": {
+                    "type": "string",
+                    "enum": ["port", "port_range"]
+                },
+                "state": {
+                    "type": "string",
+                    "enum": ["open", "close"]
+                },
+                "port_hi": {
+                    "type": "number"
+                },
+                "port_lo": {
+                    "type": "number"
+                },
+                "nodes": {
+                    "$ref": "#/definitions/nodes_target"
+                }
+            },
+            "required": ["protocol", "name", "network_type", "property_type", "state", "nodes"]
+        },
+        "storage_node": {
+            "title": "storage_node",
+            "description": "Storage Node",
+            "type": "object",
+            "properties": {
+                "owner": {
+                    "type": "string"
+                },
+                "group": {
+                    "type": "string"
+                },
+                "permissions": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "property_type": {
+                    "type": "string"
+                },
+                "size": {
+                    "type": "string"
+                },
+                "nodes": {
+                    "$ref": "#/definitions/nodes_target"
+                }
+            },
+            "required": ["owner", "group", "permissions", "name", "path", "property_type", "size", "nodes"]
+        },
+        "mini_content": {
+            "title": "mini_content",
+            "description": "object of content",
+            "type": "object",
+            "properties": {
+                "owner": {
+                    "type": "string"
+                },
+                "permissions": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "domu_path": {
+                    "type": "string"
+                },
+                "sha256sum": {
+                    "type": "string"
+                },
+                "group": {
+                    "type": "string"
+                },
+                "extract": {
+                    "type": "boolean"
+                }
+            },
+            "required": ["owner", "permissions", "version", "name", "path", "sha256sum", "group", "extract"]
+        }
+    },
+    "properties": {
+        "version": {
+            "description": "Label version of the module",
+            "type": "string"
+        },
+        "date": {
+            "description": "Date of creation of the module",
+            "type": "string"
+        },
+        "name": {
+            "description": "Name of the module",
+            "type": "string"
+        },
+        "label": {
+            "description": "Label of the module",
+            "type": "string"
+        },
+        "module_type": {
+            "description": "Type of module",
+            "type": "string",
+            "enum": ["package"]
+        },
+        "service": {
+            "description": "The type of dedicated service where run",
+            "type": "array",
+            "items": {
+                "type": "string",
+                "enum": ["ATP"]
+            },
+            "minItems": 1,
+            "uniqueItems": true
+        },
+        "platform": {
+            "description": "The platform where run",
+            "type": "array",
+            "items": {
+                "type": "string",
+                "enum": ["OCI", "OCIEXACC"]
+            },
+            "minItems": 1,
+            "uniqueItems": true
+        },
+        "requires": {
+            "description": "Module dependencies",
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "min_version": {
+                        "type": "string"
+                    },
+                    "module_name": {
+                        "type": "string"
+                    }
+                },
+                "required": ["min_version", "module_name"]
+            },
+            "minItems": 1,
+            "uniqueItems": true
+        },
+        "contents": {
+            "description": "Content of the module",
+            "type": "array",
+            "items": {
+                "$ref": "#/definitions/mini_content"
+            },
+            "minItems": 1,
+            "uniqueItems": true
+        },
+        "exec_calls": {
+            "$ref": "#/definitions/exec_call"
+        },
+        "network": {
+            "type": "array",
+            "items": {
+                "$ref": "#/definitions/network_node"
+            },
+            "minItems": 1,
+            "uniqueItems": true
+        },
+        "storage": {
+            "type": "array",
+            "items": {
+                "$ref": "#/definitions/storage_node"
+            },
+            "minItems": 1,
+            "uniqueItems": true
+        }
+    },
+    "required": ["version", "date", "module_type", "contents", "label", "exec_calls"]
+}

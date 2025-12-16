@@ -1,0 +1,25 @@
+<?xml version="1.0" ?>
+<number ebTreeNodeType="White" value="1">
+    <number ebTreeNodeType="White" value="2">
+        <number ebTreeNodeType="Green" value="11">
+            <number ebTreeNodeType="Green" value="77">
+                <number ebTreeNodeType="Green" value="88"/>
+            </number>
+        </number>
+        <number ebTreeNodeType="White" value="3"/>
+        <number ebTreeNodeType="Red" value="4"/>
+        <number ebTreeNodeType="White" value="5"/>
+    </number>
+    <number ebTreeNodeType="White" value="6">
+        <number ebTreeNodeType="Green" value="10">
+            <number ebTreeNodeType="Green" value="31"/>
+        </number>
+        <number ebTreeNodeType="Red" value="7">
+            <number ebTreeNodeType="Red" value="25"/>
+        </number>
+        <number ebTreeNodeType="White" value="8">
+            <number ebTreeNodeType="Red" value="30"/>
+        </number>
+        <number ebTreeNodeType="White" value="9"/>
+    </number>
+</number>

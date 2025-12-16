@@ -1,0 +1,9 @@
+{
+    "exarootuser":"user1234",
+    "exarooturl":"user1234.oracle.com",
+    "fqdn":"scaqab10adm01.us.oracle.com",
+    "hostname":"scaqab10adm01",
+    "vaultaccess":"value",
+    "vaultid":"value",
+    "trustcertificates":["cert1","cert2","cert3"]
+}

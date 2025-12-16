@@ -1,0 +1,57 @@
+{
+    "properties": {
+        "body": {
+            "type": "string"
+        },
+        "clustername": {
+            "type": "string"
+        },
+        "cmdtype": {
+            "type": "string"
+        },
+        "columns": {
+            "type": "string"
+        },
+        "data": {
+            "type": "string"
+        },
+        "endtime": {
+            "type": "string"
+        },
+        "error": {
+            "type": "string"
+        },
+        "error_str": {
+            "type": "string"
+        },
+        "limit": {
+            "type": "string"
+        },
+        "lock": {
+            "type": "string"
+        },
+        "offset": {
+            "type": "string"
+        },
+        "params": {
+            "type": "string"
+        },
+        "starttime": {
+            "type": "string"
+        },
+        "status": {
+            "type": "string"
+        },
+        "statusinfo": {
+            "type": "string"
+        },
+        "uuid": {
+            "type": "string"
+        },
+        "xml": {
+            "type": "string"
+        }
+    },
+    "required": [],
+    "type": "object"
+}

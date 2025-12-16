@@ -1,0 +1,1136 @@
+#
+# $Header: ecs/exacloud/exabox/infrapatching/test/test_infrapatching_dom0.txt /main/54 2025/12/04 04:10:46 araghave Exp $
+#
+# test_infrapatching_dom0.py
+#
+# Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+#
+#    NAME
+#      test_infrapatching_dom0.py - Unit test case script for all Dom0 operations.
+#
+#    DESCRIPTION
+#      Unit test case script for all Dom0 operations.
+#
+#    NOTES
+#      Unit test case script for all Dom0 operations.
+#
+#    MODIFIED   (MM/DD/YY)
+#    sdevasek    10/13/25 - ENH 38437135 - IMPLEMENT ADDITION OF SCRIPTNAME
+#                           SCRIPTBUNLDENAME AND SCRIPTBUNDLEHASH ATTRIBUTES
+#                           TO ECRA REGISTERED PLUGINS METADATA REGISTRATION
+#    araghave    10/03/25 - Enhancement Request 38444755 - INFRAPATCHING TEST
+#                           AUTOMATION - TEST ADDITION TO PERFORM DOMU ELU
+#                           PATCH OPERATIONS
+#    sdevasek    09/03/25 - Enh 38351663 - TEST ADDITION TO VALIDATE PLUGIN
+#                           EXECUTION FAILURE SCENARIO
+#    apotluri    06/24/25 - Enhancement Request 38109516 - INFRAPATCH TEST
+#                           AUTOMATION : CREATE PRECHECK RETRY FAILURE FOR DOMU
+#                           AND SWITCH
+#    sdevasek    06/20/25 - Enh 38059211  - ENHANCE TESTS MAINTENABILITY BY
+#                           SEPARATING OUT CLUSTERLESS TESTS AND SINGLE VM
+#                           TESTS INTO SEPARATE FILES
+#    sdevasek    06/11/25   Enh 38037644 - ADD TESTS TO VALIDATE MULTIPLE PATCH
+#                           SESSIONS ON EXTERNAL LAUNCHNODE
+#    apotluri    06/10/25 - Enhancement Request 37981656 - INFRAPATCH TEST
+#                           AUTOMATION : ADD TEST FOR PATCH RETRY CASE FOR
+#                           DOM0, DOMU AND SWITCH
+#    antamil     04/06/25 - Bug 36842057 test to validate registered launchnode
+#    apotluri    05/21/25 - Bug 37941851 - INFRAPATCH TEST AUTOMATION: UPDATE
+#                           RETRY TESTS TO VALIDATE ECRA_ERROR WITH "RETRY ECRA
+#                           REQUEST ID .* HAS ALREADY FAILED BEFORE ECRA
+#                           UPGRADE WITH ERROR CODE 0X03010054\. FAILING
+#                           INFRAPATCHING ON RETRY AFTER ECRA UPGRADE
+#    antamil     05/19/25   Bug 37866030 - Testscript development for
+#                           clusterless patching
+#    apotluri    05/06/25 - INFRAPATCH TEST AUTOMATION:
+#                           dom0_patch_with_include_list is failing during db
+#                           health checks as db is down
+#    apotluri    04/02/25 - Enhancement Request 37780245 - INFRAPATCH TEST
+#                           AUTOMATION : DISABLE DCS AGENT SANITY CHECKS
+#    apotluri    01/31/25 - Enhancement Request 37507403 - INFRAPATCHING TEST
+#                           AUTOMATION: ADD TEST CASE WITH SELINUX ENFORCING ON
+#                           DB NODES AND RUN PATCH_PREREQ_CHECK AND PATCH
+#                           OPERATIONS
+#    apotluri    11/21/24 - Enhancement Request 37091565 - ADDITION OF
+#                           AUTOMATION TEST TO VALIDATE PATCHMGR SESSION
+#                           DETECTION AFTER SWITCHOVER
+#    apotluri    11/19/24 - Bug 37270845 - INFRAPATCH TEST AUTOMATION:
+#                           ENHANCING RESILIENCE IN VERIFYING CDB/PDB
+#                           DEGRADATION SCENARIOS
+#    sdevasek    11/12/24 - Enh 36994135 -TEST ADDITION FOR CELL NONROLLING
+#                           WITH INCLUDENODELIST TO CATER GMR
+#    apotluri    10/17/24 - Enhancement Request 37104851 - INFRAPATCHING TEST
+#                           AUTOMATION - TEST ADDITION TO VALIDATE CDB/PDB
+#                           DOWNTIME DURING DOM0 PATCHING
+#    apotluri    10/17/24 - Enhancement Request 37104821 - INFRAPATCHING TEST
+#                           AUTOMATION - TEST ADDITION TO VALIDATE CDB/PDB
+#                           DEGRADATION DURING DOM0 PATCHING
+#    apotluri    08/05/24 - Infrapatch test automation :
+#                           dom0_patch_prereq_check_with_rack_model fails due
+#                           to thread log name change
+#    araghave    07/15/24 - Enh 36830077 - CLEANUP KSPLICE CODE FROM
+#                           INFRAPATCHING FILES
+#    apotluri    06/03/24 - Bug 36687979 - INFRAPATCH TEST AUTOMATION : DBNU
+#                           PLUGIN VERIFICATION FAILS THOUGH LOG SHOWS
+#                           SUCCEEDED MESSAGES
+#    apotluri    05/15/24 - Enhancement Request 36560878 - INFRAPATCHING TEST
+#                           AUTOMATION: VALIDATE DBNU PLUGIN IS EXECUTED OR NOT
+#    apotluri    04/08/24 - Enhancement Request 35846277 - TEST ADDITION TO
+#                           AUTOMATION TO VALIDATE ZERO VALUE FOR METEROCPU
+#                           SCENARIO IN INFRAPATCHING
+#    sdevasek    03/19/24 - Enh 36317237 - TEST AUTOMATION - ADD TEST FOR
+#                           ONEOFF V2 IMPLEMENTATION
+#    apotluri    02/05/24 - Bug 36261410 - INFRAPATCH TEST AUTOMATION: X9
+#                           AUTOMATION IS FAILING WITH INDENTATION ERROR
+#    jyotdas     01/19/24 - 36157656 - enhance infrapatch domu details payload
+#                           to pass vms shutdown by customer
+#    sdevasek    12/15/23 - Enh 36097928 - ADDITION OF TESTS TO MODIFY DEFAULT
+#                           INFRAPATCHING.CONF PARAMS TO INCREASE CODE COVERAGE
+#    antamil     12/08/23 - Enh 35976409 - Added dom0_patch_retry testcase
+#    emekala     11/20/23 - ENH 35706149 - Changes required in infrapatching
+#                           test auomation files to support Pipeline execution
+#    araghave    08/03/23 - Enh 35661378 - ADD DOM0 PATCHING CRS TESTS : DOM0
+#                           POSTCHECK SHOULD STARTUP CRS ON ALL VMS IF CRS IS
+#                           DOWN
+#    apotluri    07/24/23 - ENH 35610019 - INFRAPATCHING TEST AUTOMATION : DOMU
+#                           INCLUDE NODELIST TEST CASES ARE FAILING IF
+#                           NATHOSTNAMES ARE USED
+#    emekala     07/18/23 - ENH 35610691 - INFRAPATCHING TEST AUTOMATION - Run
+#                           SMR (Exasplice) as part of code coverage test suite
+#    sdevasek    05/16/23 - ENH 35293729 - TEST ADDITION TO VALIDATE HEARTBEAT
+#                           CHECK BY MAKING CRS TO DISABLE IN ONE OF THE DOMU
+#    emekala     05/16/23 - ENH 35330659 - Infrapatching Test Automation -
+#                           Tracking ticket to enable Exasplice test suite in
+#                           Jenkins for periodical execution
+#    apotluri    05/10/23 - Enh 35371736 - INFRAPATCHING TEST AUTOMATION : MOVE
+#                           CLEAN UP SPACE TASK TO A GENERIC PLACE INSTEAD OF
+#                           DOING FOR EVERY TEST
+#    emekala     04/20/23 - Enh 35000319 - TEST ADDITION TO VALIDATE EXASPLICE
+#                           SCENARIO IN INFRAPATCHING AUTOMATION
+#    emekala     04/14/23 - ENH 35204492 - HEARTBEAT FAILURE ERROR CODE IS
+#                           GETTING OVERRIDDEN WITH GENERIC ERROR CODE
+#                           0X03010007 FOR DOM0 POSTCHECK FAILURE
+#    emekala     03/07/23 - Enh 35143881 - REMOVE PLUGIN EXECUTION FOR ROLLBACK
+#                           TESTS IN INFRAPATCHING AUTOMATION
+#    emekala     02/27/23 - Enh 35123619 - TEST DEPENDENCY ADDITION FOR BACKUP
+#                           TESTS WITH ROLLBACK TESTS
+#    apotluri    02/16/23 - ENH 34292618 - INFRAPATCHING AUTOMATION STABILITY -
+#                           CLEAR UP SPACE IN THE NODES IN AUTOMATION RACK
+#    emekala     02/15/23 - Enh 35027349 - ENABLE POSTCHECK AND BACKUP_IMAGE
+#                           TESTS IN INFRAPATCHING AUTOMATION
+#    sdevasek    12/20/22 - ENH 33893463 - UPDATE INFRAPATCH TEST AUTOMATION TO
+#                           PROVIDE DIFFS OF TIME PROFILE FOR MAJOR OPERATIONS
+#                           ACROSS CURRENT AND PREVIOUS RUNS
+#    antamil     12/05/22 - ENH 34564371-IGNORE VALIDATION OF
+#                           TIME PROFILE DATA AND PLUGIN CONSOLE LOG FOR
+#                           ALREADY PATCHED NODE
+#    sdevasek    09/14/22 - ENH 33924998 - TEST ADDITION TO DELETE ANY PENDING
+#                           RACK_PATCH_UPDATE OPERATIONS USING ABORT REQUEST
+#    sdevasek    08/11/22 - ENH 34465298 - TEST ADDITION TO AUTOMATION TO LOOK
+#                           FOR TIME_PROFILE_DATA IN STATUS REPORT
+#    sdevasek    04/21/22 - ENH 34088744 - ENABLE TESTS FOR KSPLICE AND ONEOFF
+#                           OPERATIONS IN INFRAPTACHING AUTOMATION
+#    sdevasek    04/07/22 - ENH 33999815 - DISABLE EXACLOUD PLUGIN EXECUTION
+#                           IN AUTOMATION
+#    sdevasek    03/07/22 - Bug-33928270 - STAGE CUSTOM DOM0DOMU SCRIPT FOR
+#                           NON-ROLLING DOM0 PATCH TEST DURING CELL PATCH TEST
+#    sdevasek    02/14/22 - Enh-33737906 - TEST ADDITION TO THE INFRAPATCHING
+#                           AUTOMATION FOR EXACLOUD PLUGINS
+#    sdevasek    02/04/22 - Enh-33819329 - TEST ADDITION TO THE INFRAPATCHING
+#                           AUTOMATION FOR INCLUDELIST FEATURE
+#    sdevasek    12/03/21 - Enh-33310641 - TEST ADDITION TO THE INFRAPATCHING
+#                           AUTOMATION FOR DCS AGENT BASED SANITY CHECKS
+#    nmallego    10/23/21 - Bug-33310632 - Test for non-rolling upgrade
+#    sdevasek    09/13/21 - Enh 32929805 - Infrapatching CI/CD pipeline
+#                           implementation
+#    araghave    05/27/21 - Enh 32929805 - INFRA PATCHING TEST FRAMEWORK
+#    rkhemcha    08/28/20 - Creation
+#
+
+import pytest
+import unittest
+
+from utils import *
+from constants import *
+
+
+# Class which defines unit tests as dom0 target
+@pytest.mark.dom0
+class Test_dom0_class(unittest.TestCase):
+    # Class level variables
+    __dom0s = []
+    __domu_list_with_nathostnames = []
+    __target_name = PATCH_DOM0
+
+    @classmethod
+    def setUpClass(cls):
+        cls.__dom0s = mGetInfraPatchingTestConfigParam('dom0s')
+        cls.__domu_list_with_nathostnames = mGetInfraPatchingTestVms('domuNatHostname', 'domu')
+        plugin_meta_data_handler = InfrapatchPluginMetadataHandler()
+        plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScripts(PATCH_DOM0, ONEOFF_PLUGIN)
+        plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScripts(PATCH_DOM0, DBNU_PLUGIN)
+        plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScripts(PATCH_DOM0, EXACLOUD_PLUGIN, "Pre")
+        plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScripts(PATCH_DOM0, EXACLOUD_PLUGIN, "Post")
+
+    @classmethod
+    def tearDownClass(cls):
+        plugin_meta_data_handler = InfrapatchPluginMetadataHandler()
+        for _plugin_type in [ONEOFF_PLUGIN, DBNU_PLUGIN]:
+            plugin_meta_data_handler.mDeleteRegisteredInfrapatchPlugineMetadataScripts(
+                "script_%s_%s" % (PATCH_DOM0, _plugin_type), PATCH_DOM0, _plugin_type)
+            plugin_meta_data_handler.mDeleteRegisteredInfrapatchPlugineMetadataScripts(
+                "script_%s_%s_pre" % (PATCH_DOM0, EXACLOUD_PLUGIN), PATCH_DOM0, EXACLOUD_PLUGIN)
+            plugin_meta_data_handler.mDeleteRegisteredInfrapatchPlugineMetadataScripts(
+                "script_%s_%s_post" % (PATCH_DOM0, EXACLOUD_PLUGIN), PATCH_DOM0, EXACLOUD_PLUGIN)
+
+    def __init__(self, *initial_data, **kwargs):
+        super(Test_dom0_class, self).__init__(*initial_data, **kwargs)
+        self.__operation = ""
+        self.__operation_style = OP_STYLE_AUTO
+        self.__required_nodes_in_node_progress_status = []
+        self.__non_required_nodes_in_node_progress_status = []
+        self.__patch_node_list = []
+        self.__patch_operation_status_result = False
+        self.__patch_operation_status_output = ""
+        self.__crs_bin_path = ""
+        _domu_node = mGetInfraPatchingTestVms('domuNatHostname', 'domu')[0]
+        _result, _output_map = mExecuteRemoteExasshCmd(
+            "cat /etc/oratab|grep grid|grep -v '^#'|grep -i asm|cut -d ':' -f2", [_domu_node])
+        self.__crs_bin_path = _output_map[_domu_node]
+
+    # This method is to run something similar before every test execution.
+    def setUp(self):
+        self.__required_nodes_in_node_progress_status = Test_dom0_class.__dom0s
+        self.__non_required_nodes_in_node_progress_status = []
+        self.__patch_node_list = []
+        mUpdateAdditionalOptionsInPayload("IncludeNodeList", "none")
+        mUpdateAdditionalOptionsInPayload("OneoffCustomPluginFile", "none")
+        mUpdateAdditionalOptionsInPayload("OneoffScriptArgs", "none")
+        mUpdateAdditionalOptionsInPayload("exasplice", "no")
+        mUpdateParamInPayload("BackupMode", "yes")
+        mUpdateParamInPayload("EnablePlugins", "no")
+        mUpdateParamInPayload("PluginTypes", "none")
+        mDeletePendingFailedECRARequest()
+        mDeleteAdditionalOptionsFromPayload('LaunchNode')
+        mDeleteAdditionalOptionsFromPayload('LaunchNodeType')
+        mExecuteRemoteExasshCmd("%s/bin/crsctl enable crs" % self.__crs_bin_path,
+                                    Test_dom0_class.__domu_list_with_nathostnames)
+
+    # This method runs after every test execution.
+    def tearDown(self):
+        # Reset sshd config settings
+        mExecuteRemoteExasshCmd(
+            "/bin/sed  \\'s/ClientAliveInterval.*/ClientAliveInterval 600/\\' -i /etc/ssh/sshd_config",
+            Test_dom0_class.__dom0s)
+
+
+    @pytest.mark.dom0_patch_prereq_check
+    def test_dom0_patch_prereq_check(self):
+        _result, _status_output = mExecuteInfraPatchCommandWithDCSAgentChecks(TASK_PREREQ_CHECK, PATCH_DOM0,
+                                                                              OP_STYLE_AUTO)
+        self.assertTrue(_result, "Precheck operation failed.")
+
+        _copy_time_profile_diff_data = mCopyTimeStatsFileForTimeDiffAnalysis(_status_output)
+        self.assertEqual(_copy_time_profile_diff_data, EXIT_SUCCESS, "Copying time profile data failed.")
+
+    @pytest.mark.dom0_patch_prereq_check_with_rack_model
+    def test_dom0_patch_prereq_check_with_rack_model(self):
+        self.__patch_node_list = Test_dom0_class.__dom0s
+        _result, _ = mExecuteRemoteExasshCmd(
+            "/bin/sed  \\'s/ClientAliveInterval.*/ClientAliveInterval 590/\\' -i /etc/ssh/sshd_config",
+            self.__patch_node_list)
+        self.assertTrue(_result, "Could not modify sshd_conf file to update ClientAliveInterval params.")
+        # registration
+        _username = base64.b64decode(mGetInfraPatchingTestConfigParam('ecrausername')).decode('utf-8')
+        _password = base64.b64decode(mGetInfraPatchingTestConfigParam('ecrapassword')).decode('utf-8')
+        _ecra_url = mGetInfraPatchingTestConfigParam('ecraurl')
+        _rack_model = "X6-2"
+        _roll_back_version = mGetInfraPatchingTestConfigParam('older_image_version')
+
+        # Registration payload
+        _pay_load = '{"serviceType": "EXACS", "targetTypes": ["dom0"], "imageVersion": "%s", "rackModel": "%s"}' % (_roll_back_version, _rack_model)
+
+        _ret, _output = CurlRequest().mExecute("exaversion/registration", "POST", _pay_load)
+        mPatchLogInfo(_output)
+        if _ret == 0:
+            _output = _output.strip().splitlines()[-1]
+            mPatchLogInfo("Exaversion Registration successfully with version : %s " % (_output.strip().splitlines()[-1]))
+
+        ## Run precheck
+        mUpdateAdditionalOptionsInPayload("rackModel", "X6-2")
+        _result, _status_output = mExecuteInfraPatchCommand(TASK_PREREQ_CHECK, PATCH_DOM0, OP_STYLE_AUTO)
+        mDeleteAdditionalOptionsFromPayload("rackModel")
+
+        _ecra_install_base = mGetInfraPatchingTestConfigParam('ecra_install_base')
+        _patching_metadata = mCreatePatchOperationMetaDataFromStatusOutput(_status_output)
+        _exacloud_path = mGetExacloudInstallPath()
+        if _patching_metadata:
+            _current_infra_patch_log_file = "%s/log/threads/0000-0000-0000-0000/00000000-0000-0000-0000-000000000000/%s_cluctrl.%s_%s.log" % (
+                _exacloud_path,
+                _patching_metadata.mGetChildRequestUUID(), TASK_PREREQ_CHECK, PATCH_DOM0)
+
+            _target_version_cmd = "grep -R '\"TargetVersion\":' %s | awk -F '\"' '{print $4}'" % _current_infra_patch_log_file
+            _out, _stat = mExecuteLocal(_target_version_cmd)
+            self.assertEqual(_out, _roll_back_version, "Ecra metadata version and exacloud payload version for model matches.")
+
+    @pytest.mark.dom0_one_off
+    def test_dom0_one_off(self):
+        self.__operation = TASK_ONEOFF
+        self.__operation_style = OP_STYLE_AUTO
+        self.mValidatePatchOperationWithIncludeNodeList()
+
+    @pytest.mark.dom0_one_off_v2
+    def test_dom0_one_off_v2(self):
+        # step1: Validate plugin is executed and plugin files are present
+        self.__operation = TASK_ONEOFFV2
+        self.__operation_style = OP_STYLE_AUTO
+        mUpdateParamInPayload("OneoffScriptAlias", "script_%s_%s" % (PATCH_DOM0, ONEOFF_PLUGIN))
+        self.mValidatePatchOperationWithIncludeNodeList()
+
+        # step2: When FailOnError is set to Yes, operation should fail
+        _scrip_alias = "script_%s_%s" % (PATCH_DOM0, ONEOFF_PLUGIN)
+        plugin_meta_data_handler = InfrapatchPluginMetadataHandler()
+        _data = '{"ScriptName": "%s.sh", "ScriptAlias": "%s", "ChangeRequestID": "CRID-4567", "Description": ' \
+                '"sample", "PluginType": "%s", "PluginTarget": "%s", "FailOnError":"Yes"}' % (
+                    _scrip_alias,
+                    _scrip_alias, ONEOFF_PLUGIN,
+                    PATCH_DOM0)
+        _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
+
+        _result, _status_output = mExecuteInfraPatchCommandWithDCSAgentChecks(TASK_ONEOFFV2, PATCH_DOM0)
+        self.assertFalse(_result, "Oneoffv2 operation should have failed.")
+
+        # step3: When IsEnabled is set to No, oneoff plugin script should not get executed, execution oneoff fails
+        # since there is no script to execute which is provided as input
+        plugin_meta_data_handler = InfrapatchPluginMetadataHandler()
+        _data = '{"ScriptName": "%s.sh", "ScriptAlias": "%s", "ChangeRequestID": "CRID-4567", "Description": ' \
+                '"sample", "PluginType": "%s", "PluginTarget": "%s", "FailOnError":"No","IsEnabled":"No"}' % (
+                    _scrip_alias, 
+                    _scrip_alias, ONEOFF_PLUGIN,
+                    PATCH_DOM0)
+        _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
+
+        _result, _status_output = mExecuteInfraPatchCommandWithDCSAgentChecks(TASK_ONEOFFV2, PATCH_DOM0)
+        self.assertFalse(_result, "Oneoffv2 operation should have failed.")
+
+    @pytest.mark.dom0_one_off_v2_plugin_metadata_validator
+    def test_dom0_one_of_v2_plugin_metadata_validator(self):
+        # 1. Validate ECRA endpoint for get registered plugin metadata is working or not
+        plugin_meta_data_handler = InfrapatchPluginMetadataHandler()
+        _scrip_alias = "script_%s_%s" % (PATCH_DOM0, ONEOFF_PLUGIN)
+        _ret, _out = plugin_meta_data_handler.mGetRegisteredInfrapatchPlugineMetadataScripts()
+        if _ret != 0:
+            self.assertTrue(False, "Failed to get plugin metadata from ECRA.")
+
+        _plugin_meta_data_json = json.loads(_out)
+        _plugin_meta_data_list = _plugin_meta_data_json["InfraPatchPluginMetaData"]
+        _found_meta_data = False
+        for _plugin_meta_data in _plugin_meta_data_list:
+            if _plugin_meta_data["ScriptAlias"] == _scrip_alias:
+                _found_meta_data = True
+        self.assertTrue(_found_meta_data, "Getting infrapatch plugin metadata failed.")
+
+        # 2. Missing ScriptAlias parameter
+        _data = '{ "PluginType": "exacloud", "PluginTarget": "dom0"}'
+        _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
+        _response = json.loads(_out)
+        self.assertEqual(_response["errorCode"], "0x030E0014",
+                         "Script alias is missing for plugin metadata registration.")
+
+        # 3. Description value can not be empty
+        _data = '{ "ScriptAlias": "ScriptAlias",  "PluginType": "exacloud", "PluginTarget": "dom0" ,"Description" :""}'
+        _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
+        _response = json.loads(_out)
+        self.assertEqual(_response["errorCode"], "0x030E0013", "Invalid parameter value is specified for plugin "
+                                                               "metadata registration.")
+
+        # 4. ChangeRequestID value can not be empty
+        _data = '{ "ScriptAlias": "ScriptAlias",  "PluginType": "exacloud", "PluginTarget": "dom0" ,"Description": ' \
+                '"desc",,"ChangeRequestID" :""} '
+        _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
+        _response = json.loads(_out)
+        self.assertEqual(_response["errorCode"], "0x0100000A", "ChangeRequestID parameter value can not be empty for "
+                                                               "plugin metadata registration.")
+
+        # 5. Phase is mandatory for dom0 exacloud plugin
+        _data = '{ "ScriptAlias": "ScriptAlias", "PluginType": "exacloud", "PluginTarget": "dom0",' \
+                '"Description":"decs","ChangeRequestID":"crid","ScriptName" : "syslens.sh"} '
+        _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
+        _response = json.loads(_out)
+        print(_out)
+        self.assertEqual(_response["errorCode"], "0x030E0013",
+                         "Phase is mandatory for dom0 exacloud plugin for plugin metadata registration.")
+
+        # 6. Phase has to be either pre or post
+        _data = '{ "ScriptAlias": "ScriptAlias", "PluginType": "exacloud", "PluginTarget": "dom0",' \
+                '"Description":"decs","ChangeRequestID":"crid","ScriptName" : "syslens.sh", ' \
+                '"Phase":"prepost"} '
+        _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
+        _response = json.loads(_out)
+        print(_out)
+        self.assertEqual(_response["errorCode"], "0x030E0013",
+                         "Phase can have Pre or Post for dom0 exacloud plugin as value for plugin metadata "
+                         "registration.")
+
+        # 7. Validate for other required params, here Description, ChangeRequestID are missing
+        _data = '{ "ScriptAlias": "ScriptAlias",  "PluginType": "oneoff", "PluginTarget": "dom0"}'
+        _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
+        _response = json.loads(_out)
+        self.assertEqual(_response["errorCode"], "0x0100000A",
+                         "Other required parameters are missing for plugin metadata "
+                         "registration.")
+
+        # 8. Missing PluginType parameter
+        _data = '{ "ScriptAlias": "ScriptAlias",  "PluginTarget": "dom0" ,"Description" :"desc"}'
+        _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
+        _response = json.loads(_out)
+        self.assertEqual(_response["message"], "Mandatory parameter(s) are missing for infrapatch plugin metadata "
+                                               "registration.{}")
+
+        # 9. Missing PluginType PluginTarget
+        _data = '{ "ScriptAlias": "ScriptAlias",  "PluginType": "exacloud" ,"Description" :"desc"}'
+        _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
+        _response = json.loads(_out)
+        self.assertEqual(_response["errorCode"], "0x030E0014",
+                         "PluginTarget is missing for plugin metadata registration.")
+
+        # 10. ScriptAlias can not be empty
+        _data = '{ "ScriptAlias": "",  "PluginType": "exacloud", "PluginTarget": "dom0"}'
+        _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
+        _response = json.loads(_out)
+        self.assertEqual(_response["errorCode"], "0x030E0013",
+                         "ScriptAlias can not be empty for plugin metadata registration.")
+
+        # 11. RebootNode value can not be Yes for domo oneoff
+        _data = '{ "ScriptAlias": "ScriptAlias",  "PluginType": "oneoff", "PluginTarget": "dom0","RebootNode":"Yes"}'
+        _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
+        _response = json.loads(_out)
+        self.assertEqual(_response["errorCode"], "0x030E0013", "Dbnu plugin is not applicable for cell.")
+
+        # 12. PluginType can not be empty
+        _data = '{ "ScriptAlias": "ScriptAlias",  "PluginType": "", "PluginTarget": "dom0"}'
+        _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
+        _response = json.loads(_out)
+        self.assertEqual(_response["errorCode"], "0x030E0013",
+                         "PluginType can not be empty for plugin metadata registration.")
+
+        # 13. PluginTarget can not be empty
+        _data = '{ "ScriptAlias": "ScriptAlias",  "PluginType": "exacloud", "PluginTarget": ""}'
+        _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
+        _response = json.loads(_out)
+        self.assertEqual(_response["errorCode"], "0x030E0013",
+                         "PluginTarget can not be empty for plugin metadata registration.")
+
+        # 14. ScriptName can not be empty
+        _data = '{ "ScriptAlias": "ScriptAlias", "PluginType": "exacloud", "PluginTarget": "dom0","ScriptName":"",' \
+                '"Description" :"desc","ChangeRequestID" :"ChangeRequestID"} '
+        _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
+        _response = json.loads(_out)
+        self.assertEqual(_response["errorCode"], "0x030E0013",
+                         "ScriptName can not be empty for plugin metadata registration.")
+
+        # 15. IsEnabled can have Yes or No only
+        _data = '{ "ScriptAlias": "ScriptAlias", "PluginType": "exacloud", "PluginTarget": "dom0","IsEnabled":"n"} '
+        _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
+        _response = json.loads(_out)
+        self.assertEqual(_response["errorCode"], "0x030E0013",
+                         "IsEnabled can have Yes or No only as value for plugin metadata registration.")
+
+        # 16. FailOnError can have Yes or No only
+        _data = '{ "ScriptAlias": "ScriptAlias", "PluginType": "exacloud", "PluginTarget": "dom0","IsEnabled":"Yes", ' \
+                '"FailOnError":"true"} '
+        _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
+        _response = json.loads(_out)
+        self.assertEqual(_response["errorCode"], "0x030E0013",
+                         "FailOnError can have Yes or No only as value for plugin metadata registration.")
+
+        # 17. RebootNode can have Yes or No only
+        _data = '{ "ScriptAlias": "ScriptAlias", "PluginType": "oneoff", "PluginTarget": "dom0", "RebootNode":"false"} '
+        _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
+        _response = json.loads(_out)
+        self.assertEqual(_response["errorCode"], "0x030E0013",
+                         "RebootNode can have Yes or No only as value for plugin metadata registration.")
+
+        # 18. ScriptAlias is mandatory for plugin metadata deletion
+        _ret, _out = plugin_meta_data_handler.mDeleteRegisteredInfrapatchPlugineMetadataScripts("", "dom0", "oneoff")
+
+        self.assertEqual(_ret, 1, "ScriptAlias parameter is required for plugin metadata registration deletion.")
+
+        # 19. ScriptAlias is mandatory for plugin metadata deletion
+        _ret, _out = plugin_meta_data_handler.mDeleteRegisteredInfrapatchPlugineMetadataScripts("", "dom0", "exacloud")
+        self.assertEqual(_ret, 1, "ScriptAlias parameter is required for plugin metadata registration deletion.")
+
+        # 20. PluginTarget is mandatory for plugin metadata deletion
+        _ret, _out = plugin_meta_data_handler.mDeleteRegisteredInfrapatchPlugineMetadataScripts("ScriptAlias", "",
+                                                                                                "oneoff")
+        _response = json.loads(_out)
+        self.assertEqual(_response["errorCode"], "0x030E0014",
+                         "PluginTarget parameter is required for plugin metadata registration deletion.")
+
+        # 21. PluginType is mandatory for plugin metadata deletion
+        _ret, _out = plugin_meta_data_handler.mDeleteRegisteredInfrapatchPlugineMetadataScripts("ScriptAlias", "dom0",
+                                                                                                "")
+        _response = json.loads(_out)
+        self.assertEqual(_response["errorCode"], "0x030E0014",
+                         "PluginType parameter is required for plugin metadata registration deletion.")
+
+    @pytest.mark.dom0_patch
+    def test_dom0_patch(self):
+        self.__operation = TASK_PATCH
+        self.__operation_style = OP_STYLE_ROLLING
+        self.__patch_node_list = Test_dom0_class.__dom0s
+        self.mExecuteAndValidatePatchOperationWithExacloudPlugins()
+
+    @pytest.mark.dom0_patch_plugin_failure
+    def test_dom0_patch_plugin_failure(self):
+        """
+        This test is  to validate the behavior of a patch operation when a plugin failure occurs on a DOM0 node.
+        """
+        self.__operation = TASK_PATCH
+        self.__operation_style = OP_STYLE_ROLLING
+        self.__patch_node_list = Test_dom0_class.__dom0s
+        _dom0s = Test_dom0_class.__dom0s
+        # Run patch operation with first dom0
+        _include_node_list = ",".join(_dom0s[:1])
+        mUpdateAdditionalOptionsInPayload("IncludeNodeList", _include_node_list)
+
+        mUpdateParamInPayload("EnablePlugins", "yes")
+        mUpdateParamInPayload("PluginTypes", "dom0+dom0domu")
+        self.assertTrue(mStageCustomPluginScripts(Test_dom0_class.__target_name, aForcePluginFailure=True),
+                        "Staging custom scripts failed for exacloud plugin execution.")
+
+        self.__patch_operation_status_result, self.__patch_operation_status_output = \
+            mExecuteInfraPatchCommand(self.__operation, Test_dom0_class.__target_name,
+                                                        self.__operation_style)
+        _status_json = json.loads(self.__patch_operation_status_output)
+        _error_code = _status_json["errorCode"]
+        self.assertEqual(_error_code, "0x030B0003", "The expected error code is not returned when the plugin execution failed.")
+
+    @pytest.mark.dom0_postcheck
+    def test_dom0_postcheck(self):
+        _result, _status_output = mExecuteInfraPatchCommandWithDCSAgentChecks(TASK_POSTCHECK, PATCH_DOM0)
+        self.assertTrue(_result, "Postcheck operation failed.")
+
+    @pytest.mark.dom0_patch_meteredocpus
+    def test_dom0_patch_meteredocpus(self):
+        # Set cores to 0
+        _cluster_name = mGetInfraPatchingTestConfigParam('cluster')
+        _cores = 0
+        _result = mSetMeteredOcpus(_cluster_name, _cores)
+        self.assertTrue(_result, "Setting the cores to %s failed." % _cores)
+
+        mExecuteRemoteExasshCmd(
+            "/bin/sed  \\'s/ClientAliveInterval.*/ClientAliveInterval 500/\\' -i /etc/ssh/sshd_config",
+            Test_dom0_class.__dom0s)
+        _patch_result, _status_output = mExecuteInfraPatchCommand(TASK_PATCH, PATCH_DOM0, OP_STYLE_ROLLING)
+
+        _ecra_install_base = mGetInfraPatchingTestConfigParam('ecra_install_base')
+        _patching_metadata = mCreatePatchOperationMetaDataFromStatusOutput(_status_output)
+        _exacloud_path = mGetExacloudInstallPath()
+        if _patching_metadata:
+            _current_infra_patch_log_file = "%s/log/threads/0000-0000-0000-0000/00000000-0000-0000-0000-000000000000/%s_cluctrl.%s.log" % (
+                _exacloud_path,
+                _patching_metadata.mGetChildRequestUUID(), TASK_PATCH)
+
+            _verify_cmd = "grep -R 'List of VMs with customer hostname and non-zero VCPU and not shut down from CP explicitly' %s | grep %s" % (
+            _current_infra_patch_log_file, _cluster_name)
+            _out, _stat = mExecuteLocal(_verify_cmd)
+
+        # Set cores back
+        _cores = 8
+        _result = mSetMeteredOcpus(_cluster_name, _cores)
+        self.assertTrue(_result, "Setting the cores to %s failed." % _cores)
+
+        self.assertNotEqual(_stat, 0, "Failing as on cluster %s VCPUs on one/more domus is not set to 0" % _cluster_name)
+
+    @pytest.mark.dom0_postcheck_crs_validation
+    def test_dom0_postcheck_crs_validation(self):
+        _domus = mGetInfraPatchingTestVms('domuNatHostname', 'domu')
+        _ret = mUpdateCRSonVMs("stop", _domus)
+        if not _ret:
+            self.assertTrue(_ret, "Could not stop the crs on the VMs.")
+        _result, _status_output = mExecuteInfraPatchCommandWithDCSAgentChecks(TASK_POSTCHECK, PATCH_DOM0)
+        self.assertTrue(_result, "Postcheck operation failed.")
+
+    @pytest.mark.dom0_rollback
+    def test_dom0_rollback(self):
+        self.__operation = TASK_ROLLBACK
+        self.__operation_style = OP_STYLE_ROLLING
+        self.__patch_node_list = Test_dom0_class.__dom0s
+        self.mExecuteAndValidatePatchOperationWithExacloudPlugins()
+
+    @pytest.mark.dom0_patch_non_rolling
+    def test_dom0_patch_non_rolling(self):
+        self.__operation = TASK_PATCH
+        self.__operation_style = OP_STYLE_NON_ROLLING
+        self.__patch_node_list = Test_dom0_class.__dom0s
+        self.mExecuteAndValidatePatchOperationWithExacloudPlugins()
+        _copy_time_profile_diff_data = mCopyTimeStatsFileForTimeDiffAnalysis(self.__patch_operation_status_output)
+        self.assertEqual(_copy_time_profile_diff_data, EXIT_SUCCESS, "Copying time profile data failed.")
+
+    @pytest.mark.dom0_rollback_non_rolling
+    def test_dom0_rollback_non_rolling(self):
+        self.__operation = TASK_ROLLBACK
+        self.__operation_style = OP_STYLE_NON_ROLLING
+        self.__patch_node_list = Test_dom0_class.__dom0s
+        self.mExecuteAndValidatePatchOperationWithExacloudPlugins()
+        _copy_time_profile_diff_data = mCopyTimeStatsFileForTimeDiffAnalysis(self.__patch_operation_status_output)
+        self.assertEqual(_copy_time_profile_diff_data, EXIT_SUCCESS, "Copying time profile data failed.")
+
+    @pytest.mark.dom0_patch_non_rolling_with_gmr
+    def test_dom0_patch_non_rolling_with_gmr(self):
+        self.__operation = TASK_PATCH
+        self.__operation_style = OP_STYLE_NON_ROLLING
+        _include_node_list = ",".join(Test_dom0_class.__dom0s)
+        mUpdateAdditionalOptionsInPayload("IncludeNodeList", _include_node_list)
+        _op_result, _status_output = mExecuteInfraPatchCommandWithRetry(self.__operation, Test_dom0_class.__target_name,
+                                                        self.__operation_style)
+        self.assertTrue(_op_result, "non rolling patch with granular maintenance style is failed.")
+        _updated_patch_list = mGetNodesWithPatchOperation(_status_output)
+        self.assertEqual(len(_updated_patch_list), len(Test_dom0_class.__dom0s), f"{self.__operation} operation does not have correct no of nodes.")
+
+    @pytest.mark.dom0_patch_prereq_check_with_include_list
+    def test_dom0_patch_prereq_check_with_include_list(self):
+        # Enabling space validation in precheck
+        self.assertTrue(mUpdateInfrapatchingConfParam("free_space_check_validation_enabled_on_dom0", "True"),
+                        "parameter updation in infrapatching.conf failed.")
+        self.assertTrue(mUpdateInfrapatchingConfParam("enable_stale_mount_check", "True"),
+                        "parameter updation in infrapatching.conf failed.")
+
+        self.__operation = TASK_PREREQ_CHECK
+        self.__operation_style = OP_STYLE_ROLLING
+        self.mValidatePatchOperationWithIncludeNodeList()
+
+    @pytest.mark.dom0_patch_with_include_list
+    def test_dom0_patch_with_include_list(self):
+        self.assertTrue(mUpdateInfrapatchingConfParam("vif_bridge_symlink_post_check", "True"),
+                        "parameter updation in infrapatching.conf failed.")
+
+        self.__operation = TASK_PATCH
+        self.__operation_style = OP_STYLE_ROLLING
+
+        """
+        Here disabling the crs in one of the domu so when dom0 comes back after rebooting heartbeat check gets failed
+        But when domu keys are available, infrapatching tool goes and start crs on that node
+
+        The intention of this is to test this specific heartbeat check flow so added this
+        """
+        if mGetInfraPatchingTestConfigParam("is_r1_env") == "True":
+            mExecuteRemoteExasshCmd("%s/bin/crsctl disable crs" % self.__crs_bin_path,
+                                    [Test_dom0_class.__domu_list_with_nathostnames[0]])
+        self.mValidatePatchOperationWithIncludeNodeList()
+
+    @pytest.mark.dom0_postcheck_with_include_list
+    def test_dom0_postcheck_with_include_list(self):
+        self.__operation = TASK_POSTCHECK
+        self.__operation_style = OP_STYLE_ROLLING
+        self.mValidatePatchOperationWithIncludeNodeList()
+
+    @pytest.mark.dom0_rollback_with_include_list
+    def test_dom0_rollback_with_include_list(self):
+        self.__operation = TASK_ROLLBACK
+        self.__operation_style = OP_STYLE_ROLLING
+        self.mValidatePatchOperationWithIncludeNodeList()
+
+    @pytest.mark.dom0_patch_prereq_check_elu
+    def test_dom0_patch_prereq_check_elu(self):
+        mUpdateAdditionalOptionsInPayload("exasplice", "yes")
+        _result, _status_output = mExecuteInfraPatchCommandWithRetry(TASK_PREREQ_CHECK, PATCH_DOM0, OP_STYLE_AUTO)
+        self.assertTrue(_result, "Dom0 ELU precheck operation failed.")
+
+    @pytest.mark.dom0_patch_elu
+    def test_dom0_patch_elu(self):
+        mUpdateAdditionalOptionsInPayload("exasplice", "yes")
+        _dom0s = Test_dom0_class.__dom0s
+        # Run patch operation with first dom0
+        _include_node_list = ",".join(_dom0s[:1])
+        mUpdateAdditionalOptionsInPayload("IncludeNodeList", _include_node_list)
+        _result, _status_output = mExecuteInfraPatchCommandWithRetry(TASK_PATCH, PATCH_DOM0, OP_STYLE_AUTO)
+        self.assertTrue(_result, "Dom0 ELU patch operation failed.")
+
+    @pytest.mark.dom0_rollback_elu
+    def test_dom0_rollback_elu(self):
+        mUpdateAdditionalOptionsInPayload("exasplice", "yes")
+        _dom0s = Test_dom0_class.__dom0s
+        # Run rollback operation with first dom0
+        _include_node_list = ",".join(_dom0s[:1])
+        mUpdateAdditionalOptionsInPayload("IncludeNodeList", _include_node_list)
+        _result, _status_output = mExecuteInfraPatchCommandWithRetry(TASK_ROLLBACK, PATCH_DOM0, OP_STYLE_AUTO)
+        self.assertTrue(_result, "Dom0 ELU rollback operation failed.")
+
+    @pytest.mark.dom0_backup_image
+    def test_dom0_backup_image(self):
+        """
+        Note:
+        backup test need to be executed cautiously. There are chances of ending up both
+        partitions of the node with latest exadata image.
+        """
+        _result, _status_output = mExecuteInfraPatchCommandWithDCSAgentChecks(TASK_BACKUP_IMAGE, PATCH_DOM0)
+        self.assertTrue(_result, "Backup image operation failed.")
+
+    @pytest.mark.dom0_patch_ha_check
+    def test_dom0_patch_ha_check(self):
+        _cluster_name = mGetInfraPatchingTestConfigParam("cluster")
+        _rack_exaunit = mGetInfraPatchingTestConfigParam("rack_exaunit")
+        _domu_nodes = mGetInfraPatchingTestVms('customerHostname', _cluster_name)[:-1]
+        for _domu_node in _domu_nodes:
+            _result = mVmCntrlOperation(str(_rack_exaunit), _domu_node, "stop")
+            self.assertTrue(_result, "shutdown of vm %s failed." % _domu_node)
+
+        _result, _status_output = mExecuteInfraPatchCommand(TASK_PATCH, PATCH_DOM0, OP_STYLE_ROLLING)
+        _status_json = json.loads(_status_output)
+        _error_code = _status_json["errorCode"]
+
+        # Bring up the vm even if patch fails or gives different error code
+        for _domu_node in _domu_nodes:
+            _result = mVmCntrlOperation(str(_rack_exaunit), _domu_node, "start")
+            self.assertTrue(_result, "start of vm %s failed." % _domu_node)
+
+        self.assertEqual(_error_code, "0x03030018", "DomUs are not running on dom0 while dom0 patch requested.")
+
+    @pytest.mark.dom0_patch_prereq_check_retry_failure
+    def test_dom0_patch_prereq_check_retry_failure(self):
+        """
+        This test is to simulate patch prereq check retry failure scenario
+
+        The following things are done in this test
+        1. Execute patch and make it to fail at patch_mgr side
+        2. After certain time limit retry the workflow
+        3. Start monitoring status of the above request
+        4. Verify if retry failed with expected error message
+        """
+
+        _failure_cmd = "/bin/sed  \\'s/ClientAliveInterval.*/ClientAliveInterval 590/\\' -i /etc/ssh/sshd_config"
+        _restore_cmd = "/bin/sed  \\'s/ClientAliveInterval.*/ClientAliveInterval 600/\\' -i /etc/ssh/sshd_config"
+        _error_code = "0x03020001"
+        _result, _msg = mValidatePatchPrereqCheckRetryFailure(Test_dom0_class.__dom0s, PATCH_DOM0, _failure_cmd, _restore_cmd, _error_code)
+        self.assertTrue(_result, _msg)
+
+    @pytest.mark.dom0_patch_retry
+    def test_dom0_patch_retry(self):
+        """
+        This test is to simulate patch retry scenario
+
+        The following things are done in this test
+        1. Execute patch and make it to fail at patch_mgr side
+        2. ecradb error code is changed to SUCCESS so that retry continutes and latches on the existing patchmgr session
+        3. Run patch_mgr cmd explicitly in the background
+        4. After certain time limit retry the workflow
+        5. Start monitoring status of the above request
+        """
+        _failure_cmd = "/bin/sed  \\'s/ClientAliveInterval.*/ClientAliveInterval 590/\\' -i /etc/ssh/sshd_config"
+        _restore_cmd = "/bin/sed  \\'s/ClientAliveInterval.*/ClientAliveInterval 600/\\' -i /etc/ssh/sshd_config"
+        _patch_node_list = Test_dom0_class.__dom0s
+
+        _result, _msg = mRunPatchRetryScenario(
+            PATCH_DOM0, TASK_PATCH, _patch_node_list,
+            _failure_cmd, _restore_cmd, aErrorCode="0x03010045", aErrorMsg="patchmgr command failed with non-zero status."
+        )
+        self.assertTrue(_result, _msg)
+
+    @pytest.mark.dom0_patch_cdb_downtime_check
+    def test_dom0_patch_cdb_downtime_check(self):
+        """
+        This test is to simulate cdb downtime by keeping pdb in restricted mode and applying the patch
+        1. Get the required details
+        2. Make the cdb into restricted state
+        2. Run the patch
+        3. restore the cdb state
+        4. Check for error code to ascertain the test fail or success
+
+        """
+        # STEP 1 : Get the required info and assign to variables
+        _cluster_name = mGetInfraPatchingTestConfigParam('cluster')
+        _domu_nathostname = mGetInfraPatchingTestVms('domuNatHostname', _cluster_name)[0]
+        _oracle_dbname = mGetInfraPatchingTestConfigParam('oracle_dbname')
+
+        # STEP 2: Put cdb in restricted mode
+        _status = mUpdateCdb(_oracle_dbname, _domu_nathostname)
+        self.assertEqual(_status, EXIT_SUCCESS, "ERROR updating cdb")
+
+        # TODO
+        # STEP 3: run the patch cmd
+        #_result, _status_output = self.mPatchSingleNode("patch", PATCH_DOMU, OP_STYLE_ROLLING)
+        self.__operation = TASK_PATCH
+        self.__operation_style = OP_STYLE_ROLLING
+        _dom0s = Test_dom0_class.__dom0s
+
+        # Run patch operation with first dom0
+        _include_node_list = ",".join(_dom0s[:1])
+        mUpdateAdditionalOptionsInPayload("IncludeNodeList", _include_node_list)
+
+        _result, _status_output = mExecuteInfraPatchCommandWithDCSAgentChecks(self.__operation, Test_dom0_class.__target_name,
+                                                        self.__operation_style)
+        _include_node_list = "none"
+        mUpdateAdditionalOptionsInPayload("IncludeNodeList", _include_node_list)
+
+        # STEP 4: Remove cdb from restricted mode
+        _status = mUpdateCdb(_oracle_dbname, _domu_nathostname, False)
+        self.assertEqual(_status, EXIT_SUCCESS, "ERROR updating cdb")
+
+        # STEP 5: verify the execution of patch
+        _status_json = json.loads(_status_output)
+        _error_code = _status_json["errorCode"]
+        self.assertEqual(_error_code, "0x0303002B", "Dom0 patch didn't fail with expected error code")
+
+    @pytest.mark.dom0_patch_cdb_degradation_check
+    def test_dom0_patch_cdb_degradation_check(self):
+        """
+        This test is to simulate cdb downtime by keeping pdb in restricted mode and applying the patch
+        1. Get the required info and assign to variables
+        2. Populate file with db cmds to keep stop the instances and copy to domu
+        3. Update crontab entry with @reboot <filename> to execute
+        4. run the patch cmd
+        5. Start back db instances
+        6. Remove crontab entry
+        7. verify the execution of patch
+        """
+        # STEP 1 : Get the required info and assign to variables
+        _cluster_name = mGetInfraPatchingTestConfigParam('cluster')
+        _domu_nathostname = mGetInfraPatchingTestVms('domuNatHostname', _cluster_name)[0]
+        _oracle_dbname = mGetInfraPatchingTestConfigParam('oracle_dbname')
+        _cdb_cmd_file = "/tmp/cdb_cmds"
+        _cdb_log_file = "/tmp/cdb_log"
+        _cron_job = "@reboot su - grid -c \\\"bash -x %s >%s 2>&1\\\"" % (_cdb_cmd_file, _cdb_log_file)
+
+        # STEP 2: Populate file with db cmds to stop the instances and copy to domu. 
+        # first remove if any entry exists already 
+        _status = mUpdateCrontabEntry([_domu_nathostname], "@reboot", True)
+        _status = mUpdateCdb(_oracle_dbname, _domu_nathostname, True, True, _cdb_cmd_file)
+        self.assertEqual(_status, EXIT_SUCCESS, "ERROR updating cdb")
+
+        # STEP 3: Update crontab entry with @reboot <filename> to execute
+        _status = mUpdateCrontabEntry([_domu_nathostname], _cron_job)
+        self.assertEqual(_status, EXIT_SUCCESS, "ERROR updating crontab entry")
+
+        # STEP 4: run the patch cmd
+        #_result, _status_output = self.mPatchSingleNode("patch", PATCH_DOMU, OP_STYLE_ROLLING)
+        self.__operation = TASK_PATCH
+        self.__operation_style = OP_STYLE_ROLLING
+        _dom0s = Test_dom0_class.__dom0s
+
+        # Run patch operation with first dom0
+        _include_node_list = ",".join(_dom0s[:1])
+        mUpdateAdditionalOptionsInPayload("IncludeNodeList", _include_node_list)
+
+        _result, _status_output = mExecuteInfraPatchCommandWithDCSAgentChecks(self.__operation,
+                                                                              Test_dom0_class.__target_name,
+                                                                              self.__operation_style)
+        _include_node_list = "none"
+        mUpdateAdditionalOptionsInPayload("IncludeNodeList", _include_node_list)
+
+        # STEP 5: Start back db instances
+        _status = mUpdateCdb(_oracle_dbname, _domu_nathostname, False)
+        self.assertEqual(_status, EXIT_SUCCESS, "ERROR updating cdb")
+
+        # STEP 6: Remove crontab entry
+        _status = mUpdateCrontabEntry([_domu_nathostname], _cron_job, True)
+        self.assertEqual(_status, EXIT_SUCCESS, "ERROR removing crontab entry")
+
+        # Remove cdb_cmds file
+        _result, _ = mExecuteRemoteExasshCmd(
+            "rm -f %s" % _cdb_cmd_file, [_domu_nathostname])
+        self.assertTrue(_result, "Could not modify sshd_conf file to update ClientAliveInterval params.")
+
+        # STEP 7: verify the execution of patch
+        _status_json = json.loads(_status_output)
+        _error_code = _status_json["errorCode"]
+        self.assertEqual(_error_code, "0x0303002B", "Dom0 patch didn't fail with expected error code")
+
+    @pytest.mark.dom0_patch_pdb_downtime_check
+    def test_dom0_patch_pdb_downtime_check(self):
+        """
+        This test is to simulate pdb downtime by keeping pdb in restricted mode and applying the patch
+        1. Get the required info and assign to variables
+        2. Update pdb from restricted mode
+        3. Run the patch
+        4. restore the pdb state
+        5. Check for error code to ascertain the test fail or success
+        """
+        _pdb_cmds_file = "/tmp/pdb_cmds"
+
+        # STEP 1 : Get the required info and assign to variables
+        _status, _pdb_name, _oracle_home_path, _connect_strings, _domu_nathostnames = mGetPdbDetails()
+        self.assertEqual(_status, EXIT_SUCCESS, "ERROR getting pdb details")
+
+        # STEP 2: Update pdb from restricted mode
+        _status = mUpdatePdb(_pdb_cmds_file, _pdb_name, _oracle_home_path, _connect_strings, _domu_nathostnames)
+        self.assertEqual(_status, EXIT_SUCCESS, "ERROR while updating pdb")
+
+        # TODO
+        # STEP 3: run the patch cmd
+        #_result, _status_output = self.mPatchSingleNode("patch", PATCH_DOMU, OP_STYLE_ROLLING)
+        self.__operation = TASK_PATCH
+        self.__operation_style = OP_STYLE_ROLLING
+        _dom0s = Test_dom0_class.__dom0s
+
+        # Run patch operation with first dom0
+        _include_node_list = ",".join(_dom0s[:1])
+        mUpdateAdditionalOptionsInPayload("IncludeNodeList", _include_node_list)
+
+        _result, _status_output = mExecuteInfraPatchCommandWithDCSAgentChecks(self.__operation,
+                                                                              Test_dom0_class.__target_name,
+                                                                              self.__operation_style)
+        _include_node_list = "none"
+        mUpdateAdditionalOptionsInPayload("IncludeNodeList", _include_node_list)
+
+        # STEP 4: Remove pdb from restricted mode
+        _status = mUpdatePdb(_pdb_cmds_file, _pdb_name, _oracle_home_path, _connect_strings, _domu_nathostnames, False)
+        self.assertEqual(_status, EXIT_SUCCESS, "ERROR while updating pdb")
+
+        # STEP 5: verify the execution of patch
+        _status_json = json.loads(_status_output)
+        _error_code = _status_json["errorCode"]
+        self.assertEqual(_error_code, "0x0303002D", "Dom0 patch didn't fail with expected error code")
+
+    @pytest.mark.dom0_patch_pdb_degradation_check
+    def test_dom0_patch_pdb_degradation_check(self):
+        """
+        This test is to simulate pdb degradation by keeping pdb in restricted mode after applying the patch
+        1. Get the required details
+        2. Populate file with db cmds to keep set the pdb in restircted mode and copy to domu
+        3. Create crontab entry to run the db cmds post reboot
+        4. run the patch cmd
+        5. Remove pdb from restricted mode
+        6. Remove crontab entry
+        7. verify the execution of patch
+        """
+
+        # STEP 1 : Get the required info and assign to variables
+        _cluster_name = mGetInfraPatchingTestConfigParam('cluster')
+        _domu_customer_hostnames = mGetInfraPatchingTestVms('customerHostname', _cluster_name)
+        _status, _pdb_name, _oracle_home_path, _connect_strings, _domu_nathostnames = mGetPdbDetails()
+        mPatchLogInfo("_pdb_name : %s" % _pdb_name)
+        mPatchLogInfo("_oracle_home_path : %s" % _oracle_home_path)
+        mPatchLogInfo("_connect_strings : %s" % _connect_strings)
+        mPatchLogInfo("_domu_nathostnames : %s" % _domu_nathostnames)
+        _pdb_cmd_file = "/tmp/pdb_cmds"
+        _pdb_log_file = "/tmp/pdb_log"
+        _cluster_name = mGetInfraPatchingTestConfigParam('cluster')
+        _cron_job = "@reboot bash -x %s >%s 2>&1" % (_pdb_cmd_file, _pdb_log_file)
+        _domu_nathostname = mGetInfraPatchingTestVms('domuNatHostname', _cluster_name)[0]
+
+        # STEP 2: Populate file with db cmds to keep set the pdb in restircted mode and copy to domu
+        _connect_strings = _connect_strings[0].replace(_domu_customer_hostnames[1], _domu_customer_hostnames[0])
+        _status = mUpdatePdb(_pdb_cmd_file, _pdb_name, _oracle_home_path, [_connect_strings], [_domu_nathostname], True, True)
+
+        # STEP 3: Create crontab entry to run the db cmds post reboot
+        # remove if crontab entry already exists
+        _status = mUpdateCrontabEntry([_domu_nathostname], "@reboot", True)
+        _status = mUpdateCrontabEntry([_domu_nathostname], _cron_job)
+        self.assertEqual(_status, EXIT_SUCCESS, "ERROR updating crontab entry")
+
+        # STEP 4: run the patch cmd
+        # _result, _status_output = mExecuteInfraPatchCommandWithRetry(TASK_PATCH, PATCH_DOMU, OP_STYLE_ROLLING)
+        #_result, _status_output = self.mPatchSingleNode("patch", PATCH_DOMU, OP_STYLE_ROLLING)
+        self.__operation = TASK_PATCH
+        self.__operation_style = OP_STYLE_ROLLING
+        _dom0s = Test_dom0_class.__dom0s
+
+        # Run patch operation with first dom0
+        _include_node_list = ",".join(_dom0s[:1])
+        mUpdateAdditionalOptionsInPayload("IncludeNodeList", _include_node_list)
+
+        _result, _status_output = mExecuteInfraPatchCommandWithDCSAgentChecks(self.__operation,
+                                                                              Test_dom0_class.__target_name,
+                                                                              self.__operation_style)
+        _include_node_list = "none"
+        mUpdateAdditionalOptionsInPayload("IncludeNodeList", _include_node_list)
+
+        # STEP 5: Remove pdb from restricted mode
+        _status = mUpdatePdb(_pdb_cmd_file, _pdb_name, _oracle_home_path, [_connect_strings], [_domu_nathostname], False)
+        self.assertEqual(_status, EXIT_SUCCESS, "ERROR updating pdb")
+
+        # STEP 6: Remove crontab entry
+        _status = mUpdateCrontabEntry([_domu_nathostname], _cron_job, True)
+        self.assertEqual(_status, EXIT_SUCCESS, "ERROR removing crontab entry")
+
+        # Remove cdb_cmds file
+        _result, _ = mExecuteRemoteExasshCmd(
+            "rm -f %s" % _pdb_cmd_file, [_domu_nathostname])
+        self.assertTrue(_result, "Could not modify sshd_conf file to update ClientAliveInterval params.")
+
+        # STEP 7: verify the execution of patch
+        _status_json = json.loads(_status_output)
+        _error_code = _status_json["errorCode"]
+        self.assertEqual(_error_code, "0x0303002C", "Dom0 patch didn't fail with expected error code")
+
+    @pytest.mark.dom0_enable_selinux
+    def test_dom0_enable_selinux(self):
+        _node = mGetInfraPatchingTestConfigParam('dom0s')
+        _result = mUpdateSelinux([_node[0]], "enabled", "dom0")
+        self.assertTrue(_result, "selinux disable failed.")
+
+    @pytest.mark.dom0_disable_selinux
+    def test_dom0_disable_selinux(self):
+        _node = mGetInfraPatchingTestConfigParam('dom0s')
+        _result = mUpdateSelinux([_node[0]], "disabled", "dom0")
+        self.assertTrue(_result, "selinux disable failed.")
+
+    def mValidatePatchOperationWithIncludeNodeList(self):
+        """
+        First run patch operation in first dom0 and then run patch operation in all dom0s.
+        The second iteration is to cover the scenario of filter node list in infrapatching backend
+        for precheck/patch/rollback scenario.
+        """
+        _dom0s = Test_dom0_class.__dom0s
+        # Run patch operation with first dom0
+        _include_node_list = ",".join(_dom0s[:1])
+        mUpdateAdditionalOptionsInPayload("IncludeNodeList", _include_node_list)
+        self.__required_nodes_in_node_progress_status = [_dom0s[0]]
+        self.__non_required_nodes_in_node_progress_status = [_dom0s[1]]
+        self.__patch_node_list = [_dom0s[0]]
+
+        if self.__operation in [TASK_ONEOFF, TASK_ONEOFFV2]:
+            # Use custom script in first iteration and default script in second iteration, so default script here.
+            self.mExecuteAndValidateOneoffOperation()
+        else:
+            self.mExecuteAndValidatePatchOperationWithExacloudPlugins()
+
+            # Postchecks are internal infra tests and not execute via patchmgr cmds
+            # hence time profile details won't be available
+            if not self.__operation == TASK_POSTCHECK:
+                # Capturing time profile diff only for single dom0
+                _copy_time_profile_diff_data = mCopyTimeStatsFileForTimeDiffAnalysis(
+                    self.__patch_operation_status_output)
+                self.assertEqual(_copy_time_profile_diff_data, EXIT_SUCCESS, "Copying time profile data failed.")
+
+        # Run patch operation in all the dom0s
+        _include_node_list = "none"
+        mUpdateAdditionalOptionsInPayload("IncludeNodeList", _include_node_list)
+        self.__required_nodes_in_node_progress_status = _dom0s
+        self.__non_required_nodes_in_node_progress_status = []
+
+        if self.__operation in [TASK_ONEOFF, TASK_ONEOFFV2]:
+            # In case of one-off operation, script would get executed on all nodes
+            # so need to check presence of console logs in all the nodes
+            self.__patch_node_list = []
+            # Use custom script in first iteration and default script in second iteration, so custom script here.
+            self.mExecuteAndValidateOneoffOperation(aUseDefaultScript=False)
+        else:
+            self.mExecuteAndValidatePatchOperationWithExacloudPlugins()
+
+    def mExecuteAndValidatePatchOperationWithExacloudPlugins(self):
+        _updated_patch_list = []
+        _disable_exacloud_plugin_execution = (
+                mGetInfraPatchingTestConfigParam('disable_exacloud_plugin_execution') == 'True')
+
+        if not _disable_exacloud_plugin_execution:
+            # plugin execution need to be done only for patch operation
+            # In case of non-rolling, custom scripts are staged to dom0/domus before even start of cell patching test
+            if self.__operation in [TASK_PATCH] and self.__operation_style != OP_STYLE_NON_ROLLING:
+                mUpdateParamInPayload("EnablePlugins", "yes")
+                mUpdateParamInPayload("PluginTypes", "dom0+dom0domu")
+                self.assertTrue(mStageCustomPluginScripts(Test_dom0_class.__target_name),
+                                "Staging custom scripts failed for exacloud plugin execution.")
+
+        # we get the latest timestamp from dbnu plugin log from here and pass it to verify_dbnu_plugin_logs method
+        # This to check the messages post the given time stamp for the execution logs where dbnu plugins are executed in the latest run
+        _plugin_log = "/var/log/exadatatmp/dbnu-plugin.log"
+        _exacloud_path = mGetExacloudInstallPath()
+        _exassh_bin_path = "%s/bin/exassh" % _exacloud_path
+        _cmd = "tail -1 %s | cut -c1-20" % _plugin_log
+        _exassh_cmd = "%s %s -sl -e %s" % (_exassh_bin_path, Test_dom0_class.__dom0s[0], _cmd)
+        _time_stamp, _stat = mExecuteLocal(_exassh_cmd)
+        if _stat != 0:
+            self.assertTrue(_stat, "Problem while getting timestamp from plugin log %s on %s" % (
+                _plugin_log, [Test_dom0_class.__dom0s[0]]))
+
+        self.__patch_operation_status_result, self.__patch_operation_status_output = \
+            mExecuteInfraPatchCommandWithDCSAgentChecks(self.__operation, Test_dom0_class.__target_name,
+                                                        self.__operation_style)
+        self.assertTrue(self.__patch_operation_status_result,
+                        "%s operation failed." % (self.__operation.capitalize()))
+
+        # Postchecks are internal infra tests and not execute via patchmgr cmds
+        if not self.__operation == TASK_POSTCHECK:
+            _updated_patch_list = mGetNodesWithPatchOperation(self.__patch_operation_status_output)
+            if self.__operation == TASK_PATCH and Test_dom0_class.__dom0s[0] in _updated_patch_list:
+                self.verify_dbnu_plugin_logs(_time_stamp)
+
+            if not _disable_exacloud_plugin_execution:
+                # plugin execution need to be done only for patch and rollback operation
+                if self.__operation in [TASK_PATCH, TASK_ROLLBACK]:
+                    _exacloud_plugin_script_execution_validator = ExacloudPluginScriptExecutionValidator(
+                        Test_dom0_class.__target_name,
+                        self.__operation,
+                        self.__operation_style)
+                    self.assertTrue(
+                        _exacloud_plugin_script_execution_validator.mValidate(self.__patch_operation_status_output,
+                                                                              _updated_patch_list),
+                        "Exacloud plugin execution failed.")
+
+
+            self.assertTrue(
+                mCheckNodesPresenceInNodeProgressStatus(self.__patch_operation_status_output,
+                                                        _updated_patch_list,
+                                                        self.__non_required_nodes_in_node_progress_status),
+                "Either expected nodes are not present or unexpected nodes are present in node_progress_status.")
+
+            _time_profile_data_validator = TimeProfileDataValidator(Test_dom0_class.__target_name,
+                                                                    self.__operation, self.__operation_style)
+            # Need to pass nodes where actual patching happens and nodes where patching does not happen (Test_dom0_class.__dom0s-self.__patch_node_list)
+            self.assertTrue(
+                _time_profile_data_validator.mValidate(self.__patch_operation_status_output, _updated_patch_list,
+                                                       [i for i in Test_dom0_class.__dom0s if
+                                                        i not in _updated_patch_list]),
+                "time_profile_data validation failed.")
+
+    def mExecuteAndValidateOneoffOperation(self, aUseDefaultScript=True):
+        if not aUseDefaultScript and self.__operation != TASK_ONEOFFV2:
+            _one_off_script_file_path = mCreateOneOffScriptFile(self.__operation)
+            if not _one_off_script_file_path:
+                self.assertTrue(False, "Failed to create one-off script file.")
+            mUpdateAdditionalOptionsInPayload("OneoffCustomPluginFile", _one_off_script_file_path)
+
+        mUpdateAdditionalOptionsInPayload("OneoffScriptArgs", "stage=Pre,EXACS=yes,root_access=True")
+        mUpdateParamInPayload("BackupMode", "no")
+        self.__patch_operation_status_result, self.__patch_operation_status_output = \
+            mExecuteInfraPatchCommandWithDCSAgentChecks(self.__operation, Test_dom0_class.__target_name,
+                                                        self.__operation_style)
+        self.assertTrue(self.__patch_operation_status_result,
+                        "%s operation failed." % (self.__operation.capitalize()))
+
+        _script_execution_validator = OneOffPluginScriptExecutionValidator(Test_dom0_class.__target_name,
+                                                                                  self.__operation,
+                                                                                  self.__operation_style)
+        self.assertTrue(_script_execution_validator.mValidate(self.__patch_operation_status_output,
+                                                              self.__patch_node_list),
+                        "One-off script execution failed.")
+
+    def verify_dbnu_plugin_logs(self, timeStamp):
+        # This method will check for the required_messages if they are present in the dbnu log after given timeStamp
+
+        _required_messages = [
+            "[vm_serial_console script execution successful, Exit Status : 0]",
+            "[dbnu Plugin Message] : Custom plugin upgrade run completed with success."
+        ]
+
+        # ignore known failure messages 
+        _ignore_failures_x9 = [
+            "[IPrules dbnu Plugin Message] : FILE vif-bridge.EBT DOES NOT EXIST, SYMLINK COULD NOT BE RESTORED",
+            "[dbnu Plugin Message] : Custom plugin upgrade run completed with success."
+        ]
+
+        _plugin_log = "/var/log/exadatatmp/dbnu-plugin.log"
+        _exacloud_path = mGetExacloudInstallPath()
+        _exassh_bin_path = "%s/bin/exassh" % _exacloud_path
+        # print the content of file by removing all lines from the beginning of a file up to the last occurrence of given timeStamp
+        # Ex: sed '1,$(grep -n "Wed May 22 23:08:15" /var/log/exadatatmp/dbnu-plugin.log | tail -1 | cut -d: -f1)d' /var/log/exadatatmp/dbnu-plugin.log
+        _cmd = "sed '1,$(grep -n \"%s\" %s | tail -1 | cut -d: -f1)d' %s" % (timeStamp, _plugin_log, _plugin_log)
+        _exassh_cmd = "%s %s -sl -e %s" % (_exassh_bin_path, Test_dom0_class.__dom0s[0], _cmd)
+        _logs, _stat = mExecuteLocal(_exassh_cmd)
+        if _stat != 0:
+            self.assertTrue(_stat, "Problem while getting plugin log %s from %s" % (
+            _plugin_log, [Test_dom0_class.__dom0s[0]]))
+
+        # Find missing messages
+        _missing_messages = [_msg for _msg in _required_messages if _msg not in _logs]
+
+        if mGetInfraPatchingTestConfigParam("is_r1_env") == "True":
+            # Remove ignored messages for x9 rack
+            _missing_messages = [_msg for _msg in _missing_messages if _msg not in _ignore_failures_x9]
+
+        _messages_missing = len(_missing_messages) > 0
+        self.assertFalse(_messages_missing, "Following messages are not found in %s log of %s after %s : \n%s" % (_plugin_log, Test_dom0_class.__dom0s[0], timeStamp, _missing_messages))
+

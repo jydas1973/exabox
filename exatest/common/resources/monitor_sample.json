@@ -1,0 +1,58 @@
+{
+    "scaqab10adm02vm01": [
+        {
+            "type": "scan_ip",
+            "ip": "10.0.4.14",
+            "interface_type": "client",
+            "mac": "00:00:17:01:4C:65",
+            "standby_vnic_mac": "00:00:17:01:DC:4A",
+            "vlantag": "1",
+            "floating": "True"
+        },
+        {
+            "type": "scan_ip",
+            "ip": "10.0.2.94",
+            "interface_type": "client",
+            "mac": "00:00:17:01:4C:65",
+            "standby_vnic_mac": "00:00:17:01:DC:4A",
+            "vlantag": "1",
+            "floating": "True"
+        },
+        {
+            "type": "scan_ip",
+            "ip": "10.0.13.241",
+            "interface_type": "client",
+            "mac": "00:00:17:01:4C:65",
+            "standby_vnic_mac": "00:00:17:01:DC:4A",
+            "vlantag": "1",
+            "floating": "True"
+        },
+        {
+            "type": "host_ip",
+            "ip": "10.0.7.65",
+            "interface_type": "client",
+            "mac": "00:00:17:01:4C:65",
+            "standby_vnic_mac": "00:00:17:01:DC:4A",
+            "vlantag": "1",
+            "floating": "False"
+        },
+        {
+            "type": "host_ip",
+            "ip": "10.0.30.94",
+            "interface_type": "backup",
+            "mac": "00:00:17:01:56:05",
+            "standby_vnic_mac": "00:00:17:01:ED:1F",
+            "vlantag": "2",
+            "floating": "False"
+        },
+        {
+            "type": "vip",
+            "ip": "10.0.1.248",
+            "interface_type": "client",
+            "mac": "00:00:17:01:4C:65",
+            "standby_vnic_mac": "00:00:17:01:DC:4A",
+            "vlantag": "1",
+            "floating": "True"
+        }
+    ]
+}

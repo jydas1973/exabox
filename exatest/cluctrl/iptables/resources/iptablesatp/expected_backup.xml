@@ -1,0 +1,8 @@
+<filter name="my_filter">
+    <rule action="accept" direction="in" priority="500">
+        <all />
+    </rule>
+    <rule action="accept" direction="out" priority="500">
+        <all />
+    </rule>
+</filter>

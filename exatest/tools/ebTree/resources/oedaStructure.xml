@@ -1,0 +1,275 @@
+<?xml version="1.0" ?>
+<engineeredSystem ebTreeNodeType="" xmlns="model">
+	<configKeys ebTreeNodeType="">
+		<configKey ebTreeNodeType=""/>
+	</configKeys>
+	<customerName ebTreeNodeType=""/>
+	<databases ebTreeNodeType="">
+		<database ebTreeNodeType="">
+			<cdbId ebTreeNodeType=""/>
+			<characterset ebTreeNodeType=""/>
+			<databaseBlockSize ebTreeNodeType=""/>
+			<databaseHome ebTreeNodeType=""/>
+			<databaseOwner ebTreeNodeType=""/>
+			<databaseSid ebTreeNodeType=""/>
+			<databaseStyle ebTreeNodeType=""/>
+			<databaseTemplate ebTreeNodeType=""/>
+			<databaseType ebTreeNodeType=""/>
+			<diskGroups ebTreeNodeType="">
+				<diskGroup ebTreeNodeType=""/>
+			</diskGroups>
+			<language ebTreeNodeType=""/>
+			<machines ebTreeNodeType="">
+				<machine ebTreeNodeType=""/>
+			</machines>
+			<version ebTreeNodeType=""/>
+		</database>
+	</databases>
+	<departmentName ebTreeNodeType=""/>
+	<esPrefix ebTreeNodeType=""/>
+	<esRacks ebTreeNodeType="">
+		<esRack ebTreeNodeType="">
+			<esRackItem ebTreeNodeType="">
+				<rackItemDescription ebTreeNodeType=""/>
+				<rackItemSerialNumber ebTreeNodeType=""/>
+				<rackLocation ebTreeNodeType=""/>
+				<uHeight ebTreeNodeType=""/>
+				<uLocation ebTreeNodeType=""/>
+				<version ebTreeNodeType=""/>
+			</esRackItem>
+			<rackDescription ebTreeNodeType=""/>
+			<rackType ebTreeNodeType=""/>
+			<rackUSize ebTreeNodeType=""/>
+			<version ebTreeNodeType=""/>
+		</esRack>
+	</esRacks>
+	<groups ebTreeNodeType="">
+		<group ebTreeNodeType="">
+			<groupId ebTreeNodeType=""/>
+			<groupName ebTreeNodeType=""/>
+			<groupType ebTreeNodeType=""/>
+			<version ebTreeNodeType=""/>
+		</group>
+	</groups>
+	<iloms ebTreeNodeType="">
+		<ilom ebTreeNodeType="">
+			<dnsServers ebTreeNodeType="">
+				<dnsServer ebTreeNodeType="">
+					<ipAddress ebTreeNodeType=""/>
+				</dnsServer>
+			</dnsServers>
+			<ilomName ebTreeNodeType=""/>
+			<ilomTimeZone ebTreeNodeType=""/>
+			<networks ebTreeNodeType="">
+				<network ebTreeNodeType=""/>
+			</networks>
+			<ntpServers ebTreeNodeType="">
+				<ntpServer ebTreeNodeType="">
+					<ipAddress ebTreeNodeType=""/>
+				</ntpServer>
+			</ntpServers>
+			<version ebTreeNodeType=""/>
+		</ilom>
+		<version ebTreeNodeType=""/>
+	</iloms>
+	<machines ebTreeNodeType="">
+		<machine ebTreeNodeType="">
+			<DefaultGatewayNet ebTreeNodeType=""/>
+			<DomUImageName ebTreeNodeType=""/>
+			<ImageVersion ebTreeNodeType=""/>
+			<TimeZone ebTreeNodeType=""/>
+			<dnsServers ebTreeNodeType="">
+				<dnsServer ebTreeNodeType="">
+					<ipAddress ebTreeNodeType=""/>
+				</dnsServer>
+			</dnsServers>
+			<hostName ebTreeNodeType=""/>
+			<iloms ebTreeNodeType="">
+				<ilom ebTreeNodeType=""/>
+			</iloms>
+			<machine ebTreeNodeType=""/>
+			<machineType ebTreeNodeType=""/>
+			<networks ebTreeNodeType="">
+				<network ebTreeNodeType=""/>
+			</networks>
+			<ntpServers ebTreeNodeType="">
+				<ntpServer ebTreeNodeType="">
+					<ipAddress ebTreeNodeType=""/>
+				</ntpServer>
+			</ntpServers>
+			<osType ebTreeNodeType=""/>
+			<software ebTreeNodeType="">
+				<clusters ebTreeNodeType="">
+					<cluster ebTreeNodeType=""/>
+				</clusters>
+				<databaseHomes ebTreeNodeType="">
+					<databaseHome ebTreeNodeType=""/>
+				</databaseHomes>
+			</software>
+			<storage ebTreeNodeType="">
+				<localDisks ebTreeNodeType="">
+					<localDisk ebTreeNodeType=""/>
+				</localDisks>
+			</storage>
+			<users ebTreeNodeType="">
+				<user ebTreeNodeType=""/>
+			</users>
+			<version ebTreeNodeType=""/>
+			<virtual ebTreeNodeType=""/>
+			<vmSizeName ebTreeNodeType=""/>
+			<writeBackFlashCache ebTreeNodeType=""/>
+		</machine>
+	</machines>
+	<networks ebTreeNodeType="">
+		<network ebTreeNodeType="">
+			<domainName ebTreeNodeType=""/>
+			<gateway ebTreeNodeType=""/>
+			<hostName ebTreeNodeType=""/>
+			<ipAddress ebTreeNodeType=""/>
+			<macAddress ebTreeNodeType=""/>
+			<master ebTreeNodeType=""/>
+			<natdomainName ebTreeNodeType=""/>
+			<nathostName ebTreeNodeType=""/>
+			<natipAddress ebTreeNodeType=""/>
+			<natnetMask ebTreeNodeType=""/>
+			<netMask ebTreeNodeType=""/>
+			<networkName ebTreeNodeType=""/>
+			<networkType ebTreeNodeType=""/>
+			<pkey ebTreeNodeType=""/>
+			<pkeyName ebTreeNodeType=""/>
+			<slave ebTreeNodeType=""/>
+			<version ebTreeNodeType=""/>
+			<vlanId ebTreeNodeType=""/>
+			<vswitchNetworkParams ebTreeNodeType=""/>
+		</network>
+	</networks>
+	<platinum ebTreeNodeType="">
+		<platinumEnabled ebTreeNodeType=""/>
+		<version ebTreeNodeType=""/>
+	</platinum>
+	<software ebTreeNodeType="">
+		<clusters ebTreeNodeType="">
+			<cluster ebTreeNodeType="">
+				<backupLocation ebTreeNodeType=""/>
+				<basedir ebTreeNodeType=""/>
+				<clusterHome ebTreeNodeType=""/>
+				<clusterName ebTreeNodeType=""/>
+				<clusterOwner ebTreeNodeType=""/>
+				<clusterScans ebTreeNodeType="">
+					<clusterScan ebTreeNodeType=""/>
+				</clusterScans>
+				<clusterVersion ebTreeNodeType=""/>
+				<clusterVips ebTreeNodeType="">
+					<clusterVip ebTreeNodeType="">
+						<domainName ebTreeNodeType=""/>
+						<machines ebTreeNodeType="">
+							<machine ebTreeNodeType=""/>
+						</machines>
+						<vipIpAddress ebTreeNodeType=""/>
+						<vipName ebTreeNodeType=""/>
+					</clusterVip>
+				</clusterVips>
+				<diskGroups ebTreeNodeType="">
+					<diskGroup ebTreeNodeType=""/>
+				</diskGroups>
+				<inventoryLocation ebTreeNodeType=""/>
+				<language ebTreeNodeType=""/>
+				<patches ebTreeNodeType="">
+					<patch ebTreeNodeType="">
+						<patchNumber ebTreeNodeType=""/>
+					</patch>
+				</patches>
+				<scanIps ebTreeNodeType=""/>
+				<version ebTreeNodeType=""/>
+			</cluster>
+			<clusterScans ebTreeNodeType="">
+				<clusterScan ebTreeNodeType="">
+					<scanIps ebTreeNodeType="">
+						<scanIp ebTreeNodeType="">
+							<ipAddress ebTreeNodeType=""/>
+						</scanIp>
+					</scanIps>
+					<scanName ebTreeNodeType=""/>
+					<scanPort ebTreeNodeType=""/>
+					<scanType ebTreeNodeType=""/>
+				</clusterScan>
+			</clusterScans>
+		</clusters>
+		<databaseHomes ebTreeNodeType="">
+			<databaseHome ebTreeNodeType="">
+				<basedir ebTreeNodeType=""/>
+				<cluster ebTreeNodeType=""/>
+				<databaseHomeLoc ebTreeNodeType=""/>
+				<databaseHomeName ebTreeNodeType=""/>
+				<databaseSwOwner ebTreeNodeType=""/>
+				<databaseVersion ebTreeNodeType=""/>
+				<inventoryLocation ebTreeNodeType=""/>
+				<language ebTreeNodeType=""/>
+				<machines ebTreeNodeType="">
+					<machine ebTreeNodeType=""/>
+				</machines>
+				<patches ebTreeNodeType="">
+					<patch ebTreeNodeType="">
+						<patchNumber ebTreeNodeType=""/>
+					</patch>
+				</patches>
+				<useZfs ebTreeNodeType=""/>
+				<version ebTreeNodeType=""/>
+			</databaseHome>
+		</databaseHomes>
+	</software>
+	<storage ebTreeNodeType="">
+		<diskGroups ebTreeNodeType="">
+			<diskGroup ebTreeNodeType="">
+				<cellDisks ebTreeNodeType=""/>
+				<diskGroupName ebTreeNodeType=""/>
+				<diskGroupSize ebTreeNodeType=""/>
+				<machines ebTreeNodeType="">
+					<machine ebTreeNodeType=""/>
+				</machines>
+				<ocrVote ebTreeNodeType=""/>
+				<quorumDisk ebTreeNodeType=""/>
+				<redundancy ebTreeNodeType=""/>
+				<sliceSize ebTreeNodeType=""/>
+				<version ebTreeNodeType=""/>
+			</diskGroup>
+			<version ebTreeNodeType=""/>
+		</diskGroups>
+		<localDisks ebTreeNodeType="">
+			<localDisk ebTreeNodeType="">
+				<localDiskName ebTreeNodeType=""/>
+				<localDiskSize ebTreeNodeType=""/>
+				<version ebTreeNodeType=""/>
+			</localDisk>
+		</localDisks>
+		<version ebTreeNodeType=""/>
+	</storage>
+	<switches ebTreeNodeType="">
+		<switch ebTreeNodeType="">
+			<ibPartitionMembership ebTreeNodeType=""/>
+			<networks ebTreeNodeType="">
+				<network ebTreeNodeType=""/>
+			</networks>
+			<switchDescription ebTreeNodeType=""/>
+			<version ebTreeNodeType=""/>
+		</switch>
+	</switches>
+	<users ebTreeNodeType="">
+		<user ebTreeNodeType="">
+			<groups ebTreeNodeType="">
+				<group ebTreeNodeType=""/>
+			</groups>
+			<homedir ebTreeNodeType=""/>
+			<userType ebTreeNodeType=""/>
+			<userid ebTreeNodeType=""/>
+			<username ebTreeNodeType=""/>
+			<version ebTreeNodeType=""/>
+		</user>
+	</users>
+	<version ebTreeNodeType=""/>
+	<vmSizes ebTreeNodeType="">
+		<vmSizeName ebTreeNodeType="">
+			<vmAttribute ebTreeNodeType=""/>
+		</vmSizeName>
+	</vmSizes>
+</engineeredSystem>

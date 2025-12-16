@@ -1,0 +1,123 @@
+/
+/
+/ Usage examples of various commands are to be listed here
+/
+/ Copyright (c) 2017, Oracle and/or its affiliates. All rights reserved.
+/
+/   NAME
+/       flow_examples.txt
+/
+/   DESCRIPTION
+/     <short description of component this file declares/defines>
+/
+/   NOTES
+/     <other useful comments, qualifications, etc.>
+/
+/   MODIFIED   (MM/DD/YY)
+/   mmsharif    03/13/17 - Flow of single compose-cluster call
+/   mmsharif    03/12/17 - Creation
+/
+
+Flow of single compose-cluster call
+-------------------------------------
+
+Command line usage example:
+/scratch/mmsharif/ecra_installs/testinstall/mw_home/user_projects/domains/exacloud$
+/scratch/mmsharif/ecra_installs/testinstall/mw_home/user_projects/domains/exacloud$ ./bin/exacloud -bmc compose_cluster  -jc ~/myscripts/input.json -al localhost -as
+$ ExaCloud
+  Core Version   : 17.1.5 (17.031)
+  Base Path      : /scratch/mmsharif/ecra_installs/testinstall/mw_home/user_projects/domains/exacloud/bin/../
+  OEDA Path      : /scratch/mmsharif/ecra_installs/testinstall/mw_home/user_projects/domains/exacloud/oeda
+  Log  Path      : /scratch/mmsharif/ecra_installs/testinstall/mw_home/user_projects/domains/exacloud/bin/../log
+* LOG * {
+    "status": "Pending",
+    "cmd": "compose_cluster",
+    "statusinfo": "Undefined",
+    "uuid": "b306bda4-07a8-11e7-b3cc-00163e52a57f",
+    "success": "True"
+}
+
+
+Calling GET /Status for this UUID:
+Request URL: http://slc02owp.us.oracle.com:7080/Status?uuid=b306bda4-07a8-11e7-b3cc-00163e52a57f
+
+{
+  "body": [
+    "b306bda4-07a8-11e7-b3cc-00163e52a57f",
+    "Done",
+    "Sun Mar 12 21:51:19 2017",
+    "Sun Mar 12 21:51:20 2017",
+    "bmcctrl.compose_cluster",
+    "{\"jsonconf\": {\"clusters\": [{\"product\": \"exd\",
+\"availability_domain\": \"ad1\", \"oracle_admin_vcnid\":
+\"unique_random_string_11\", \"cluster_size\": \"3cell2comp3ibsw2pdu1ethsw\",
+\"time_zone\": \"America/Los_Angeles\", \"nodes\":
+[{\"oracle_hostname_pick_\": \"cellAAA1\", \"node_sequence\": 9,
+\"oracle_gateway\": \"12.12.1.1\", \"ilom_dns\": [\"9_ilom_dns1\",
+\"9_ilom_dns2\"], \"ilom_ip\": \"9_ilom_ip\", \"oracle_netmask\":
+\"255.255.224.0\", \"oracle_ip\": \"12.12.13.1\", \"ilom_hostname\":
+\"9_ilom_hostname\", \"node_model\": \"x6_2\", \"ilom_ntp\":
+[\"9_ilom_ntp1\"], \"node_type\": \"cell\", \"oracle_dns\": [\"9_dns1\",
+\"9_dns2\", \"9_dns3\"], \"cabinet_name\": \"cabname1\", \"ilom_gateway\":
+\"9_ilom_gateway\", \"ilom_domain\": \"9_ilom_domain\", \"cabinet_id\": 1,
+\"storage_pkey\": \"0xaa00\", \"oracle_domain\": \"us.oracle.com\",
+\"ilom_netmask\": \"9_ilom_netmask\", \"oracle_ntp\": [\"9_ntp1\", \"9_ntp2\",
+\"9_ntp3\"]}, {\"oracle_gateway\": \"12.12.1.1\", \"ilom_gateway\":
+\"16_ilom_gateway\", \"node_type\": \"compute\", \"natip_pick_\":
+[\"16_natip1\", \"16_natip2\", \"16_natip3\", \"16_natip4\"], \"etherfaces\":
+[\"16_eth0\", \"16_eth1\", \"16_eth2\", \"16_eth3\"], \"compute_pkey\":
+\"0xa000\", \"ilom_ip\": \"16_ilom_ip\", \"oracle_ip\": \"12.12.13.4\",
+\"storage_pkey\": \"0xaa00\", \"cabinet_name\": \"cabname1\", \"ilom_dns\":
+[\"16_ilom_dns1\", \"16_ilom_dns2\"], \"ilom_hostname\": \"16_ilom_hostname\",
+\"node_sequence\": 16, \"mac_pick_\": [\"16_mac1\", \"16_mac2\", \"16_mac3\",
+\"16_mac4\"], \"oracle_netmask\": \"255.255.224.0\", \"natname\":
+\"16_natname\", \"oracle_dns\": [\"16_dns1\", \"16_dns2\", \"16_dns3\"],
+\"oracle_hostname\": \"dom0AAA1\", \"ilom_ntp\": [\"16_ilom_ntp1\"],
+\"cabinet_id\": 1, \"oracle_ntp\": [\"16_ntp1\", \"16_ntp2\", \"16_ntp3\"],
+\"node_model\": \"x6_2\", \"ilom_domain\": \"16_ilom_domain\",
+\"ilom_netmask\": \"16_ilom_netmask\", \"oracle_domain\": \"us.oracle.com\",
+\"cavium\": [\"16_cav1\", \"16_cav2\", \"16_cav3\", \"16_cav4\"]},
+{\"oracle_gateway\": \"12.12.1.1\", \"ilom_gateway\": \"12_ilom_gateway\",
+\"node_type\": \"compute\", \"natip_pick_\": [\"12_natip1\", \"12_natip2\",
+\"12_natip3\", \"12_natip4\"], \"compute_pkey\": \"0xa000\", \"ilom_ip\":
+\"12_ilom_ip\", \"oracle_ip\": \"12.12.13.16\", \"storage_pkey\": \"0xaa00\",
+\"cabinet_name\": \"cabname1\", \"ilom_dns\": [\"12_ilom_dns1\",
+\"12_ilom_dns2\"], \"ilom_hostname\": \"12_ilom_hostname\", \"node_sequence\":
+12, \"mac_pick_\": [\"12_mac1\", \"12_mac2\", \"12_mac3\", \"12_mac4\"],
+\"oracle_netmask\": \"255.255.224.0\", \"natname\": \"12_natname\",
+\"oracle_dns\": [\"12_dns1\", \"12_dns2\", \"12_dns3\"], \"oracle_hostname\":
+\"dom0AAA2\", \"ilom_ntp\": [\"12_ilom_ntp1\"], \"cabinet_id\": 1,
+\"oracle_ntp\": [\"12_ntp1\", \"12_ntp2\", \"12_ntp3\"], \"node_model\":
+\"x6_2\", \"ilom_domain\": \"12_ilom_domain\", \"ilom_netmask\":
+\"12_ilom_netmask\", \"oracle_domain\": \"us.oracle.com\", \"cavium\":
+[\"12_cav1\", \"12_cav2\", \"12_cav3\", \"12_cav4\"]}, {\"node_sequence\": 20,
+\"oracle_gateway\": \"12.12.1.1\", \"oracle_netmask\": \"255.255.224.0\",
+\"node_type\": \"ibsw\", \"oracle_dns\": [\"20_dns1\", \"20_dns2\",
+\"20_dns3\"], \"cabinet_id\": 1, \"oracle_ntp\": [\"20_ntp1\", \"20_ntp2\",
+\"20_ntp3\"], \"oracle_ip\": \"12.12.13.9\", \"node_model\": \"x6_2\",
+\"oracle_hostname\": \"ibswAAA1\", \"oracle_domain\": \"us.oracle.com\",
+\"cabinet_name\": \"cabname1\"}], \"oracle_admin_subnet\": \"12.12.0.0/16\",
+\"temporary_ecs_rack_name_pick_\": \"temp_cluster1\"}]}, \"cmd\":
+\"compose_cluster\", \"hostname\": \"slc02owp.us.oracle.com\"}",
+    "0",
+    "No Errors",
+    "* TIMING: Sun Mar 12 21:51:20 2017 - Sun Mar 12 21:51:20 2017\n* REQ
+INFO:
+compose_cluster\n--------------------------------------------------------------------------------\nWriting
+BMC log at
+log/bmcctrl/b306bda4-07a8-11e7-b3cc-00163e52a57f/bmcctrl.log\ncompose_cluster
+succeeded\n",
+    "<base 64 encoded xml>"
+    "000:: No status info available",
+    "Undef",
+    "0",
+    "{\"temporary_ecs_rack_name\": \"temp_cluster1\", \"nodes\": [{\"mac\":
+[\"16_mac1\", \"16_mac2\", \"16_mac3\", \"16_mac4\"], \"natip\":
+[\"16_natip1\", \"16_natip2\", \"16_natip3\", \"16_natip4\"]}, {\"mac\":
+[\"12_mac1\", \"12_mac2\", \"12_mac3\", \"12_mac4\"], \"natip\":
+[\"12_natip1\", \"12_natip2\", \"12_natip3\", \"12_natip4\"]}]}",
+    {}
+  ],
+  "status": "Done",
+  "success": "True"
+}

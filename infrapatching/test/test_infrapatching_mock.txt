@@ -1,0 +1,964 @@
+#
+# $Header: ecs/exacloud/exabox/infrapatching/test/test_infrapatching_mock.txt /main/7 2025/01/17 05:22:26 emekala Exp $
+#
+# test_infrapatching_mock.py
+#
+# Copyright (c) 2020, 2024, Oracle and/or its affiliates.
+#
+#    NAME
+#      test_infrapatching_mock.py - Mock unit test case script for all Infrapatching
+#                                   operations.
+#
+#    DESCRIPTION
+#      Unit test case script for all infrapatching mock operations.
+#
+#    NOTES
+#      Unit test case script for all infrapatching mock  operations.
+#
+#    MODIFIED   (MM/DD/YY)
+#    emekala     12/10/24 - ENH 37374442 - SUPPORT INFRA PATCH MOCK FWK TO
+#                           ACCEPT MOCK RESPONSE IN JSON FORMAT VIA REST API
+#    araghave    12/10/24 - Enh 37241595 - TEST CHANGES TO REPLACE ALL IBSWITCH
+#                           REFERENCE WITH GENERIC SWITCH REFERENCES IN INFRA
+#                           PATCHING TEST CODE
+#    emekala     11/28/24 - ENH 37328901 - Add support to initialize infra
+#                           patch mock setup when payload has mock request
+#                           attribute
+#    emekala     11/19/24 - BUG 37293033 - INFAPATCHING MOCK OPERATIONS ARE
+#                           FAILING IN BM ENV
+#    emekala     01/17/24 - ENH 36094940 - Support ECRA mock mode for
+#                           Infrapatching operations
+#
+import os
+import re
+import sys
+import time
+import json
+import shutil
+import base64
+import getopt
+import traceback
+import threading
+from pathlib import Path
+import concurrent.futures
+from datetime import datetime, timedelta
+
+from utils import *
+from constants import *
+
+class MockInfraPatchingValidator:
+    def __init__(self):
+        # user home
+        self.userHome = str(Path.home())
+
+        # ecra details
+        self.ecraInstallFolder = None
+        self.ecraOpsUserName = base64.b64decode(mGetInfraPatchingTestConfigParam('ecrausername')).decode('utf-8')
+        self.ecraOpsUserPassword = base64.b64decode(mGetInfraPatchingTestConfigParam('ecrapassword')).decode('utf-8')
+        self.ecraEndpointUrl = mGetInfraPatchingTestConfigParam('ecraurl')
+
+        # patch curl cmds
+        self.curlPutCmd = "curl --silent  -u {ecraUserName}:{ecraPassword} -i -k -X PUT --header 'Content-Type: application/json' --header 'Accept: application/json' -d".format(ecraUserName=self.ecraOpsUserName, ecraPassword=self.ecraOpsUserPassword)
+        self.curlGetCmd = "curl --silent  -u {ecraUserName}:{ecraPassword} -i -k -X GET --header 'Content-Type: application/json' --header 'Accept: application/json'".format(ecraUserName=self.ecraOpsUserName, ecraPassword=self.ecraOpsUserPassword)
+
+        # log and report files
+        self.mockReportFile = None
+        self.consolidatedMockReportFile = None
+        self.ecraLogFile = None
+        self.exacloudLogFile = None
+        self.agentLogFile = None
+        self.mockToolLogFile = None
+        self.mockToolLogFileObj = None
+        self.tmpFileWithFilteredLogMsgsWithinStartEndDatetime = "{homeDir}/filtered_log_msgs_between_start_end_datetime.txt".format(homeDir=self.userHome)
+
+        # registered rack with ecra for updating dummy_racks xml with registered rack's xml for exacloud to succeed with xml parsing
+        self.registeredRackClusterNameWithEcra = None
+
+        # mock execution details
+        self.enabledMockModeType = None
+        self.requestToEnableMockModeType = None
+        self.mockClusterName = 'dummy_rack'
+        self.numberOfClusters = 0
+        self.operationStyles = None
+        self.operations = None
+        self.targets = None
+        self.mockModeViaRestApi = None
+        self.runCntStartRange = 1
+        self.runCntIncrementRange = 0
+        self.runCntEndRange = 0
+
+        # misc
+        self.startDateTime = datetime.now()
+        self.endDateTime = datetime.now()
+        self.lock = threading.Lock()
+        self.defaultStdOut = sys.stdout
+
+        self.finalRunStatus = EXIT_SUCCESS
+
+    def mUsage(self):
+        """
+        Show tool usage
+        """
+        print("")
+        print(f"This tool concurrently runs infra operations against unique clusters. It supports/performs the following tasks:\n 1. Enables {next(iter(SUPPORTED_MOCK_MODE_TYPES))} {next(iter(EXACLOUD_MOCK_PROPERTY_NAMES))} for infrapatching and restarts exacloud service\n 2. Inserts number_of_combinational_tests_to_be_run unique dummy_rack clusters in the multiples of given combination of target(s), operation(s) and operation_type(s) into ecs_racks_table using the xml content of registered_rack_cluster_with_ecra,\n  initiates concurrent infra operations in a loop with the given combination of operation_style + operation against the given targe(s)\n  collects and prints the consolidated run status and\n 3. Finally disables {next(iter(SUPPORTED_MOCK_MODE_TYPES))} {next(iter(EXACLOUD_MOCK_PROPERTY_NAMES))}, deletes all the dummy_rack cluster rows from ecs_racks_table and restarts exacloud service\n\nregistered_rack_cluster_with_ecra: is the valid cluster name that is already registered with the ECRA instance. This cluster xml is used while inserting unique dummy_rack cluster entries into ecs_racks_table.\nnumber_of_combinational_tests_to_be_run: is the number of combinational tests user wants the tool to run with the given combination of operation style(s) + operation(s) + target(s).\n\nFor example, when number_of_combinational_tests_to_be_run = 2, target = dom0, cell, operation = patch_prereq_check, patch and operation_style = rolling then tool runs 2 sets of tests for each combination of: rolling + patch_prereq_check + dom0, rolling + patch_prereq_check + cell, rolling + patch + dom0, rolling + patch + cell. For this it inserts a total of 8 unique dummy_rack clusters (in the multiples of number_of_combinational_tests_to_be_run and given combination of target(s), operation(s) and operation_type(s)) into ecs_racks_table.\n\nConcurrent infra operations are initiated in a loop against one hw component at a time with the given combination of operation_style + operation")
+        print("")
+        print("")
+        print("Usage: python3 {scriptName} [-e|--enable_mock_mode <args>] [-r|--run <args>] [-d|--disable_mock_mode <args>] [ -h|--help]".format(scriptName=sys.argv[0]))
+        print("")
+        print("  -e|--enable_mock_mode <ecra_install_folder_path>")
+        print("    Enable mock mode patch for infra patching")
+        print("      Ex: python3 {scriptName} -e <ecra_install_folder_path>".format(scriptName=sys.argv[0]))
+        print("")
+        print("  -r|--run <ecra_install_folder_path>#<registered_rack_cluster_with_ecra>#<number_of_combinational_tests_to_be_run>#<comma_separated_targets>#<comma_separated_operations>#<comma_separated_operationStyles>") 
+        print("    Run infrapatching operations in enabled mock mode")
+        print("      Ex: python3 {scriptName} -r <ecra_install_folder_path>#<registered_rack_cluster_with_ecra>#<number_of_combinational_tests_to_be_run>#<comma_separated_targets>#<comma_separated_operations>#<comma_separated_operationStyles>".format(scriptName=sys.argv[0]))
+        print("")
+        print("  -r|--run <ecra_install_folder_path>#<registered_rack_cluster_with_ecra>#<number_of_combinational_tests_to_be_run>#<comma_separated_targets>#<comma_separated_operations>#<comma_separated_operationStyles>#mockMode") 
+        print("")
+        print("        With the extra parameter mockMode appended to the existing run options..., mock tooling prepares mock config json payload from exacloud/config/custom_mock_patch.json and adds 'mockMode':'<mock_config_json>' to AdditionalOptions of the infra patch rest api allowing infra patching fwk to run in mock mode patch without explicitly enabling the mock_mode_patch in exabox.conf and restarting the exacloud service.")
+        print("")
+        print("  -d|--disable_mock_mode <ecra_install_folder_path>")
+        print("    Disables mock mode patch for infra patching and also deletes all the {rackName} mock clusters from ecs_racks table so that future infrapatching operations run in normal mode".format(rackName=self.mockClusterName))
+        print("      Ex: python3 {scriptName} -d <ecra_install_folder_path>".format(scriptName=sys.argv[0]))
+        print("")
+        print("  -h|--help")
+        print("    Show help message")
+        print("")
+        print("python3 {scriptName} -d /scratch/emekala/ecra_installs/apr1024".format(scriptName=sys.argv[0]))
+        print("python3 {scriptName} -e /scratch/emekala/ecra_installs/apr1024".format(scriptName=sys.argv[0]))
+        print("python3 {scriptName} -r /scratch/emekala/ecra_installs/apr1024#scaqae03adm0102clu3#1#cell#patch_prereq_check#rolling".format(scriptName=sys.argv[0]))
+        print("python3 {scriptName} -r /scratch/emekala/ecra_installs/apr1024#scaqae03adm0102clu3#1#cell#patch_prereq_check#rolling#mockMode".format(scriptName=sys.argv[0]))
+        print("python3 {scriptName} -r /scratch/emekala/ecra_installs/apr1024#scaqae03adm0102clu3#1#cell,dom0#patch_prereq_check#rolling".format(scriptName=sys.argv[0]))
+        print("python3 {scriptName} -r /scratch/emekala/ecra_installs/apr1024#scaqae03adm0102clu3#2#cell,dom0#patch_prereq_check,patch#rolling".format(scriptName=sys.argv[0]))
+        print("python3 {scriptName} -r /scratch/emekala/ecra_installs/apr1024#scaqae03adm0102clu3#1#cell,dom0,domu,switch#patch_prereq_check,patch#rolling,non-rolling".format(scriptName=sys.argv[0]))
+        print("python3 {scriptName} -r /scratch/emekala/ecra_installs/apr1024#scaqae03adm0102clu3#1#cell,dom0,domu,switch#patch_prereq_check,patch#rolling,non-rolling,auto".format(scriptName=sys.argv[0]))
+        print("")
+        self.finalRunStatus = EXIT_FAILURE
+        sys.exit(self.finalRunStatus)
+
+    def mLogMessage(self, aMsg, aLogTarget=None):
+        """
+        Helper method to print msgs to console/logfile or all
+        """
+
+        if aLogTarget is None or aLogTarget in ['logfile', 'all']:
+            sys.stdout = self.mockToolLogFileObj
+            mPatchLogInfo("\n{msg}\n".format(msg=aMsg))
+        if aLogTarget is not None and aLogTarget in ['console', 'all']:
+            sys.stdout = self.defaultStdOut
+            print(aMsg)
+
+    def mInsertMockTestRacksIntoEcsRacks(self):
+        """
+        Helper method to insert mock test rack rows into ecs_racks table
+        """
+
+        # prepare a sql file with insert stmts with the given range
+        _insertRacksSqlFile = "{homeDir}/ecs_racks_insert_stmts.sql".format(homeDir=self.userHome)
+        _insertFile = open(_insertRacksSqlFile, 'w')
+        for _i in range(self.runCntStartRange, self.numberOfClusters + 1):
+            _insertFile.write("\ninsert into ecs_racks(NAME, xml, status) values('{rackName}{number}', '{xmlFile}', 'READY');".format(rackName=self.mockClusterName, number=_i, xmlFile=self.mockClusterName))
+        _insertFile.write("\ncommit;")
+        _insertFile.write("\nupdate ecs_racks set xml = (select xml from ecs_racks a where a.name = '{registeredRackClusterWithEcra}') where name like '{rackName}%';".format(registeredRackClusterWithEcra=self.registeredRackClusterNameWithEcra, rackName=self.mockClusterName))
+        _insertFile.write("\nupdate ecs_racks set updated_xml = (select xml from ecs_racks a where a.name = '{registeredRackClusterWithEcra}') where name like '{rackName}%';".format(registeredRackClusterWithEcra=self.registeredRackClusterNameWithEcra, rackName=self.mockClusterName))
+        _insertFile.write("\nupdate ecs_racks set exaunitid = (select exaunitid from ecs_racks a where a.name = '{registeredRackClusterWithEcra}') where name like '{rackName}%';".format(registeredRackClusterWithEcra=self.registeredRackClusterNameWithEcra, rackName=self.mockClusterName))
+        _insertFile.write("\ndelete from ecs_registries where rack_id like '{rackName}%';".format(rackName=self.mockClusterName))
+        _insertFile.write("\ncommit;")
+        _insertFile.write("\nselect count(*) from ecs_registries where rack_id like '{rackName}%';".format(rackName=self.mockClusterName))
+        _insertFile.close()
+
+        sys.stdout = self.mockToolLogFileObj
+        mExecuteDbCmd(aEcraInstallFolder=self.ecraInstallFolder, aSqlFileToExecute=_insertRacksSqlFile, aOnSqlError="CONTINUE")
+
+    def mDeleteMockTestRacksFromEcsRacks(self):
+        """
+        Helper method to delete mock test rack rows from ecs_racks table
+        """
+
+        # prepare a sql file with delete stmts to delete all trace of dummy_rack entries created as part of mock testing
+        _deleteRacksSqlFile = "{homeDir}/ecs_racks_delete_stmts.sql".format(homeDir=self.userHome)
+        _deleteFile = open(_deleteRacksSqlFile, 'w')
+        _deleteFile.write("\ndelete from ecs_racks where name like '{rackName}%';".format(rackName=self.mockClusterName))
+        _deleteFile.write("\ndelete from ecs_registries where rack_id like '{rackName}%';".format(rackName=self.mockClusterName))
+        _deleteFile.write("\ncommit;")
+        _deleteFile.write("\nselect count(*) from ecs_registries where rack_id like '{rackName}%';".format(rackName=self.mockClusterName))
+        _deleteFile.close()
+
+        sys.stdout = self.mockToolLogFileObj
+        mExecuteDbCmd(aEcraInstallFolder=self.ecraInstallFolder, aSqlFileToExecute=_deleteRacksSqlFile, aOnSqlError="CONTINUE")
+
+    def mEnableEcraMockMode(self):
+        """
+        Enabling ecra mock mode requires: 
+          1. Set required mock mode properties to TRUE in ecra db
+          2. Copying mock response template json files from ade view to 
+            <ecra_install>/<domainsFolder>/cfg
+          3. Updating <ecra_install>/<domainsFolder>/cfg/ecra.json
+             to set required mock attributes to true
+          4. Inserting mock test rack rows into ecs_racks table. <<-- this is not
+                                              mandatory as you can work with your own rack
+          5. Restarting ecra services
+        """
+
+        self.mLogMessage(aMsg="Enabling ecra mock mode...\n", aLogTarget='all')
+
+        # Setting required mock mode properties to TRUE in ecra db
+        self.mLogMessage(aMsg="Setting required mock mode properties to TRUE in ecra db...", aLogTarget='all')
+        for _mockPropertyName in ECRA_MOCK_PROPERTY_NAMES:
+            _propertyCurlCmd = "{curlCmd} '{propertyValue}' '{ecraEndpointUrl}/properties/{propertyName}'".format(curlCmd=self.curlPutCmd, propertyValue="{\"value\":\"TRUE\"}", ecraEndpointUrl=self.ecraEndpointUrl, propertyName=_mockPropertyName)
+            _response = mExecuteCmd(aCmd=_propertyCurlCmd)
+            if not _response.startswith(HTTP_200_RESPONSE_CODE):
+                raise Exception("Error while setting mock mode property to TRUE with cmd: {curlCmd}".format(curlCmd=_propertyCurlCmd))
+
+        # In some environments ade view cant be created like X9 R1 env. In such cases tool checks if the file already present in the target location if not tool will fail
+        try:
+            # Creating ade view from ECS MAIN line series to get the mock response template json files
+            self.mLogMessage(aMsg="Creating ade view from ECS MAIN line series to get the mock response template json files...", aLogTarget='all')
+    
+            sys.stdout = self.mockToolLogFileObj
+            mCreateAdeView(aSeries="ECS_MAIN_LINUX.X64")
+            with open('{homeDir}/view_dir.txt'.format(homeDir=self.userHome), 'r') as file:
+                _adeViewDir = file.read().rstrip()
+
+            # Copying mock response template json files from ade view to cfg/
+            self.mLogMessage(aMsg="Copying mock response template json files from ade view to {ecraInstallFolder}/{domainsFolder}/cfg...".format(ecraInstallFolder=self.ecraInstallFolder, domainsFolder=DOMAINS_FOLDER), aLogTarget='all')
+            shutil.copyfile('{ADE_VIEW_DIR}/ecs/test/data/mockrsp_tmpl.json'.format(ADE_VIEW_DIR=_adeViewDir), '{ecraInstallFolder}/{domainsFolder}/cfg/mockrsp_tmpl.json'.format(ecraInstallFolder=self.ecraInstallFolder, domainsFolder=DOMAINS_FOLDER))
+        except:
+            self.mLogMessage(aMsg="Unable to create ade view in this environment. Checking if the file already exists in the target location : {ecraInstallFolder}/{domainsFolder}/cfg/mockrsp_tmpl.json...".format(ecraInstallFolder=self.ecraInstallFolder, domainsFolder=DOMAINS_FOLDER), aLogTarget='logfile') 
+            mRunViaSubprocess(aExecutionType='cmd', aExecute="ls -1 {ecraInstallFolder}/{domainsFolder}/cfg/mockrsp_tmpl.json".format(ecraInstallFolder=self.ecraInstallFolder, domainsFolder=DOMAINS_FOLDER))
+
+        # Updating cfg/ecra.json to set required mock attributes to true       
+        self.mLogMessage(aMsg="Updating {ecraInstallFolder}/{domainsFolder}/cfg/ecra.json to set required mock attributes to true...".format(ecraInstallFolder=self.ecraInstallFolder, domainsFolder=DOMAINS_FOLDER), aLogTarget='all') 
+        with open("{ecraInstallFolder}/{domainsFolder}/cfg/ecra.json".format(ecraInstallFolder=self.ecraInstallFolder, domainsFolder=DOMAINS_FOLDER), "r") as _jsonFile:
+            _data = json.load(_jsonFile)
+        for _mockPropertyName in ECRA_MOCK_PROPERTY_NAMES:
+            _data["{propertyName}".format(propertyName=_mockPropertyName)] = "true"
+        with open("{ecraInstallFolder}/{domainsFolder}/cfg/ecra.json".format(ecraInstallFolder=self.ecraInstallFolder, domainsFolder=DOMAINS_FOLDER), "w") as _jsonFile:
+            json.dump(_data, _jsonFile)
+
+        # Inserting mock test rows into ecs_racks table
+        self.mLogMessage(aMsg="Inserting {numberOfClusters} {rackName} mock test racks into ecs_racks table...".format(numberOfClusters=self.numberOfClusters, rackName=self.mockClusterName), aLogTarget='all')
+        self.mInsertMockTestRacksIntoEcsRacks()
+
+        # Restarting ecra services
+        self.mLogMessage(aMsg="Restarting ecra services...", aLogTarget='all')
+        sys.stdout = self.mockToolLogFileObj
+        mRestartEcraServices(aEcraInstallFolder=self.ecraInstallFolder)
+
+    def mDisableEcraMockMode(self):
+        """
+        Disabling ecra mock mode requires: 
+          1. Set required mock mode properties to FALSE in ecra db
+          2. Remove not required mock response template json files from 
+            <ecra_install>/<domainsFolder>/cfg
+          3. Updating <ecra_install>/<domainsFolder>/cfg/ecra.json
+             to remove not required mock attributes 
+          4. Deleting mock test rack rows from ecs_racks table. <<-- this is not
+                                              mandatory as you can work with your own rack
+          5. Restarting ecra services
+        """
+
+        self.mLogMessage(aMsg="Disabling ecra mock mode...\n", aLogTarget='all')
+
+        # Setting required mock mode properties to FALSE in ecra db
+        self.mLogMessage(aMsg="Setting required mock mode properties to FALSE in ecra db...", aLogTarget='all')
+        for _mockPropertyName in ECRA_MOCK_PROPERTY_NAMES:
+            _propertyCurlCmd = "{curlCmd} '{propertyValue}' '{ecraEndpointUrl}/properties/{propertyName}'".format(curlCmd=self.curlPutCmd, propertyValue="{\"value\":\"FALSE\"}", ecraEndpointUrl=self.ecraEndpointUrl, propertyName=_mockPropertyName)
+            _response = mExecuteCmd(aCmd=_propertyCurlCmd)
+            if not _response.startswith(HTTP_200_RESPONSE_CODE):
+                raise Exception("Error while setting mock mode property to FALSE with cmd: {curlCmd}".format(curlCmd=_propertyCurlCmd))
+
+        # Removing not required mock response template json files from cfg/
+        self.mLogMessage(aMsg="Removing not required mock response template json files from {ecraInstallFolder}/{domainsFolder}/cfg ...".format(ecraInstallFolder=self.ecraInstallFolder, domainsFolder=DOMAINS_FOLDER), aLogTarget='all')
+
+       # In some environments ade view cant be created like X9 R1 env. In such cases tool checks if the file already present in the target location if not tool will fail.
+       # hence lets not remove this file. Having this file will not cause any issues as required ecra mock mode properties are disabled.
+       # try:
+       #     os.remove("{_file}".format(_file='{ecraInstallFolder}/{domainsFolder}/cfg/mockrsp_tmpl.json'.format(ecraInstallFolder=self.ecraInstallFolder, domainsFolder=DOMAINS_FOLDER)))
+       # except:
+       #     pass
+
+        # Updating config/ecra.json to remove not required mock attributes
+        self.mLogMessage(aMsg="Updating {ecraInstallFolder}/{domainsFolder}/cfg/ecra.json to remove not required mock attributes...".format(ecraInstallFolder=self.ecraInstallFolder, domainsFolder=DOMAINS_FOLDER), aLogTarget='all')
+        with open("{ecraInstallFolder}/{domainsFolder}/cfg/ecra.json".format(ecraInstallFolder=self.ecraInstallFolder, domainsFolder=DOMAINS_FOLDER), "r") as _jsonFile:
+            _data = json.load(_jsonFile)
+        for _mockPropertyName in ECRA_MOCK_PROPERTY_NAMES:
+            if "{propertyName}".format(propertyName=_mockPropertyName) in _data:
+                del _data["{propertyName}".format(propertyName=_mockPropertyName)]
+        with open("{ecraInstallFolder}/{domainsFolder}/cfg/ecra.json".format(ecraInstallFolder=self.ecraInstallFolder, domainsFolder=DOMAINS_FOLDER), "w") as _jsonFile:
+            json.dump(_data, _jsonFile)
+
+        # Deleting mock test rows from ecs_racks table
+        self.mLogMessage(aMsg="Deleting {rackName} mock test racks from ecs_racks table...".format(rackName=self.mockClusterName), aLogTarget='all')
+        self.mDeleteMockTestRacksFromEcsRacks()
+
+        # Restarting ecra services
+        self.mLogMessage(aMsg="Restarting ecra services...", aLogTarget='all')
+        sys.stdout = self.mockToolLogFileObj
+        mRestartEcraServices(aEcraInstallFolder=self.ecraInstallFolder)
+
+    def mCheckEcraMockModeStatus(self):
+        """
+        Checking if ecra mock mode enabled by: 
+          1. Checking for required mock mode properties set to TRUE in ecra db
+          2. Checking if mock response template json files present in 
+            <ecra_install>/<domainsFolder>/cfg
+          3. Checking if <ecra_install>/<domainsFolder>/cfg/ecra.json
+             has required mock attributes set to true
+          4. Checking if mock test rack rows inserted into ecs_racks table. <<-- this is not
+                                              mandatory as you can work with your own rack
+        """
+
+        self.mLogMessage(aMsg="Checking for ecra mock mode status...\n", aLogTarget='logfile')
+
+        _overallStatus = True
+        # Checking if required mock mode properties set to TRUE in ecra db
+        self.mLogMessage(aMsg="Checking if required mock mode properties set to TRUE in ecra db...", aLogTarget='logfile')
+        for _mockPropertyName in ECRA_MOCK_PROPERTY_NAMES:
+            _propertyCurlCmd = "{curlCmd} '{ecraEndpointUrl}/properties/{propertyName}'".format(curlCmd=self.curlGetCmd, ecraEndpointUrl=self.ecraEndpointUrl, propertyName=_mockPropertyName)
+            _response = mExecuteCmd(aCmd=_propertyCurlCmd)
+            if _response.startswith(HTTP_200_RESPONSE_CODE):
+                _propertyValueExists = False
+                for _line in iter(_response.splitlines()):
+                    if '\"property_value\":\"TRUE\"' in _line:
+                        _propertyValueExists = True
+                        self.mLogMessage(aMsg="Required mock mode property: {propertyName} set to TRUE".format(propertyName=_mockPropertyName), aLogTarget='logfile')
+                        break
+                if not _propertyValueExists:
+                    _overallStatus = False
+                    self.mLogMessage(aMsg="Required mock mode property: {propertyName} not set to TRUE".format(propertyName=_mockPropertyName), aLogTarget='logfile')
+            
+            else:
+                raise Exception("Error while executing: {curlCmd}".format(curlCmd=_propertyCurlCmd))
+
+        # Checking if mock response template json files copied to cfg folder
+        self.mLogMessage(aMsg="Checking if mock response template json files copied to {ecraInstallFolder}/{domainsFolder}/cfg...".format(ecraInstallFolder=self.ecraInstallFolder, domainsFolder=DOMAINS_FOLDER), aLogTarget='logfile')
+        _isFileExists = False
+        if os.path.exists("{file}".format(file='{ecraInstallFolder}/{domainsFolder}/cfg/mockrsp_tmpl.json'.format(ecraInstallFolder=self.ecraInstallFolder, domainsFolder=DOMAINS_FOLDER))):
+            _isFileExists = True
+            self.mLogMessage(aMsg="mockrsp_tmpl.json file present", aLogTarget='logfile')
+        if not _isFileExists:
+            _overallStatus = False
+            self.mLogMessage(aMsg="mockrsp_tmpl.json file not present", aLogTarget='logfile')
+
+        # Checking if ecra.json has required mock attributes set to true
+        self.mLogMessage(aMsg="Checking if {ecraInstallFolder}/{domainsFolder}/cfg/ecra.json has required mock attributes set to true...".format(ecraInstallFolder=self.ecraInstallFolder, domainsFolder=DOMAINS_FOLDER), aLogTarget='logfile')
+        with open("{ecraInstallFolder}/{domainsFolder}/cfg/ecra.json".format(ecraInstallFolder=self.ecraInstallFolder, domainsFolder=DOMAINS_FOLDER), "r") as _jsonFile:
+            _data = json.load(_jsonFile)
+        _isKeyExists = False
+        for _mockPropertyName in ECRA_MOCK_PROPERTY_NAMES:
+            if (_mockPropertyName in _data and _data["{propertyName}".format(propertyName=_mockPropertyName)] == "true"):
+                _isKeyExists = True
+                self.mLogMessage(aMsg="Required mock mode property: {propertyName} set to true".format(propertyName=_mockPropertyName), aLogTarget='logfile')
+        if not _isKeyExists:
+            _overallStatus = False
+            self.mLogMessage(aMsg="Required mock mode property(s) {mockModePropertyNames} either missing or not set to true".format(mockModePropertyNames=ECRA_MOCK_PROPERTY_NAMES), aLogTarget='logfile')
+
+        return _overallStatus
+
+    def mEnableExacloudMockMode(self):
+        """
+        Enabling exacloud mock mode requires: 
+        """
+
+        self.mLogMessage(aMsg=f"Enabling {next(iter(SUPPORTED_MOCK_MODE_TYPES))} {next(iter(EXACLOUD_MOCK_PROPERTY_NAMES))} for infrapatching...\n", aLogTarget='all')
+
+        # Updating config/exabox.conf to set required mock attributes to True       
+        self.mLogMessage(aMsg="Updating {ecraInstallFolder}/{domainsFolder}/exacloud/config/exabox.conf to set required mock attributes to True...".format(ecraInstallFolder=self.ecraInstallFolder, domainsFolder=DOMAINS_FOLDER), aLogTarget='all') 
+        with open("{ecraInstallFolder}/{domainsFolder}/exacloud/config/exabox.conf".format(ecraInstallFolder=self.ecraInstallFolder, domainsFolder=DOMAINS_FOLDER), "r") as _jsonFile:
+            _data = json.load(_jsonFile)
+        for _mockPropertyName in EXACLOUD_MOCK_PROPERTY_NAMES:
+            _data["{propertyName}".format(propertyName=_mockPropertyName)] = "True"
+        with open("{ecraInstallFolder}/{domainsFolder}/exacloud/config/exabox.conf".format(ecraInstallFolder=self.ecraInstallFolder, domainsFolder=DOMAINS_FOLDER), "w") as _jsonFile:
+            json.dump(_data, _jsonFile)
+
+        # Inserting mock test rows into ecs_racks table
+        #self.mLogMessage(aMsg="Inserting {numberOfClusters} {rackName} mock test rows into ecs_racks table...".format(numberOfClusters=self.numberOfClusters, rackName=self.mockClusterName), aLogTarget='all')
+        #self.mInsertMockTestRacksIntoEcsRacks()
+
+        # Restarting ecra services
+        self.mLogMessage(aMsg="Restarting exacloud service...", aLogTarget='all')
+        sys.stdout = self.mockToolLogFileObj
+        mRestartExacloudService(aEcraInstallFolder=self.ecraInstallFolder)
+
+    def mDisableExacloudMockMode(self):
+        """
+        Disabling exacloud mock mode requires: 
+        """
+ 
+        self.mLogMessage(aMsg=f"Disabling {next(iter(SUPPORTED_MOCK_MODE_TYPES))} {next(iter(EXACLOUD_MOCK_PROPERTY_NAMES))} for infrapatching\n", aLogTarget='all')
+
+        # Updating config/exabox.conf to set required mock attributes to False
+        self.mLogMessage(aMsg="Updating {ecraInstallFolder}/{domainsFolder}/exacloud/config/exabox.conf to set required mock attributes to False...".format(ecraInstallFolder=self.ecraInstallFolder, domainsFolder=DOMAINS_FOLDER), aLogTarget='all') 
+        with open("{ecraInstallFolder}/{domainsFolder}/exacloud/config/exabox.conf".format(ecraInstallFolder=self.ecraInstallFolder, domainsFolder=DOMAINS_FOLDER), "r") as _jsonFile:
+            _data = json.load(_jsonFile)
+        for _mockPropertyName in EXACLOUD_MOCK_PROPERTY_NAMES:
+            _data["{propertyName}".format(propertyName=_mockPropertyName)] = "False"
+        with open("{ecraInstallFolder}/{domainsFolder}/exacloud/config/exabox.conf".format(ecraInstallFolder=self.ecraInstallFolder, domainsFolder=DOMAINS_FOLDER), "w") as _jsonFile:
+            json.dump(_data, _jsonFile)
+
+        # Deleting mock test rows from ecs_racks table
+        self.mLogMessage(aMsg="Deleting {rackName} mock test rows from ecs_racks table...".format(rackName=self.mockClusterName), aLogTarget='all')
+        self.mDeleteMockTestRacksFromEcsRacks()
+
+        # Restarting ecra services
+        self.mLogMessage(aMsg="Restarting exacloud service...", aLogTarget='all')
+        sys.stdout = self.mockToolLogFileObj
+        mRestartExacloudService(aEcraInstallFolder=self.ecraInstallFolder)
+
+    def mCheckExacloudMockModeStatus(self):
+        """
+        Checking if exacloud mock mode enabled by: 
+          1. Checking if <ecra_install>/<domainsFolder>/exacloud/config/exabox.conf
+             has required mock attributes set to True
+        """
+
+        self.mLogMessage(aMsg="Checking for exacloud mock mode status for infrapatching...\n", aLogTarget='logfile')
+
+        _overallStatus = True
+        # Checking if exabox.conf has required mock attributes set to True
+        self.mLogMessage(aMsg="Checking if {ecraInstallFolder}/{domainsFolder}/exacloud/config/exabox.conf has required mock attributes set to True...".format(ecraInstallFolder=self.ecraInstallFolder, domainsFolder=DOMAINS_FOLDER), aLogTarget='logfile')
+        with open("{ecraInstallFolder}/{domainsFolder}/exacloud/config/exabox.conf".format(ecraInstallFolder=self.ecraInstallFolder, domainsFolder=DOMAINS_FOLDER), "r") as _jsonFile:
+            _data = json.load(_jsonFile)
+        _isKeyExists = False
+        for _mockPropertyName in EXACLOUD_MOCK_PROPERTY_NAMES:
+            if (_mockPropertyName in _data and _data["{propertyName}".format(propertyName=_mockPropertyName)] == "True"):
+                _isKeyExists = True
+                self.mLogMessage(aMsg="Required mock mode property: {propertyName} set to True".format(propertyName=_mockPropertyName), aLogTarget='logfile')
+        if not _isKeyExists:
+            _overallStatus = False
+            self.mLogMessage(aMsg="Required mock mode property(s) {mockModePropertyNames} either missing or not set to true".format(mockModePropertyNames=EXACLOUD_MOCK_PROPERTY_NAMES), aLogTarget='logfile')
+
+        return _overallStatus
+
+    def mCheckMockModeStatus(self):
+        """
+        Checking if mock mode enabled by: 
+        Running all the supported mock mode checks
+
+        Return ecra - if ecra mock mode enabled
+        Return exacloud - if exacloud mock mode enabled
+        Return all - if more than one mock mode enabled
+        Return None if mock mode not enabled
+        """
+
+        self.mLogMessage(aMsg="Checking mock mode status...\n", aLogTarget='logfile')
+        sys.stdout = self.mockToolLogFileObj 
+        mCheckAndStartEcraServices(aEcraInstallFolder=self.ecraInstallFolder)
+
+        _enabledMockModeType = None
+        if self.mCheckEcraMockModeStatus():
+            self.mLogMessage(aMsg="Ecra mock mode already enabled!", aLogTarget='logfile')
+            _enabledMockModeType = 'ecra'
+            if self.mCheckExacloudMockModeStatus():
+                self.mLogMessage(aMsg="Exacloud mock mode already enabled!", aLogTarget='logfile')
+                _enabledMockModeType = 'all'
+                self.mLogMessage(aMsg="WARNING: Both Ecra and Exacloud mock modes are enabled!", aLogTarget='all')
+        elif self.mCheckExacloudMockModeStatus():
+            self.mLogMessage(aMsg="Exacloud mock mode already enabled!", aLogTarget='logfile')
+            _enabledMockModeType = 'exacloud'
+
+        return _enabledMockModeType
+
+    def mUpdateReport(self, aMsg, aMode):
+        """
+        Helper method to update the mock progress of infrapatching operations
+        into report file
+        """
+
+        self.lock.acquire()
+        _reportFile = open(self.mockReportFile, aMode)
+        _reportFile.write('{msg}\n'.format(msg=aMsg))
+        _reportFile.close()
+        self.lock.release() 
+    
+    def mUpdateConsolidatedReport(self, aMsg, aMode):
+        """
+        Helper method to update the mock consolidated progress of infrapatching operations
+        into report file
+        """
+
+        self.lock.acquire()
+        _reportFile = open(self.consolidatedMockReportFile, aMode)
+        _reportFile.write('{msg}\n'.format(msg=aMsg))
+        _reportFile.close()
+        self.lock.release() 
+
+    def mRetrieveLinesWithinStartEndDatTimeFromLogfile(self, aStartDateTime, aEndDateTime, aDateTimeFormat, aLogFile):
+        """
+        Helper method to filter lines from logfile within a start/end datetime range
+        """
+
+        _dateDiff = aEndDateTime - aStartDateTime
+        _days, _hours, _minutes  = _dateDiff.days, _dateDiff.seconds // 3600, _dateDiff.seconds %3600//60
+        _startDatetimeSecAfter = aStartDateTime + timedelta(seconds = 2)
+
+        mRunViaSubprocess(aExecutionType='cmd', aExecute="awk '/{startDatetimeSecAfter}*/,/{endDateTime}.*/' {logFile} > {targetFile}".format(startDatetimeSecAfter=(_startDatetimeSecAfter).strftime(aDateTimeFormat), endDateTime=(aEndDateTime).strftime(aDateTimeFormat), logFile=aLogFile, targetFile=self.tmpFileWithFilteredLogMsgsWithinStartEndDatetime))
+
+        self.mLogMessage(aMsg="Total size of the filtered log messages file {filteredLogFile} is: {fileSize}".format(filteredLogFile=self.tmpFileWithFilteredLogMsgsWithinStartEndDatetime, fileSize=Path(self.tmpFileWithFilteredLogMsgsWithinStartEndDatetime).stat().st_size), aLogTarget='logfile')
+           
+    def mValidateAgentLog(self):
+        """
+        Helper method to validate the mock run execution from agent log
+        """
+
+        # Process the filtered log messages from self.tmpFileWithFilteredLogMsgsWithinStartEndDatetime
+        os.environ['RACK_NAME'] = self.mockClusterName
+        os.environ['TOTAL_NUMBER_OF_REQUESTS_HANDLED'] = str(self.runCntEndRange-self.runCntIncrementRange)
+        os.environ['LOG_FILE'] = self.tmpFileWithFilteredLogMsgsWithinStartEndDatetime
+
+        # prepare a bash script to run the given sql file
+        _tmpShFile = "{homeDir}/tmpBashScript.sh".format(homeDir=str(Path.home()))
+        with open ("{script}".format(script=_tmpShFile), 'w') as rsh:
+            rsh.write('''\
+#! /bin/bash
+
+echo -e "----------------------------------------------------"
+echo -e "  RACK NAME      | THREAD ID | HTTP CODE |    STATUS"
+echo -e "----------------------------------------------------"
+
+rack_list_cnt=$(grep "${RACK_NAME}" ${LOG_FILE} | wc -l)
+unique_thread_ids=
+no_of_unique_threads=0
+failed_requests=0
+for i in $(seq 1 $rack_list_cnt)
+do
+  rack="${RACK_NAME}${i}"
+  rack_match_cnt=$(grep "${rack}'" ${LOG_FILE} | wc -l)
+  if [[ ! -z "${rack_match_cnt}" && "${rack_match_cnt}" -gt "0" ]]; then
+    thread_id=$(grep "${rack}'" ${LOG_FILE} | tail -1 | awk '{print $8}')
+    if [[ -z "${unique_thread_ids}" ]]; then
+      unique_thread_ids="${thread_id}\n"
+      no_of_unique_threads=1
+    else
+      thread_id_match=$(echo "${unique_thread_ids}" | grep "${thread_id}")
+      if [[ -z "${thread_id_match}" ]]; then
+        unique_thread_ids="${unique_thread_ids}${thread_id}\n"
+        no_of_unique_threads=$((no_of_unique_threads+1))
+      fi
+    fi
+    error_code=$(egrep "\- ${thread_id} \-" ${LOG_FILE} | grep -A1 "${rack}'" )
+    error_code=$(echo "${error_code}" | tail -1 | awk '{print $(NF-1)}')
+    case ${error_code} in
+      200) echo "${rack}    |   ${thread_id}   |    ${error_code}    |   SUCCESS" ;;
+      503) echo "${rack}    |   ${thread_id}   |    ${error_code}    |   FAILED <<--" 
+           ((failed_requests++));;
+      *) echo "${rack}    |   ${thread_id}   |    ${error_code}    |   UNKNOWN <<-->>" ;;
+    esac
+  fi
+done
+echo -e "\n--->Out of '${TOTAL_NUMBER_OF_REQUESTS_HANDLED}' requests, '${failed_requests}' requests failed with 503 HTTP CODE:"
+echo -e "--->Total '${no_of_unique_threads}' unique threads handled '${TOTAL_NUMBER_OF_REQUESTS_HANDLED}' requests. Following are the thread ids:"
+echo -e "${unique_thread_ids}"
+''')
+        # run the bash script
+        os.chmod("{script}".format(script=_tmpShFile), 0o755)
+        self.defaultStdOut = sys.stdout 
+        mRunViaSubprocess(aExecutionType='script', aExecute="{script}".format(script=_tmpShFile)) 
+
+    def mValidateMockRunExecution(self, aStartDateTime, aEndDateTime):
+        """
+        Helper method to validate the mock run execution
+        """
+
+        # Datetime format for reading lines from agent/exacloud log files
+        # self.startDateTime).strftime('%Y-%m-%d %H:%M:%S'), aEndDateTimeFormat=(self.endDateTime).strftime('%Y-%m-%d %H:%M:%S')
+
+        # Datetime format for reading lines from ecra log file (notice T in the format. that is the only difference from above
+        # (self.startDateTime).strftime('%Y-%m-%dT%H:%M:%S'), aEndDateTimeFormat=(self.endDateTime).strftime('%Y-%m-%dT%H:%M:%S')
+
+        if self.enabledMockModeType == 'exacloud':
+            # Filter specific lines from agent.log for further processing
+            self.mRetrieveLinesWithinStartEndDatTimeFromLogfile(aStartDateTime=aStartDateTime, aEndDateTime=aEndDateTime, aDateTimeFormat='%Y-%m-%d %H:%M:', aLogFile=self.agentLogFile)
+            if Path(self.tmpFileWithFilteredLogMsgsWithinStartEndDatetime).stat().st_size > 0:
+                self.mLogMessage(aMsg="\n--->Consolidated requests status from exacloud agent logfile", aLogTarget='all')
+                self.mValidateAgentLog()
+
+    def mExecuteInfraPatchCommand(self, aOperation, aTarget, aOperationStyle, aClusterName, aPatchCurlCmdWithPayload):
+        """
+         Internal method to execute curl cmd to initiate infrapatch operation and to monitor the progress of it.
+         This method is used for MOCK mode where direct client url of the operation is executed for different mock test 
+         clusters within a short span of time.
+    
+        It returns:
+          1)True  -> when infra patch operation succeeds.
+            False -> when infra patch operation fails. It can fail if HTTP response does return 202 or HTTP response does not
+                   have status_uri HTTP header or Infrapatch operation itself failed in the backend.
+          2) status call output if present otherwise empty
+    
+        This method does the following
+            1)Update the payload json with the operation and target passed as arguments.
+            2)Use the payload json and initiate patch operation with curl command.
+            3)Parse for status_uri HTTPHeader in the response.
+            4)Poll for the progress status.
+    
+        """
+
+        _ret = True
+        _status_output = ""
+        _response = mExecuteCmd(aCmd=aPatchCurlCmdWithPayload)
+        _status_url = mGetHTTPHeaderValueFromHTTPResponse(_response, STATUS_URI)
+        if _response.startswith(HTTP_202_RESPONSE_CODE) or len(_status_url) > 0:
+            mPatchLogInfo("\nPatch operation started in background.\n")
+            _ret, _status_output = mCheckPatchOperationStatus(_status_url, aMockMode='Yes')
+        else:
+            mPatchLogError("\nEither HTTP 202 response is not returned for the HTTP request of patch operation initiation or status_uri is missing from response. Full response received for the request is: \n{response}".format(response=_response))
+            _ret = False
+
+        if _ret:
+            mPatchLogInfo("")
+            mPatchLogInfo("\nCluster: {clusterName}. Successfully executed: {target} {operation} in {operationStyle} operation style\n".format(clusterName=aClusterName, target=aTarget, operation=aOperation, operationStyle=aOperationStyle))
+            self.mUpdateReport(aMsg='{curDateTime}: Operation status of cluster: {clusterName} SUCCESS. ECRA status url: {statusUrl}'.format(curDateTime=(datetime.now()).strftime('%Y-%m-%d %H:%M:%S'), clusterName=aClusterName, statusUrl=_status_url), aMode='a')
+            self.mUpdateConsolidatedReport(aMsg=f'{aTarget:9s} {aOperation:22s} {aOperationStyle:12s} with cluster: {aClusterName:14s} {"SUCCESS":8s} ECRA status url: {_status_url}', aMode='a')
+        else:
+            mPatchLogInfo("")
+            mPatchLogError("\nCluster: {clusterName}. Problem while running: {target} {operation} in {operationStyle} operation style. Response received for the request is: \n{response}".format(clusterName=aClusterName, target=aTarget, operation=aOperation, operationStyle=aOperationStyle, response=_status_output))
+            self.mUpdateReport(aMsg='{curDateTime}: Operation status of cluster: {clusterName} FAIL <<--. ECRA status url: {statusUrl}'.format(curDateTime=(datetime.now()).strftime('%Y-%m-%d %H:%M:%S'), clusterName=aClusterName, statusUrl=_status_url), aMode='a')
+            self.mUpdateConsolidatedReport(aMsg=f'{aTarget:9s} {aOperation:22s} {aOperationStyle:12s} with cluster: {aClusterName:14s} {"FAIL":8s} ECRA status url: {_status_url}', aMode='a')
+        mPatchLogInfo("******************************************************")
+        
+    def mBeginPrintFormat(self, aOperation, aTarget, aOperationStyle):
+        """
+        Helper method to print initial output in certain format
+        """
+
+        self.mLogMessage(aMsg="", aLogTarget='all')
+        _msg = "======================================================================"
+        self.mLogMessage(aMsg=_msg, aLogTarget='all')
+        _msg = "{curDateTime}: Initiating: {range} '{target}' '{operation}' operations of '{operationStyle}' operationStyle against clusters: {rackName}{startRange}..{rackName}{endRange}".format(curDateTime=(self.startDateTime).strftime('%Y-%m-%d %H:%M:%S'), range=self.runCntIncrementRange, target=aTarget, operation=aOperation, operationStyle=aOperationStyle, rackName=self.mockClusterName, startRange=self.runCntStartRange, endRange=self.runCntEndRange)
+        self.mLogMessage(aMsg=_msg, aLogTarget='all')
+        
+    def mEndPrintFormat(self, aOperation, aTarget, aOperationStyle):
+        """
+        Helper method to print final output in certain format
+        """
+
+        _msg = "{curDateTime}: Completed:  {range} '{target}' '{operation}' operations of '{operationStyle}' operationStyle against clusters: {rackName}{startRange}..{rackName}{endRange}".format(curDateTime=(self.endDateTime).strftime('%Y-%m-%d %H:%M:%S'), range=self.runCntIncrementRange, target=aTarget, operation=aOperation, operationStyle=aOperationStyle, rackName=self.mockClusterName, startRange=self.runCntStartRange, endRange=self.runCntEndRange)
+        self.mLogMessage(aMsg=_msg, aLogTarget='all')
+
+    def mPrintDateTimeDiff(self, aRange, aStartDateTime, aEndDateTime, aMsg):
+        _dateDiff = aEndDateTime - aStartDateTime
+        _days, _hours, _minutes  = _dateDiff.days, _dateDiff.seconds // 3600, _dateDiff.seconds %3600//60
+        _seconds = _dateDiff.seconds - _hours*3600 - _minutes*60
+        self.mLogMessage(aMsg="\n---->Total time taken to run {msg} {range} operations: ~{days}days {hours}hrs {minutes}mins {seconds}secs".format(msg=aMsg, range=aRange, days=_days, hours=_hours, minutes=_minutes, seconds=_seconds), aLogTarget='all')
+
+    def mRun(self):
+        """
+        Method to run infrapatching operations in mock mode
+        """
+
+        try:
+            _runOperationStartDateTime = datetime.now()
+            _totalNumberOfCombinationsTested = 0
+            # iterate thru given operation styles to run operations against targets.
+            self.consolidatedMockReportFile = "{ecraInstallFolder}/{mockToolLogFolder}/consolidated_mock_report_{curDateTime}.txt".format(ecraInstallFolder=self.ecraInstallFolder, mockToolLogFolder=MOCK_LOG_FOLDER, curDateTime=self.startDateTime.strftime('%Y-%m-%d-%H:%M:%S'))
+            for _operationStyle in self.operationStyles.split(','):
+                for _operation in self.operations.split(','):
+                    for _target in self.targets.split(','):
+                        _totalNumberOfCombinationsTested = _totalNumberOfCombinationsTested + self.runCntIncrementRange
+                        self.startDateTime = datetime.now()
+                        self.mBeginPrintFormat(aOperation=_operation, aTarget=_target, aOperationStyle=_operationStyle)
+                        self.mockReportFile = "{ecraInstallFolder}/{mockToolLogFolder}/mock_report_{target}_{operation}_{operationStyle}_{curDateTime}.txt".format(ecraInstallFolder=self.ecraInstallFolder, mockToolLogFolder=MOCK_LOG_FOLDER, target=_target, operation=_operation, operationStyle=_operationStyle, curDateTime=self.startDateTime.strftime('%Y-%m-%d-%H:%M:%S'))
+                        try:
+                            os.remove("{reportFile}".format(reportFile=self.mockReportFile))
+                        except:
+                            pass
+
+                        self.mUpdateReport(aMsg="Consolidated report of running   {range} '{target}' '{operation}' operations of '{operationStyle}' operationStyle against clusters: {rackName}{startRange}..{rackName}{endRange}".format(range=self.runCntIncrementRange, target=_target, operation=_operation, operationStyle=_operationStyle, rackName=self.mockClusterName, startRange=self.runCntStartRange, endRange=self.runCntEndRange), aMode='a')
+                        _msg = "*********************************************************************"
+                        self.mUpdateReport(aMsg=_msg, aMode='a')
+
+                        # redirect cmd specific console msgs to logfile
+                        sys.stdout = self.mockToolLogFileObj
+
+                        # spawn threads to run the operations
+                        with concurrent.futures.ThreadPoolExecutor(self.runCntIncrementRange) as _executor:
+                            for _i in range(self.runCntStartRange, self.runCntEndRange + 1):
+                                _clusterName = "{rackName}{clusterIndex}".format(rackName=self.mockClusterName, clusterIndex=_i)
+                                _patchCurlCmdWithPayload = mGetInfrapatchCurlCmd(aEcraInstallFolder=self.ecraInstallFolder, aOperation=_operation, aTarget=_target, aOperationStyle=_operationStyle, aClusterName=_clusterName, aMockModeViaRestApi=self.mockModeViaRestApi)
+                                _executor.submit(self.mExecuteInfraPatchCommand, aOperation=_operation, aTarget=_target, aOperationStyle=_operationStyle, aClusterName=_clusterName, aPatchCurlCmdWithPayload=_patchCurlCmdWithPayload)
+                                #self.mExecuteInfraPatchCommand(aOperation=_operation, aTarget=_target, aOperationStyle=_operationStyle, aClusterName=_clusterName, aPatchCurlCmdWithPayload=_patchCurlCmdWithPayload)
+                                #time.sleep(30)
+
+                        self.endDateTime = datetime.now()
+                        self.mEndPrintFormat(aOperation=_operation, aTarget=_target, aOperationStyle=_operationStyle)
+                        self.mPrintDateTimeDiff(aRange=self.runCntIncrementRange, aStartDateTime=self.startDateTime, aEndDateTime=self.endDateTime, aMsg='')
+                        self.mLogMessage(aMsg="", aLogTarget='console')
+
+                        # show consolidated report of completed threads
+                        _reportOutput = mRunViaSubprocess(aExecutionType='cmd', aExecute="cat {reportFile}".format(reportFile=self.mockReportFile))
+                        self.mLogMessage(aMsg="{reportOutput}\n".format(reportOutput=_reportOutput), aLogTarget='all')
+                        _reportOutput = mRunViaSubprocess(aExecutionType='cmd', aExecute="grep -w FAIL {reportFile} | wc -l".format(reportFile=self.mockReportFile))
+                        if int(_reportOutput) != 0:
+                            self.finalRunStatus = EXIT_FAILURE
+                        self.mLogMessage(aMsg="--->'{failedRequests}' failed requests out of '{incrementRange}' concurrent requests\n".format(failedRequests=_reportOutput, incrementRange=self.runCntIncrementRange), aLogTarget='all')
+
+                        self.runCntStartRange = self.runCntEndRange + 1
+                        self.runCntEndRange = self.runCntEndRange + self.runCntIncrementRange
+
+                self.mUpdateConsolidatedReport(aMsg='', aMode='a')
+
+            
+            _runOperationEndDateTime = datetime.now()
+            #self.mValidateMockRunExecution(_runOperationStartDateTime, _runOperationEndDateTime)
+
+            _consolidatedMockReportOutput = mRunViaSubprocess(aExecutionType='cmd', aExecute="cat {reportFile}".format(reportFile=self.consolidatedMockReportFile))
+            self.mLogMessage(aMsg="\n"+" "*35+"="*30+"\n"+" "*35+"Consolidated run status report\n"+" "*35+"="*30+"\n{reportOutput}\n".format(reportOutput=_consolidatedMockReportOutput), aLogTarget='all')
+
+            # show log file location again when console log gets printed with more cluster report data
+            #if self.numberOfClusters >= 100:
+            #    _msg = "======================================================================"
+            #    self.mLogMessage(aMsg="\n{msg}".format(msg=_msg), aLogTarget='console')
+            #    self.mLogMessage(aMsg="Mock tool execution log file: {logFile}".format(logFile=self.mockToolLogFile), aLogTarget='console')
+            #    self.mLogMessage(aMsg="", aLogTarget='console')
+            #    self.mLogMessage(aMsg="ECRA log file: {ecraLogFile}".format(ecraLogFile=self.ecraLogFile), aLogTarget='console')
+            #    self.mLogMessage(aMsg="Exacloud log file: {exacloudLogFile}".format(exacloudLogFile=self.exacloudLogFile), aLogTarget='console')
+            #    self.mLogMessage(aMsg="Exacloud Agent log file: {agentLogFile}".format(agentLogFile=self.agentLogFile), aLogTarget='console')
+            #    self.mLogMessage(aMsg=_msg, aLogTarget='console')
+            #    self.mLogMessage(aMsg="", aLogTarget='console')
+
+            self.mPrintDateTimeDiff(aRange=_totalNumberOfCombinationsTested, aStartDateTime=_runOperationStartDateTime, aEndDateTime=_runOperationEndDateTime, aMsg='the tool for')
+
+        except e:
+            self.mLogMessage(aMsg="An exception occurred: {exception}".format(exception=e), aLogTarget='all')
+            raise Exception(e)
+
+    def mPrepareLogFile(self, aOptionName):
+        """
+        Helper method to prepare the tool logfile
+        """
+        Path("{ecraInstallFolder}/{mockToolLogFolder}".format(ecraInstallFolder=self.ecraInstallFolder, mockToolLogFolder=MOCK_LOG_FOLDER)).mkdir(parents=True, exist_ok=True)
+
+        self.mockToolLogFile = "{ecraInstallFolder}/{mockToolLogFolder}/mock_{option}_infrapatching_operations_{curDateTime}.log".format(ecraInstallFolder=self.ecraInstallFolder, mockToolLogFolder=MOCK_LOG_FOLDER, option=aOptionName, curDateTime=datetime.now().strftime('%Y-%m-%d-%H:%M:%S'))
+        self.ecraLogFile = "{ecraInstallFolder}/{domainsFolder}/log/ecra-EcraServer1-json.log".format(ecraInstallFolder=self.ecraInstallFolder, domainsFolder=DOMAINS_FOLDER)
+        self.exacloudLogFile = "{ecraInstallFolder}/{exacloudLogFolder}/exacloud.log".format(ecraInstallFolder=self.ecraInstallFolder, exacloudLogFolder=EXACLOUD_LOG_FOLDER)
+        self.agentLogFile = "{ecraInstallFolder}/{exacloudLogFolder}/agent.log".format(ecraInstallFolder=self.ecraInstallFolder, exacloudLogFolder=EXACLOUD_LOG_FOLDER)
+        _msg = "======================================================================"
+        print("")
+        print(_msg)
+        print("Mock tool execution log file: {logFile}".format(logFile=self.mockToolLogFile))
+        print("")
+        print("ECRA log file: {ecraLogFile}".format(ecraLogFile=self.ecraLogFile))
+        print("Exacloud log file: {exacloudLogFile}".format(exacloudLogFile=self.exacloudLogFile))
+        print("Exacloud Agent log file: {agentLogFile}".format(agentLogFile=self.agentLogFile))
+        print(_msg)
+        print("")
+
+        self.mockToolLogFileObj = open("{logFile}".format(logFile=self.mockToolLogFile), "w")
+
+    def mPrepareForExecution(self, aRunOption, aRunOptionArgs):
+        """
+        This is helper method to parse the arguments and prepare logfiles and etc.,
+        """
+
+        _argsArray = re.split(r'#', aRunOptionArgs)
+        _number_of_combinational_tests_to_be_run = 1
+
+        if not os.path.isdir(_argsArray[0]):
+            print("\nERROR: Ecra install folder {_path} doesn't exists!".format(_path=_argsArray[0]))
+            self.mUsage()
+        else:
+            self.ecraInstallFolder = _argsArray[0]
+     
+        self.runCntIncrementRange = _number_of_combinational_tests_to_be_run
+        self.runCntEndRange = self.runCntIncrementRange
+
+        if aRunOption == 'enable_mock_mode':
+            self.numberOfClusters = _number_of_combinational_tests_to_be_run
+            self.requestToEnableMockModeType = next(iter(SUPPORTED_MOCK_MODE_TYPES))
+
+        elif aRunOption == 'run':
+            if _argsArray[1] == '':
+                print("\nERROR: Mandatory argument: Registered rack cluster name with ECRA missing for: {option} option!".format(option=aRunOption))
+                self.mUsage()
+            else:
+                self.registeredRackClusterNameWithEcra = _argsArray[1].lower()
+
+            if _argsArray[2] == '':
+                print("\nERROR: number_of_combinational_tests_to_be_run should be an integer!")
+                self.mUsage() 
+            else:
+                try:
+                    _number_of_combinational_tests_to_be_run = int(_argsArray[2])
+                except:
+                    print("\nERROR: number_of_combinational_tests_to_be_run should be an integer!")
+                    self.mUsage()
+
+            if _argsArray[3] == '':
+                print("\nERROR: Mandatory argument: target missing for: {option} option!".format(option=aRunOption))
+                self.mUsage()
+            else:
+                self.targets = _argsArray[3]
+                for _target in self.targets.split(','):
+                    if _target.lower() not in SUPPORTED_MOCK_TARGETS:
+                        print("\nERROR: Invalid target: {target}. Supported targets are: {targets} !".format(target=_target, targets=SUPPORTED_MOCK_TARGETS))
+                        self.mUsage() 
+
+            if _argsArray[4] == '':
+                print("\nERROR: Mandatory argument: operation missing for: {option} option!".format(option=aRunOption))
+                self.mUsage()
+            else:
+                self.operations = _argsArray[4]
+                for _operation in self.operations.split(','):
+                    if _operation.lower() not in SUPPORTED_MOCK_OPERATIONS:
+                        print("\nERROR: Invalid operation: {operation}. Supported operations are: {operations} !".format(operation=_operation, operations=SUPPORTED_MOCK_OPERATIONS))
+                        self.mUsage() 
+
+            if _argsArray[5] == '':
+                print("\nERROR: Mandatory argument: operation style missing for: {option} option!".format(option=aRunOption))
+                self.mUsage()
+            else:
+                self.operationStyles = _argsArray[5]
+                for _operationStyle in self.operationStyles.split(','):
+                    if _operationStyle.lower() not in SUPPORTED_MOCK_OPERATION_STYLES:
+                        print("\nERROR: Invalid operation style: {operationStyle}. Supported operation styles are: {operationStyles} !".format(operationStyle=_operationStyle, operationStyles=SUPPORTED_MOCK_OPERATION_STYLES))
+                        self.mUsage() 
+
+            if len(_argsArray) == 7 and ("mockMode" == _argsArray[6] or "MockMode" == _argsArray[6]):
+                self.mockModeViaRestApi = _argsArray[6]
+
+            _numberOfTargets = self.targets.count(",") + 1
+            _numberOfOperations = self.operations.count(",") + 1
+            _numberOfOperationStyles = self.operationStyles.count(",") + 1
+
+            self.numberOfClusters = _number_of_combinational_tests_to_be_run * (_numberOfTargets * _numberOfOperations * _numberOfOperationStyles)
+            self.runCntIncrementRange = _number_of_combinational_tests_to_be_run
+            print(f"\nRequest to run: '{self.runCntIncrementRange}' tests each for the given combination of: target(s) '{self.targets}', operation type(s) '{self.operations}' and operation style(s) '{self.operationStyles}'. Total '{self.numberOfClusters}' unique dummy_rack clusters will be used for this testing.")
+            self.runCntEndRange = self.runCntIncrementRange
+
+        # prepare logfiles
+        self.mPrepareLogFile(aOptionName='{option}'.format(option=aRunOption))
+
+    def mExecute(self):
+        """
+        This method is used to parse command line options and execute corresponding action based on options.
+        """
+
+        try:
+            _options, _remainder = getopt.getopt(sys.argv[1:], 'he:r:d:', ['help',
+                                                                         'enable_mock_mode=', 
+                                                                         'run=',
+                                                                         'disable_mock_mode=',
+                                                                        ])
+            # If no arguments passed then display help
+            _runOption = None
+            _runOptionArgs = None
+            if len(_options) == 0:
+                self.mUsage()
+            else:
+                # check for options
+                for _option, _args in _options:
+                    if _option in ["-h", "--help"]:
+                        self.mUsage()
+                    elif _option in ["-e", "--enable_mock_mode"]:
+                        _runOption = 'enable_mock_mode'
+                        if _args not in ['-r', '-d', '-h']: 
+                            _runOptionArgs = _args
+                        else:
+                            print("\nERROR: Mandatory argument(s) missing for: {option} option!".format(option=_runOption))
+                            self.mUsage()
+                    elif _option in ["-r", "--run"]:
+                        _runOption = 'run'
+                        if _args not in ['-d', '-e', '-h'] and (_args.count('#') == 5 or _args.count('#') == 6): 
+                            _runOptionArgs = _args
+                        else:
+                            print("\nERROR: Mandatory argument(s) missing for: {option} option!".format(option=_runOption))
+                            self.mUsage()
+                    elif _option in ["-d", "--disable_mock_mode"]:
+                        _runOption = 'disable_mock_mode'
+                        if _args not in ['-r', '-e', '-h']: 
+                            _runOptionArgs = _args
+                        else:
+                            print("\nERROR: Mandatory argument(s) missing for: {option} option!".format(option=_runOption))
+                            self.mUsage()
+
+                # parse arguments and prepare for execution
+                self.mPrepareForExecution(_runOption, _runOptionArgs)
+
+                # execute mock supported option
+                self.enabledMockModeType = self.mCheckMockModeStatus()
+                if _runOption == 'enable_mock_mode':
+                    if self.enabledMockModeType is None:
+                        if self.requestToEnableMockModeType == "ecra":
+                            self.mEnableEcraMockMode()
+                        elif self.requestToEnableMockModeType == "exacloud":
+                            self.mEnableExacloudMockMode()
+                    else:
+                        _requestedMockModeAlreadyEnabled = 'No'
+                        if self.enabledMockModeType == "ecra" and self.requestToEnableMockModeType == "ecra":
+                            _requestedMockModeAlreadyEnabled = 'Yes'
+                        elif self.enabledMockModeType == "exacloud" and self.requestToEnableMockModeType == "exacloud":
+                            _requestedMockModeAlreadyEnabled = 'Yes'
+                        else:
+                            if self.requestToEnableMockModeType == "ecra":
+                                self.mLogMessage(aMsg="Request is to enable '{requestedMockMode}' mock mode but '{enabledMockMode}' mock mode already enabled!\n".format(requestedMockMode=self.requestToEnableMockModeType, enabledMockMode=self.enabledMockModeType), aLogTarget='all')
+                                self.mDisableExacloudMockMode()
+                                self.mLogMessage(aMsg="", aLogTarget='all')
+                                self.mEnableEcraMockMode()
+                            elif self.requestToEnableMockModeType == "exacloud":
+                                self.mLogMessage(aMsg="Request is to enable '{requestedMockMode}' mock mode but '{enabledMockMode}' mock mode already enabled!\n".format(requestedMockMode=self.requestToEnableMockModeType, enabledMockMode=self.enabledMockModeType), aLogTarget='all')
+                                self.mDisableEcraMockMode()
+                                self.mLogMessage(aMsg="", aLogTarget='all')
+                                self.mEnableExacloudMockMode()
+
+                        if _requestedMockModeAlreadyEnabled == 'Yes':
+                            # make sure required mock test rows are inserted into ecs_racks table. 
+                            # Duplicate rows anyway fails with unique constraint error which we are ignoring
+                            self.mLogMessage(aMsg="Inserting {numberOfClusters} {rackName} mock test racks into ecs_racks table...\n".format(numberOfClusters=self.numberOfClusters, rackName=self.mockClusterName), aLogTarget='logfile')
+                            self.mInsertMockTestRacksIntoEcsRacks()
+                            self.mLogMessage(aMsg=f"{self.requestToEnableMockModeType} {next(iter(EXACLOUD_MOCK_PROPERTY_NAMES))} already enabled.", aLogTarget='all')
+
+                elif _runOption == 'run':
+                    if self.mockModeViaRestApi:
+                        if self.enabledMockModeType is not None and self.enabledMockModeType in SUPPORTED_MOCK_MODE_TYPES:
+                            self.mLogMessage(aMsg=f"-->{next(iter(EXACLOUD_MOCK_PROPERTY_NAMES))} already enabled in exacloud but user also specified the parameter: {self.mockModeViaRestApi}. First disabling {next(iter(EXACLOUD_MOCK_PROPERTY_NAMES))} and then mock tooling prepares mock config json payload from exacloud/config/custom_mock_patch.json and adds 'mockMode':'<mock_config_json>' to AdditionalOptions of the infra patch rest api allowing infra patching fwk to run in mock mode patch without explicitly enabling the mock_mode_patch in exabox.conf and restarting the exacloud service...\n", aLogTarget='all')
+                            if self.enabledMockModeType in ["ecra", "all"]:
+                                self.mDisableEcraMockMode()
+                            if self.enabledMockModeType in ["exacloud", "all"]:
+                                self.mDisableExacloudMockMode()
+                        else:
+                            self.mLogMessage(aMsg=f"-->{next(iter(EXACLOUD_MOCK_PROPERTY_NAMES))} not enabled in exacloud but user specified the parameter: {self.mockModeViaRestApi}. Mock tooling prepares mock config json payload from exacloud/config/custom_mock_patch.json and adds 'mockMode':'<mock_config_json>' to AdditionalOptions of the infra patch rest api allowing infra patching fwk to run in mock mode patch without explicitly enabling the mock_mode_patch in exabox.conf and restarting the exacloud service...\n", aLogTarget='all')
+                        self.mInsertMockTestRacksIntoEcsRacks()
+                        self.mRun()
+                    else:
+                        if self.enabledMockModeType is not None and self.enabledMockModeType in SUPPORTED_MOCK_MODE_TYPES:
+                            self.mInsertMockTestRacksIntoEcsRacks()
+                            self.mLogMessage(aMsg=f"-->{self.enabledMockModeType} {next(iter(EXACLOUD_MOCK_PROPERTY_NAMES))} for infrapatching already enabled. Proceeding with infrapatching mock tests...\n", aLogTarget='all')
+                            self.mRun()
+                        else:
+                            self.mLogMessage(aMsg=f"ERROR: Mock mode not yet enabled. Enable: {next(iter(SUPPORTED_MOCK_MODE_TYPES))} {next(iter(EXACLOUD_MOCK_PROPERTY_NAMES))} before running the tests!\n", aLogTarget='all')
+                            self.finalRunStatus = EXIT_FAILURE
+
+                elif _runOption == 'disable_mock_mode':
+                    # disable all mock modes if, enabled
+                    if self.enabledMockModeType is not None:
+                        if self.enabledMockModeType in ["ecra", "all"]:
+                            self.mDisableEcraMockMode()
+                        if self.enabledMockModeType in ["exacloud", "all"]:
+                            self.mDisableExacloudMockMode()
+                    else:
+                        # make sure required mock test rows are deleted from ecs_racks table. 
+                        # db anyway ignores if row not already present
+                        self.mLogMessage(aMsg="Deleting {rackName} mock test racks from ecs_racks table...\n".format(rackName=self.mockClusterName), aLogTarget='logfile')
+                        self.mDeleteMockTestRacksFromEcsRacks()
+                        self.mLogMessage(aMsg=f"{next(iter(SUPPORTED_MOCK_MODE_TYPES))} {next(iter(EXACLOUD_MOCK_PROPERTY_NAMES))} already disabled.", aLogTarget='all')
+
+            self.mLogMessage(aMsg="", aLogTarget='all')
+
+        except getopt.GetoptError:
+            self.mUsage()
+        except Exception as _e:
+            sys.stdout = self.defaultStdOut
+            mPatchLogError(str(_e))
+            traceback.print_exc(file=sys.stdout)
+            self.finalRunStatus = EXIT_FAILURE
+        finally:
+            # Removing all the temp files created by the tool
+            mRunViaSubprocess(aExecutionType='cmd', aExecute="rm -f $HOME/{filtered_log_msgs_between_start_end_datetime.txt,tmpBashScript.sh,create_ade_view.sh,view_dir.txt,ecs_racks_insert_stmts.sql,ecs_racks_delete_stmts.sql,tmpSqlFileToExecute.sh}")
+            sys.stdout = self.defaultStdOut
+            if self.mockToolLogFileObj is not None and hasattr(self.mockToolLogFileObj, 'close'):
+                self.mockToolLogFileObj.close()
+            sys.exit(self.finalRunStatus)
+
+if __name__ == "__main__":
+    MockInfraPatchingValidator().mExecute()

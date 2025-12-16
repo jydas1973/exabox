@@ -1,0 +1,16 @@
+{
+    "properties": {
+        "operation": {
+            "type": "string"
+        },
+        "key_value_pair": {
+            "type": "object"
+        },
+        "keys": {
+            "type": "array"
+        }
+    },
+    "required": [
+    ],
+    "type": "object"
+}

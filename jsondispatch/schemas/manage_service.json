@@ -1,0 +1,24 @@
+{
+    "properties": {
+        "operation": {
+            "type": "string"
+        },
+        "service": {
+            "type": "string"
+        },
+        "task": {
+            "type": "string",
+            "enum": ["start", "stop", "status"]
+        },
+        "host_nodes": {
+            "type": "array"
+        }
+    },
+    "required": [
+        "operation",
+        "service",
+        "task",
+        "host_nodes"
+    ],
+    "type": "object"
+}

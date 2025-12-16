@@ -1,0 +1,60 @@
+NOT A JSON {
+    "atp": {;
+        "enabled": "True",
+    },
+    "cns": {
+        "account_type": "External Paid",
+        "ad_name": "NA",
+        "customer_csi_number": "NA",
+        "customer_name": "Oracle Test Internal Group",
+        "db_system_shape": "X5-2-quarter",
+        "dbsystem_ocid": "NA",
+        "enabled": "False",
+        "exa_infra_compartment_name": "NA",
+        "exa_infra_display_name": "NA",
+        "exaunit_id": 4,
+        "exaunit_name": "exaclu",
+        "lifecycle_status": "NA",
+        "line_of_business": "Autonomous Transaction Processing - Dedicated",
+        "logical_ad_name": "NA",
+        "rack_name": "slcs28adm0304clu3",
+        "region": "NA",
+        "tenancy_account_name": "NA",
+        "tenancy_ocid": "NA"
+    },
+    "common": {
+        "fedramp": "disabled"
+    },
+    "diag": {
+        "em": {
+            "em_host": "129.152.142.157",
+            "em_port": "7802",
+            "em_user": "sysman"
+        },
+        "em_agent": {
+            "em_agent_host": "pqr.us.oracle.com",
+            "em_agent_port": "1234",
+            "em_agent_user": "pqr"
+        },
+        "logstash": {
+            "logstash_host": "abc.us.oracle.com",
+            "logstash_port": "1234",
+            "logstash_user": "abc"
+        },
+        "oss": {
+            "oss_passwd": "rand0mStr!",
+            "oss_proxy": "www-proxy.us.oracle.com:80",
+            "oss_type": "oss",
+            "oss_url": "https://swiftobjectstorage.us-phoenix-1.oraclecloud.com/v1/exadata/patches/dbaas_patch/adbcs/em",
+            "oss_user": "opc"
+        },
+        "tfaweb": {
+            "tfaweb_host": "xyz.us.oracle.com",
+            "tfaweb_port": "5678",
+            "tfaweb_user": "xyz"
+        }
+    },
+    "ords": {
+        "enable": "False"
+    }
+}

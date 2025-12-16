@@ -1,0 +1,9 @@
+Name                                        ID   Mem VCPUs      State   Time(s)
+Domain-0                                     0  8746     4     r----- 2145201.6
+scaqab10adm01vm01.us.oracle.com              1 92163    10     -b---- 811282.1
+scaqab10adm01vm03.us.oracle.com              2 92163    10     -b---- 495633.3
+scaqab10adm01vm05.us.oracle.com              8 92163    10     -b----  51637.6
+scaqab10adm01vm07.us.oracle.com             11 92163    10     -b----  42935.3
+scaqab10adm01vm08.us.oracle.com             11 92163    10     -b----  42935.3
+scaqab10adm02vm08.us.oracle.com             11 92163    10     -b----  42935.3
+scaqab10client01vm02.us.oracle.com           5 92163    10     -b---- 446566.6

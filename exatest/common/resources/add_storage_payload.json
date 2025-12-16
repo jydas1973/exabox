@@ -1,0 +1,62 @@
+{
+    "reshaped_node_subset": {
+        "added_cells": [
+            {
+                "cell_hostname": "iad103712exdcl07.iad103712exd.adminiad1.oraclevcn.com",
+                "model": "X8M-2",
+                "network_info": {
+                    "cellnetworks": [
+                        {
+                            "admin": [
+                                {
+                                    "fqdn": "iad103712exdcl07.iad103712exd.adminiad1.oraclevcn.com",
+                                    "gateway": "10.0.4.129",
+                                    "ipaddr": "10.0.4.136",
+                                    "netmask": "255.255.255.128"
+                                }
+                            ]
+                        },
+                        {
+                            "private": [
+                                {
+                                    "fqdn": "iad103712exdcl07-priv1.iad103712exd.adminiad1.oraclevcn.com",
+                                    "ipaddr": "100.106.30.24"
+                                },
+                                {
+                                    "fqdn": "iad103712exdcl07-priv2.iad103712exd.adminiad1.oraclevcn.com",
+                                    "ipaddr": "100.106.30.25"
+                                }
+                            ]
+                        },
+                        {
+                            "ilom": [
+                                {
+                                    "fqdn": "iad103712exdcl07lo.iad103712exd.adminiad1.oraclevcn.com",
+                                    "gateway": "10.0.4.129",
+                                    "ipaddr": "10.0.4.151",
+                                    "netmask": "255.255.255.128"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "rack_info": {
+                    "uheight": 1,
+                    "uloc": 6
+                },
+                "racktype": "1035"
+            }
+        ],
+        "full_compute_to_virtualcompute_list": [
+            {
+              "compute_node_hostname": "iad103716exdd015.iad103716exd.adminiad1.oraclevcn.com",
+              "compute_node_virtual_hostname": "iad103716x8mcompexpn15c.clientsubnet.devx8melastic.oraclevcn.com"
+            },
+            {
+              "compute_node_hostname": "iad103716exdd016.iad103716exd.adminiad1.oraclevcn.com",
+              "compute_node_virtual_hostname": "iad103716x8mcompexpn16c.clientsubnet.devx8melastic.oraclevcn.com"
+            }
+        ],
+        "removed_cells": []
+    }
+}

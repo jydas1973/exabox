@@ -1,0 +1,156 @@
+<?xml version="1.0" ?>
+<engineeredSystem ebTreeNodeType="">
+	<customerName ebTreeNodeType=""/>
+	<databases ebTreeNodeType="">
+		<database ebTreeNodeType="">
+			<cdbId ebTreeNodeType=""/>
+			<databaseHome ebTreeNodeType=""/>
+			<databaseOwner ebTreeNodeType=""/>
+			<databaseSid ebTreeNodeType=""/>
+			<databaseType ebTreeNodeType=""/>
+		</database>
+	</databases>
+	<esRacks ebTreeNodeType="">
+		<esRack ebTreeNodeType="">
+			<esRackItem ebTreeNodeType="">
+				<rackItemDescription ebTreeNodeType=""/>
+			</esRackItem>
+			<rackDescription ebTreeNodeType=""/>
+		</esRack>
+	</esRacks>
+	<exacloudVersion ebTreeNodeType=""/>
+	<machines ebTreeNodeType="">
+		<machine ebTreeNodeType="">
+			<DefaultGatewayNet ebTreeNodeType=""/>
+			<TimeZone ebTreeNodeType=""/>
+			<dnsServers ebTreeNodeType="">
+				<dnsServer ebTreeNodeType="">
+					<ipAddress ebTreeNodeType=""/>
+				</dnsServer>
+			</dnsServers>
+			<hostName ebTreeNodeType=""/>
+			<machine ebTreeNodeType=""/>
+			<networks ebTreeNodeType="">
+				<network ebTreeNodeType=""/>
+			</networks>
+			<ntpServers ebTreeNodeType="">
+				<ntpServer ebTreeNodeType="">
+					<ipAddress ebTreeNodeType=""/>
+				</ntpServer>
+			</ntpServers>
+			<osType ebTreeNodeType=""/>
+			<software ebTreeNodeType="">
+				<clusters ebTreeNodeType="">
+					<cluster ebTreeNodeType=""/>
+				</clusters>
+				<databaseHomes ebTreeNodeType="">
+					<databaseHome ebTreeNodeType=""/>
+				</databaseHomes>
+			</software>
+			<storage ebTreeNodeType="">
+				<localDisks ebTreeNodeType="">
+					<localDisk ebTreeNodeType=""/>
+				</localDisks>
+			</storage>
+			<vmSizeName ebTreeNodeType=""/>
+		</machine>
+	</machines>
+	<networks ebTreeNodeType="">
+		<network ebTreeNodeType="">
+			<domainName ebTreeNodeType=""/>
+			<gateway ebTreeNodeType=""/>
+			<hostName ebTreeNodeType=""/>
+			<ipAddress ebTreeNodeType=""/>
+			<macAddress ebTreeNodeType=""/>
+			<master ebTreeNodeType=""/>
+			<natdomainName ebTreeNodeType=""/>
+			<nathostName ebTreeNodeType=""/>
+			<natipAddress ebTreeNodeType=""/>
+			<natnetMask ebTreeNodeType=""/>
+			<netMask ebTreeNodeType=""/>
+			<networkName ebTreeNodeType=""/>
+			<networkType ebTreeNodeType=""/>
+			<pkey ebTreeNodeType=""/>
+			<pkeyName ebTreeNodeType=""/>
+			<slave ebTreeNodeType=""/>
+			<version ebTreeNodeType=""/>
+			<vlanId ebTreeNodeType=""/>
+			<vswitchNetworkParams ebTreeNodeType=""/>
+		</network>
+	</networks>
+	<software ebTreeNodeType="">
+		<clusters ebTreeNodeType="">
+			<cluster ebTreeNodeType="">
+				<clusterHome ebTreeNodeType=""/>
+				<clusterName ebTreeNodeType=""/>
+				<clusterOwner ebTreeNodeType=""/>
+				<clusterScans ebTreeNodeType="">
+					<clusterScan ebTreeNodeType=""/>
+				</clusterScans>
+				<clusterVersion ebTreeNodeType=""/>
+				<clusterVips ebTreeNodeType="">
+					<clusterVip ebTreeNodeType="">
+						<domainName ebTreeNodeType=""/>
+						<machines ebTreeNodeType="">
+							<machine ebTreeNodeType=""/>
+						</machines>
+						<vipIpAddress ebTreeNodeType=""/>
+						<vipName ebTreeNodeType=""/>
+					</clusterVip>
+				</clusterVips>
+				<diskGroups ebTreeNodeType="">
+					<diskGroup ebTreeNodeType=""/>
+				</diskGroups>
+				<inventoryLocation ebTreeNodeType=""/>
+			</cluster>
+			<clusterScans ebTreeNodeType="">
+				<clusterScan ebTreeNodeType="">
+					<scanName ebTreeNodeType=""/>
+				</clusterScan>
+			</clusterScans>
+		</clusters>
+		<databaseHomes ebTreeNodeType="">
+			<databaseHome ebTreeNodeType="">
+				<cluster ebTreeNodeType=""/>
+				<databaseHomeLoc ebTreeNodeType=""/>
+				<databaseHomeName ebTreeNodeType=""/>
+				<databaseSwOwner ebTreeNodeType=""/>
+				<databaseVersion ebTreeNodeType=""/>
+				<machines ebTreeNodeType="">
+					<machine ebTreeNodeType=""/>
+				</machines>
+				<patches ebTreeNodeType="">
+					<patch ebTreeNodeType="">
+						<patchNumber ebTreeNodeType=""/>
+					</patch>
+				</patches>
+			</databaseHome>
+		</databaseHomes>
+	</software>
+	<storage ebTreeNodeType="">
+		<diskGroups ebTreeNodeType="">
+			<diskGroup ebTreeNodeType="">
+				<diskGroupName ebTreeNodeType=""/>
+				<diskGroupSize ebTreeNodeType=""/>
+				<machines ebTreeNodeType="">
+					<machine ebTreeNodeType=""/>
+				</machines>
+				<ocrVote ebTreeNodeType=""/>
+				<redundancy ebTreeNodeType=""/>
+				<sliceSize ebTreeNodeType=""/>
+			</diskGroup>
+		</diskGroups>
+	</storage>
+	<switches ebTreeNodeType="">
+		<switch ebTreeNodeType="">
+			<networks ebTreeNodeType="">
+				<network ebTreeNodeType=""/>
+			</networks>
+		</switch>
+	</switches>
+	<vmSizes ebTreeNodeType="">
+		<vmSizeName ebTreeNodeType="">
+			<vmAttribute ebTreeNodeType=""/>
+		</vmSizeName>
+	</vmSizes>
+</engineeredSystem>

@@ -1,0 +1,401 @@
+#
+# $Header: ecs/exacloud/exabox/infrapatching/test/infrapatching_coverage.txt /main/6 2025/07/22 09:41:33 apotluri Exp $
+#
+# infrapatching_coverage.py
+#
+# Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+#
+#    NAME
+#      infrapatching_coverage.py - Infrapatching code coverage calculator for integration tests.
+#
+#    DESCRIPTION
+#      Provides methods to start exacloud agent with code coverage enabled and to calculate code coverage etc.
+#
+#    NOTES
+#      <other useful comments, qualifications, etc.>
+#
+#    MODIFIED   (MM/DD/YY)
+#    apotluri    07/21/25 - Enhancement Request 37982406 - COMBINE COVERAGE
+#                           REPORTS FROM CLUSTERLESS SETUP AND REGULAR COVERAGE
+#                           RUN SETUP
+#    sdevasek    08/30/22 - ENH 36147204 - ADD PYTHON COVERAGE FILTERS TO
+#                           EXCLUDE METHODS THAT DO NOT GET EXECUTED AS PART
+#                           INFRAPATCHING LIKE EXACC SPECIFIC METHODS
+#    apotluri    06/21/24 - Enhancement Request 36750543 - PYTHON UPGRADE -
+#                           INFRAPATCHING FILES SHOULD HAVE DYNAMICALLY SET
+#                           PYTHON PATHS TO AVOID REGRESSIONS
+#    sdevasek    11/09/22 - ENH 34743194 - UPDATE INFRAPATCHING TEST CODE
+#                           TO MAKE AUTOMATION TO WORK IN X9M R1 ENV
+#    sdevasek    03/21/22 - Enh-33321832 - GET CODE COVERAGE REPORT FOR
+#                           INFRAPATCHING PYTHON CODE
+#    sdevasek    03/10/22 - Enh-33913390 - ENABLE EXACLOUD AGENT TO
+#                           CAPTURE CODE COVERAGE IN AUTOMATION
+#
+
+import os
+import glob
+import shutil
+import utils
+import traceback
+from enum import Enum
+from constants import *
+
+
+class ExecutionStatus(Enum):
+    """
+    Enum values for execution status values of coverage executor
+    """
+    INIT = "INIT"
+    INPROGRESS = "INPROGRESS"
+    FAILED = "FAILED"
+    COMPLETED = "COMPLETED"
+
+
+class ExacloudAgentAction(Enum):
+    """
+    Enum values of actions that can be taken on exacloud agent
+    """
+    START = "START"
+    STOP = "STOP"
+    STATUS = "STATUS"
+
+
+class CodeCoverageCalculator:
+
+    def __init__(self):
+        self.__exacloud_install_path = ""
+        self.__status = ExecutionStatus.INIT
+        self.mUpdateExacloudInstallLocation()
+
+    def mUpdateExacloudInstallLocation(self):
+        self.__exacloud_install_path = utils.mGetExacloudInstallPath()
+
+    def mExecuteActionOnExacloudAgent(self, aAction):
+        """
+        This method is used to take actions like start, stop etc on exacloud agent
+        """
+        _coveragerc_path = self.__exacloud_install_path + "/.coveragerc"
+        os.environ["COVERAGE_PROCESS_START"] = _coveragerc_path
+        _exacloud_agent_ctl_cmd = ""
+        if aAction == ExacloudAgentAction.START:
+            _exacloud_agent_ctl_cmd = self.__exacloud_install_path + "/bin/exacloud --agent start -da"
+        elif aAction == ExacloudAgentAction.STOP:
+            _exacloud_agent_ctl_cmd = self.__exacloud_install_path + "/bin/exacloud --agent stop -fsd"
+        elif aAction == ExacloudAgentAction.STATUS:
+            _exacloud_agent_ctl_cmd = self.__exacloud_install_path + "/bin/exacloud --agent status"
+        else:
+            utils.mPatchLogError("Invalid exacloud agent action provided.")
+            return
+
+        utils.mPatchLogInfo("Exacloud agent command running is %s." % _exacloud_agent_ctl_cmd)
+        _output, _stat = utils.mExecuteLocal(_exacloud_agent_ctl_cmd)
+        if _stat != 0:
+            utils.mPatchLogError("Executing %s failed." % aAction)
+            self.__status = ExecutionStatus.FAILED
+        else:
+            utils.mPatchLogInfo("Executing %s completed." % aAction)
+
+    def __mMoveCoverageData(self, aRestoreCoverageFilesToExacloudLocation=False):
+        """
+        This private method is used to copy coverage data files between exacloud and exacloud/covdata folder.
+        When aRestoreCoverageFilesToExacloudLocation is specified as True, it copies coverage data to exacloud from
+        exacloud/covdata folder.
+        """
+        _cov_preserve_path = "%s/%s" % (self.__exacloud_install_path, COV_DATA_PRESERVE_DIRECTORY)
+        if not os.path.exists(_cov_preserve_path):
+            os.makedirs(_cov_preserve_path)
+
+        if aRestoreCoverageFilesToExacloudLocation:
+            _src_directory_for_coverage_file = _cov_preserve_path
+            _destination_directory = self.__exacloud_install_path
+        else:
+            _src_directory_for_coverage_file = self.__exacloud_install_path
+            _destination_directory = _cov_preserve_path
+
+        _files = os.listdir(_src_directory_for_coverage_file)
+        for _file in _files:
+            if not _file.startswith(".coverage."):
+                continue
+            _dest_file = _destination_directory + "/" + _file
+            _src_file = _src_directory_for_coverage_file + "/" + _file
+            _file_copy_cmd = "cp -f %s %s " % (_src_file, _dest_file)
+            _output, _stat = utils.mExecuteLocal(_file_copy_cmd)
+            if _stat != 0:
+                utils.mPatchLogError("Coverage preserve failed.")
+                return
+        utils.mPatchLogInfo("Coverage data is copied from %s to %s ." % (_src_directory_for_coverage_file,
+                                                                         _destination_directory))
+
+    def mPreserveCoverageData(self):
+        """
+        This method is used to copy coverage data files to exacloud/covdata folder
+        """
+        return self.__mMoveCoverageData()
+
+    def mCopyBackPreserveData(self):
+        """
+        This method is used to copy coverage data files from exacloud/covdata directory to exacloud directory
+        """
+        return self.__mMoveCoverageData(aRestoreCoverageFilesToExacloudLocation=True)
+
+    def mGenerateCodeCoverageReportData(self, aTextPathToSaveReportData):
+        """
+        This method is used to generate coverage report.
+        If all the steps are completed it returns EXIT_SUCCESS otherwise EXIT_FAILURE
+        """
+        self.__mCalculateCoverage(aTextPathToSaveReportData)
+        if self.__status == ExecutionStatus.COMPLETED:
+            return EXIT_SUCCESS
+        else:
+            return EXIT_FAILURE
+
+    def mUpdateCoveragerc(self):
+        """
+        This methods checks if env in R1 and not clusterless and does the following:
+        1. Copies the coverage files from clusterless setup
+        2. Updates the paths in .coveragerc file with regular r1 and clusterless exacloud path
+
+        This method is used to modify the .coveragerc file for code coverage calculation
+        in a specific environment setup. It checks if the environment is R1 and not
+        clusterless, and if so, updates the .coveragerc file accordingly.
+        """
+        if utils.mGetInfraPatchingTestConfigParam('is_r1_env') == "True":
+            if utils.mGetInfraPatchingTestConfigParam('is_clusterless') == "False":
+                _coveragerc_path = self.__exacloud_install_path + "/.coveragerc"
+                _clusterless_exacloud_path = utils.mGetInfraPatchingTestConfigParam('clusterless_exacloud_path')
+                _target_line = 'concurrency = multiprocessing'
+                _content_to_add = f"""
+[paths]
+exacloud =
+    {self.__exacloud_install_path}
+    {_clusterless_exacloud_path}
+    exacloud
+"""
+
+                _clusterless_coverage_files_path = os.path.join(_clusterless_exacloud_path, "cov_data", ".coverage.*")
+                _clusterless_coverage_files = glob.glob(_clusterless_coverage_files_path)
+
+                if not _clusterless_coverage_files:
+                    utils.mPatchLogInfo(f"No coverage files found to copy under {_clusterless_coverage_files_path}.")
+                else:
+                    for file in _clusterless_coverage_files:
+                        try:
+                            shutil.copy(file, self.__exacloud_install_path)
+                        except Exception as e:
+                            utils.mPatchLogError(f"Failed to copy {file}: {e}")
+                            return
+                    utils.mPatchLogInfo(f"Coverage files copied successfully from {_clusterless_coverage_files_path} to {self.__exacloud_install_path}.")
+
+                    try:
+                        with open(_coveragerc_path, 'r') as _file:
+                            _file_lines = _file.readlines()
+                    except FileNotFoundError:
+                        utils.mPatchLogError(f"The file {_coveragerc_path} was not found.")
+                    else:
+                        _new_lines = []
+                        _content_added = False
+                        for _line in _file_lines:
+                            _new_lines.append(_line)
+                            if _line.strip() == _target_line:
+                                _new_lines.extend(['{}\n'.format(line) for line in _content_to_add.split('\n')])
+                                _content_added = True
+
+                        if _content_added:
+                            try:
+                                with open(_coveragerc_path, 'w') as _file:
+                                    _file.writelines(_new_lines)
+                                utils.mPatchLogInfo(f"Content added successfully to {_coveragerc_path}.")
+                            except Exception as e:
+                                utils.mPatchLogError(f"An error occurred while writing to {_coveragerc_path}: {e}")
+                        else:
+                            utils.mPatchLogInfo(
+                                f"The line '{_target_line}' was not found in the _file {_coveragerc_path}.")
+            else:
+                utils.mPatchLogInfo(f"Update of .coveragerc is not required for clusterless env")
+        else:
+            utils.mPatchLogInfo(f"Update of .coveragerc is not required for non-r1 envs")
+
+    def __mCalculateCoverage(self, aTextPathToSaveReportData):
+        """
+        This method is used to generate coverage report.
+        It does the following steps
+        1. Stop the exacloud agent.
+        2. copy .coverage files from exacloud location to exacloud/covdata folder.
+           and copy back all the .coverage files back to exacloud location(which could have accumulated
+           over multiple test runs and covdata acts as backup folder for covdata).
+        3. Run coverage combine comamnd to combine all the coverage data files.
+        4. Generate text summary report for coverage.
+        5. Generate html report
+        6. Save the html report to htmlcov folder in test location.
+        """
+        utils.mPatchLogInfo("Code coverage calculation started.")
+        # 1. Stop exacloud agent
+        utils.mPatchLogInfo("Stopping exacloud agent.")
+        self.mExecuteActionOnExacloudAgent(ExacloudAgentAction.STOP)
+        if self.__status == ExecutionStatus.FAILED:
+            return
+        _exacloud_path = self.__exacloud_install_path
+
+        # 2. Preserve and copy back the preserved data
+        self.mPreserveCoverageData()
+        self.mCopyBackPreserveData()
+        self.mUpdateCoveragerc()
+
+        # 3. Combine code coverage data
+        _coverage_data_combine_cmd = "%s/bin/python3 -m  coverage combine" % self.__exacloud_install_path
+        utils.mPatchLogInfo("Command used to combine the coverage is %s." % _coverage_data_combine_cmd)
+        _output, _stat = utils.mExecuteLocal(_coverage_data_combine_cmd)
+        if _stat != 0:
+            utils.mPatchLogError("Coverage combine failed.")
+            self.__status = ExecutionStatus.FAILED
+            return
+        utils.mPatchLogInfo("Coverage data combine completed.")
+
+        # 4. Generate text summary report for code coverage
+        _generate_text_summary_report_cmd = "%s/bin/python3 -m  coverage  report  -i --include=%s > %s" \
+                                            % (self.__exacloud_install_path,
+                                               os.path.join(self.__exacloud_install_path, 'exabox/infrapatching/*'),
+                                               aTextPathToSaveReportData)
+
+        utils.mPatchLogInfo("Command used to generate text summary report for coverage is %s."
+                            % _generate_text_summary_report_cmd)
+        _output, _stat = utils.mExecuteLocal(_generate_text_summary_report_cmd)
+        if _stat != 0:
+            utils.mPatchLogError("Generate text summary report for code coverage failed.")
+            self.__status = ExecutionStatus.FAILED
+            return
+
+        # 5. Generate html report
+        _generate_cov_html_report_cmd = "%s/bin/python3 -m  coverage  html -i --include=%s" \
+                                        % (self.__exacloud_install_path,
+                                           os.path.join(self.__exacloud_install_path, 'exabox/infrapatching/*'))
+        utils.mPatchLogInfo("Command used to generate html report is %s." % _generate_cov_html_report_cmd)
+        _output, _stat = utils.mExecuteLocal(_generate_cov_html_report_cmd)
+        if _stat != 0:
+            utils.mPatchLogError("Generate html overage report failed.")
+            self.__status = ExecutionStatus.FAILED
+            return
+        utils.mPatchLogInfo("Html report for coverage is generated.")
+
+        # 6. Copy html data to test location
+        _src_cov_html_directory = os.path.join(self.__exacloud_install_path, "htmlcov")
+        _dest_cov_html_directory = "htmlcov"
+        # Remove existing report any
+        if os.path.exists(_dest_cov_html_directory):
+            shutil.rmtree(_dest_cov_html_directory)
+
+        if os.path.exists(_src_cov_html_directory):
+            utils.mPatchLogInfo(
+                "Copying coverage html report from %s to %s." % (_src_cov_html_directory, _dest_cov_html_directory))
+            shutil.copytree(_src_cov_html_directory, _dest_cov_html_directory)
+        else:
+            utils.mPatchLogError("Coverage report html creation failed.")
+            self.__status = ExecutionStatus.FAILED
+            return
+
+        self.__status = ExecutionStatus.COMPLETED
+        utils.mPatchLogInfo("Code coverage calculation completed.")
+
+    def mEnableCodeCoverageExecutionWithExacloud(self):
+        """
+        This method is used to execute prerequisites for code coverage calculation
+        It does the following steps.
+        1. Install coverage package.
+        2. Update sitecustomize.py with coverage.process_startup().
+        3. Create and update .coveragerc.
+        4. Update COVERAGE_PROCESS_START env varaible with coveragerc file.
+        """
+
+        utils.mPatchLogInfo("Executing prerequisites for code coverage setup is started.")
+        # 1. Install coverage package  bin/python3 -m pip install --proxy=http://www-proxy.us.oracle.com:80/ 'coverage==5.0.3'
+
+        _coverage_package_install_cmd = "%s/bin/python3 -m pip install  %s" % (self.__exacloud_install_path,
+                                                                                         COVERAGE_PACKAGE)
+        utils.mPatchLogInfo("Command used to install coverage package is %s." % _coverage_package_install_cmd)
+        _output, _stat = utils.mExecuteLocal(_coverage_package_install_cmd)
+        if _stat != 0:
+            utils.mPatchLogWarn("Failed to install coverage package, so trying with proxy")
+            utils.mPatchLogInfo("Command used to install coverage package is %s." % _coverage_package_install_cmd)
+            _coverage_package_install_cmd = "%s/bin/python3 -m pip install --proxy=%s %s" % (self.__exacloud_install_path,
+                                                                                             PROXY, COVERAGE_PACKAGE)
+            _output, _stat = utils.mExecuteLocal(_coverage_package_install_cmd)
+            if _stat != 0:
+                self.__status = ExecutionStatus.FAILED
+                return
+
+        # 2. Update opt/py3_venv/lib/python<version>/site-packages/sitecustomize.py with coverage.process_startup()
+        _site_customize_path = utils.mGetSiteCustomizePyLocation()
+        if os.path.exists(_site_customize_path):
+            os.remove(_site_customize_path)
+            utils.mPatchLogInfo("%s file is removed to create a fresh one" % _site_customize_path)
+
+        try:
+            fd = open(_site_customize_path, 'w')
+            fd.write("import coverage\n")
+            fd.write("coverage.process_startup()")
+            fd.close()
+            utils.mPatchLogInfo("coverage.process_startup() is updated in sitecustomize.py")
+
+        except Exception as E:
+            utils.mPatchLogError("sitecustomize.py could not get updated.")
+            utils.mPatchLogPrint(traceback.format_exc())
+            self.__status = ExecutionStatus.FAILED
+            return
+
+        # 3. Create and update .coveragerc
+        _coveragerc_path = self.__exacloud_install_path + "/.coveragerc"
+        if os.path.exists(_coveragerc_path):
+            os.remove(_coveragerc_path)
+            utils.mPatchLogInfo("%s file is removed to create a fresh one" % _coveragerc_path)
+        try:
+            # Get the list of methods to exclude in the coverage reporting calculation
+            _methods_to_exclude_coverage_report = utils.mGetInfraPatchingTestConfigParam('methods_to_exclude_coverage_report')
+            _exclude_methods = "\n".join([f"        ^\\s*def {method}\\(.*\\):" for method in _methods_to_exclude_coverage_report])
+
+            fd = open(_coveragerc_path, 'w')
+            fd.write("[run]\n")
+            fd.write("parallel = True\n")
+            fd.write("include  = \n")
+            fd.write("        */exabox/infrapatching/*\n")
+            fd.write("concurrency = multiprocessing\n")
+            fd.write("[report]\n")
+            fd.write("exclude_lines   = \n")
+            fd.write(_exclude_methods)
+            fd.close()
+            utils.mPatchLogInfo("coveragerc file is created.")
+        except Exception as E:
+            utils.mPatchLogError("coveragerc could not get updated.")
+            utils.mPatchLogPrint(traceback.format_exc())
+            self.__status = ExecutionStatus.FAILED
+            return
+
+        # 4. Set environment variable
+        os.environ["COVERAGE_PROCESS_START"] = _coveragerc_path
+        utils.mPatchLogInfo("Executing prerequisites completed for code coverage calculation.")
+
+    def mPrepareCodeCoverageEnvironment(self):
+        """
+        This method is used to prepare the environment required for code coverage calculation
+        It does the following steps.
+        1. Stop exacloud agent.
+        2. Run the prerequisites that setups exacloud agent to run in code coverage mode.
+        3. Start exacloud agent
+        """
+        utils.mPatchLogInfo("Prepare setup for code coverage started.")
+        self.__status = ExecutionStatus.INPROGRESS
+        utils.mPatchLogInfo("Stopping exacloud agent.")
+        self.mExecuteActionOnExacloudAgent(ExacloudAgentAction.STOP)
+        if self.__status == ExecutionStatus.FAILED:
+            return EXIT_FAILURE
+        self.mEnableCodeCoverageExecutionWithExacloud()
+        if self.__status == ExecutionStatus.FAILED:
+            return EXIT_FAILURE
+        utils.mPatchLogInfo("Starting exacloud agent.")
+        self.mExecuteActionOnExacloudAgent(ExacloudAgentAction.START)
+        if self.__status == ExecutionStatus.FAILED:
+            utils.mPatchLogError("Preparing setup for code coverage failed.")
+            return EXIT_FAILURE
+        else:
+            utils.mPatchLogInfo("Prepare setup for code coverage completed.")
+            return EXIT_SUCCESS
+

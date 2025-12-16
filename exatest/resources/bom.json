@@ -1,0 +1,72 @@
+{
+    "BOM_file_version": "1.0.1",
+    "BuildID": "GoldImageBuild_2025-05-29_210733",
+    "artifacts": {
+        "guest_image": "System.first.boot.25.1.3.0.0.250313.rtg.img",
+        "gi": "grid_23.7.0.25.01",
+        "rpms": {
+            "exacloud-gold-config-1.0-1.x86_64.rpm": {
+                "version": "1.0.1",
+                "hash": "0ca475a96b408a256311a42e34283f8de8f96e934cfbf71b75e57e7ff788fbb6"
+            },
+            "dbaastools_exa_main.rpm": {
+                "version": "1.0.MAIN_250526.0101",
+                "name": "dbaastools_exa",
+                "hash": "20b47a12f348a86aea15a997e726b2697b823d6688d38f7a20b87cd5edc7841a"
+            },
+            "dbcs-agent.OL7.x86_64.rpm": {
+                "version": "2.8OL7.MAIN_250526.0101",
+                "name": "dbcs-agent",
+                "hash": "f798614668375d474fb0a9b3d60a0a24e95a020bb72125223198a00af546c4e2"
+            },
+            "ahf_setup": {
+                "version": "Thu May 29 21:07:46 UTC 2025",
+                "hash": "f3d1f3ef0fb0adda7d0a2c842cf45d70380092f8c9d3fde17aec3e6c908e65aa"
+            },
+            "kmstdecli-0.3.868-1.noarch.rpm": {
+                "version": "0.3.868.1",
+                "name": "kmstdecli",
+                "hash": "f868da8b531a39053a5c1ea6cb5347144d2b870c54affc1233ca74096ff92428"
+            },
+            "libkmstdepkcs11_2.4-2.4-1-Linux.rpm": {
+                "version": "2.4.1",
+                "name": "libkmstdepkcs11_2.4",
+                "hash": "c664a3ed45be751fc294e4c248e0d2267848421f296bfc0f206b7aa4e6a9c3e8"
+            }
+        }
+    },
+    "gold_image": {
+        "system_image": "System.first.boot.25.1.3.0.0.250313.2910464.gold.img.bz2",
+        "u01_image": "u01.20.25.1.3.0.0.250313.2910464.gold.img.bz2",
+        "oss_url": ""
+    },
+    "master_edv_volumes": {
+        "system_vault_ocid": null,
+        "system_vault_name": null,
+        "system_volume_ocid": null,
+        "system_volume_name": null,
+        "u01_volume_ocid": null,
+        "u01_volume_name": null
+    },
+    "build_state": {
+        "status": "Success",
+        "start_time": "2025-05-29 21:07:33+661068",
+        "end_time": "2025-05-29 21:14:40+468026",
+        "elapsed_time": "0:07:06.806958",
+        "logs": "GoldImageBuild_2025-05-29_210733.log"
+    },
+    "validation_state": {
+        "status": null,
+        "start_time": null,
+        "end_time": null,
+        "elapsed_time": null,
+        "logs": null
+    },
+    "promotion_state": {
+        "status": null,
+        "start_time": null,
+        "end_time": null,
+        "elapsed_time": null,
+        "logs": null
+    }
+}

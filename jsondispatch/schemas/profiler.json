@@ -1,0 +1,15 @@
+{
+    "properties": {
+        "workflowId": {
+            "type": "string"
+        },
+        "exaunitId": {
+            "type": "string"
+        }
+    },
+    "required": [
+        "workflowId",
+        "exaunitId"
+    ],
+    "type": "object"
+}

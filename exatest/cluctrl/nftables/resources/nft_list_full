@@ -1,0 +1,18 @@
+table ip INPUT { # handle 2
+}
+table ip OUTPUT { # handle 3
+}
+table ip FORWARD { # handle 4
+}
+table ip filter { # handle 5
+    chain FORWARD { # handle 1
+        oifname "vmbondeth0.8" counter packets 0 bytes 0 accept # handle 4
+        oifname "vmbondeth0.7" counter packets 0 bytes 0 accept # handle 5
+    }
+
+    chain INPUT { # handle 2
+    }
+
+    chain OUTPUT { # handle 3
+    }
+}

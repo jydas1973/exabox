@@ -1,0 +1,53 @@
+<filter name="my_filter">
+    <rule action="accept" direction="out" priority="500">
+        <all />
+    </rule>
+    <rule action="accept" direction="in" priority="500">
+        <all />
+    </rule>
+    <rule action="accept" direction="in" priority="500">
+        <tcp dstportstart="1521" />
+    </rule>
+    <rule action="accept" direction="out" priority="500">
+        <tcp dstportstart="1521" />
+    </rule>
+    <rule action="accept" direction="in" priority="500">
+        <tcp dstportstart="2484" />
+    </rule>
+    <rule action="accept" direction="out" priority="500">
+        <tcp dstportstart="2484" />
+    </rule>
+    <rule action="accept" direction="out" priority="500">
+        <tcp dstportstart="25" />
+    </rule>
+    <rule action="accept" direction="out" priority="500">
+        <tcp dstportstart="389" />
+    </rule>
+    <rule action="accept" direction="in" priority="500">
+        <tcp dstportstart="443" />
+    </rule>
+    <rule action="accept" direction="out" priority="500">
+        <tcp dstportstart="443" />
+    </rule>
+    <rule action="accept" direction="out" priority="500">
+        <tcp dstportstart="587" />
+    </rule>
+    <rule action="accept" direction="in" priority="500">
+        <tcp dstportstart="6200" />
+    </rule>
+    <rule action="accept" direction="out" priority="500">
+        <tcp dstportstart="6200" />
+    </rule>
+    <rule action="accept" direction="out" priority="500">
+        <tcp dstportstart="636" />
+    </rule>
+    <rule action="accept" direction="out" priority="500">
+        <tcp dstportstart="80" />
+    </rule>
+    <rule action="accept" direction="in" priority="500">
+        <tcp dstportstart="7060" srcipaddr="169.254.169.254" srcipmask="32" />
+    </rule>
+    <rule action="accept" direction="in" priority="500">
+        <tcp dstportstart="7070" srcipaddr="169.254.169.254" srcipmask="32" />
+    </rule>
+</filter>

@@ -1,0 +1,3317 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<engineeredSystem filetype="PAAS" id="09a57220-b08a-4ba3-90fd-7dcfe160850e" oedaversion="190822">
+    <customerName>scaqae14adm0102clu2</customerName>
+    <departmentName>12345678</departmentName>
+    <version>version2</version>
+    <actions>
+        <action deployed="true" id="1" merged="true">
+            <subCommand>ALTER MACHINE VCPU="6" ACTION="SETVCPU" WHERE ID="scaqae14compute02_Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_vm01_id"</subCommand>
+        </action>
+        <action deployed="true" id="2" merged="true">
+            <subCommand>ALTER MACHINE VCPU="6" ACTION="SETVCPU" WHERE ID="scaqae14compute01_Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_vm01_id"</subCommand>
+        </action>
+        <action deployed="true" id="3" merged="true">
+            <subCommand>ALTER MACHINE VCPU="6" ACTION="SETVCPU" WHERE ID="scaqae14compute02_Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_vm01_id"</subCommand>
+        </action>
+        <action deployed="true" id="4" merged="true">
+            <subCommand>ALTER MACHINE VCPU="6" ACTION="SETVCPU" WHERE ID="scaqae14compute01_Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_vm01_id"</subCommand>
+        </action>
+        <action deployed="true" id="5" merged="true">
+            <subCommand>ALTER MACHINE NTPSERVERS="10.250.40.1,10.246.0.1,10.232.144.1" WHERE ID="scaqae14compute02_Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_vm01_id"</subCommand>
+        </action>
+        <action deployed="true" id="6" merged="true">
+            <subCommand>ALTER MACHINE NTPSERVERS="10.250.40.1,10.246.0.1,10.232.144.1" WHERE ID="scaqae14compute01_Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_vm01_id"</subCommand>
+        </action>
+        <action deployed="true" id="7" merged="true">
+            <subCommand>ALTER CLUSTER GIVERSION="18.1.0.0.210420" CLUSTERNAME="exaclu-164" GIHOMELOC="/u01/app/18.1.0.0/grid" ASMSCOPEDSECURITY="False" PATCHLIST="27681568,28096386,28659165,28828717,29301682,29708703,30116795,30480702,30899645,31305362,31748523,32226219,32524152" WHERE ID="Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_id"</subCommand>
+        </action>
+        <action deployed="true" id="8" merged="true">
+            <subCommand>ALTER DATABASEHOME DBVERSION="18.1.0.0.210420" DBHOMELOC="/u01/app/oracle/product/18.1.0.0/dbhome_1" PATCHLIST="27681568,28096386,28659165,28828717,29301682,29708703,30116795,30480702,30899645,31305362,31748523,32226219,32524152" WHERE ID="DbHome_1487eced-8e66-12e3-7e1e-fc24f763dbd9_id"</subCommand>
+        </action>
+        <action deployed="true" id="9" merged="true">
+            <subCommand>ADD DATABASEHOME DBLANG="all_langs" INVLOC="/u01/app/oraInventory" DBVERSION="11.2.0.4.210420" OWNER="aaca2596-968f-8c64-7b79-51f7ae3d6017" DBHOMENAME="cC_dbHome_0" DBHOMELOC="/u01/app/oracle/product/11.2.0.4/dbhome_1" BASEDIR="/u01/app/oracle" PATCHLIST="" WHERE CLUSTERID="Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_id"</subCommand>
+        </action>
+        <action deployed="true" id="10" merged="true">
+            <subCommand>ADD DATABASEHOME DBLANG="all_langs" INVLOC="/u01/app/oraInventory" DBVERSION="12.1.0.2.210420" OWNER="aaca2596-968f-8c64-7b79-51f7ae3d6017" DBHOMENAME="cB_dbHome_0" DBHOMELOC="/u01/app/oracle/product/12.1.0.2/dbhome_1" BASEDIR="/u01/app/oracle" PATCHLIST="32518631,32131231,31718813,31307682,30805478,30464171,30070242,29698629,29176139,28833531,28553949,28349951,27968010,27486326,27010930,26635880,26610322,26022196,25433352,24968615,24448103,23273686,22899531,22243551,21744410,21640036,21447820,21188742,21053000,20879108,20698050,20504076,20329440,20141343,20026159,19774304,19404326" WHERE CLUSTERID="Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_id"</subCommand>
+        </action>
+        <action deployed="true" id="11" merged="true">
+            <subCommand>ADD DATABASEHOME DBLANG="all_langs" INVLOC="/u01/app/oraInventory" DBVERSION="12.2.0.1.210420" OWNER="aaca2596-968f-8c64-7b79-51f7ae3d6017" DBHOMENAME="cA_dbHome_0" DBHOMELOC="/u01/app/oracle/product/12.2.0.1/dbhome_1" BASEDIR="/u01/app/oracle" PATCHLIST="32540149,32226491,31750094,31305382,30920127,30501932,30116802,29708720,29301687,28828733,28714316,27468969,27100009,26737266,26610291,26133434,26129945" WHERE CLUSTERID="Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_id"</subCommand>
+        </action>
+        <action deployed="true" id="12" merged="true">
+            <subCommand>ALTER DISKGROUP REDUNDANCY="NORMAL" QUORUMDISK="false" TYPE="delta" DISKGROUPSIZE="4966G" WHERE ID="e1d748d8-9131-34a6-8c1e-19d4a5d9e895_RECO"</subCommand>
+        </action>
+        <action deployed="true" id="13" merged="true">
+            <subCommand>ALTER DISKGROUP TYPE="catalog" DISKGROUPSIZE="153G" ACFSSIZE="100" ACFSNAME="acfsvol01" ACFSPATH="/acfs01" WHERE ID="45977097-66c5-ca1d-f1d5-f8d2722e6798_DATA"</subCommand>
+        </action>
+    </actions>
+    <machines>
+        <machine id="scaqae14compute01_id">
+            <hostName>scaqae14adm01.us.oracle.com</hostName>
+            <iloms>
+                <ilom id="scaqae14adm01-c.us.oracle.com_Ilom" />
+            </iloms>
+            <networks>
+                <network id="scaqae14adm01-priv.us.oracle.com_private1" />
+                <network id="scaqae14adm01-priv.us.oracle.com_private2" />
+                <network id="scaqae14adm01.us.oracle.com_admin" />
+            </networks>
+            <networkPools>
+                <networkPool id="d63f0452-eac5-c2cf-1a88-f2fb8076347d_dbPrivPool" />
+                <networkPool id="913fe5cc-caca-28e6-919a-7c1d7c4056c9_dbAdminPool" />
+                <networkPool id="5f1daf55-7cd5-f25d-b5d1-35d78faf76b9_dbIlomPool" />
+            </networkPools>
+            <machineType>compute</machineType>
+            <dnsServers>
+                <dnsServer>
+                    <ipAddress>10.31.138.25</ipAddress>
+                </dnsServer>
+                <dnsServer>
+                    <ipAddress>10.231.225.65</ipAddress>
+                </dnsServer>
+                <dnsServer>
+                    <ipAddress>10.31.138.25</ipAddress>
+                </dnsServer>
+            </dnsServers>
+            <ntpServers>
+                <ntpServer>
+                    <ipAddress>10.210.176.28</ipAddress>
+                </ntpServer>
+                <ntpServer>
+                    <ipAddress>10.31.16.1</ipAddress>
+                </ntpServer>
+                <ntpServer>
+                    <ipAddress>10.31.223.1</ipAddress>
+                </ntpServer>
+            </ntpServers>
+            <TimeZone>America/Los_Angeles</TimeZone>
+            <DefaultGatewayNet>scaqae14adm01.us.oracle.com_admin</DefaultGatewayNet>
+            <virtual>false</virtual>
+            <version>version2</version>
+            <osType>LinuxKVM</osType>
+            <machine id="scaqae14compute01_Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_vm01_id" />
+        </machine>
+        <machine id="scaqae14compute02_id">
+            <hostName>scaqae14adm02.us.oracle.com</hostName>
+            <iloms>
+                <ilom id="scaqae14adm02-c.us.oracle.com_Ilom" />
+            </iloms>
+            <networks>
+                <network id="scaqae14adm02-priv.us.oracle.com_private1" />
+                <network id="scaqae14adm02-priv.us.oracle.com_private2" />
+                <network id="scaqae14adm02.us.oracle.com_admin" />
+            </networks>
+            <networkPools>
+                <networkPool id="d63f0452-eac5-c2cf-1a88-f2fb8076347d_dbPrivPool" />
+                <networkPool id="913fe5cc-caca-28e6-919a-7c1d7c4056c9_dbAdminPool" />
+                <networkPool id="5f1daf55-7cd5-f25d-b5d1-35d78faf76b9_dbIlomPool" />
+            </networkPools>
+            <machineType>compute</machineType>
+            <dnsServers>
+                <dnsServer>
+                    <ipAddress>10.31.138.25</ipAddress>
+                </dnsServer>
+                <dnsServer>
+                    <ipAddress>10.231.225.65</ipAddress>
+                </dnsServer>
+                <dnsServer>
+                    <ipAddress>10.31.138.25</ipAddress>
+                </dnsServer>
+            </dnsServers>
+            <ntpServers>
+                <ntpServer>
+                    <ipAddress>10.210.176.28</ipAddress>
+                </ntpServer>
+                <ntpServer>
+                    <ipAddress>10.31.16.1</ipAddress>
+                </ntpServer>
+                <ntpServer>
+                    <ipAddress>10.31.223.1</ipAddress>
+                </ntpServer>
+            </ntpServers>
+            <TimeZone>America/Los_Angeles</TimeZone>
+            <DefaultGatewayNet>scaqae14adm02.us.oracle.com_admin</DefaultGatewayNet>
+            <virtual>false</virtual>
+            <version>version2</version>
+            <osType>LinuxKVM</osType>
+            <machine id="scaqae14compute02_Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_vm01_id" />
+        </machine>
+        <machine id="scaqae14storage01_id">
+            <hostName>scaqae14celadm01.us.oracle.com</hostName>
+            <iloms>
+                <ilom id="scaqae14celadm01-c.us.oracle.com_Ilom" />
+            </iloms>
+            <writeBackFlashCache>automatic</writeBackFlashCache>
+            <networks>
+                <network id="scaqae14celadm01-priv.us.oracle.com_private1" />
+                <network id="scaqae14celadm01-priv.us.oracle.com_private2" />
+                <network id="scaqae14celadm01.us.oracle.com_admin" />
+            </networks>
+            <networkPools>
+                <networkPool id="78b525f1-7d9f-8e25-9146-eacc0f8eb83d_cellPrivPool" />
+                <networkPool id="436a383a-5e50-6294-27e3-672772b98722_cellAdminPool" />
+                <networkPool id="0f8a5aff-eed2-195a-8fd3-66752d4ae870_cellILomPool" />
+            </networkPools>
+            <storage>
+                <localDisks>
+                    <localDisk id="scaqae14storage01_id_CD_00" />
+                    <localDisk id="scaqae14storage01_id_CD_01" />
+                    <localDisk id="scaqae14storage01_id_CD_02" />
+                    <localDisk id="scaqae14storage01_id_CD_03" />
+                    <localDisk id="scaqae14storage01_id_CD_04" />
+                    <localDisk id="scaqae14storage01_id_CD_05" />
+                    <localDisk id="scaqae14storage01_id_CD_06" />
+                    <localDisk id="scaqae14storage01_id_CD_07" />
+                    <localDisk id="scaqae14storage01_id_CD_08" />
+                    <localDisk id="scaqae14storage01_id_CD_09" />
+                    <localDisk id="scaqae14storage01_id_CD_10" />
+                    <localDisk id="scaqae14storage01_id_CD_11" />
+                </localDisks>
+            </storage>
+            <software>
+                <clusters>
+                    <cluster id="Cluster-c21de517e-7719-3643-73c6-9a419d7b5a93_id" />
+                    <cluster id="Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_id" />
+                    <cluster id="Cluster-cfdb017d3-0d79-31e2-f14a-642a9f800d9a_id" />
+                    <cluster id="Cluster-c5788792c-5fd0-8b62-2d4e-2a80ad43cbaf_id" />
+                    <cluster id="Cluster-cf77f79a4-eeaa-595c-e0e9-8061eace7545_id" />
+                    <cluster id="Cluster-c6b1888ab-6513-6bc5-0ef6-219696a4711e_id" />
+                    <cluster id="Cluster-cf6445db9-e298-9c82-c9e4-d47a37ec5c6d_id" />
+                    <cluster id="Cluster-c03dca026-8919-0b39-6fb6-e65ec3464460_id" />
+                </clusters>
+                <databaseHomes />
+            </software>
+            <machineType>storage</machineType>
+            <dnsServers>
+                <dnsServer>
+                    <ipAddress>10.31.138.25</ipAddress>
+                </dnsServer>
+                <dnsServer>
+                    <ipAddress>10.231.225.65</ipAddress>
+                </dnsServer>
+                <dnsServer>
+                    <ipAddress>10.31.138.25</ipAddress>
+                </dnsServer>
+            </dnsServers>
+            <ntpServers>
+                <ntpServer>
+                    <ipAddress>10.210.176.28</ipAddress>
+                </ntpServer>
+                <ntpServer>
+                    <ipAddress>10.31.16.1</ipAddress>
+                </ntpServer>
+                <ntpServer>
+                    <ipAddress>10.31.223.1</ipAddress>
+                </ntpServer>
+            </ntpServers>
+            <TimeZone>America/Los_Angeles</TimeZone>
+            <DefaultGatewayNet>scaqae14celadm01.us.oracle.com_admin</DefaultGatewayNet>
+            <virtual>false</virtual>
+            <version>version2</version>
+            <osType>LinuxPhysical</osType>
+        </machine>
+        <machine id="scaqae14storage02_id">
+            <hostName>scaqae14celadm02.us.oracle.com</hostName>
+            <iloms>
+                <ilom id="scaqae14celadm02-c.us.oracle.com_Ilom" />
+            </iloms>
+            <writeBackFlashCache>automatic</writeBackFlashCache>
+            <networks>
+                <network id="scaqae14celadm02-priv.us.oracle.com_private1" />
+                <network id="scaqae14celadm02-priv.us.oracle.com_private2" />
+                <network id="scaqae14celadm02.us.oracle.com_admin" />
+            </networks>
+            <networkPools>
+                <networkPool id="78b525f1-7d9f-8e25-9146-eacc0f8eb83d_cellPrivPool" />
+                <networkPool id="436a383a-5e50-6294-27e3-672772b98722_cellAdminPool" />
+                <networkPool id="0f8a5aff-eed2-195a-8fd3-66752d4ae870_cellILomPool" />
+            </networkPools>
+            <storage>
+                <localDisks>
+                    <localDisk id="scaqae14storage02_id_CD_00" />
+                    <localDisk id="scaqae14storage02_id_CD_01" />
+                    <localDisk id="scaqae14storage02_id_CD_02" />
+                    <localDisk id="scaqae14storage02_id_CD_03" />
+                    <localDisk id="scaqae14storage02_id_CD_04" />
+                    <localDisk id="scaqae14storage02_id_CD_05" />
+                    <localDisk id="scaqae14storage02_id_CD_06" />
+                    <localDisk id="scaqae14storage02_id_CD_07" />
+                    <localDisk id="scaqae14storage02_id_CD_08" />
+                    <localDisk id="scaqae14storage02_id_CD_09" />
+                    <localDisk id="scaqae14storage02_id_CD_10" />
+                    <localDisk id="scaqae14storage02_id_CD_11" />
+                </localDisks>
+            </storage>
+            <software>
+                <clusters>
+                    <cluster id="Cluster-c21de517e-7719-3643-73c6-9a419d7b5a93_id" />
+                    <cluster id="Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_id" />
+                    <cluster id="Cluster-cfdb017d3-0d79-31e2-f14a-642a9f800d9a_id" />
+                    <cluster id="Cluster-c5788792c-5fd0-8b62-2d4e-2a80ad43cbaf_id" />
+                    <cluster id="Cluster-cf77f79a4-eeaa-595c-e0e9-8061eace7545_id" />
+                    <cluster id="Cluster-c6b1888ab-6513-6bc5-0ef6-219696a4711e_id" />
+                    <cluster id="Cluster-cf6445db9-e298-9c82-c9e4-d47a37ec5c6d_id" />
+                    <cluster id="Cluster-c03dca026-8919-0b39-6fb6-e65ec3464460_id" />
+                </clusters>
+                <databaseHomes />
+            </software>
+            <machineType>storage</machineType>
+            <dnsServers>
+                <dnsServer>
+                    <ipAddress>10.31.138.25</ipAddress>
+                </dnsServer>
+                <dnsServer>
+                    <ipAddress>10.231.225.65</ipAddress>
+                </dnsServer>
+                <dnsServer>
+                    <ipAddress>10.31.138.25</ipAddress>
+                </dnsServer>
+            </dnsServers>
+            <ntpServers>
+                <ntpServer>
+                    <ipAddress>10.210.176.28</ipAddress>
+                </ntpServer>
+                <ntpServer>
+                    <ipAddress>10.31.16.1</ipAddress>
+                </ntpServer>
+                <ntpServer>
+                    <ipAddress>10.31.223.1</ipAddress>
+                </ntpServer>
+            </ntpServers>
+            <TimeZone>America/Los_Angeles</TimeZone>
+            <DefaultGatewayNet>scaqae14celadm02.us.oracle.com_admin</DefaultGatewayNet>
+            <virtual>false</virtual>
+            <version>version2</version>
+            <osType>LinuxPhysical</osType>
+        </machine>
+        <machine id="scaqae14storage03_id">
+            <hostName>scaqae14celadm03.us.oracle.com</hostName>
+            <iloms>
+                <ilom id="scaqae14celadm03-c.us.oracle.com_Ilom" />
+            </iloms>
+            <writeBackFlashCache>automatic</writeBackFlashCache>
+            <networks>
+                <network id="scaqae14celadm03-priv.us.oracle.com_private1" />
+                <network id="scaqae14celadm03-priv.us.oracle.com_private2" />
+                <network id="scaqae14celadm03.us.oracle.com_admin" />
+            </networks>
+            <networkPools>
+                <networkPool id="78b525f1-7d9f-8e25-9146-eacc0f8eb83d_cellPrivPool" />
+                <networkPool id="436a383a-5e50-6294-27e3-672772b98722_cellAdminPool" />
+                <networkPool id="0f8a5aff-eed2-195a-8fd3-66752d4ae870_cellILomPool" />
+            </networkPools>
+            <storage>
+                <localDisks>
+                    <localDisk id="scaqae14storage03_id_CD_00" />
+                    <localDisk id="scaqae14storage03_id_CD_01" />
+                    <localDisk id="scaqae14storage03_id_CD_02" />
+                    <localDisk id="scaqae14storage03_id_CD_03" />
+                    <localDisk id="scaqae14storage03_id_CD_04" />
+                    <localDisk id="scaqae14storage03_id_CD_05" />
+                    <localDisk id="scaqae14storage03_id_CD_06" />
+                    <localDisk id="scaqae14storage03_id_CD_07" />
+                    <localDisk id="scaqae14storage03_id_CD_08" />
+                    <localDisk id="scaqae14storage03_id_CD_09" />
+                    <localDisk id="scaqae14storage03_id_CD_10" />
+                    <localDisk id="scaqae14storage03_id_CD_11" />
+                </localDisks>
+            </storage>
+            <software>
+                <clusters>
+                    <cluster id="Cluster-c21de517e-7719-3643-73c6-9a419d7b5a93_id" />
+                    <cluster id="Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_id" />
+                    <cluster id="Cluster-cfdb017d3-0d79-31e2-f14a-642a9f800d9a_id" />
+                    <cluster id="Cluster-c5788792c-5fd0-8b62-2d4e-2a80ad43cbaf_id" />
+                    <cluster id="Cluster-cf77f79a4-eeaa-595c-e0e9-8061eace7545_id" />
+                    <cluster id="Cluster-c6b1888ab-6513-6bc5-0ef6-219696a4711e_id" />
+                    <cluster id="Cluster-cf6445db9-e298-9c82-c9e4-d47a37ec5c6d_id" />
+                    <cluster id="Cluster-c03dca026-8919-0b39-6fb6-e65ec3464460_id" />
+                </clusters>
+                <databaseHomes />
+            </software>
+            <machineType>storage</machineType>
+            <dnsServers>
+                <dnsServer>
+                    <ipAddress>10.31.138.25</ipAddress>
+                </dnsServer>
+                <dnsServer>
+                    <ipAddress>10.231.225.65</ipAddress>
+                </dnsServer>
+                <dnsServer>
+                    <ipAddress>10.31.138.25</ipAddress>
+                </dnsServer>
+            </dnsServers>
+            <ntpServers>
+                <ntpServer>
+                    <ipAddress>10.210.176.28</ipAddress>
+                </ntpServer>
+                <ntpServer>
+                    <ipAddress>10.31.16.1</ipAddress>
+                </ntpServer>
+                <ntpServer>
+                    <ipAddress>10.31.223.1</ipAddress>
+                </ntpServer>
+            </ntpServers>
+            <TimeZone>America/Los_Angeles</TimeZone>
+            <DefaultGatewayNet>scaqae14celadm03.us.oracle.com_admin</DefaultGatewayNet>
+            <virtual>false</virtual>
+            <version>version2</version>
+            <osType>LinuxPhysical</osType>
+        </machine>
+        <machine id="scaqae14compute01_Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_vm01_id">
+            <hostName>scaqae14dv0102.us.oracle.com</hostName>
+            <users>
+                <user id="e4745bec-7f72-170d-a300-9e80667010cd" />
+                <user id="aaca2596-968f-8c64-7b79-51f7ae3d6017" />
+            </users>
+            <networks>
+                <network id="scaqae14dv0102-priv.us.oracle.com_private1" />
+                <network id="scaqae14dv0102-priv.us.oracle.com_private2" />
+                <network id="scaqae14dv0102.us.oracle.com_client" />
+                <network id="scaqae14dv0102-bk.us.oracle.com_backup" />
+            </networks>
+            <networkPools>
+                <networkPool id="52422056-5e93-eaf7-4f5c-a519625c440d_domUPrivPool" />
+                <networkPool id="c6fc0628-d6af-f65e-81ee-29e8ad4ceeef_clientPool" />
+                <networkPool id="43a20bcf-d26c-a307-4383-077447a81fe9_backupPool" />
+            </networkPools>
+            <software>
+                <clusters>
+                    <cluster id="Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_id">
+                        <version>version1</version>
+                        <scanIps />
+                    </cluster>
+                </clusters>
+                <databaseHomes>
+                    <databaseHome id="DbHome_1487eced-8e66-12e3-7e1e-fc24f763dbd9_id" />
+                    <databaseHome id="Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_databaseHome1" />
+                    <databaseHome id="Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_databaseHome2" />
+                    <databaseHome id="Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_databaseHome3" />
+                </databaseHomes>
+            </software>
+            <machineType>compute</machineType>
+            <dnsServers>
+                <dnsServer>
+                    <ipAddress>10.31.138.25</ipAddress>
+                </dnsServer>
+                <dnsServer>
+                    <ipAddress>10.231.225.65</ipAddress>
+                </dnsServer>
+                <dnsServer>
+                    <ipAddress>10.31.138.25</ipAddress>
+                </dnsServer>
+            </dnsServers>
+            <ntpServers>
+                <ntpServer>
+                    <ipAddress>10.250.40.1</ipAddress>
+                </ntpServer>
+                <ntpServer>
+                    <ipAddress>10.246.0.1</ipAddress>
+                </ntpServer>
+                <ntpServer>
+                    <ipAddress>10.232.144.1</ipAddress>
+                </ntpServer>
+            </ntpServers>
+            <TimeZone>America/Los_Angeles</TimeZone>
+            <DefaultGatewayNet>scaqae14dv0102.us.oracle.com_client</DefaultGatewayNet>
+            <ImageVersion>default</ImageVersion>
+            <DomUImageName>default</DomUImageName>
+            <virtual>true</virtual>
+            <version>version2</version>
+            <osType>LinuxKVMGuest</osType>
+            <guestCores>6</guestCores>
+            <guestMemory>32Gb</guestMemory>
+            <guestLocalDiskSize>20Gb</guestLocalDiskSize>
+        </machine>
+        <machine id="scaqae14compute02_Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_vm01_id">
+            <hostName>scaqae14dv0202.us.oracle.com</hostName>
+            <users>
+                <user id="e4745bec-7f72-170d-a300-9e80667010cd" />
+                <user id="aaca2596-968f-8c64-7b79-51f7ae3d6017" />
+            </users>
+            <networks>
+                <network id="scaqae14dv0202-priv.us.oracle.com_private1" />
+                <network id="scaqae14dv0202-priv.us.oracle.com_private2" />
+                <network id="scaqae14dv0202.us.oracle.com_client" />
+                <network id="scaqae14dv0202-bk.us.oracle.com_backup" />
+            </networks>
+            <networkPools>
+                <networkPool id="52422056-5e93-eaf7-4f5c-a519625c440d_domUPrivPool" />
+                <networkPool id="c6fc0628-d6af-f65e-81ee-29e8ad4ceeef_clientPool" />
+                <networkPool id="43a20bcf-d26c-a307-4383-077447a81fe9_backupPool" />
+            </networkPools>
+            <software>
+                <clusters>
+                    <cluster id="Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_id">
+                        <version>version1</version>
+                        <scanIps />
+                    </cluster>
+                </clusters>
+                <databaseHomes>
+                    <databaseHome id="DbHome_1487eced-8e66-12e3-7e1e-fc24f763dbd9_id" />
+                    <databaseHome id="Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_databaseHome1" />
+                    <databaseHome id="Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_databaseHome2" />
+                    <databaseHome id="Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_databaseHome3" />
+                </databaseHomes>
+            </software>
+            <machineType>compute</machineType>
+            <dnsServers>
+                <dnsServer>
+                    <ipAddress>10.31.138.25</ipAddress>
+                </dnsServer>
+                <dnsServer>
+                    <ipAddress>10.231.225.65</ipAddress>
+                </dnsServer>
+                <dnsServer>
+                    <ipAddress>10.31.138.25</ipAddress>
+                </dnsServer>
+            </dnsServers>
+            <ntpServers>
+                <ntpServer>
+                    <ipAddress>10.250.40.1</ipAddress>
+                </ntpServer>
+                <ntpServer>
+                    <ipAddress>10.246.0.1</ipAddress>
+                </ntpServer>
+                <ntpServer>
+                    <ipAddress>10.232.144.1</ipAddress>
+                </ntpServer>
+            </ntpServers>
+            <TimeZone>America/Los_Angeles</TimeZone>
+            <DefaultGatewayNet>scaqae14dv0202.us.oracle.com_client</DefaultGatewayNet>
+            <ImageVersion>default</ImageVersion>
+            <DomUImageName>default</DomUImageName>
+            <virtual>true</virtual>
+            <version>version2</version>
+            <osType>LinuxKVMGuest</osType>
+            <guestCores>6</guestCores>
+            <guestMemory>32Gb</guestMemory>
+            <guestLocalDiskSize>20Gb</guestLocalDiskSize>
+        </machine>
+    </machines>
+    <iloms>
+        <ilom id="scaqae14adm01-c.us.oracle.com_Ilom">
+            <networks>
+                <network id="scaqae14adm01-c.us.oracle.com_Ilom" />
+            </networks>
+            <dnsServers>
+                <dnsServer>
+                    <ipAddress>10.31.138.25</ipAddress>
+                </dnsServer>
+                <dnsServer>
+                    <ipAddress>10.231.225.65</ipAddress>
+                </dnsServer>
+                <dnsServer>
+                    <ipAddress>10.31.138.25</ipAddress>
+                </dnsServer>
+            </dnsServers>
+            <ntpServers>
+                <ntpServer>
+                    <ipAddress>10.210.176.28</ipAddress>
+                </ntpServer>
+                <ntpServer>
+                    <ipAddress>10.31.16.1</ipAddress>
+                </ntpServer>
+                <ntpServer>
+                    <ipAddress>10.31.223.1</ipAddress>
+                </ntpServer>
+            </ntpServers>
+            <ilomTimeZone>America/Los_Angeles</ilomTimeZone>
+            <ilomName>scaqae14adm01-c Ilom</ilomName>
+            <version>12</version>
+        </ilom>
+        <ilom id="scaqae14adm02-c.us.oracle.com_Ilom">
+            <networks>
+                <network id="scaqae14adm02-c.us.oracle.com_Ilom" />
+            </networks>
+            <dnsServers>
+                <dnsServer>
+                    <ipAddress>10.31.138.25</ipAddress>
+                </dnsServer>
+                <dnsServer>
+                    <ipAddress>10.231.225.65</ipAddress>
+                </dnsServer>
+                <dnsServer>
+                    <ipAddress>10.31.138.25</ipAddress>
+                </dnsServer>
+            </dnsServers>
+            <ntpServers>
+                <ntpServer>
+                    <ipAddress>10.210.176.28</ipAddress>
+                </ntpServer>
+                <ntpServer>
+                    <ipAddress>10.31.16.1</ipAddress>
+                </ntpServer>
+                <ntpServer>
+                    <ipAddress>10.31.223.1</ipAddress>
+                </ntpServer>
+            </ntpServers>
+            <ilomTimeZone>America/Los_Angeles</ilomTimeZone>
+            <ilomName>scaqae14adm02-c Ilom</ilomName>
+            <version>12</version>
+        </ilom>
+        <ilom id="scaqae14celadm01-c.us.oracle.com_Ilom">
+            <networks>
+                <network id="scaqae14celadm01-c.us.oracle.com_Ilom" />
+            </networks>
+            <dnsServers>
+                <dnsServer>
+                    <ipAddress>10.31.138.25</ipAddress>
+                </dnsServer>
+                <dnsServer>
+                    <ipAddress>10.231.225.65</ipAddress>
+                </dnsServer>
+                <dnsServer>
+                    <ipAddress>10.31.138.25</ipAddress>
+                </dnsServer>
+            </dnsServers>
+            <ntpServers>
+                <ntpServer>
+                    <ipAddress>10.210.176.28</ipAddress>
+                </ntpServer>
+                <ntpServer>
+                    <ipAddress>10.31.16.1</ipAddress>
+                </ntpServer>
+                <ntpServer>
+                    <ipAddress>10.31.223.1</ipAddress>
+                </ntpServer>
+            </ntpServers>
+            <ilomTimeZone>America/Los_Angeles</ilomTimeZone>
+            <ilomName>scaqae14celadm01-c Ilom</ilomName>
+            <version>12</version>
+        </ilom>
+        <ilom id="scaqae14celadm02-c.us.oracle.com_Ilom">
+            <networks>
+                <network id="scaqae14celadm02-c.us.oracle.com_Ilom" />
+            </networks>
+            <dnsServers>
+                <dnsServer>
+                    <ipAddress>10.31.138.25</ipAddress>
+                </dnsServer>
+                <dnsServer>
+                    <ipAddress>10.231.225.65</ipAddress>
+                </dnsServer>
+                <dnsServer>
+                    <ipAddress>10.31.138.25</ipAddress>
+                </dnsServer>
+            </dnsServers>
+            <ntpServers>
+                <ntpServer>
+                    <ipAddress>10.210.176.28</ipAddress>
+                </ntpServer>
+                <ntpServer>
+                    <ipAddress>10.31.16.1</ipAddress>
+                </ntpServer>
+                <ntpServer>
+                    <ipAddress>10.31.223.1</ipAddress>
+                </ntpServer>
+            </ntpServers>
+            <ilomTimeZone>America/Los_Angeles</ilomTimeZone>
+            <ilomName>scaqae14celadm02-c Ilom</ilomName>
+            <version>12</version>
+        </ilom>
+        <ilom id="scaqae14celadm03-c.us.oracle.com_Ilom">
+            <networks>
+                <network id="scaqae14celadm03-c.us.oracle.com_Ilom" />
+            </networks>
+            <dnsServers>
+                <dnsServer>
+                    <ipAddress>10.31.138.25</ipAddress>
+                </dnsServer>
+                <dnsServer>
+                    <ipAddress>10.231.225.65</ipAddress>
+                </dnsServer>
+                <dnsServer>
+                    <ipAddress>10.31.138.25</ipAddress>
+                </dnsServer>
+            </dnsServers>
+            <ntpServers>
+                <ntpServer>
+                    <ipAddress>10.210.176.28</ipAddress>
+                </ntpServer>
+                <ntpServer>
+                    <ipAddress>10.31.16.1</ipAddress>
+                </ntpServer>
+                <ntpServer>
+                    <ipAddress>10.31.223.1</ipAddress>
+                </ntpServer>
+            </ntpServers>
+            <ilomTimeZone>America/Los_Angeles</ilomTimeZone>
+            <ilomName>scaqae14celadm03-c Ilom</ilomName>
+            <version>12</version>
+        </ilom>
+    </iloms>
+    <users>
+        <user id="e4745bec-7f72-170d-a300-9e80667010cd">
+            <version>version2</version>
+            <userType>grid</userType>
+            <username>grid</username>
+            <homedir>/home/grid</homedir>
+            <userid>1000</userid>
+            <groups>
+                <group id="8a6f379d-362a-ed55-2e48-093d98217279" />
+                <group id="def2f3f8-03d3-b1fa-ea93-adaaea2ab931" />
+                <group id="566d6416-ff23-10a0-23d3-a6e92fb61305" />
+                <group id="c3975364-adab-5fed-c738-e1fccd4b3126" />
+            </groups>
+        </user>
+        <user id="aaca2596-968f-8c64-7b79-51f7ae3d6017">
+            <version>version2</version>
+            <userType>database</userType>
+            <username>oracle</username>
+            <homedir>/home/oracle</homedir>
+            <userid>1001</userid>
+            <groups>
+                <group id="8a6f379d-362a-ed55-2e48-093d98217279" />
+                <group id="6fadc8d4-98e6-0005-3762-dc2cca61dded" />
+                <group id="02feebfc-9498-d9f1-7c5b-269a0b9bd174" />
+                <group id="def2f3f8-03d3-b1fa-ea93-adaaea2ab931" />
+            </groups>
+        </user>
+    </users>
+    <groups>
+        <group id="566d6416-ff23-10a0-23d3-a6e92fb61305">
+            <version>version2</version>
+            <groupId>1005</groupId>
+            <groupName>asmoper</groupName>
+            <groupType>OSOPER</groupType>
+        </group>
+        <group id="c3975364-adab-5fed-c738-e1fccd4b3126">
+            <version>version2</version>
+            <groupId>1006</groupId>
+            <groupName>asmadmin</groupName>
+            <groupType>OSASM</groupType>
+        </group>
+        <group id="8a6f379d-362a-ed55-2e48-093d98217279">
+            <version>version2</version>
+            <groupId>1001</groupId>
+            <groupName>oinstall</groupName>
+            <groupType>OINSTALLGROUP</groupType>
+        </group>
+        <group id="6fadc8d4-98e6-0005-3762-dc2cca61dded">
+            <version>version2</version>
+            <groupId>1002</groupId>
+            <groupName>dba</groupName>
+            <groupType>DBA_GROUP</groupType>
+        </group>
+        <group id="02feebfc-9498-d9f1-7c5b-269a0b9bd174">
+            <version>version2</version>
+            <groupId>1003</groupId>
+            <groupName>racoper</groupName>
+            <groupType>OPER_GROUP</groupType>
+        </group>
+        <group id="def2f3f8-03d3-b1fa-ea93-adaaea2ab931">
+            <version>version2</version>
+            <groupId>1004</groupId>
+            <groupName>asmdba</groupName>
+            <groupType>OSDBA</groupType>
+        </group>
+    </groups>
+    <userGroupCollections>
+        <userGroupCollection id="UserCollection-1_id">
+            <users>
+                <user id="e4745bec-7f72-170d-a300-9e80667010cd" />
+                <user id="aaca2596-968f-8c64-7b79-51f7ae3d6017" />
+            </users>
+            <userGroupCollectionType>rolesep</userGroupCollectionType>
+        </userGroupCollection>
+    </userGroupCollections>
+    <networks>
+        <network id="scaqae14adm01-priv.us.oracle.com_private1">
+            <networkName>scaqae14adm01-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>scaqae14adm01-priv1</hostName>
+            <ipAddress>192.168.115.240</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <domainName>us.oracle.com</domainName>
+            <master>re0</master>
+            <slave />
+        </network>
+        <network id="scaqae14adm01-priv.us.oracle.com_private2">
+            <networkName>scaqae14adm01-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>scaqae14adm01-priv2</hostName>
+            <ipAddress>192.168.115.241</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <domainName>us.oracle.com</domainName>
+            <master>re1</master>
+            <slave />
+        </network>
+        <network id="scaqae14adm02-priv.us.oracle.com_private1">
+            <networkName>scaqae14adm02-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>scaqae14adm02-priv1</hostName>
+            <ipAddress>192.168.115.242</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <domainName>us.oracle.com</domainName>
+            <master>re0</master>
+            <slave />
+        </network>
+        <network id="scaqae14adm02-priv.us.oracle.com_private2">
+            <networkName>scaqae14adm02-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>scaqae14adm02-priv2</hostName>
+            <ipAddress>192.168.115.243</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <domainName>us.oracle.com</domainName>
+            <master>re1</master>
+            <slave />
+        </network>
+        <network id="scaqae14celadm01-priv.us.oracle.com_private1">
+            <networkName>scaqae14celadm01-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>scaqae14celadm01-priv1</hostName>
+            <ipAddress>192.168.115.244</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <domainName>us.oracle.com</domainName>
+            <master>re0</master>
+            <slave />
+        </network>
+        <network id="scaqae14celadm01-priv.us.oracle.com_private2">
+            <networkName>scaqae14celadm01-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>scaqae14celadm01-priv2</hostName>
+            <ipAddress>192.168.115.245</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <domainName>us.oracle.com</domainName>
+            <master>re1</master>
+            <slave />
+        </network>
+        <network id="scaqae14celadm02-priv.us.oracle.com_private1">
+            <networkName>scaqae14celadm02-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>scaqae14celadm02-priv1</hostName>
+            <ipAddress>192.168.115.246</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <domainName>us.oracle.com</domainName>
+            <master>re0</master>
+            <slave />
+        </network>
+        <network id="scaqae14celadm02-priv.us.oracle.com_private2">
+            <networkName>scaqae14celadm02-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>scaqae14celadm02-priv2</hostName>
+            <ipAddress>192.168.115.247</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <domainName>us.oracle.com</domainName>
+            <master>re1</master>
+            <slave />
+        </network>
+        <network id="scaqae14celadm03-priv.us.oracle.com_private1">
+            <networkName>scaqae14celadm03-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>scaqae14celadm03-priv1</hostName>
+            <ipAddress>192.168.115.248</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <domainName>us.oracle.com</domainName>
+            <master>re0</master>
+            <slave />
+        </network>
+        <network id="scaqae14celadm03-priv.us.oracle.com_private2">
+            <networkName>scaqae14celadm03-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>scaqae14celadm03-priv2</hostName>
+            <ipAddress>192.168.115.249</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <domainName>us.oracle.com</domainName>
+            <master>re1</master>
+            <slave />
+        </network>
+        <network id="scaqae14dv0101-priv.us.oracle.com_private1">
+            <networkName>scaqae14dv0101-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0101-priv1</hostName>
+            <ipAddress>192.168.115.1</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <domainName>us.oracle.com</domainName>
+            <master>re0</master>
+            <slave />
+        </network>
+        <network id="scaqae14dv0101-priv.us.oracle.com_private2">
+            <networkName>scaqae14dv0101-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0101-priv2</hostName>
+            <ipAddress>192.168.115.2</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <domainName>us.oracle.com</domainName>
+            <master>re1</master>
+            <slave />
+        </network>
+        <network id="scaqae14dv0201-priv.us.oracle.com_private1">
+            <networkName>scaqae14dv0201-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0201-priv1</hostName>
+            <ipAddress>192.168.115.3</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <domainName>us.oracle.com</domainName>
+            <master>re0</master>
+            <slave />
+        </network>
+        <network id="scaqae14dv0201-priv.us.oracle.com_private2">
+            <networkName>scaqae14dv0201-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0201-priv2</hostName>
+            <ipAddress>192.168.115.4</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <domainName>us.oracle.com</domainName>
+            <master>re1</master>
+            <slave />
+        </network>
+        <network id="scaqae14dv0102-priv.us.oracle.com_private1">
+            <networkName>scaqae14dv0102-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0102-priv1</hostName>
+            <ipAddress>192.168.115.33</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <domainName>us.oracle.com</domainName>
+            <master>re0</master>
+            <slave />
+        </network>
+        <network id="scaqae14dv0102-priv.us.oracle.com_private2">
+            <networkName>scaqae14dv0102-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0102-priv2</hostName>
+            <ipAddress>192.168.115.34</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <domainName>us.oracle.com</domainName>
+            <master>re1</master>
+            <slave />
+        </network>
+        <network id="scaqae14dv0202-priv.us.oracle.com_private1">
+            <networkName>scaqae14dv0202-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0202-priv1</hostName>
+            <ipAddress>192.168.115.35</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <domainName>us.oracle.com</domainName>
+            <master>re0</master>
+            <slave />
+        </network>
+        <network id="scaqae14dv0202-priv.us.oracle.com_private2">
+            <networkName>scaqae14dv0202-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0202-priv2</hostName>
+            <ipAddress>192.168.115.36</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <domainName>us.oracle.com</domainName>
+            <master>re1</master>
+            <slave />
+        </network>
+        <network id="scaqae14dv0103-priv.us.oracle.com_private1">
+            <networkName>scaqae14dv0103-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0103-priv1</hostName>
+            <ipAddress>192.168.115.65</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <domainName>us.oracle.com</domainName>
+            <master>re0</master>
+            <slave />
+        </network>
+        <network id="scaqae14dv0103-priv.us.oracle.com_private2">
+            <networkName>scaqae14dv0103-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0103-priv2</hostName>
+            <ipAddress>192.168.115.66</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <domainName>us.oracle.com</domainName>
+            <master>re1</master>
+            <slave />
+        </network>
+        <network id="scaqae14dv0203-priv.us.oracle.com_private1">
+            <networkName>scaqae14dv0203-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0203-priv1</hostName>
+            <ipAddress>192.168.115.67</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <domainName>us.oracle.com</domainName>
+            <master>re0</master>
+            <slave />
+        </network>
+        <network id="scaqae14dv0203-priv.us.oracle.com_private2">
+            <networkName>scaqae14dv0203-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0203-priv2</hostName>
+            <ipAddress>192.168.115.68</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <domainName>us.oracle.com</domainName>
+            <master>re1</master>
+            <slave />
+        </network>
+        <network id="scaqae14dv0104-priv.us.oracle.com_private1">
+            <networkName>scaqae14dv0104-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0104-priv1</hostName>
+            <ipAddress>192.168.115.97</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <domainName>us.oracle.com</domainName>
+            <master>re0</master>
+            <slave />
+        </network>
+        <network id="scaqae14dv0104-priv.us.oracle.com_private2">
+            <networkName>scaqae14dv0104-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0104-priv2</hostName>
+            <ipAddress>192.168.115.98</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <domainName>us.oracle.com</domainName>
+            <master>re1</master>
+            <slave />
+        </network>
+        <network id="scaqae14dv0204-priv.us.oracle.com_private1">
+            <networkName>scaqae14dv0204-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0204-priv1</hostName>
+            <ipAddress>192.168.115.99</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <domainName>us.oracle.com</domainName>
+            <master>re0</master>
+            <slave />
+        </network>
+        <network id="scaqae14dv0204-priv.us.oracle.com_private2">
+            <networkName>scaqae14dv0204-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0204-priv2</hostName>
+            <ipAddress>192.168.115.100</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <domainName>us.oracle.com</domainName>
+            <master>re1</master>
+            <slave />
+        </network>
+        <network id="scaqae14dv0105-priv.us.oracle.com_private1">
+            <networkName>scaqae14dv0105-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0105-priv1</hostName>
+            <ipAddress>192.168.115.128</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <domainName>us.oracle.com</domainName>
+            <master>re0</master>
+            <slave />
+        </network>
+        <network id="scaqae14dv0105-priv.us.oracle.com_private2">
+            <networkName>scaqae14dv0105-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0105-priv2</hostName>
+            <ipAddress>192.168.115.129</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <domainName>us.oracle.com</domainName>
+            <master>re1</master>
+            <slave />
+        </network>
+        <network id="scaqae14dv0205-priv.us.oracle.com_private1">
+            <networkName>scaqae14dv0205-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0205-priv1</hostName>
+            <ipAddress>192.168.115.130</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <domainName>us.oracle.com</domainName>
+            <master>re0</master>
+            <slave />
+        </network>
+        <network id="scaqae14dv0205-priv.us.oracle.com_private2">
+            <networkName>scaqae14dv0205-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0205-priv2</hostName>
+            <ipAddress>192.168.115.131</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <domainName>us.oracle.com</domainName>
+            <master>re1</master>
+            <slave />
+        </network>
+        <network id="scaqae14dv0106-priv.us.oracle.com_private1">
+            <networkName>scaqae14dv0106-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0106-priv1</hostName>
+            <ipAddress>192.168.115.161</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <domainName>us.oracle.com</domainName>
+            <master>re0</master>
+            <slave />
+        </network>
+        <network id="scaqae14dv0106-priv.us.oracle.com_private2">
+            <networkName>scaqae14dv0106-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0106-priv2</hostName>
+            <ipAddress>192.168.115.162</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <domainName>us.oracle.com</domainName>
+            <master>re1</master>
+            <slave />
+        </network>
+        <network id="scaqae14dv0206-priv.us.oracle.com_private1">
+            <networkName>scaqae14dv0206-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0206-priv1</hostName>
+            <ipAddress>192.168.115.163</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <domainName>us.oracle.com</domainName>
+            <master>re0</master>
+            <slave />
+        </network>
+        <network id="scaqae14dv0206-priv.us.oracle.com_private2">
+            <networkName>scaqae14dv0206-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0206-priv2</hostName>
+            <ipAddress>192.168.115.164</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <domainName>us.oracle.com</domainName>
+            <master>re1</master>
+            <slave />
+        </network>
+        <network id="scaqae14dv0107-priv.us.oracle.com_private1">
+            <networkName>scaqae14dv0107-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0107-priv1</hostName>
+            <ipAddress>192.168.115.192</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <domainName>us.oracle.com</domainName>
+            <master>re0</master>
+            <slave />
+        </network>
+        <network id="scaqae14dv0107-priv.us.oracle.com_private2">
+            <networkName>scaqae14dv0107-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0107-priv2</hostName>
+            <ipAddress>192.168.115.193</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <domainName>us.oracle.com</domainName>
+            <master>re1</master>
+            <slave />
+        </network>
+        <network id="scaqae14dv0207-priv.us.oracle.com_private1">
+            <networkName>scaqae14dv0207-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0207-priv1</hostName>
+            <ipAddress>192.168.115.194</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <domainName>us.oracle.com</domainName>
+            <master>re0</master>
+            <slave />
+        </network>
+        <network id="scaqae14dv0207-priv.us.oracle.com_private2">
+            <networkName>scaqae14dv0207-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0207-priv2</hostName>
+            <ipAddress>192.168.115.195</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <domainName>us.oracle.com</domainName>
+            <master>re1</master>
+            <slave />
+        </network>
+        <network id="scaqae14dv0108-priv.us.oracle.com_private1">
+            <networkName>scaqae14dv0108-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0108-priv1</hostName>
+            <ipAddress>192.168.115.225</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <domainName>us.oracle.com</domainName>
+            <master>re0</master>
+            <slave />
+        </network>
+        <network id="scaqae14dv0108-priv.us.oracle.com_private2">
+            <networkName>scaqae14dv0108-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0108-priv2</hostName>
+            <ipAddress>192.168.115.226</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <domainName>us.oracle.com</domainName>
+            <master>re1</master>
+            <slave />
+        </network>
+        <network id="scaqae14dv0208-priv.us.oracle.com_private1">
+            <networkName>scaqae14dv0208-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0208-priv1</hostName>
+            <ipAddress>192.168.115.227</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <domainName>us.oracle.com</domainName>
+            <master>re0</master>
+            <slave />
+        </network>
+        <network id="scaqae14dv0208-priv.us.oracle.com_private2">
+            <networkName>scaqae14dv0208-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0208-priv2</hostName>
+            <ipAddress>192.168.115.228</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <domainName>us.oracle.com</domainName>
+            <master>re1</master>
+            <slave />
+        </network>
+        <network id="scaqae14adm01.us.oracle.com_admin">
+            <networkName>scaqae14adm01 admin</networkName>
+            <networkType>admin</networkType>
+            <version>2</version>
+            <hostName>scaqae14adm01</hostName>
+            <ipAddress>10.31.26.202</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.31.16.1</gateway>
+            <domainName>us.oracle.com</domainName>
+            <master>eth0</master>
+            <slave />
+            <vlanId>0</vlanId>
+        </network>
+        <network id="scaqae14adm02.us.oracle.com_admin">
+            <networkName>scaqae14adm02 admin</networkName>
+            <networkType>admin</networkType>
+            <version>2</version>
+            <hostName>scaqae14adm02</hostName>
+            <ipAddress>10.31.26.203</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.31.16.1</gateway>
+            <domainName>us.oracle.com</domainName>
+            <master>eth0</master>
+            <slave />
+            <vlanId>0</vlanId>
+        </network>
+        <network id="scaqae14celadm01.us.oracle.com_admin">
+            <networkName>scaqae14celadm01 admin</networkName>
+            <networkType>admin</networkType>
+            <version>2</version>
+            <hostName>scaqae14celadm01</hostName>
+            <ipAddress>10.31.26.210</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.31.16.1</gateway>
+            <domainName>us.oracle.com</domainName>
+            <master>eth0</master>
+            <slave />
+            <vlanId>0</vlanId>
+        </network>
+        <network id="scaqae14celadm02.us.oracle.com_admin">
+            <networkName>scaqae14celadm02 admin</networkName>
+            <networkType>admin</networkType>
+            <version>2</version>
+            <hostName>scaqae14celadm02</hostName>
+            <ipAddress>10.31.26.211</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.31.16.1</gateway>
+            <domainName>us.oracle.com</domainName>
+            <master>eth0</master>
+            <slave />
+            <vlanId>0</vlanId>
+        </network>
+        <network id="scaqae14celadm03.us.oracle.com_admin">
+            <networkName>scaqae14celadm03 admin</networkName>
+            <networkType>admin</networkType>
+            <version>2</version>
+            <hostName>scaqae14celadm03</hostName>
+            <ipAddress>10.31.26.212</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.31.16.1</gateway>
+            <domainName>us.oracle.com</domainName>
+            <master>eth0</master>
+            <slave />
+            <vlanId>0</vlanId>
+        </network>
+        <network id="scaqae14adm01-c.us.oracle.com_Ilom">
+            <networkName>scaqae14adm01-c Ilom</networkName>
+            <networkType>Ilom</networkType>
+            <version>2</version>
+            <hostName>scaqae14adm01-c</hostName>
+            <ipAddress>10.31.26.224</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.31.16.1</gateway>
+            <domainName>us.oracle.com</domainName>
+            <vlanId>0</vlanId>
+        </network>
+        <network id="scaqae14adm02-c.us.oracle.com_Ilom">
+            <networkName>scaqae14adm02-c Ilom</networkName>
+            <networkType>Ilom</networkType>
+            <version>2</version>
+            <hostName>scaqae14adm02-c</hostName>
+            <ipAddress>10.31.26.225</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.31.16.1</gateway>
+            <domainName>us.oracle.com</domainName>
+            <vlanId>0</vlanId>
+        </network>
+        <network id="scaqae14celadm01-c.us.oracle.com_Ilom">
+            <networkName>scaqae14celadm01-c Ilom</networkName>
+            <networkType>Ilom</networkType>
+            <version>2</version>
+            <hostName>scaqae14celadm01-c</hostName>
+            <ipAddress>10.31.26.232</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.31.16.1</gateway>
+            <domainName>us.oracle.com</domainName>
+            <vlanId>0</vlanId>
+        </network>
+        <network id="scaqae14celadm02-c.us.oracle.com_Ilom">
+            <networkName>scaqae14celadm02-c Ilom</networkName>
+            <networkType>Ilom</networkType>
+            <version>2</version>
+            <hostName>scaqae14celadm02-c</hostName>
+            <ipAddress>10.31.26.233</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.31.16.1</gateway>
+            <domainName>us.oracle.com</domainName>
+            <vlanId>0</vlanId>
+        </network>
+        <network id="scaqae14celadm03-c.us.oracle.com_Ilom">
+            <networkName>scaqae14celadm03-c Ilom</networkName>
+            <networkType>Ilom</networkType>
+            <version>2</version>
+            <hostName>scaqae14celadm03-c</hostName>
+            <ipAddress>10.31.26.234</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.31.16.1</gateway>
+            <domainName>us.oracle.com</domainName>
+            <vlanId>0</vlanId>
+        </network>
+        <network id="scaqae14sw-adm0.us.oracle.com_admin">
+            <networkName>scaqae14sw-adm0 admin</networkName>
+            <networkType>admin</networkType>
+            <version>2.0</version>
+            <hostName>scaqae14sw-adm0</hostName>
+            <ipAddress>10.31.26.246</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.31.16.1</gateway>
+            <domainName>us.oracle.com</domainName>
+            <vlanId>0</vlanId>
+        </network>
+        <network id="scaqae14sw-rocea0.us.oracle.com_admin">
+            <networkName>scaqae14sw-rocea0 admin</networkName>
+            <networkType>admin</networkType>
+            <version>2.0</version>
+            <hostName>scaqae14sw-rocea0</hostName>
+            <ipAddress>10.31.27.120</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.31.16.1</gateway>
+            <domainName>us.oracle.com</domainName>
+            <vlanId>0</vlanId>
+        </network>
+        <network id="scaqae14sw-roceb0.us.oracle.com_admin">
+            <networkName>scaqae14sw-roceb0 admin</networkName>
+            <networkType>admin</networkType>
+            <version>2.0</version>
+            <hostName>scaqae14sw-roceb0</hostName>
+            <ipAddress>10.31.27.121</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.31.16.1</gateway>
+            <domainName>us.oracle.com</domainName>
+            <vlanId>0</vlanId>
+        </network>
+        <network id="scaqae14sw-pdua0.us.oracle.com_admin">
+            <networkName>scaqae14sw-pdua0 admin</networkName>
+            <networkType>admin</networkType>
+            <version>2.0</version>
+            <hostName>scaqae14sw-pdua0</hostName>
+            <ipAddress>10.31.26.250</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.31.16.1</gateway>
+            <domainName>us.oracle.com</domainName>
+            <vlanId>0</vlanId>
+        </network>
+        <network id="scaqae14sw-pdub0.us.oracle.com_admin">
+            <networkName>scaqae14sw-pdub0 admin</networkName>
+            <networkType>admin</networkType>
+            <version>2.0</version>
+            <hostName>scaqae14sw-pdub0</hostName>
+            <ipAddress>10.31.26.251</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.31.16.1</gateway>
+            <domainName>us.oracle.com</domainName>
+            <vlanId>0</vlanId>
+        </network>
+        <network id="scaqae14dv0101.us.oracle.com_client">
+            <networkName>scaqae14dv0101 client</networkName>
+            <networkType>client</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0101</hostName>
+            <ipAddress>10.31.115.4</ipAddress>
+            <netMask>255.255.255.224</netMask>
+            <gateway>10.31.115.1</gateway>
+            <domainName>us.oracle.com</domainName>
+            <master>bondeth0</master>
+            <slave>eth1 eth2</slave>
+            <lacp>false</lacp>
+            <vlanId>428</vlanId>
+        </network>
+        <network id="scaqae14dv0201.us.oracle.com_client">
+            <networkName>scaqae14dv0201 client</networkName>
+            <networkType>client</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0201</hostName>
+            <ipAddress>10.31.115.5</ipAddress>
+            <netMask>255.255.255.224</netMask>
+            <gateway>10.31.115.1</gateway>
+            <domainName>us.oracle.com</domainName>
+            <master>bondeth0</master>
+            <slave>eth1 eth2</slave>
+            <lacp>false</lacp>
+            <vlanId>428</vlanId>
+        </network>
+        <network id="scaqae14dv0102.us.oracle.com_client">
+            <networkName>scaqae14dv0102 client</networkName>
+            <networkType>client</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0102</hostName>
+            <ipAddress>10.31.115.36</ipAddress>
+            <netMask>255.255.255.224</netMask>
+            <gateway>10.31.115.33</gateway>
+            <domainName>us.oracle.com</domainName>
+            <master>bondeth0</master>
+            <slave>eth1 eth2</slave>
+            <lacp>false</lacp>
+            <vlanId>429</vlanId>
+        </network>
+        <network id="scaqae14dv0202.us.oracle.com_client">
+            <networkName>scaqae14dv0202 client</networkName>
+            <networkType>client</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0202</hostName>
+            <ipAddress>10.31.115.37</ipAddress>
+            <netMask>255.255.255.224</netMask>
+            <gateway>10.31.115.33</gateway>
+            <domainName>us.oracle.com</domainName>
+            <master>bondeth0</master>
+            <slave>eth1 eth2</slave>
+            <lacp>false</lacp>
+            <vlanId>429</vlanId>
+        </network>
+        <network id="scaqae14dv0103.us.oracle.com_client">
+            <networkName>scaqae14dv0103 client</networkName>
+            <networkType>client</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0103</hostName>
+            <ipAddress>10.31.115.68</ipAddress>
+            <netMask>255.255.255.224</netMask>
+            <gateway>10.31.115.65</gateway>
+            <domainName>us.oracle.com</domainName>
+            <master>bondeth0</master>
+            <slave>eth1 eth2</slave>
+            <lacp>false</lacp>
+            <vlanId>430</vlanId>
+        </network>
+        <network id="scaqae14dv0203.us.oracle.com_client">
+            <networkName>scaqae14dv0203 client</networkName>
+            <networkType>client</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0203</hostName>
+            <ipAddress>10.31.115.69</ipAddress>
+            <netMask>255.255.255.224</netMask>
+            <gateway>10.31.115.65</gateway>
+            <domainName>us.oracle.com</domainName>
+            <master>bondeth0</master>
+            <slave>eth1 eth2</slave>
+            <lacp>false</lacp>
+            <vlanId>430</vlanId>
+        </network>
+        <network id="scaqae14dv0104.us.oracle.com_client">
+            <networkName>scaqae14dv0104 client</networkName>
+            <networkType>client</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0104</hostName>
+            <ipAddress>10.31.115.100</ipAddress>
+            <netMask>255.255.255.224</netMask>
+            <gateway>10.31.115.97</gateway>
+            <domainName>us.oracle.com</domainName>
+            <master>bondeth0</master>
+            <slave>eth1 eth2</slave>
+            <lacp>false</lacp>
+            <vlanId>431</vlanId>
+        </network>
+        <network id="scaqae14dv0204.us.oracle.com_client">
+            <networkName>scaqae14dv0204 client</networkName>
+            <networkType>client</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0204</hostName>
+            <ipAddress>10.31.115.101</ipAddress>
+            <netMask>255.255.255.224</netMask>
+            <gateway>10.31.115.97</gateway>
+            <domainName>us.oracle.com</domainName>
+            <master>bondeth0</master>
+            <slave>eth1 eth2</slave>
+            <lacp>false</lacp>
+            <vlanId>431</vlanId>
+        </network>
+        <network id="scaqae14dv0105.us.oracle.com_client">
+            <networkName>scaqae14dv0105 client</networkName>
+            <networkType>client</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0105</hostName>
+            <ipAddress>10.31.115.132</ipAddress>
+            <netMask>255.255.255.224</netMask>
+            <gateway>10.31.115.129</gateway>
+            <domainName>us.oracle.com</domainName>
+            <master>bondeth0</master>
+            <slave>eth1 eth2</slave>
+            <lacp>false</lacp>
+            <vlanId>432</vlanId>
+        </network>
+        <network id="scaqae14dv0205.us.oracle.com_client">
+            <networkName>scaqae14dv0205 client</networkName>
+            <networkType>client</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0205</hostName>
+            <ipAddress>10.31.115.133</ipAddress>
+            <netMask>255.255.255.224</netMask>
+            <gateway>10.31.115.129</gateway>
+            <domainName>us.oracle.com</domainName>
+            <master>bondeth0</master>
+            <slave>eth1 eth2</slave>
+            <lacp>false</lacp>
+            <vlanId>432</vlanId>
+        </network>
+        <network id="scaqae14dv0106.us.oracle.com_client">
+            <networkName>scaqae14dv0106 client</networkName>
+            <networkType>client</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0106</hostName>
+            <ipAddress>10.31.115.164</ipAddress>
+            <netMask>255.255.255.224</netMask>
+            <gateway>10.31.115.161</gateway>
+            <domainName>us.oracle.com</domainName>
+            <master>bondeth0</master>
+            <slave>eth1 eth2</slave>
+            <lacp>false</lacp>
+            <vlanId>433</vlanId>
+        </network>
+        <network id="scaqae14dv0206.us.oracle.com_client">
+            <networkName>scaqae14dv0206 client</networkName>
+            <networkType>client</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0206</hostName>
+            <ipAddress>10.31.115.165</ipAddress>
+            <netMask>255.255.255.224</netMask>
+            <gateway>10.31.115.161</gateway>
+            <domainName>us.oracle.com</domainName>
+            <master>bondeth0</master>
+            <slave>eth1 eth2</slave>
+            <lacp>false</lacp>
+            <vlanId>433</vlanId>
+        </network>
+        <network id="scaqae14dv0107.us.oracle.com_client">
+            <networkName>scaqae14dv0107 client</networkName>
+            <networkType>client</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0107</hostName>
+            <ipAddress>10.31.115.196</ipAddress>
+            <netMask>255.255.255.224</netMask>
+            <gateway>10.31.115.193</gateway>
+            <domainName>us.oracle.com</domainName>
+            <master>bondeth0</master>
+            <slave>eth1 eth2</slave>
+            <lacp>false</lacp>
+            <vlanId>434</vlanId>
+        </network>
+        <network id="scaqae14dv0207.us.oracle.com_client">
+            <networkName>scaqae14dv0207 client</networkName>
+            <networkType>client</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0207</hostName>
+            <ipAddress>10.31.115.197</ipAddress>
+            <netMask>255.255.255.224</netMask>
+            <gateway>10.31.115.193</gateway>
+            <domainName>us.oracle.com</domainName>
+            <master>bondeth0</master>
+            <slave>eth1 eth2</slave>
+            <lacp>false</lacp>
+            <vlanId>434</vlanId>
+        </network>
+        <network id="scaqae14dv0108.us.oracle.com_client">
+            <networkName>scaqae14dv0108 client</networkName>
+            <networkType>client</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0108</hostName>
+            <ipAddress>10.31.115.228</ipAddress>
+            <netMask>255.255.255.224</netMask>
+            <gateway>10.31.115.225</gateway>
+            <domainName>us.oracle.com</domainName>
+            <master>bondeth0</master>
+            <slave>eth1 eth2</slave>
+            <lacp>false</lacp>
+            <vlanId>435</vlanId>
+        </network>
+        <network id="scaqae14dv0208.us.oracle.com_client">
+            <networkName>scaqae14dv0208 client</networkName>
+            <networkType>client</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0208</hostName>
+            <ipAddress>10.31.115.229</ipAddress>
+            <netMask>255.255.255.224</netMask>
+            <gateway>10.31.115.225</gateway>
+            <domainName>us.oracle.com</domainName>
+            <master>bondeth0</master>
+            <slave>eth1 eth2</slave>
+            <lacp>false</lacp>
+            <vlanId>435</vlanId>
+        </network>
+        <network id="scaqae14dv0101-bk.us.oracle.com_backup">
+            <networkName>scaqae14dv0101-bk backup</networkName>
+            <networkType>backup</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0101-bk</hostName>
+            <ipAddress>10.31.114.7</ipAddress>
+            <netMask>255.255.255.240</netMask>
+            <gateway>10.31.114.1</gateway>
+            <domainName>us.oracle.com</domainName>
+            <master>bondeth1</master>
+            <slave>eth3 eth4</slave>
+            <lacp>false</lacp>
+            <vlanId>402</vlanId>
+        </network>
+        <network id="scaqae14dv0201-bk.us.oracle.com_backup">
+            <networkName>scaqae14dv0201-bk backup</networkName>
+            <networkType>backup</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0201-bk</hostName>
+            <ipAddress>10.31.114.8</ipAddress>
+            <netMask>255.255.255.240</netMask>
+            <gateway>10.31.114.1</gateway>
+            <domainName>us.oracle.com</domainName>
+            <master>bondeth1</master>
+            <slave>eth3 eth4</slave>
+            <lacp>false</lacp>
+            <vlanId>402</vlanId>
+        </network>
+        <network id="scaqae14dv0102-bk.us.oracle.com_backup">
+            <networkName>scaqae14dv0102-bk backup</networkName>
+            <networkType>backup</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0102-bk</hostName>
+            <ipAddress>10.31.114.20</ipAddress>
+            <netMask>255.255.255.240</netMask>
+            <gateway>10.31.114.17</gateway>
+            <domainName>us.oracle.com</domainName>
+            <master>bondeth1</master>
+            <slave>eth3 eth4</slave>
+            <lacp>false</lacp>
+            <vlanId>403</vlanId>
+        </network>
+        <network id="scaqae14dv0202-bk.us.oracle.com_backup">
+            <networkName>scaqae14dv0202-bk backup</networkName>
+            <networkType>backup</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0202-bk</hostName>
+            <ipAddress>10.31.114.21</ipAddress>
+            <netMask>255.255.255.240</netMask>
+            <gateway>10.31.114.17</gateway>
+            <domainName>us.oracle.com</domainName>
+            <master>bondeth1</master>
+            <slave>eth3 eth4</slave>
+            <lacp>false</lacp>
+            <vlanId>403</vlanId>
+        </network>
+        <network id="scaqae14dv0103-bk.us.oracle.com_backup">
+            <networkName>scaqae14dv0103-bk backup</networkName>
+            <networkType>backup</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0103-bk</hostName>
+            <ipAddress>10.31.114.36</ipAddress>
+            <netMask>255.255.255.240</netMask>
+            <gateway>10.31.114.33</gateway>
+            <domainName>us.oracle.com</domainName>
+            <master>bondeth1</master>
+            <slave>eth3 eth4</slave>
+            <lacp>false</lacp>
+            <vlanId>404</vlanId>
+        </network>
+        <network id="scaqae14dv0203-bk.us.oracle.com_backup">
+            <networkName>scaqae14dv0203-bk backup</networkName>
+            <networkType>backup</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0203-bk</hostName>
+            <ipAddress>10.31.114.37</ipAddress>
+            <netMask>255.255.255.240</netMask>
+            <gateway>10.31.114.33</gateway>
+            <domainName>us.oracle.com</domainName>
+            <master>bondeth1</master>
+            <slave>eth3 eth4</slave>
+            <lacp>false</lacp>
+            <vlanId>404</vlanId>
+        </network>
+        <network id="scaqae14dv0104-bk.us.oracle.com_backup">
+            <networkName>scaqae14dv0104-bk backup</networkName>
+            <networkType>backup</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0104-bk</hostName>
+            <ipAddress>10.31.114.52</ipAddress>
+            <netMask>255.255.255.240</netMask>
+            <gateway>10.31.114.49</gateway>
+            <domainName>us.oracle.com</domainName>
+            <master>bondeth1</master>
+            <slave>eth3 eth4</slave>
+            <lacp>false</lacp>
+            <vlanId>405</vlanId>
+        </network>
+        <network id="scaqae14dv0204-bk.us.oracle.com_backup">
+            <networkName>scaqae14dv0204-bk backup</networkName>
+            <networkType>backup</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0204-bk</hostName>
+            <ipAddress>10.31.114.53</ipAddress>
+            <netMask>255.255.255.240</netMask>
+            <gateway>10.31.114.49</gateway>
+            <domainName>us.oracle.com</domainName>
+            <master>bondeth1</master>
+            <slave>eth3 eth4</slave>
+            <lacp>false</lacp>
+            <vlanId>405</vlanId>
+        </network>
+        <network id="scaqae14dv0105-bk.us.oracle.com_backup">
+            <networkName>scaqae14dv0105-bk backup</networkName>
+            <networkType>backup</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0105-bk</hostName>
+            <ipAddress>10.31.114.68</ipAddress>
+            <netMask>255.255.255.240</netMask>
+            <gateway>10.31.114.65</gateway>
+            <domainName>us.oracle.com</domainName>
+            <master>bondeth1</master>
+            <slave>eth3 eth4</slave>
+            <lacp>false</lacp>
+            <vlanId>406</vlanId>
+        </network>
+        <network id="scaqae14dv0205-bk.us.oracle.com_backup">
+            <networkName>scaqae14dv0205-bk backup</networkName>
+            <networkType>backup</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0205-bk</hostName>
+            <ipAddress>10.31.114.69</ipAddress>
+            <netMask>255.255.255.240</netMask>
+            <gateway>10.31.114.65</gateway>
+            <domainName>us.oracle.com</domainName>
+            <master>bondeth1</master>
+            <slave>eth3 eth4</slave>
+            <lacp>false</lacp>
+            <vlanId>406</vlanId>
+        </network>
+        <network id="scaqae14dv0106-bk.us.oracle.com_backup">
+            <networkName>scaqae14dv0106-bk backup</networkName>
+            <networkType>backup</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0106-bk</hostName>
+            <ipAddress>10.31.114.84</ipAddress>
+            <netMask>255.255.255.240</netMask>
+            <gateway>10.31.114.81</gateway>
+            <domainName>us.oracle.com</domainName>
+            <master>bondeth1</master>
+            <slave>eth3 eth4</slave>
+            <lacp>false</lacp>
+            <vlanId>407</vlanId>
+        </network>
+        <network id="scaqae14dv0206-bk.us.oracle.com_backup">
+            <networkName>scaqae14dv0206-bk backup</networkName>
+            <networkType>backup</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0206-bk</hostName>
+            <ipAddress>10.31.114.85</ipAddress>
+            <netMask>255.255.255.240</netMask>
+            <gateway>10.31.114.81</gateway>
+            <domainName>us.oracle.com</domainName>
+            <master>bondeth1</master>
+            <slave>eth3 eth4</slave>
+            <lacp>false</lacp>
+            <vlanId>407</vlanId>
+        </network>
+        <network id="scaqae14dv0107-bk.us.oracle.com_backup">
+            <networkName>scaqae14dv0107-bk backup</networkName>
+            <networkType>backup</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0107-bk</hostName>
+            <ipAddress>10.31.114.100</ipAddress>
+            <netMask>255.255.255.240</netMask>
+            <gateway>10.31.114.97</gateway>
+            <domainName>us.oracle.com</domainName>
+            <master>bondeth1</master>
+            <slave>eth3 eth4</slave>
+            <lacp>false</lacp>
+            <vlanId>408</vlanId>
+        </network>
+        <network id="scaqae14dv0207-bk.us.oracle.com_backup">
+            <networkName>scaqae14dv0207-bk backup</networkName>
+            <networkType>backup</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0207-bk</hostName>
+            <ipAddress>10.31.114.101</ipAddress>
+            <netMask>255.255.255.240</netMask>
+            <gateway>10.31.114.97</gateway>
+            <domainName>us.oracle.com</domainName>
+            <master>bondeth1</master>
+            <slave>eth3 eth4</slave>
+            <lacp>false</lacp>
+            <vlanId>408</vlanId>
+        </network>
+        <network id="scaqae14dv0108-bk.us.oracle.com_backup">
+            <networkName>scaqae14dv0108-bk backup</networkName>
+            <networkType>backup</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0108-bk</hostName>
+            <ipAddress>10.31.114.123</ipAddress>
+            <netMask>255.255.255.240</netMask>
+            <gateway>10.31.114.113</gateway>
+            <domainName>us.oracle.com</domainName>
+            <master>bondeth1</master>
+            <slave>eth3 eth4</slave>
+            <lacp>false</lacp>
+            <vlanId>409</vlanId>
+        </network>
+        <network id="scaqae14dv0208-bk.us.oracle.com_backup">
+            <networkName>scaqae14dv0208-bk backup</networkName>
+            <networkType>backup</networkType>
+            <version>2</version>
+            <hostName>scaqae14dv0208-bk</hostName>
+            <ipAddress>10.31.114.116</ipAddress>
+            <netMask>255.255.255.240</netMask>
+            <gateway>10.31.114.113</gateway>
+            <domainName>us.oracle.com</domainName>
+            <master>bondeth1</master>
+            <slave>eth3 eth4</slave>
+            <lacp>false</lacp>
+            <vlanId>409</vlanId>
+        </network>
+    </networks>
+    <switches>
+        <switch id="scaqae14cisco01_id">
+            <switchDescription>Exadata Admin Switch</switchDescription>
+            <networks>
+                <network id="scaqae14sw-adm0.us.oracle.com_admin" />
+            </networks>
+        </switch>
+        <switch id="scaqae14ibl02_id">
+            <switchDescription>Exadata Leaf Switch</switchDescription>
+            <networks>
+                <network id="scaqae14sw-rocea0.us.oracle.com_admin" />
+            </networks>
+        </switch>
+        <switch id="scaqae14ibl03_id">
+            <switchDescription>Exadata Leaf Switch</switchDescription>
+            <networks>
+                <network id="scaqae14sw-roceb0.us.oracle.com_admin" />
+            </networks>
+        </switch>
+        <switch id="scaqae14pdu04_id">
+            <switchDescription>Exadata PDU Switch</switchDescription>
+            <networks>
+                <network id="scaqae14sw-pdua0.us.oracle.com_admin" />
+            </networks>
+        </switch>
+        <switch id="scaqae14pdu05_id">
+            <switchDescription>Exadata PDU Switch</switchDescription>
+            <networks>
+                <network id="scaqae14sw-pdub0.us.oracle.com_admin" />
+            </networks>
+        </switch>
+    </switches>
+    <esRacks>
+        <esRack id="d3bfa25f-2e3a-1a0f-f6db-74009ce839a3">
+            <esRackItem id="scaqae14compute01_id">
+                <rackLocation>UNKNOWN rackItem_1</rackLocation>
+                <uLocation>16</uLocation>
+                <uHeight>1</uHeight>
+                <rackItemDescription>Exadata X7-2 RoCE Compute Node</rackItemDescription>
+                <rackItemSerialNumber>UNKNOWN</rackItemSerialNumber>
+                <version>version2</version>
+            </esRackItem>
+            <esRackItem id="scaqae14compute02_id">
+                <rackLocation>UNKNOWN rackItem_2</rackLocation>
+                <uLocation>17</uLocation>
+                <uHeight>1</uHeight>
+                <rackItemDescription>Exadata X7-2 RoCE Compute Node</rackItemDescription>
+                <rackItemSerialNumber>UNKNOWN</rackItemSerialNumber>
+                <version>version2</version>
+            </esRackItem>
+            <esRackItem id="scaqae14storage01_id">
+                <rackLocation>UNKNOWN rackItem_1</rackLocation>
+                <uLocation>2</uLocation>
+                <uHeight>2</uHeight>
+                <rackItemDescription>Exadata Cell Node HC 10TB RoCE</rackItemDescription>
+                <rackItemSerialNumber>UNKNOWN</rackItemSerialNumber>
+                <version>version2</version>
+            </esRackItem>
+            <esRackItem id="scaqae14storage02_id">
+                <rackLocation>UNKNOWN rackItem_2</rackLocation>
+                <uLocation>4</uLocation>
+                <uHeight>2</uHeight>
+                <rackItemDescription>Exadata Cell Node HC 10TB RoCE</rackItemDescription>
+                <rackItemSerialNumber>UNKNOWN</rackItemSerialNumber>
+                <version>version2</version>
+            </esRackItem>
+            <esRackItem id="scaqae14storage03_id">
+                <rackLocation>UNKNOWN rackItem_3</rackLocation>
+                <uLocation>6</uLocation>
+                <uHeight>2</uHeight>
+                <rackItemDescription>Exadata Cell Node HC 10TB RoCE</rackItemDescription>
+                <rackItemSerialNumber>UNKNOWN</rackItemSerialNumber>
+                <version>version2</version>
+            </esRackItem>
+            <esRackItem id="scaqae14cisco01_id">
+                <rackLocation>UNKNOWN rackItem_1</rackLocation>
+                <uLocation>21</uLocation>
+                <uHeight>1</uHeight>
+                <rackItemDescription>Exadata Admin Switch</rackItemDescription>
+                <rackItemSerialNumber>UNKNOWN</rackItemSerialNumber>
+                <version>version2</version>
+            </esRackItem>
+            <esRackItem id="scaqae14ibl02_id">
+                <rackLocation>UNKNOWN rackItem_2</rackLocation>
+                <uLocation>20</uLocation>
+                <uHeight>1</uHeight>
+                <rackItemDescription>Exadata Leaf Switch</rackItemDescription>
+                <rackItemSerialNumber>UNKNOWN</rackItemSerialNumber>
+                <version>version2</version>
+            </esRackItem>
+            <esRackItem id="scaqae14ibl03_id">
+                <rackLocation>UNKNOWN rackItem_3</rackLocation>
+                <uLocation>22</uLocation>
+                <uHeight>1</uHeight>
+                <rackItemDescription>Exadata Leaf Switch</rackItemDescription>
+                <rackItemSerialNumber>UNKNOWN</rackItemSerialNumber>
+                <version>version2</version>
+            </esRackItem>
+            <esRackItem id="scaqae14pdu04_id">
+                <rackLocation>UNKNOWN rackItem_4</rackLocation>
+                <uLocation>0</uLocation>
+                <uHeight>0</uHeight>
+                <rackItemDescription>Exadata PDU Switch</rackItemDescription>
+                <rackItemSerialNumber>UNKNOWN</rackItemSerialNumber>
+                <version>version2</version>
+            </esRackItem>
+            <esRackItem id="scaqae14pdu05_id">
+                <rackLocation>UNKNOWN rackItem_5</rackLocation>
+                <uLocation>0</uLocation>
+                <uHeight>0</uHeight>
+                <rackItemDescription>Exadata PDU Switch</rackItemDescription>
+                <rackItemSerialNumber>UNKNOWN</rackItemSerialNumber>
+                <version>version2</version>
+            </esRackItem>
+            <rackPrefix>scaqae14</rackPrefix>
+            <esRackFamily>Exadata</esRackFamily>
+            <rackType>1037</rackType>
+            <customerName>scaqae14adm0102clu2</customerName>
+            <applicationName>12345678</applicationName>
+            <region>America</region>
+            <timezone>Los_Angeles</timezone>
+            <rackDescription>X8M-2 ZDLRA Elastic Rack HC 14TB</rackDescription>
+            <rackUSize>42</rackUSize>
+            <rackSerialNumber>UNKNOWN</rackSerialNumber>
+            <version>version2</version>
+            <enableWriteBackFlashCache>automatic</enableWriteBackFlashCache>
+        </esRack>
+    </esRacks>
+    <software>
+        <clusters>
+            <cluster id="Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_id">
+                <version>CloneInstall</version>
+                <clusterName>exaclu-164</clusterName>
+                <clusterOwner>e4745bec-7f72-170d-a300-9e80667010cd</clusterOwner>
+                <clusterVersion>18.1.0.0.210420</clusterVersion>
+                <clusterHome>/u01/app/18.1.0.0/grid</clusterHome>
+                <inventoryLocation>/u01/app/oraInventory</inventoryLocation>
+                <asmScopedSecurity>false</asmScopedSecurity>
+                <clusterVips>
+                    <clusterVip id="scaqae14compute01_Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_vm01_id_vip">
+                        <vipName>scaqae14dv0102-vip</vipName>
+                        <domainName>us.oracle.com</domainName>
+                        <vipIpAddress>10.31.115.44</vipIpAddress>
+                        <machines>
+                            <machine id="scaqae14compute01_Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_vm01_id" />
+                        </machines>
+                    </clusterVip>
+                    <clusterVip id="scaqae14compute02_Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_vm01_id_vip">
+                        <vipName>scaqae14dv0202-vip</vipName>
+                        <domainName>us.oracle.com</domainName>
+                        <vipIpAddress>10.31.115.45</vipIpAddress>
+                        <machines>
+                            <machine id="scaqae14compute02_Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_vm01_id" />
+                        </machines>
+                    </clusterVip>
+                </clusterVips>
+                <customerName>scaqae14adm0102clu2</customerName>
+                <application>12345678</application>
+                <scanIps />
+                <clusterScans>
+                    <clusterScan id="Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_id_scan_client" />
+                </clusterScans>
+                <diskGroups>
+                    <diskGroup id="45977097-66c5-ca1d-f1d5-f8d2722e6798_DATA" />
+                    <diskGroup id="e1d748d8-9131-34a6-8c1e-19d4a5d9e895_RECO" />
+                </diskGroups>
+                <basedir>/u01/app/grid</basedir>
+                <language>all_langs</language>
+                <patches>
+                    <patch>
+                        <patchNumber>27681568</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>28096386</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>28659165</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>28828717</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>29301682</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>29708703</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>30116795</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>30480702</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>30899645</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>31305362</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>31748523</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>32226219</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>32524152</patchNumber>
+                    </patch>
+                </patches>
+            </cluster>
+            <clusterScans>
+                <clusterScan id="Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_id_scan_client">
+                    <scanName>scaqae14dvclu02-scan1</scanName>
+                    <scanType>client</scanType>
+                    <scanPort>1521</scanPort>
+                    <scanIps>
+                        <scanIp>
+                            <ipAddress>10.31.115.51</ipAddress>
+                        </scanIp>
+                        <scanIp>
+                            <ipAddress>10.31.115.52</ipAddress>
+                        </scanIp>
+                        <scanIp>
+                            <ipAddress>10.31.115.53</ipAddress>
+                        </scanIp>
+                    </scanIps>
+                </clusterScan>
+            </clusterScans>
+        </clusters>
+        <databaseHomes>
+            <databaseHome id="DbHome_1487eced-8e66-12e3-7e1e-fc24f763dbd9_id">
+                <version>CloneInstall</version>
+                <cluster id="Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_id" />
+                <databaseHomeName>DbHome_2</databaseHomeName>
+                <databaseSwOwner>aaca2596-968f-8c64-7b79-51f7ae3d6017</databaseSwOwner>
+                <databaseVersion>18.1.0.0.210420</databaseVersion>
+                <databaseHomeLoc>/u01/app/oracle/product/18.1.0.0/dbhome_1</databaseHomeLoc>
+                <inventoryLocation>/u01/app/oraInventory</inventoryLocation>
+                <installType>rac_database</installType>
+                <language>all_langs</language>
+                <machines>
+                    <machine id="scaqae14compute01_Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_vm01_id" />
+                    <machine id="scaqae14compute02_Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_vm01_id" />
+                </machines>
+                <patches>
+                    <patch>
+                        <patchNumber>27681568</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>28096386</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>28659165</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>28828717</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>29301682</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>29708703</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>30116795</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>30480702</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>30899645</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>31305362</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>31748523</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>32226219</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>32524152</patchNumber>
+                    </patch>
+                </patches>
+                <basedir>/u01/app/oracle</basedir>
+            </databaseHome>
+            <databaseHome id="Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_databaseHome1">
+                <version>CloneInstall</version>
+                <cluster id="Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_id" />
+                <databaseHomeName>cC_dbHome_0</databaseHomeName>
+                <databaseSwOwner>aaca2596-968f-8c64-7b79-51f7ae3d6017</databaseSwOwner>
+                <databaseVersion>11.2.0.4.210420</databaseVersion>
+                <databaseHomeLoc>/u01/app/oracle/product/11.2.0.4/dbhome_1</databaseHomeLoc>
+                <inventoryLocation>/u01/app/oraInventory</inventoryLocation>
+                <language>all_langs</language>
+                <machines>
+                    <machine id="scaqae14compute01_Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_vm01_id" />
+                    <machine id="scaqae14compute02_Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_vm01_id" />
+                </machines>
+                <patches>
+                    <patch>
+                        <patchNumber />
+                    </patch>
+                </patches>
+                <basedir>/u01/app/oracle</basedir>
+                <useZfs>false</useZfs>
+            </databaseHome>
+            <databaseHome id="Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_databaseHome2">
+                <version>CloneInstall</version>
+                <cluster id="Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_id" />
+                <databaseHomeName>cB_dbHome_0</databaseHomeName>
+                <databaseSwOwner>aaca2596-968f-8c64-7b79-51f7ae3d6017</databaseSwOwner>
+                <databaseVersion>12.1.0.2.210420</databaseVersion>
+                <databaseHomeLoc>/u01/app/oracle/product/12.1.0.2/dbhome_1</databaseHomeLoc>
+                <inventoryLocation>/u01/app/oraInventory</inventoryLocation>
+                <language>all_langs</language>
+                <machines>
+                    <machine id="scaqae14compute01_Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_vm01_id" />
+                    <machine id="scaqae14compute02_Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_vm01_id" />
+                </machines>
+                <patches>
+                    <patch>
+                        <patchNumber>32518631</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>32131231</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>31718813</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>31307682</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>30805478</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>30464171</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>30070242</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>29698629</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>29176139</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>28833531</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>28553949</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>28349951</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>27968010</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>27486326</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>27010930</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>26635880</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>26610322</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>26022196</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>25433352</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>24968615</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>24448103</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>23273686</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>22899531</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>22243551</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>21744410</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>21640036</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>21447820</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>21188742</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>21053000</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>20879108</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>20698050</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>20504076</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>20329440</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>20141343</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>20026159</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>19774304</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>19404326</patchNumber>
+                    </patch>
+                </patches>
+                <basedir>/u01/app/oracle</basedir>
+                <useZfs>false</useZfs>
+            </databaseHome>
+            <databaseHome id="Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_databaseHome3">
+                <version>CloneInstall</version>
+                <cluster id="Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_id" />
+                <databaseHomeName>cA_dbHome_0</databaseHomeName>
+                <databaseSwOwner>aaca2596-968f-8c64-7b79-51f7ae3d6017</databaseSwOwner>
+                <databaseVersion>12.2.0.1.210420</databaseVersion>
+                <databaseHomeLoc>/u01/app/oracle/product/12.2.0.1/dbhome_1</databaseHomeLoc>
+                <inventoryLocation>/u01/app/oraInventory</inventoryLocation>
+                <language>all_langs</language>
+                <machines>
+                    <machine id="scaqae14compute01_Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_vm01_id" />
+                    <machine id="scaqae14compute02_Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_vm01_id" />
+                </machines>
+                <patches>
+                    <patch>
+                        <patchNumber>32540149</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>32226491</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>31750094</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>31305382</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>30920127</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>30501932</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>30116802</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>29708720</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>29301687</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>28828733</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>28714316</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>27468969</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>27100009</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>26737266</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>26610291</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>26133434</patchNumber>
+                    </patch>
+                    <patch>
+                        <patchNumber>26129945</patchNumber>
+                    </patch>
+                </patches>
+                <basedir>/u01/app/oracle</basedir>
+                <useZfs>false</useZfs>
+            </databaseHome>
+        </databaseHomes>
+    </software>
+    <databases>
+        <database id="database_1cafe00a-ff3f-f3ed-dccd-809ec63ab987_id">
+            <version>2</version>
+            <databaseOwner>aaca2596-968f-8c64-7b79-51f7ae3d6017</databaseOwner>
+            <databaseSid>cdbm02</databaseSid>
+            <databaseBlockSize>8192</databaseBlockSize>
+            <characterset>AL32UTF8</characterset>
+            <dbConfigType>rac_database</dbConfigType>
+            <databaseHome id="DbHome_1487eced-8e66-12e3-7e1e-fc24f763dbd9_id" />
+            <machines>
+                <machine id="scaqae14compute01_Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_vm01_id" />
+                <machine id="scaqae14compute02_Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_vm01_id" />
+            </machines>
+            <databaseType>cdb</databaseType>
+            <databaseTemplate>OLTP</databaseTemplate>
+            <databaseStyle>ADMIN</databaseStyle>
+            <language>all_langs</language>
+            <diskGroups>
+                <diskGroup id="45977097-66c5-ca1d-f1d5-f8d2722e6798_DATA" />
+                <diskGroup id="e1d748d8-9131-34a6-8c1e-19d4a5d9e895_RECO" />
+            </diskGroups>
+        </database>
+        <database id="database_1cafe00a-ff3f-f3ed-dccd-809ec63ab987_pdb1">
+            <version>2</version>
+            <databaseOwner>aaca2596-968f-8c64-7b79-51f7ae3d6017</databaseOwner>
+            <databaseSid>pdb2</databaseSid>
+            <databaseHome id="DbHome_1487eced-8e66-12e3-7e1e-fc24f763dbd9_id" />
+            <machines>
+                <machine id="scaqae14compute01_Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_vm01_id" />
+                <machine id="scaqae14compute02_Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_vm01_id" />
+            </machines>
+            <databaseType>pdb</databaseType>
+            <cdbId>database_1cafe00a-ff3f-f3ed-dccd-809ec63ab987_id</cdbId>
+            <databaseTemplate>OLTP</databaseTemplate>
+        </database>
+    </databases>
+    <storage>
+        <diskGroups>
+            <version>2</version>
+            <diskGroup id="45977097-66c5-ca1d-f1d5-f8d2722e6798_DATA">
+                <version>VirtualLayout</version>
+                <diskGroupName>CATALOG</diskGroupName>
+                <diskGroupType>CATALOG</diskGroupType>
+                <redundancy>HIGH</redundancy>
+                <sliceSize>12G</sliceSize>
+                <machines>
+                    <machine id="scaqae14storage01_id" />
+                    <machine id="scaqae14storage02_id" />
+                    <machine id="scaqae14storage03_id" />
+                </machines>
+                <cellDisks>All</cellDisks>
+                <diskGroupSize>153G</diskGroupSize>
+                <ocrVote>true</ocrVote>
+                <quorumDisk>true</quorumDisk>
+                <sparse>false</sparse>
+                <uiSize>3TB</uiSize>
+                <uiSizeType>usize</uiSizeType>
+                <uiRawSize>9216GB</uiRawSize>
+                <acfsVolumeName>acfsvol01</acfsVolumeName>
+                <acfsVolumeSize>100</acfsVolumeSize>
+                <acfsMountPath>/acfs01</acfsMountPath>
+            </diskGroup>
+            <diskGroup id="e1d748d8-9131-34a6-8c1e-19d4a5d9e895_RECO">
+                <version>VirtualLayout</version>
+                <diskGroupName>DELTA</diskGroupName>
+                <diskGroupType>DELTA</diskGroupType>
+                <redundancy>NORMAL</redundancy>
+                <sliceSize>275G</sliceSize>
+                <machines>
+                    <machine id="scaqae14storage01_id" />
+                    <machine id="scaqae14storage02_id" />
+                    <machine id="scaqae14storage03_id" />
+                </machines>
+                <cellDisks>All</cellDisks>
+                <diskGroupSize>4966G</diskGroupSize>
+                <ocrVote>false</ocrVote>
+                <quorumDisk>false</quorumDisk>
+                <sparse>false</sparse>
+                <uiSize>2TB</uiSize>
+                <uiSizeType>usize</uiSizeType>
+                <uiRawSize>6144GB</uiRawSize>
+            </diskGroup>
+        </diskGroups>
+        <localDisks>
+            <localDisk id="scaqae14storage01_id_CD_00">
+                <version>Version13</version>
+                <localDiskName>CD_00</localDiskName>
+                <localDiskSize>10000</localDiskSize>
+            </localDisk>
+            <localDisk id="scaqae14storage01_id_CD_01">
+                <version>Version13</version>
+                <localDiskName>CD_01</localDiskName>
+                <localDiskSize>10000</localDiskSize>
+            </localDisk>
+            <localDisk id="scaqae14storage01_id_CD_02">
+                <version>Version13</version>
+                <localDiskName>CD_02</localDiskName>
+                <localDiskSize>10000</localDiskSize>
+            </localDisk>
+            <localDisk id="scaqae14storage01_id_CD_03">
+                <version>Version13</version>
+                <localDiskName>CD_03</localDiskName>
+                <localDiskSize>10000</localDiskSize>
+            </localDisk>
+            <localDisk id="scaqae14storage01_id_CD_04">
+                <version>Version13</version>
+                <localDiskName>CD_04</localDiskName>
+                <localDiskSize>10000</localDiskSize>
+            </localDisk>
+            <localDisk id="scaqae14storage01_id_CD_05">
+                <version>Version13</version>
+                <localDiskName>CD_05</localDiskName>
+                <localDiskSize>10000</localDiskSize>
+            </localDisk>
+            <localDisk id="scaqae14storage01_id_CD_06">
+                <version>Version13</version>
+                <localDiskName>CD_06</localDiskName>
+                <localDiskSize>10000</localDiskSize>
+            </localDisk>
+            <localDisk id="scaqae14storage01_id_CD_07">
+                <version>Version13</version>
+                <localDiskName>CD_07</localDiskName>
+                <localDiskSize>10000</localDiskSize>
+            </localDisk>
+            <localDisk id="scaqae14storage01_id_CD_08">
+                <version>Version13</version>
+                <localDiskName>CD_08</localDiskName>
+                <localDiskSize>10000</localDiskSize>
+            </localDisk>
+            <localDisk id="scaqae14storage01_id_CD_09">
+                <version>Version13</version>
+                <localDiskName>CD_09</localDiskName>
+                <localDiskSize>10000</localDiskSize>
+            </localDisk>
+            <localDisk id="scaqae14storage01_id_CD_10">
+                <version>Version13</version>
+                <localDiskName>CD_10</localDiskName>
+                <localDiskSize>10000</localDiskSize>
+            </localDisk>
+            <localDisk id="scaqae14storage01_id_CD_11">
+                <version>Version13</version>
+                <localDiskName>CD_11</localDiskName>
+                <localDiskSize>10000</localDiskSize>
+            </localDisk>
+            <localDisk id="scaqae14storage02_id_CD_00">
+                <version>Version13</version>
+                <localDiskName>CD_00</localDiskName>
+                <localDiskSize>10000</localDiskSize>
+            </localDisk>
+            <localDisk id="scaqae14storage02_id_CD_01">
+                <version>Version13</version>
+                <localDiskName>CD_01</localDiskName>
+                <localDiskSize>10000</localDiskSize>
+            </localDisk>
+            <localDisk id="scaqae14storage02_id_CD_02">
+                <version>Version13</version>
+                <localDiskName>CD_02</localDiskName>
+                <localDiskSize>10000</localDiskSize>
+            </localDisk>
+            <localDisk id="scaqae14storage02_id_CD_03">
+                <version>Version13</version>
+                <localDiskName>CD_03</localDiskName>
+                <localDiskSize>10000</localDiskSize>
+            </localDisk>
+            <localDisk id="scaqae14storage02_id_CD_04">
+                <version>Version13</version>
+                <localDiskName>CD_04</localDiskName>
+                <localDiskSize>10000</localDiskSize>
+            </localDisk>
+            <localDisk id="scaqae14storage02_id_CD_05">
+                <version>Version13</version>
+                <localDiskName>CD_05</localDiskName>
+                <localDiskSize>10000</localDiskSize>
+            </localDisk>
+            <localDisk id="scaqae14storage02_id_CD_06">
+                <version>Version13</version>
+                <localDiskName>CD_06</localDiskName>
+                <localDiskSize>10000</localDiskSize>
+            </localDisk>
+            <localDisk id="scaqae14storage02_id_CD_07">
+                <version>Version13</version>
+                <localDiskName>CD_07</localDiskName>
+                <localDiskSize>10000</localDiskSize>
+            </localDisk>
+            <localDisk id="scaqae14storage02_id_CD_08">
+                <version>Version13</version>
+                <localDiskName>CD_08</localDiskName>
+                <localDiskSize>10000</localDiskSize>
+            </localDisk>
+            <localDisk id="scaqae14storage02_id_CD_09">
+                <version>Version13</version>
+                <localDiskName>CD_09</localDiskName>
+                <localDiskSize>10000</localDiskSize>
+            </localDisk>
+            <localDisk id="scaqae14storage02_id_CD_10">
+                <version>Version13</version>
+                <localDiskName>CD_10</localDiskName>
+                <localDiskSize>10000</localDiskSize>
+            </localDisk>
+            <localDisk id="scaqae14storage02_id_CD_11">
+                <version>Version13</version>
+                <localDiskName>CD_11</localDiskName>
+                <localDiskSize>10000</localDiskSize>
+            </localDisk>
+            <localDisk id="scaqae14storage03_id_CD_00">
+                <version>Version13</version>
+                <localDiskName>CD_00</localDiskName>
+                <localDiskSize>10000</localDiskSize>
+            </localDisk>
+            <localDisk id="scaqae14storage03_id_CD_01">
+                <version>Version13</version>
+                <localDiskName>CD_01</localDiskName>
+                <localDiskSize>10000</localDiskSize>
+            </localDisk>
+            <localDisk id="scaqae14storage03_id_CD_02">
+                <version>Version13</version>
+                <localDiskName>CD_02</localDiskName>
+                <localDiskSize>10000</localDiskSize>
+            </localDisk>
+            <localDisk id="scaqae14storage03_id_CD_03">
+                <version>Version13</version>
+                <localDiskName>CD_03</localDiskName>
+                <localDiskSize>10000</localDiskSize>
+            </localDisk>
+            <localDisk id="scaqae14storage03_id_CD_04">
+                <version>Version13</version>
+                <localDiskName>CD_04</localDiskName>
+                <localDiskSize>10000</localDiskSize>
+            </localDisk>
+            <localDisk id="scaqae14storage03_id_CD_05">
+                <version>Version13</version>
+                <localDiskName>CD_05</localDiskName>
+                <localDiskSize>10000</localDiskSize>
+            </localDisk>
+            <localDisk id="scaqae14storage03_id_CD_06">
+                <version>Version13</version>
+                <localDiskName>CD_06</localDiskName>
+                <localDiskSize>10000</localDiskSize>
+            </localDisk>
+            <localDisk id="scaqae14storage03_id_CD_07">
+                <version>Version13</version>
+                <localDiskName>CD_07</localDiskName>
+                <localDiskSize>10000</localDiskSize>
+            </localDisk>
+            <localDisk id="scaqae14storage03_id_CD_08">
+                <version>Version13</version>
+                <localDiskName>CD_08</localDiskName>
+                <localDiskSize>10000</localDiskSize>
+            </localDisk>
+            <localDisk id="scaqae14storage03_id_CD_09">
+                <version>Version13</version>
+                <localDiskName>CD_09</localDiskName>
+                <localDiskSize>10000</localDiskSize>
+            </localDisk>
+            <localDisk id="scaqae14storage03_id_CD_10">
+                <version>Version13</version>
+                <localDiskName>CD_10</localDiskName>
+                <localDiskSize>10000</localDiskSize>
+            </localDisk>
+            <localDisk id="scaqae14storage03_id_CD_11">
+                <version>Version13</version>
+                <localDiskName>CD_11</localDiskName>
+                <localDiskSize>10000</localDiskSize>
+            </localDisk>
+        </localDisks>
+    </storage>
+    <alerts />
+    <networkPools>
+        <networkPool id="d63f0452-eac5-c2cf-1a88-f2fb8076347d_dbPrivPool">
+            <machines>
+                <machine id="scaqae14compute01_id" />
+                <machine id="scaqae14compute02_id" />
+            </machines>
+            <networkType>private</networkType>
+            <domain>us.oracle.com</domain>
+            <startIp>192.168.115.240</startIp>
+            <networkMedia>infiniband</networkMedia>
+            <nameMask>scaqae14adm%%-priv</nameMask>
+            <startId>1</startId>
+            <subnetMask>255.255.255.0</subnetMask>
+            <isActiveBonded>true</isActiveBonded>
+        </networkPool>
+        <networkPool id="78b525f1-7d9f-8e25-9146-eacc0f8eb83d_cellPrivPool">
+            <machines>
+                <machine id="scaqae14storage01_id" />
+                <machine id="scaqae14storage02_id" />
+                <machine id="scaqae14storage03_id" />
+            </machines>
+            <networkType>private</networkType>
+            <domain>us.oracle.com</domain>
+            <startIp>192.168.115.244</startIp>
+            <networkMedia>infiniband</networkMedia>
+            <nameMask>scaqae14celadm%%-priv</nameMask>
+            <startId>1</startId>
+            <subnetMask>255.255.255.0</subnetMask>
+            <isActiveBonded>true</isActiveBonded>
+        </networkPool>
+        <networkPool id="7168fd4e-2be6-d680-d9a2-1dcf7c7baa9f_domUPrivPool">
+            <machines>
+                <machine id="scaqae14compute01_Cluster-c21de517e-7719-3643-73c6-9a419d7b5a93_vm01_id" />
+                <machine id="scaqae14compute02_Cluster-c21de517e-7719-3643-73c6-9a419d7b5a93_vm01_id" />
+            </machines>
+            <networkType>private</networkType>
+            <domain>us.oracle.com</domain>
+            <startIp>192.168.115.1</startIp>
+            <nameMask>scaqae14dv%%01-priv</nameMask>
+            <startId>1</startId>
+            <subnetMask>255.255.255.0</subnetMask>
+            <isActiveBonded>true</isActiveBonded>
+        </networkPool>
+        <networkPool id="52422056-5e93-eaf7-4f5c-a519625c440d_domUPrivPool">
+            <machines>
+                <machine id="scaqae14compute01_Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_vm01_id" />
+                <machine id="scaqae14compute02_Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_vm01_id" />
+            </machines>
+            <networkType>private</networkType>
+            <domain>us.oracle.com</domain>
+            <startIp>192.168.115.33</startIp>
+            <nameMask>scaqae14dv%%02-priv</nameMask>
+            <startId>1</startId>
+            <subnetMask>255.255.255.0</subnetMask>
+            <isActiveBonded>true</isActiveBonded>
+        </networkPool>
+        <networkPool id="a1261af7-f7e0-7f9b-77ce-9fe99bcdc50c_domUPrivPool">
+            <machines>
+                <machine id="scaqae14compute01_Cluster-cfdb017d3-0d79-31e2-f14a-642a9f800d9a_vm01_id" />
+                <machine id="scaqae14compute02_Cluster-cfdb017d3-0d79-31e2-f14a-642a9f800d9a_vm01_id" />
+            </machines>
+            <networkType>private</networkType>
+            <domain>us.oracle.com</domain>
+            <startIp>192.168.115.65</startIp>
+            <nameMask>scaqae14dv%%03-priv</nameMask>
+            <startId>1</startId>
+            <subnetMask>255.255.255.0</subnetMask>
+            <isActiveBonded>true</isActiveBonded>
+        </networkPool>
+        <networkPool id="b162f736-e5b7-8bde-6c93-dcd21269a58d_domUPrivPool">
+            <machines>
+                <machine id="scaqae14compute01_Cluster-c5788792c-5fd0-8b62-2d4e-2a80ad43cbaf_vm01_id" />
+                <machine id="scaqae14compute02_Cluster-c5788792c-5fd0-8b62-2d4e-2a80ad43cbaf_vm01_id" />
+            </machines>
+            <networkType>private</networkType>
+            <domain>us.oracle.com</domain>
+            <startIp>192.168.115.97</startIp>
+            <nameMask>scaqae14dv%%04-priv</nameMask>
+            <startId>1</startId>
+            <subnetMask>255.255.255.0</subnetMask>
+            <isActiveBonded>true</isActiveBonded>
+        </networkPool>
+        <networkPool id="6cda36fa-9a29-708d-8f48-b195b4b27d66_domUPrivPool">
+            <machines>
+                <machine id="scaqae14compute01_Cluster-cf77f79a4-eeaa-595c-e0e9-8061eace7545_vm01_id" />
+                <machine id="scaqae14compute02_Cluster-cf77f79a4-eeaa-595c-e0e9-8061eace7545_vm01_id" />
+            </machines>
+            <networkType>private</networkType>
+            <domain>us.oracle.com</domain>
+            <startIp>192.168.115.128</startIp>
+            <nameMask>scaqae14dv%%05-priv</nameMask>
+            <startId>1</startId>
+            <subnetMask>255.255.255.0</subnetMask>
+            <isActiveBonded>true</isActiveBonded>
+        </networkPool>
+        <networkPool id="e5953f32-240c-b09e-5d50-111c5fa14e11_domUPrivPool">
+            <machines>
+                <machine id="scaqae14compute01_Cluster-c6b1888ab-6513-6bc5-0ef6-219696a4711e_vm01_id" />
+                <machine id="scaqae14compute02_Cluster-c6b1888ab-6513-6bc5-0ef6-219696a4711e_vm01_id" />
+            </machines>
+            <networkType>private</networkType>
+            <domain>us.oracle.com</domain>
+            <startIp>192.168.115.161</startIp>
+            <nameMask>scaqae14dv%%06-priv</nameMask>
+            <startId>1</startId>
+            <subnetMask>255.255.255.0</subnetMask>
+            <isActiveBonded>true</isActiveBonded>
+        </networkPool>
+        <networkPool id="89c9cfa3-2247-3d19-491d-d182e830e41b_domUPrivPool">
+            <machines>
+                <machine id="scaqae14compute01_Cluster-cf6445db9-e298-9c82-c9e4-d47a37ec5c6d_vm01_id" />
+                <machine id="scaqae14compute02_Cluster-cf6445db9-e298-9c82-c9e4-d47a37ec5c6d_vm01_id" />
+            </machines>
+            <networkType>private</networkType>
+            <domain>us.oracle.com</domain>
+            <startIp>192.168.115.192</startIp>
+            <nameMask>scaqae14dv%%07-priv</nameMask>
+            <startId>1</startId>
+            <subnetMask>255.255.255.0</subnetMask>
+            <isActiveBonded>true</isActiveBonded>
+        </networkPool>
+        <networkPool id="fffaf6cf-da8c-0d96-8e35-246e1a07ac28_domUPrivPool">
+            <machines>
+                <machine id="scaqae14compute01_Cluster-c03dca026-8919-0b39-6fb6-e65ec3464460_vm01_id" />
+                <machine id="scaqae14compute02_Cluster-c03dca026-8919-0b39-6fb6-e65ec3464460_vm01_id" />
+            </machines>
+            <networkType>private</networkType>
+            <domain>us.oracle.com</domain>
+            <startIp>192.168.115.225</startIp>
+            <nameMask>scaqae14dv%%08-priv</nameMask>
+            <startId>1</startId>
+            <subnetMask>255.255.255.0</subnetMask>
+            <isActiveBonded>true</isActiveBonded>
+        </networkPool>
+        <networkPool id="913fe5cc-caca-28e6-919a-7c1d7c4056c9_dbAdminPool">
+            <machines>
+                <machine id="scaqae14compute01_id" />
+                <machine id="scaqae14compute02_id" />
+            </machines>
+            <networkType>admin</networkType>
+            <gateway>10.31.16.1</gateway>
+            <domain>us.oracle.com</domain>
+            <startIp>10.31.26.202</startIp>
+            <networkMedia>copper</networkMedia>
+            <nameMask>scaqae14adm%%</nameMask>
+            <startId>1</startId>
+            <subnetMask>255.255.240.0</subnetMask>
+            <vlanId>0</vlanId>
+            <defaultGateway>false</defaultGateway>
+            <defaultHostname>false</defaultHostname>
+        </networkPool>
+        <networkPool id="436a383a-5e50-6294-27e3-672772b98722_cellAdminPool">
+            <machines>
+                <machine id="scaqae14storage01_id" />
+                <machine id="scaqae14storage02_id" />
+                <machine id="scaqae14storage03_id" />
+            </machines>
+            <networkType>admin</networkType>
+            <gateway>10.31.16.1</gateway>
+            <domain>us.oracle.com</domain>
+            <startIp>10.31.26.204</startIp>
+            <networkMedia>copper</networkMedia>
+            <nameMask>scaqae14celadm%%</nameMask>
+            <startId>1</startId>
+            <subnetMask>255.255.240.0</subnetMask>
+            <vlanId>0</vlanId>
+            <defaultGateway>false</defaultGateway>
+            <defaultHostname>true</defaultHostname>
+        </networkPool>
+        <networkPool id="5f1daf55-7cd5-f25d-b5d1-35d78faf76b9_dbIlomPool">
+            <machines>
+                <machine id="scaqae14compute01_id" />
+                <machine id="scaqae14compute02_id" />
+            </machines>
+            <networkType>Ilom</networkType>
+            <gateway>10.31.16.1</gateway>
+            <domain>us.oracle.com</domain>
+            <startIp>10.31.26.207</startIp>
+            <nameMask>scaqae14adm%%-c</nameMask>
+            <startId>1</startId>
+            <subnetMask>255.255.240.0</subnetMask>
+            <vlanId>0</vlanId>
+        </networkPool>
+        <networkPool id="0f8a5aff-eed2-195a-8fd3-66752d4ae870_cellILomPool">
+            <machines>
+                <machine id="scaqae14storage01_id" />
+                <machine id="scaqae14storage02_id" />
+                <machine id="scaqae14storage03_id" />
+            </machines>
+            <networkType>Ilom</networkType>
+            <gateway>10.31.16.1</gateway>
+            <domain>us.oracle.com</domain>
+            <startIp>10.31.26.209</startIp>
+            <nameMask>scaqae14celadm%%-c</nameMask>
+            <startId>1</startId>
+            <subnetMask>255.255.240.0</subnetMask>
+            <vlanId>0</vlanId>
+        </networkPool>
+        <networkPool id="3b651b8d-9462-e943-6970-cd3479b714d5_clientPool">
+            <machines>
+                <machine id="scaqae14compute01_Cluster-c21de517e-7719-3643-73c6-9a419d7b5a93_vm01_id" />
+                <machine id="scaqae14compute02_Cluster-c21de517e-7719-3643-73c6-9a419d7b5a93_vm01_id" />
+            </machines>
+            <networkType>client</networkType>
+            <gateway>10.31.115.1</gateway>
+            <domain>us.oracle.com</domain>
+            <startIp>10.31.115.4</startIp>
+            <networkMedia>copper</networkMedia>
+            <nameMask>scaqae14dv%%01</nameMask>
+            <startId>1</startId>
+            <vipNameMask>scaqae14dv%%01-vip</vipNameMask>
+            <scanNameMask>scaqae14dvclu01-scan1</scanNameMask>
+            <scanPort>1521</scanPort>
+            <vipStartId>1</vipStartId>
+            <subnetMask>255.255.255.224</subnetMask>
+            <vlanId>428</vlanId>
+            <lacp>false</lacp>
+            <uiNetworkDescription>RJ45/SFP28 Combined</uiNetworkDescription>
+            <isBonded>true</isBonded>
+            <isFortPond>false</isFortPond>
+            <isWhitney2>false</isWhitney2>
+            <isOptical>false</isOptical>
+            <defaultGateway>true</defaultGateway>
+            <defaultHostname>true</defaultHostname>
+        </networkPool>
+        <networkPool id="c6fc0628-d6af-f65e-81ee-29e8ad4ceeef_clientPool">
+            <machines>
+                <machine id="scaqae14compute01_Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_vm01_id" />
+                <machine id="scaqae14compute02_Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_vm01_id" />
+            </machines>
+            <networkType>client</networkType>
+            <gateway>10.31.115.33</gateway>
+            <domain>us.oracle.com</domain>
+            <startIp>10.31.115.36</startIp>
+            <networkMedia>copper</networkMedia>
+            <nameMask>scaqae14dv%%02</nameMask>
+            <startId>1</startId>
+            <vipNameMask>scaqae14dv%%02-vip</vipNameMask>
+            <scanNameMask>scaqae14dvclu02-scan1</scanNameMask>
+            <scanPort>1521</scanPort>
+            <vipStartId>1</vipStartId>
+            <subnetMask>255.255.255.224</subnetMask>
+            <vlanId>429</vlanId>
+            <lacp>false</lacp>
+            <uiNetworkDescription>RJ45/SFP28 Combined</uiNetworkDescription>
+            <isBonded>true</isBonded>
+            <isFortPond>false</isFortPond>
+            <isWhitney2>false</isWhitney2>
+            <isOptical>false</isOptical>
+            <defaultGateway>true</defaultGateway>
+            <defaultHostname>true</defaultHostname>
+        </networkPool>
+        <networkPool id="63f6f449-a0f2-1d57-36b3-5c9516afde34_clientPool">
+            <machines>
+                <machine id="scaqae14compute01_Cluster-cfdb017d3-0d79-31e2-f14a-642a9f800d9a_vm01_id" />
+                <machine id="scaqae14compute02_Cluster-cfdb017d3-0d79-31e2-f14a-642a9f800d9a_vm01_id" />
+            </machines>
+            <networkType>client</networkType>
+            <gateway>10.31.115.65</gateway>
+            <domain>us.oracle.com</domain>
+            <startIp>10.31.115.68</startIp>
+            <networkMedia>copper</networkMedia>
+            <nameMask>scaqae14dv%%03</nameMask>
+            <startId>1</startId>
+            <vipNameMask>scaqae14dv%%03-vip</vipNameMask>
+            <scanNameMask>scaqae14dvclu03-scan1</scanNameMask>
+            <scanPort>1521</scanPort>
+            <vipStartId>1</vipStartId>
+            <subnetMask>255.255.255.224</subnetMask>
+            <vlanId>430</vlanId>
+            <lacp>false</lacp>
+            <uiNetworkDescription>RJ45/SFP28 Combined</uiNetworkDescription>
+            <isBonded>true</isBonded>
+            <isFortPond>false</isFortPond>
+            <isWhitney2>false</isWhitney2>
+            <isOptical>false</isOptical>
+            <defaultGateway>true</defaultGateway>
+            <defaultHostname>true</defaultHostname>
+        </networkPool>
+        <networkPool id="59a727fc-1a4c-aa3a-5126-a72cd778111b_clientPool">
+            <machines>
+                <machine id="scaqae14compute01_Cluster-c5788792c-5fd0-8b62-2d4e-2a80ad43cbaf_vm01_id" />
+                <machine id="scaqae14compute02_Cluster-c5788792c-5fd0-8b62-2d4e-2a80ad43cbaf_vm01_id" />
+            </machines>
+            <networkType>client</networkType>
+            <gateway>10.31.115.97</gateway>
+            <domain>us.oracle.com</domain>
+            <startIp>10.31.115.100</startIp>
+            <networkMedia>copper</networkMedia>
+            <nameMask>scaqae14dv%%04</nameMask>
+            <startId>1</startId>
+            <vipNameMask>scaqae14dv%%04-vip</vipNameMask>
+            <scanNameMask>scaqae14dvclu04-scan1</scanNameMask>
+            <scanPort>1521</scanPort>
+            <vipStartId>1</vipStartId>
+            <subnetMask>255.255.255.224</subnetMask>
+            <vlanId>431</vlanId>
+            <lacp>false</lacp>
+            <uiNetworkDescription>RJ45/SFP28 Combined</uiNetworkDescription>
+            <isBonded>true</isBonded>
+            <isFortPond>false</isFortPond>
+            <isWhitney2>false</isWhitney2>
+            <isOptical>false</isOptical>
+            <defaultGateway>true</defaultGateway>
+            <defaultHostname>true</defaultHostname>
+        </networkPool>
+        <networkPool id="80abe10d-7dc5-b586-0f56-f93c3defa00b_clientPool">
+            <machines>
+                <machine id="scaqae14compute01_Cluster-cf77f79a4-eeaa-595c-e0e9-8061eace7545_vm01_id" />
+                <machine id="scaqae14compute02_Cluster-cf77f79a4-eeaa-595c-e0e9-8061eace7545_vm01_id" />
+            </machines>
+            <networkType>client</networkType>
+            <gateway>10.31.115.129</gateway>
+            <domain>us.oracle.com</domain>
+            <startIp>10.31.115.132</startIp>
+            <networkMedia>copper</networkMedia>
+            <nameMask>scaqae14dv%%05</nameMask>
+            <startId>1</startId>
+            <vipNameMask>scaqae14dv%%05-vip</vipNameMask>
+            <scanNameMask>scaqae14dvclu05-scan1</scanNameMask>
+            <scanPort>1521</scanPort>
+            <vipStartId>1</vipStartId>
+            <subnetMask>255.255.255.224</subnetMask>
+            <vlanId>432</vlanId>
+            <lacp>false</lacp>
+            <uiNetworkDescription>RJ45/SFP28 Combined</uiNetworkDescription>
+            <isBonded>true</isBonded>
+            <isFortPond>false</isFortPond>
+            <isWhitney2>false</isWhitney2>
+            <isOptical>false</isOptical>
+            <defaultGateway>true</defaultGateway>
+            <defaultHostname>true</defaultHostname>
+        </networkPool>
+        <networkPool id="da0a445d-6e8a-5b9f-f0f6-b8b4aaaa4c8c_clientPool">
+            <machines>
+                <machine id="scaqae14compute01_Cluster-c6b1888ab-6513-6bc5-0ef6-219696a4711e_vm01_id" />
+                <machine id="scaqae14compute02_Cluster-c6b1888ab-6513-6bc5-0ef6-219696a4711e_vm01_id" />
+            </machines>
+            <networkType>client</networkType>
+            <gateway>10.31.115.161</gateway>
+            <domain>us.oracle.com</domain>
+            <startIp>10.31.115.164</startIp>
+            <networkMedia>copper</networkMedia>
+            <nameMask>scaqae14dv%%06</nameMask>
+            <startId>1</startId>
+            <vipNameMask>scaqae14dv%%06-vip</vipNameMask>
+            <scanNameMask>scaqae14dvclu06-scan1</scanNameMask>
+            <scanPort>1521</scanPort>
+            <vipStartId>1</vipStartId>
+            <subnetMask>255.255.255.224</subnetMask>
+            <vlanId>433</vlanId>
+            <lacp>false</lacp>
+            <uiNetworkDescription>RJ45/SFP28 Combined</uiNetworkDescription>
+            <isBonded>true</isBonded>
+            <isFortPond>false</isFortPond>
+            <isWhitney2>false</isWhitney2>
+            <isOptical>false</isOptical>
+            <defaultGateway>true</defaultGateway>
+            <defaultHostname>true</defaultHostname>
+        </networkPool>
+        <networkPool id="0b0a5233-fbc8-57ac-41e4-c3c33949a945_clientPool">
+            <machines>
+                <machine id="scaqae14compute01_Cluster-cf6445db9-e298-9c82-c9e4-d47a37ec5c6d_vm01_id" />
+                <machine id="scaqae14compute02_Cluster-cf6445db9-e298-9c82-c9e4-d47a37ec5c6d_vm01_id" />
+            </machines>
+            <networkType>client</networkType>
+            <gateway>10.31.115.193</gateway>
+            <domain>us.oracle.com</domain>
+            <startIp>10.31.115.196</startIp>
+            <networkMedia>copper</networkMedia>
+            <nameMask>scaqae14dv%%07</nameMask>
+            <startId>1</startId>
+            <vipNameMask>scaqae14dv%%07-vip</vipNameMask>
+            <scanNameMask>scaqae14dvclu07-scan1</scanNameMask>
+            <scanPort>1521</scanPort>
+            <vipStartId>1</vipStartId>
+            <subnetMask>255.255.255.224</subnetMask>
+            <vlanId>434</vlanId>
+            <lacp>false</lacp>
+            <uiNetworkDescription>RJ45/SFP28 Combined</uiNetworkDescription>
+            <isBonded>true</isBonded>
+            <isFortPond>false</isFortPond>
+            <isWhitney2>false</isWhitney2>
+            <isOptical>false</isOptical>
+            <defaultGateway>true</defaultGateway>
+            <defaultHostname>true</defaultHostname>
+        </networkPool>
+        <networkPool id="784c2a39-4cd1-c0b8-e5d2-b5ff34e8fbb4_clientPool">
+            <machines>
+                <machine id="scaqae14compute01_Cluster-c03dca026-8919-0b39-6fb6-e65ec3464460_vm01_id" />
+                <machine id="scaqae14compute02_Cluster-c03dca026-8919-0b39-6fb6-e65ec3464460_vm01_id" />
+            </machines>
+            <networkType>client</networkType>
+            <gateway>10.31.115.225</gateway>
+            <domain>us.oracle.com</domain>
+            <startIp>10.31.115.228</startIp>
+            <networkMedia>copper</networkMedia>
+            <nameMask>scaqae14dv%%08</nameMask>
+            <startId>1</startId>
+            <vipNameMask>scaqae14dv%%08-vip</vipNameMask>
+            <scanNameMask>scaqae14dvclu08-scan1</scanNameMask>
+            <scanPort>1521</scanPort>
+            <vipStartId>1</vipStartId>
+            <subnetMask>255.255.255.224</subnetMask>
+            <vlanId>435</vlanId>
+            <lacp>false</lacp>
+            <uiNetworkDescription>RJ45/SFP28 Combined</uiNetworkDescription>
+            <isBonded>true</isBonded>
+            <isFortPond>false</isFortPond>
+            <isWhitney2>false</isWhitney2>
+            <isOptical>false</isOptical>
+            <defaultGateway>true</defaultGateway>
+            <defaultHostname>true</defaultHostname>
+        </networkPool>
+        <networkPool id="3285d95f-f7b4-b95f-c3d3-74011efec96d_backupPool">
+            <machines>
+                <machine id="scaqae14compute01_Cluster-c21de517e-7719-3643-73c6-9a419d7b5a93_vm01_id" />
+                <machine id="scaqae14compute02_Cluster-c21de517e-7719-3643-73c6-9a419d7b5a93_vm01_id" />
+            </machines>
+            <networkType>backup</networkType>
+            <gateway>10.31.114.1</gateway>
+            <domain>us.oracle.com</domain>
+            <startIp>10.31.114.7</startIp>
+            <nameMask>scaqae14dv%%01-bk</nameMask>
+            <startId>1</startId>
+            <vipNameMask>scaqae14db%%dr-vip</vipNameMask>
+            <scanNameMask>scaqae14-scan1</scanNameMask>
+            <scanPort>1522</scanPort>
+            <vipStartId>1</vipStartId>
+            <subnetMask>255.255.255.240</subnetMask>
+            <vlanId>402</vlanId>
+            <lacp>false</lacp>
+            <uiNetworkDescription>SFP28 PCI Dual Port Card</uiNetworkDescription>
+            <isBonded>true</isBonded>
+            <isFortPond>false</isFortPond>
+            <isWhitney2>false</isWhitney2>
+            <isOptical>false</isOptical>
+            <defaultGateway>false</defaultGateway>
+            <sharedClientNetworkPort>false</sharedClientNetworkPort>
+        </networkPool>
+        <networkPool id="43a20bcf-d26c-a307-4383-077447a81fe9_backupPool">
+            <machines>
+                <machine id="scaqae14compute01_Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_vm01_id" />
+                <machine id="scaqae14compute02_Cluster-caf596050-92a6-aa40-4e05-a12fa28074be_vm01_id" />
+            </machines>
+            <networkType>backup</networkType>
+            <gateway>10.31.114.17</gateway>
+            <domain>us.oracle.com</domain>
+            <startIp>10.31.114.20</startIp>
+            <nameMask>scaqae14dv%%02-bk</nameMask>
+            <startId>1</startId>
+            <vipNameMask>scaqae14db%%dr2-vip</vipNameMask>
+            <scanNameMask>scaqae14-scan2</scanNameMask>
+            <scanPort>1522</scanPort>
+            <vipStartId>1</vipStartId>
+            <subnetMask>255.255.255.240</subnetMask>
+            <vlanId>403</vlanId>
+            <lacp>false</lacp>
+            <uiNetworkDescription>SFP28 PCI Dual Port Card</uiNetworkDescription>
+            <isBonded>true</isBonded>
+            <isFortPond>false</isFortPond>
+            <isWhitney2>false</isWhitney2>
+            <isOptical>false</isOptical>
+            <defaultGateway>false</defaultGateway>
+            <sharedClientNetworkPort>false</sharedClientNetworkPort>
+        </networkPool>
+        <networkPool id="9994386c-b168-75be-a285-c73ff1a361cb_backupPool">
+            <machines>
+                <machine id="scaqae14compute01_Cluster-cfdb017d3-0d79-31e2-f14a-642a9f800d9a_vm01_id" />
+                <machine id="scaqae14compute02_Cluster-cfdb017d3-0d79-31e2-f14a-642a9f800d9a_vm01_id" />
+            </machines>
+            <networkType>backup</networkType>
+            <gateway>10.31.114.33</gateway>
+            <domain>us.oracle.com</domain>
+            <startIp>10.31.114.36</startIp>
+            <nameMask>scaqae14dv%%03-bk</nameMask>
+            <startId>1</startId>
+            <vipNameMask>scaqae14db%%dr3-vip</vipNameMask>
+            <scanNameMask>scaqae14-scan3</scanNameMask>
+            <scanPort>1522</scanPort>
+            <vipStartId>1</vipStartId>
+            <subnetMask>255.255.255.240</subnetMask>
+            <vlanId>404</vlanId>
+            <lacp>false</lacp>
+            <uiNetworkDescription>SFP28 PCI Dual Port Card</uiNetworkDescription>
+            <isBonded>true</isBonded>
+            <isFortPond>false</isFortPond>
+            <isWhitney2>false</isWhitney2>
+            <isOptical>false</isOptical>
+            <defaultGateway>false</defaultGateway>
+            <sharedClientNetworkPort>false</sharedClientNetworkPort>
+        </networkPool>
+        <networkPool id="c599983f-c5c2-685e-4093-186487620a89_backupPool">
+            <machines>
+                <machine id="scaqae14compute01_Cluster-c5788792c-5fd0-8b62-2d4e-2a80ad43cbaf_vm01_id" />
+                <machine id="scaqae14compute02_Cluster-c5788792c-5fd0-8b62-2d4e-2a80ad43cbaf_vm01_id" />
+            </machines>
+            <networkType>backup</networkType>
+            <gateway>10.31.114.49</gateway>
+            <domain>us.oracle.com</domain>
+            <startIp>10.31.114.52</startIp>
+            <nameMask>scaqae14dv%%04-bk</nameMask>
+            <startId>1</startId>
+            <vipNameMask>scaqae14db%%dr4-vip</vipNameMask>
+            <scanNameMask>scaqae14-scan4</scanNameMask>
+            <scanPort>1522</scanPort>
+            <vipStartId>1</vipStartId>
+            <subnetMask>255.255.255.240</subnetMask>
+            <vlanId>405</vlanId>
+            <lacp>false</lacp>
+            <uiNetworkDescription>SFP28 PCI Dual Port Card</uiNetworkDescription>
+            <isBonded>true</isBonded>
+            <isFortPond>false</isFortPond>
+            <isWhitney2>false</isWhitney2>
+            <isOptical>false</isOptical>
+            <defaultGateway>false</defaultGateway>
+            <sharedClientNetworkPort>false</sharedClientNetworkPort>
+        </networkPool>
+        <networkPool id="4a3f9833-d1dd-9f00-644a-8b1e398ab581_backupPool">
+            <machines>
+                <machine id="scaqae14compute01_Cluster-cf77f79a4-eeaa-595c-e0e9-8061eace7545_vm01_id" />
+                <machine id="scaqae14compute02_Cluster-cf77f79a4-eeaa-595c-e0e9-8061eace7545_vm01_id" />
+            </machines>
+            <networkType>backup</networkType>
+            <gateway>10.31.114.65</gateway>
+            <domain>us.oracle.com</domain>
+            <startIp>10.31.114.68</startIp>
+            <nameMask>scaqae14dv%%05-bk</nameMask>
+            <startId>1</startId>
+            <vipNameMask>scaqae14db%%dr5-vip</vipNameMask>
+            <scanNameMask>scaqae14-scan5</scanNameMask>
+            <scanPort>1522</scanPort>
+            <vipStartId>1</vipStartId>
+            <subnetMask>255.255.255.240</subnetMask>
+            <vlanId>406</vlanId>
+            <lacp>false</lacp>
+            <uiNetworkDescription>SFP28 PCI Dual Port Card</uiNetworkDescription>
+            <isBonded>true</isBonded>
+            <isFortPond>false</isFortPond>
+            <isWhitney2>false</isWhitney2>
+            <isOptical>false</isOptical>
+            <defaultGateway>false</defaultGateway>
+            <sharedClientNetworkPort>false</sharedClientNetworkPort>
+        </networkPool>
+        <networkPool id="4711b6c7-b3cb-c67e-d10d-e02d37218c04_backupPool">
+            <machines>
+                <machine id="scaqae14compute01_Cluster-c6b1888ab-6513-6bc5-0ef6-219696a4711e_vm01_id" />
+                <machine id="scaqae14compute02_Cluster-c6b1888ab-6513-6bc5-0ef6-219696a4711e_vm01_id" />
+            </machines>
+            <networkType>backup</networkType>
+            <gateway>10.31.114.81</gateway>
+            <domain>us.oracle.com</domain>
+            <startIp>10.31.114.84</startIp>
+            <nameMask>scaqae14dv%%06-bk</nameMask>
+            <startId>1</startId>
+            <vipNameMask>scaqae14db%%dr6-vip</vipNameMask>
+            <scanNameMask>scaqae14-scan6</scanNameMask>
+            <scanPort>1522</scanPort>
+            <vipStartId>1</vipStartId>
+            <subnetMask>255.255.255.240</subnetMask>
+            <vlanId>407</vlanId>
+            <lacp>false</lacp>
+            <uiNetworkDescription>SFP28 PCI Dual Port Card</uiNetworkDescription>
+            <isBonded>true</isBonded>
+            <isFortPond>false</isFortPond>
+            <isWhitney2>false</isWhitney2>
+            <isOptical>false</isOptical>
+            <defaultGateway>false</defaultGateway>
+            <sharedClientNetworkPort>false</sharedClientNetworkPort>
+        </networkPool>
+        <networkPool id="3a990f4a-b6ea-f444-7a7c-ce9996ee3de9_backupPool">
+            <machines>
+                <machine id="scaqae14compute01_Cluster-cf6445db9-e298-9c82-c9e4-d47a37ec5c6d_vm01_id" />
+                <machine id="scaqae14compute02_Cluster-cf6445db9-e298-9c82-c9e4-d47a37ec5c6d_vm01_id" />
+            </machines>
+            <networkType>backup</networkType>
+            <gateway>10.31.114.97</gateway>
+            <domain>us.oracle.com</domain>
+            <startIp>10.31.114.100</startIp>
+            <nameMask>scaqae14dv%%07-bk</nameMask>
+            <startId>1</startId>
+            <vipNameMask>scaqae14db%%dr7-vip</vipNameMask>
+            <scanNameMask>scaqae14-scan7</scanNameMask>
+            <scanPort>1522</scanPort>
+            <vipStartId>1</vipStartId>
+            <subnetMask>255.255.255.240</subnetMask>
+            <vlanId>408</vlanId>
+            <lacp>false</lacp>
+            <uiNetworkDescription>SFP28 PCI Dual Port Card</uiNetworkDescription>
+            <isBonded>true</isBonded>
+            <isFortPond>false</isFortPond>
+            <isWhitney2>false</isWhitney2>
+            <isOptical>false</isOptical>
+            <defaultGateway>false</defaultGateway>
+            <sharedClientNetworkPort>false</sharedClientNetworkPort>
+        </networkPool>
+        <networkPool id="b6beb410-f81d-e34a-fa0f-ac2d5d80012b_backupPool">
+            <machines>
+                <machine id="scaqae14compute01_Cluster-c03dca026-8919-0b39-6fb6-e65ec3464460_vm01_id" />
+                <machine id="scaqae14compute02_Cluster-c03dca026-8919-0b39-6fb6-e65ec3464460_vm01_id" />
+            </machines>
+            <networkType>backup</networkType>
+            <gateway>10.31.114.113</gateway>
+            <domain>us.oracle.com</domain>
+            <startIp>10.31.114.116</startIp>
+            <nameMask>scaqae14dv%%08-bk</nameMask>
+            <startId>1</startId>
+            <vipNameMask>scaqae14db%%dr8-vip</vipNameMask>
+            <scanNameMask>scaqae14-scan8</scanNameMask>
+            <scanPort>1522</scanPort>
+            <vipStartId>1</vipStartId>
+            <subnetMask>255.255.255.240</subnetMask>
+            <vlanId>409</vlanId>
+            <lacp>false</lacp>
+            <uiNetworkDescription>SFP28 PCI Dual Port Card</uiNetworkDescription>
+            <isBonded>true</isBonded>
+            <isFortPond>false</isFortPond>
+            <isWhitney2>false</isWhitney2>
+            <isOptical>false</isOptical>
+            <defaultGateway>false</defaultGateway>
+            <sharedClientNetworkPort>false</sharedClientNetworkPort>
+        </networkPool>
+    </networkPools>
+    <switchNetworkPools>
+        <switchNetworkPool id="237f14e8-0458-beb2-8341-d1867da76db7_switchPool">
+            <version>1.0</version>
+            <networkPool id="913fe5cc-caca-28e6-919a-7c1d7c4056c9_dbAdminPool">
+                <machines>
+                    <machine id="scaqae14compute01_id" />
+                    <machine id="scaqae14compute02_id" />
+                </machines>
+                <networkType>admin</networkType>
+                <gateway>10.31.16.1</gateway>
+                <domain>us.oracle.com</domain>
+                <startIp>10.31.26.212</startIp>
+                <networkMedia>copper</networkMedia>
+                <nameMask>scaqae14adm%%</nameMask>
+                <startId>1</startId>
+                <subnetMask>255.255.240.0</subnetMask>
+                <vlanId>0</vlanId>
+                <defaultGateway>false</defaultGateway>
+                <defaultHostname>true</defaultHostname>
+            </networkPool>
+            <rackId>d3bfa25f-2e3a-1a0f-f6db-74009ce839a3</rackId>
+            <ciscoswitchMask>scaqae14sw-adm%</ciscoswitchMask>
+            <kvmswitchMask>scaqae14sw-kvm%</kvmswitchMask>
+            <pduaMask>scaqae14sw-pdua%</pduaMask>
+            <pdubMask>scaqae14sw-pdub%</pdubMask>
+            <infinibandLeaf1>scaqae14sw-rocea%</infinibandLeaf1>
+            <infinibandLeaf2>scaqae14sw-roceb%</infinibandLeaf2>
+            <infinibandSpine>scaqae14sw-roces%</infinibandSpine>
+            <createPduNetworks>true</createPduNetworks>
+        </switchNetworkPool>
+    </switchNetworkPools>
+    <comments>
+        <comment id="1">
+            <commentLine>Q1 : As part of the deployment, Oracle always installs the latest Exadata Storage software. This means that different machines could have different versions of the Storage software even if they are deployed around the same time. An example of the difference between machines would be the Kernel version that is installed. Please review the Exadata Storage software version to be deployed with the Engineer during the planning phase of the deployment. Note for VM's UEK2 and UEK4 can not be mixed. Dom0 needs to be equal or higher than DomU. Please indicate desired OS image.</commentLine>
+        </comment>
+        <comment id="2">
+            <commentLine>A1 :</commentLine>
+        </comment>
+        <comment id="3">
+            <commentLine>Q2 : If you are using 10G Optical, do you have existing certified SFP Modules that you can use? if not, when do you plan to order them?</commentLine>
+        </comment>
+        <comment id="4">
+            <commentLine>A2 :</commentLine>
+        </comment>
+        <comment id="5">
+            <commentLine>Q3 : Will this machine be multi-racked connected over infiniband to another engineered system? If so, please indicate additional machines.</commentLine>
+        </comment>
+        <comment id="6">
+            <commentLine>A3 :</commentLine>
+        </comment>
+        <comment id="7">
+            <commentLine>Q3a: If this machine is multi-racked, have you ensured that the InfiniBand IPs do not overlap and that they are in the proper subnet?</commentLine>
+        </comment>
+        <comment id="8">
+            <commentLine>A3a:</commentLine>
+        </comment>
+        <comment id="9">
+            <commentLine>Q3b: If this machine is multi-racked, is an InfiniBand Listener needed for SQL communication on the InfiniBand fabric?</commentLine>
+        </comment>
+        <comment id="10">
+            <commentLine>A3b:</commentLine>
+        </comment>
+        <comment id="11">
+            <commentLine>Q4 : If requesting LACP, will bond options be different than default? If so, please specify the bond options.</commentLine>
+        </comment>
+        <comment id="12">
+            <commentLine>A4 :</commentLine>
+        </comment>
+        <comment id="13">
+            <commentLine>Q5 : Have you ensured that the private IB subnet does not overlap the other networks (client, mgmt, backup)?</commentLine>
+        </comment>
+        <comment id="14">
+            <commentLine>A5 :</commentLine>
+        </comment>
+        <comment id="15">
+            <commentLine>Q6 : If this a DR machine, have you ensured the RDBMS version matches the</commentLine>
+        </comment>
+        <comment id="16">
+            <commentLine>production version?</commentLine>
+        </comment>
+        <comment id="17">
+            <commentLine>A6 :</commentLine>
+        </comment>
+        <comment id="18">
+            <commentLine>Q7 : For a rack upgrade/expansion, should the ASM diskgroups be extended or new</commentLine>
+        </comment>
+        <comment id="19">
+            <commentLine>diskgroups created?</commentLine>
+        </comment>
+        <comment id="20">
+            <commentLine>A7 :</commentLine>
+        </comment>
+        <comment id="21">
+            <commentLine>Q8: Will the database nodes use LDAP servers for hostname or IP resolution or</commentLine>
+        </comment>
+        <comment id="22">
+            <commentLine>User security? If so, have you confirmed the UID/GID's are matching?</commentLine>
+        </comment>
+        <comment id="23">
+            <commentLine>A8:</commentLine>
+        </comment>
+        <comment id="24">
+            <commentLine>Q9: "Will Spanning Tree Protocol need to be disabled on the uplink port?"</commentLine>
+        </comment>
+        <comment id="25">
+            <commentLine>A9:</commentLine>
+        </comment>
+        <comment id="26">
+            <commentLine>Additional Comments :</commentLine>
+        </comment>
+    </comments>
+    <storageDesc>
+        <stAttribute id="TotalStorageSize">5119G</stAttribute>
+    </storageDesc>
+</engineeredSystem>

@@ -1,0 +1,309 @@
+{
+    "rackname": "exacompute-sea2-d2-51f234a9-7d79-4797-a090-70e3282d62db-clu01",
+    "reshaped_node_subset": {
+        "added_computes": [
+            {
+                "model": "X11M",
+                "racktype": "1224",
+                "compute_node_alias": "",
+                "compute_node_hostname": "sea202125exdd006.sea2xx2xx0111qf.adminsea2.oraclevcn.com",
+                "eth0_removed": "True",
+                "virtual_compute_info": {
+                    "vm": {
+                        "size": "Large",
+                        "cores": 3,
+                        "ecpufactor": 4,
+                        "ecpus": 12,
+                        "gb_memory": 66,
+                        "gb_ohsize": 0
+                    },
+                    "network_info": {
+                        "virtualcomputenetworks": [
+                            {
+                                "private": [
+                                    {
+                                        "ipaddr": "100.105.66.10",
+                                        "fqdn": "sea202125exddu0602-stre0.sea2mvm01roce.adminsea2.oraclevcn.com"
+                                    },
+                                    {
+                                        "ipaddr": "100.105.66.11",
+                                        "fqdn": "sea202125exddu0602-stre1.sea2mvm01roce.adminsea2.oraclevcn.com"
+                                    }
+                                ]
+                            },
+                            {
+                                "admin": [
+                                    {
+                                        "fqdn": "x11m05-04-mswwo.exacp12.jboduvcn.oraclevcn.com"
+                                    }
+                                ]
+                            },
+                            {
+                                "client": [
+                                    {
+                                        "ipaddr": "10.0.32.22",
+                                        "fqdn": "x11m05-04-mswwo.exacp12.jboduvcn.oraclevcn.com",
+                                        "vlantag": "2253",
+                                        "mac": "00:00:17:01:90:11",
+                                        "gateway": "10.0.32.1",
+                                        "netmask": "255.255.255.0",
+                                        "standby_vnic_mac": "00:00:17:01:C1:D6",
+                                        "natip": "10.1.18.5",
+                                        "nathostname": "sea202125exddu0602",
+                                        "natdomain": "sea2mvm01roce.adminsea2.oraclevcn.com",
+                                        "natnetmask": "255.255.0.0",
+                                        "natgateway": "10.1.0.1",
+                                        "natvlantag": "3000",
+                                        "slaves": "eth2 eth1",
+                                        "mtu": "9000"
+                                    }
+                                ]
+                            },
+                            {
+                                "backup": [
+                                    {
+                                        "ipaddr": "10.0.33.15",
+                                        "fqdn": "x11m05-04-backup-fcbqf.exacp133.jboduvcn.oraclevcn.com",
+                                        "vlantag": "2254",
+                                        "mac": "02:00:17:01:CE:20",
+                                        "gateway": "10.0.33.1",
+                                        "netmask": "255.255.255.0",
+                                        "standby_vnic_mac": "00:00:17:01:DD:36",
+                                        "slaves": "eth2 eth1",
+                                        "mtu": "9000"
+                                    }
+                                ]
+                            },
+                            {
+                                "interconnect": [
+                                    {
+                                        "ipaddr": "100.107.10.4",
+                                        "fqdn": "sea202125exddu0602-clre0.sea2mvm01roce.adminsea2.oraclevcn.com"
+                                    },
+                                    {
+                                        "ipaddr": "100.107.10.5",
+                                        "fqdn": "sea202125exddu0602-clre1.sea2mvm01roce.adminsea2.oraclevcn.com"
+                                    }
+                                ]
+                            },
+                            {
+                                "vip": [
+                                    {
+                                        "ipaddr": "10.0.32.101",
+                                        "fqdn": "x11m05-04-vip-nfjps.exacp12.jboduvcn.oraclevcn.com"
+                                    }
+                                ]
+                            },
+                            {
+                                "monitoring": {
+                                    "bond0": {
+                                        "ip": "10.0.178.135",
+                                        "netmask": "255.255.240.0",
+                                        "vlantag": 0,
+                                        "gateway": "10.0.176.1",
+                                        "preferred_interface": "eth1",
+                                        "cavium_ids": [
+                                            {
+                                                "id": "FPC2313011E",
+                                                "networkinterface": "eth1"
+                                            },
+                                            {
+                                                "id": "FPC23124831",
+                                                "networkinterface": "eth2"
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        ]
+                    },
+                    "compute_node_hostname": "x11m05-04-mswwo.exacp12.jboduvcn.oraclevcn.com"
+                },
+                "network_info": {
+                    "computenetworks": [
+                        {
+                            "admin": [
+                                {
+                                    "fqdn": "sea202125exdd006.sea2xx2xx0111qf.adminsea2.oraclevcn.com",
+                                    "ipaddr": "10.0.178.135",
+                                    "gateway": "10.0.176.1",
+                                    "netmask": "255.255.240.0",
+                                    "master": "vmbondeth0"
+                                }
+                            ]
+                        },
+                        {
+                            "private": [
+                                {
+                                    "fqdn": "sea202125exdd006-priv2.sea2xx2xx0111qf.adminsea2.oraclevcn.com",
+                                    "ipaddr": "192.168.132.19"
+                                },
+                                {
+                                    "fqdn": "sea202125exdd006-priv1.sea2xx2xx0111qf.adminsea2.oraclevcn.com",
+                                    "ipaddr": "192.168.132.18"
+                                }
+                            ]
+                        },
+                        {
+                            "ilom": [
+                                {
+                                    "fqdn": "sea202125exdd006lo.sea2xx2xx0111qf.adminsea2.oraclevcn.com",
+                                    "ipaddr": "10.0.178.149",
+                                    "gateway": "10.0.176.1",
+                                    "netmask": "255.255.240.0"
+                                }
+                            ]
+                        },
+                        {
+                            "ntp": [
+                                {
+                                    "ipaddr": "169.254.169.254"
+                                }
+                            ]
+                        },
+                        {
+                            "dns": [
+                                {
+                                    "ipaddr": "169.254.169.254"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "rack_info": {
+                    "uloc": "11",
+                    "uheight": "1"
+                },
+                "db_info": [],
+                "volumes": [
+                    {
+                        "volumetype": "GCV",
+                        "volumename": "gcv",
+                        "vaultid": "oracle-vault",
+                        "volumesizegb": "2",
+                        "volumeid": "ocid1.exascalevolume.region1.sea.anzwkljsqi6y7haa7equuwmtwuutcdpfq4edxqzx4ifc7x6atooe7ge6c3ma",
+                        "volumedevicepath": "gcv_Vmkouzz_2_6999"
+                    },
+                    {
+                        "volumetype": "SYSTEM",
+                        "volumename": "system",
+                        "vaultid": "oracle-vault",
+                        "volumesizegb": "114",
+                        "volumeid": "ocid1.exascalevolume.region1.sea.anzwkljsqi6y7haa5uonmcoetijdribvlyjqhcncfo7bpsqywmet3fwbl2cq",
+                        "volumedevicepath": "system_Vmkouzz_2_daa6"
+                    },
+                    {
+                        "volumetype": "U01",
+                        "volumename": "u01",
+                        "vaultid": "oracle-vault",
+                        "volumesizegb": "42",
+                        "volumeid": "ocid1.exascalevolume.region1.sea.anzwkljsqi6y7haayvcewmkuqubdyl7w6ocr7th6j74uccwyariipskt2aqq",
+                        "volumedevicepath": "u01_Vmkouzz_2_8a4c"
+                    },
+                    {
+                        "volumetype": "U02",
+                        "volumename": "u02",
+                        "vaultid": "oracle-vault",
+                        "volumesizegb": "156",
+                        "volumeid": "ocid1.exascalevolume.region1.sea.anzwkljsqi6y7haasbyw7ivh3272shwqy57os4qjfaoivahi44gfojh3dpqq",
+                        "volumedevicepath": "u02_Vmkouzz_2_e898"
+                    }
+                ]
+            }
+        ],
+        "retained_computes": [
+            {
+                "model": "X11M",
+                "racktype": "1224",
+                "compute_node_alias": "",
+                "compute_node_hostname": "sea202125exdd007.sea2xx2xx0111qf.adminsea2.oraclevcn.com",
+                "eth0_removed": "True",
+                "volumes": []
+            }
+        ],
+        "removed_computes": [],
+        "participating_computes": [
+            {
+                "model": "X11M",
+                "racktype": "1224",
+                "compute_node_alias": "",
+                "compute_node_hostname": "sea202125exdd007.sea2xx2xx0111qf.adminsea2.oraclevcn.com",
+                "eth0_removed": "True",
+                "volumes": []
+            },
+            {
+                "model": "X11M",
+                "racktype": "1224",
+                "compute_node_alias": "",
+                "compute_node_hostname": "sea202125exdd006.sea2xx2xx0111qf.adminsea2.oraclevcn.com",
+                "eth0_removed": "True",
+                "volumes": []
+            }
+        ],
+        "full_compute_to_virtualcompute_list": [
+            {
+                "compute_node_hostname": "sea202125exdd006.sea2xx2xx0111qf.adminsea2.oraclevcn.com",
+                "compute_node_virtual_hostname": "x11m05-04-mswwo.exacp12.jboduvcn.oraclevcn.com"
+            },
+            {
+                "compute_node_hostname": "sea202125exdd007.sea2xx2xx0111qf.adminsea2.oraclevcn.com",
+                "compute_node_virtual_hostname": "x11m05-02-vmfwa.exacp12.jboduvcn.oraclevcn.com"
+            }
+        ]
+    },
+    "vmboss": {
+        "su_config_file": null,
+        "vmboss_map": [
+            {
+                "dom0": "sea202125exdd006.sea2xx2xx0111qf.adminsea2.oraclevcn.com",
+                "domu": "x11m05-04-mswwo.exacp12.jboduvcn.oraclevcn.com",
+                "customer_tenancy_ocid": "ocid1.tenancy.region1..aaaaaaaae34gwbez3dbo7urtcf462wj3mnmanbba5xqinczgm2z5d64cnl5q",
+                "vmboss_user": "",
+                "vmboss_compartment": "vmboss_comp_ocid1.tenancy.region1..aaaaaaaae34gwbez3dbo7urtcf462wj3mnmanbba5xqinczgm2z5d64cnl5q",
+                "vmboss_metadata_bucket": "vmboss_metadata_bucket_ocid1.tenancy.region1..aaaaaaaae34gwbez3dbo7urtcf462wj3mnmanbba5xqinczgm2z5d64cnl5q",
+                "vmboss_bucket": "vmboss_bucket_ocid1.tenancy.region1..aaaaaaaae34gwbez3dbo7urtcf462wj3mnmanbba5xqinczgm2z5d64cnl5q_exacompute-sea2-d2-51f234a9-7d79-4797-a090-70e3282d62db-clu01"
+            }
+        ]
+    },
+    "filesystems": {
+        "mountpoints": {
+            "/u01": "40G",
+            "grid": "11G",
+            "/var/log": "18G",
+            "/home": "4G",
+            "/var/log/audit": "3G",
+            "/": "15G",
+            "/tmp": "10G",
+            "/var": "5G"
+        }
+    },
+    "bonding_operation": "add-compute",
+    "dom0_bonding": true,
+    "shared_env": "true",
+    "fips_compliance": "disabled",
+    "adb_s": "False",
+    "roce_information": {
+        "sea202125exdd006.sea2xx2xx0111qf.adminsea2.oraclevcn.com": {
+            "subnet_mask": "255.255.0.0",
+            "vlan_id": "3999",
+            "stre0_ip": "100.105.66.0",
+            "stre1_ip": "100.105.66.1"
+        }
+    },
+    "name": "jesandov",
+    "ecra": {
+        "whitelist_cidr": [
+            "10.0.1.32/28",
+            "10.0.1.112/28"
+        ]
+    },
+    "model_subtype": "STANDARD",
+    "grid_version": "19",
+    "storageType": "Exascale",
+    "delete_domu_keys": "false",
+    "domu_image_version": "25.1.0.0.0.241025",
+    "image_version": "25.1.0.0.0.241025",
+    "wf_uuid": "8c26ec25-39b4-4b8b-ab2b-77316a7ff9bc",
+    "operation_uuid": "9e4bac1f-8198-45df-b9b5-90c1b64d8435",
+    "exaunitid": 2841
+}

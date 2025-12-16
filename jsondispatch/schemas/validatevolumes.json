@@ -1,0 +1,15 @@
+{
+    "properties": {
+        "hostname": {
+            "type": "string"
+        },
+        "edvvolume": {
+            "type": "array"
+        }
+    },
+    "required": [
+        "hostname",
+        "edvvolume"
+    ],
+    "type": "object"
+}

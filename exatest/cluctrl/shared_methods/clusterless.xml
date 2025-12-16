@@ -1,0 +1,2347 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<engineeredSystem xmlns="model" id="bb96b678-2efb-4fad-b8c3-5baa612aa2b6" oedaversion="200728" filetype="PAAS">
+    <customerName>DBaaS SRE</customerName>
+    <departmentName>Ingestion</departmentName>
+    <version>version2</version>
+    <machines>
+        <machine id="cwl100425exdcompute01_id">
+            <hostName>cwl100425exdd001.cwl100051qfab.admincwl1.oraclevcn.com</hostName>
+            <iloms>
+                <ilom id="cwl100425exdd001lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom"/>
+            </iloms>
+            <networks>
+                <network id="cwl100425exdd001.cwl100051qfab.admincwl1.oraclevcn.com_admin"/>
+                <network id="cwl100425exddb01-priv.cwl100051qfab.admincwl1.oraclevcn.com_private1"/>
+                <network id="cwl100425exddb01-priv.cwl100051qfab.admincwl1.oraclevcn.com_private2"/>
+            </networks>
+            <networkPools>
+                <networkPool id="6951831c-05c2-5a9b-e6c2-c744a227ddc6_dbAdminPool"/>
+                <networkPool id="66dce7e7-bfc0-154e-2a6c-609ad73a3606_dbIlomPool"/>
+                <networkPool id="109f326f-04a6-e2a2-7e7c-fc6918cbe0da_dbPrivPool"/>
+            </networkPools>
+            <machineType>compute</machineType>
+            <dnsServers>
+              <dnsServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </dnsServer>
+            </dnsServers>
+            <ntpServers>
+              <ntpServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </ntpServer>
+            </ntpServers>
+            <TimeZone>UTC</TimeZone>
+            <DefaultGatewayNet>cwl100425exdd001.cwl100051qfab.admincwl1.oraclevcn.com_admin</DefaultGatewayNet>
+            <virtual>false</virtual>
+            <version>version2</version>
+            <osType>LinuxKVM</osType>
+            <physicalMemorySize>1536GB</physicalMemorySize>
+        </machine>
+        <machine id="cwl100425exdcompute02_id">
+            <hostName>cwl100425exdd002.cwl100051qfab.admincwl1.oraclevcn.com</hostName>
+            <iloms>
+                <ilom id="cwl100425exdd002lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom"/>
+            </iloms>
+            <networks>
+                <network id="cwl100425exdd002.cwl100051qfab.admincwl1.oraclevcn.com_admin"/>
+                <network id="cwl100425exddb02-priv.cwl100051qfab.admincwl1.oraclevcn.com_private1"/>
+                <network id="cwl100425exddb02-priv.cwl100051qfab.admincwl1.oraclevcn.com_private2"/>
+            </networks>
+            <networkPools>
+                <networkPool id="6951831c-05c2-5a9b-e6c2-c744a227ddc6_dbAdminPool"/>
+                <networkPool id="66dce7e7-bfc0-154e-2a6c-609ad73a3606_dbIlomPool"/>
+                <networkPool id="109f326f-04a6-e2a2-7e7c-fc6918cbe0da_dbPrivPool"/>
+            </networkPools>
+            <machineType>compute</machineType>
+            <dnsServers>
+              <dnsServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </dnsServer>
+            </dnsServers>
+            <ntpServers>
+              <ntpServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </ntpServer>
+            </ntpServers>
+            <TimeZone>UTC</TimeZone>
+            <DefaultGatewayNet>cwl100425exdd002.cwl100051qfab.admincwl1.oraclevcn.com_admin</DefaultGatewayNet>
+            <virtual>false</virtual>
+            <version>version2</version>
+            <osType>LinuxKVM</osType>
+            <physicalMemorySize>1536GB</physicalMemorySize>
+        </machine>
+        <machine id="cwl100425exdcompute03_id">
+            <hostName>cwl100425exdd003.cwl100051qfab.admincwl1.oraclevcn.com</hostName>
+            <iloms>
+                <ilom id="cwl100425exdd003lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom"/>
+            </iloms>
+            <networks>
+                <network id="cwl100425exdd003.cwl100051qfab.admincwl1.oraclevcn.com_admin"/>
+                <network id="cwl100425exddb03-priv.cwl100051qfab.admincwl1.oraclevcn.com_private1"/>
+                <network id="cwl100425exddb03-priv.cwl100051qfab.admincwl1.oraclevcn.com_private2"/>
+            </networks>
+            <networkPools>
+                <networkPool id="6951831c-05c2-5a9b-e6c2-c744a227ddc6_dbAdminPool"/>
+                <networkPool id="66dce7e7-bfc0-154e-2a6c-609ad73a3606_dbIlomPool"/>
+                <networkPool id="109f326f-04a6-e2a2-7e7c-fc6918cbe0da_dbPrivPool"/>
+            </networkPools>
+            <machineType>compute</machineType>
+            <dnsServers>
+              <dnsServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </dnsServer>
+            </dnsServers>
+            <ntpServers>
+              <ntpServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </ntpServer>
+            </ntpServers>
+            <TimeZone>UTC</TimeZone>
+            <DefaultGatewayNet>cwl100425exdd003.cwl100051qfab.admincwl1.oraclevcn.com_admin</DefaultGatewayNet>
+            <virtual>false</virtual>
+            <version>version2</version>
+            <osType>LinuxKVM</osType>
+            <physicalMemorySize>1536GB</physicalMemorySize>
+        </machine>
+        <machine id="cwl100425exdcompute04_id">
+            <hostName>cwl100425exdd004.cwl100051qfab.admincwl1.oraclevcn.com</hostName>
+            <iloms>
+                <ilom id="cwl100425exdd004lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom"/>
+            </iloms>
+            <networks>
+                <network id="cwl100425exdd004.cwl100051qfab.admincwl1.oraclevcn.com_admin"/>
+                <network id="cwl100425exddb04-priv.cwl100051qfab.admincwl1.oraclevcn.com_private1"/>
+                <network id="cwl100425exddb04-priv.cwl100051qfab.admincwl1.oraclevcn.com_private2"/>
+            </networks>
+            <networkPools>
+                <networkPool id="6951831c-05c2-5a9b-e6c2-c744a227ddc6_dbAdminPool"/>
+                <networkPool id="66dce7e7-bfc0-154e-2a6c-609ad73a3606_dbIlomPool"/>
+                <networkPool id="109f326f-04a6-e2a2-7e7c-fc6918cbe0da_dbPrivPool"/>
+            </networkPools>
+            <machineType>compute</machineType>
+            <dnsServers>
+              <dnsServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </dnsServer>
+            </dnsServers>
+            <ntpServers>
+              <ntpServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </ntpServer>
+            </ntpServers>
+            <TimeZone>UTC</TimeZone>
+            <DefaultGatewayNet>cwl100425exdd004.cwl100051qfab.admincwl1.oraclevcn.com_admin</DefaultGatewayNet>
+            <virtual>false</virtual>
+            <version>version2</version>
+            <osType>LinuxKVM</osType>
+            <physicalMemorySize>1536GB</physicalMemorySize>
+        </machine>
+        <machine id="cwl100425exdcompute05_id">
+            <hostName>cwl100425exdd005.cwl100051qfab.admincwl1.oraclevcn.com</hostName>
+            <iloms>
+                <ilom id="cwl100425exdd005lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom"/>
+            </iloms>
+            <networks>
+                <network id="cwl100425exdd005.cwl100051qfab.admincwl1.oraclevcn.com_admin"/>
+                <network id="cwl100425exddb05-priv.cwl100051qfab.admincwl1.oraclevcn.com_private1"/>
+                <network id="cwl100425exddb05-priv.cwl100051qfab.admincwl1.oraclevcn.com_private2"/>
+            </networks>
+            <networkPools>
+                <networkPool id="6951831c-05c2-5a9b-e6c2-c744a227ddc6_dbAdminPool"/>
+                <networkPool id="66dce7e7-bfc0-154e-2a6c-609ad73a3606_dbIlomPool"/>
+                <networkPool id="109f326f-04a6-e2a2-7e7c-fc6918cbe0da_dbPrivPool"/>
+            </networkPools>
+            <machineType>compute</machineType>
+            <dnsServers>
+              <dnsServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </dnsServer>
+            </dnsServers>
+            <ntpServers>
+              <ntpServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </ntpServer>
+            </ntpServers>
+            <TimeZone>UTC</TimeZone>
+            <DefaultGatewayNet>cwl100425exdd005.cwl100051qfab.admincwl1.oraclevcn.com_admin</DefaultGatewayNet>
+            <virtual>false</virtual>
+            <version>version2</version>
+            <osType>LinuxKVM</osType>
+            <physicalMemorySize>1536GB</physicalMemorySize>
+        </machine>
+        <machine id="cwl100425exdcompute06_id">
+            <hostName>cwl100425exdd006.cwl100051qfab.admincwl1.oraclevcn.com</hostName>
+            <iloms>
+                <ilom id="cwl100425exdd006lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom"/>
+            </iloms>
+            <networks>
+                <network id="cwl100425exdd006.cwl100051qfab.admincwl1.oraclevcn.com_admin"/>
+                <network id="cwl100425exddb06-priv.cwl100051qfab.admincwl1.oraclevcn.com_private1"/>
+                <network id="cwl100425exddb06-priv.cwl100051qfab.admincwl1.oraclevcn.com_private2"/>
+            </networks>
+            <networkPools>
+                <networkPool id="6951831c-05c2-5a9b-e6c2-c744a227ddc6_dbAdminPool"/>
+                <networkPool id="66dce7e7-bfc0-154e-2a6c-609ad73a3606_dbIlomPool"/>
+                <networkPool id="109f326f-04a6-e2a2-7e7c-fc6918cbe0da_dbPrivPool"/>
+            </networkPools>
+            <machineType>compute</machineType>
+            <dnsServers>
+              <dnsServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </dnsServer>
+            </dnsServers>
+            <ntpServers>
+              <ntpServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </ntpServer>
+            </ntpServers>
+            <TimeZone>UTC</TimeZone>
+            <DefaultGatewayNet>cwl100425exdd006.cwl100051qfab.admincwl1.oraclevcn.com_admin</DefaultGatewayNet>
+            <virtual>false</virtual>
+            <version>version2</version>
+            <osType>LinuxKVM</osType>
+            <physicalMemorySize>1536GB</physicalMemorySize>
+        </machine>
+        <machine id="cwl100425exdcompute07_id">
+            <hostName>cwl100425exdd007.cwl100051qfab.admincwl1.oraclevcn.com</hostName>
+            <iloms>
+                <ilom id="cwl100425exdd007lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom"/>
+            </iloms>
+            <networks>
+                <network id="cwl100425exdd007.cwl100051qfab.admincwl1.oraclevcn.com_admin"/>
+                <network id="cwl100425exddb07-priv.cwl100051qfab.admincwl1.oraclevcn.com_private1"/>
+                <network id="cwl100425exddb07-priv.cwl100051qfab.admincwl1.oraclevcn.com_private2"/>
+            </networks>
+            <networkPools>
+                <networkPool id="6951831c-05c2-5a9b-e6c2-c744a227ddc6_dbAdminPool"/>
+                <networkPool id="66dce7e7-bfc0-154e-2a6c-609ad73a3606_dbIlomPool"/>
+                <networkPool id="109f326f-04a6-e2a2-7e7c-fc6918cbe0da_dbPrivPool"/>
+            </networkPools>
+            <machineType>compute</machineType>
+            <dnsServers>
+              <dnsServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </dnsServer>
+            </dnsServers>
+            <ntpServers>
+              <ntpServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </ntpServer>
+            </ntpServers>
+            <TimeZone>UTC</TimeZone>
+            <DefaultGatewayNet>cwl100425exdd007.cwl100051qfab.admincwl1.oraclevcn.com_admin</DefaultGatewayNet>
+            <virtual>false</virtual>
+            <version>version2</version>
+            <osType>LinuxKVM</osType>
+            <physicalMemorySize>1536GB</physicalMemorySize>
+        </machine>
+        <machine id="cwl100425exdcompute08_id">
+            <hostName>cwl100425exdd008.cwl100051qfab.admincwl1.oraclevcn.com</hostName>
+            <iloms>
+                <ilom id="cwl100425exdd008lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom"/>
+            </iloms>
+            <networks>
+                <network id="cwl100425exdd008.cwl100051qfab.admincwl1.oraclevcn.com_admin"/>
+                <network id="cwl100425exddb08-priv.cwl100051qfab.admincwl1.oraclevcn.com_private1"/>
+                <network id="cwl100425exddb08-priv.cwl100051qfab.admincwl1.oraclevcn.com_private2"/>
+            </networks>
+            <networkPools>
+                <networkPool id="6951831c-05c2-5a9b-e6c2-c744a227ddc6_dbAdminPool"/>
+                <networkPool id="66dce7e7-bfc0-154e-2a6c-609ad73a3606_dbIlomPool"/>
+                <networkPool id="109f326f-04a6-e2a2-7e7c-fc6918cbe0da_dbPrivPool"/>
+            </networkPools>
+            <machineType>compute</machineType>
+            <dnsServers>
+              <dnsServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </dnsServer>
+            </dnsServers>
+            <ntpServers>
+              <ntpServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </ntpServer>
+            </ntpServers>
+            <TimeZone>UTC</TimeZone>
+            <DefaultGatewayNet>cwl100425exdd008.cwl100051qfab.admincwl1.oraclevcn.com_admin</DefaultGatewayNet>
+            <virtual>false</virtual>
+            <version>version2</version>
+            <osType>LinuxKVM</osType>
+            <physicalMemorySize>1536GB</physicalMemorySize>
+        </machine>
+        <machine id="cwl100425exdcompute09_id">
+            <hostName>cwl100425exdd009.cwl100051qfab.admincwl1.oraclevcn.com</hostName>
+            <iloms>
+                <ilom id="cwl100425exdd009lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom"/>
+            </iloms>
+            <networks>
+                <network id="cwl100425exdd009.cwl100051qfab.admincwl1.oraclevcn.com_admin"/>
+                <network id="cwl100425exddb09-priv.cwl100051qfab.admincwl1.oraclevcn.com_private1"/>
+                <network id="cwl100425exddb09-priv.cwl100051qfab.admincwl1.oraclevcn.com_private2"/>
+            </networks>
+            <networkPools>
+                <networkPool id="6951831c-05c2-5a9b-e6c2-c744a227ddc6_dbAdminPool"/>
+                <networkPool id="66dce7e7-bfc0-154e-2a6c-609ad73a3606_dbIlomPool"/>
+                <networkPool id="109f326f-04a6-e2a2-7e7c-fc6918cbe0da_dbPrivPool"/>
+            </networkPools>
+            <machineType>compute</machineType>
+            <dnsServers>
+              <dnsServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </dnsServer>
+            </dnsServers>
+            <ntpServers>
+              <ntpServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </ntpServer>
+            </ntpServers>
+            <TimeZone>UTC</TimeZone>
+            <DefaultGatewayNet>cwl100425exdd009.cwl100051qfab.admincwl1.oraclevcn.com_admin</DefaultGatewayNet>
+            <virtual>false</virtual>
+            <version>version2</version>
+            <osType>LinuxKVM</osType>
+            <physicalMemorySize>1536GB</physicalMemorySize>
+        </machine>
+        <machine id="cwl100425exdcompute10_id">
+            <hostName>cwl100425exdd010.cwl100051qfab.admincwl1.oraclevcn.com</hostName>
+            <iloms>
+                <ilom id="cwl100425exdd010lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom"/>
+            </iloms>
+            <networks>
+                <network id="cwl100425exdd010.cwl100051qfab.admincwl1.oraclevcn.com_admin"/>
+                <network id="cwl100425exddb10-priv.cwl100051qfab.admincwl1.oraclevcn.com_private1"/>
+                <network id="cwl100425exddb10-priv.cwl100051qfab.admincwl1.oraclevcn.com_private2"/>
+            </networks>
+            <networkPools>
+                <networkPool id="6951831c-05c2-5a9b-e6c2-c744a227ddc6_dbAdminPool"/>
+                <networkPool id="66dce7e7-bfc0-154e-2a6c-609ad73a3606_dbIlomPool"/>
+                <networkPool id="109f326f-04a6-e2a2-7e7c-fc6918cbe0da_dbPrivPool"/>
+            </networkPools>
+            <machineType>compute</machineType>
+            <dnsServers>
+              <dnsServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </dnsServer>
+            </dnsServers>
+            <ntpServers>
+              <ntpServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </ntpServer>
+            </ntpServers>
+            <TimeZone>UTC</TimeZone>
+            <DefaultGatewayNet>cwl100425exdd010.cwl100051qfab.admincwl1.oraclevcn.com_admin</DefaultGatewayNet>
+            <virtual>false</virtual>
+            <version>version2</version>
+            <osType>LinuxKVM</osType>
+            <physicalMemorySize>1536GB</physicalMemorySize>
+        </machine>
+        <machine id="cwl100425exdcompute11_id">
+            <hostName>cwl100425exdd011.cwl100051qfab.admincwl1.oraclevcn.com</hostName>
+            <iloms>
+                <ilom id="cwl100425exdd011lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom"/>
+            </iloms>
+            <networks>
+                <network id="cwl100425exdd011.cwl100051qfab.admincwl1.oraclevcn.com_admin"/>
+                <network id="cwl100425exddb11-priv.cwl100051qfab.admincwl1.oraclevcn.com_private1"/>
+                <network id="cwl100425exddb11-priv.cwl100051qfab.admincwl1.oraclevcn.com_private2"/>
+            </networks>
+            <networkPools>
+                <networkPool id="6951831c-05c2-5a9b-e6c2-c744a227ddc6_dbAdminPool"/>
+                <networkPool id="66dce7e7-bfc0-154e-2a6c-609ad73a3606_dbIlomPool"/>
+                <networkPool id="109f326f-04a6-e2a2-7e7c-fc6918cbe0da_dbPrivPool"/>
+            </networkPools>
+            <machineType>compute</machineType>
+            <dnsServers>
+              <dnsServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </dnsServer>
+            </dnsServers>
+            <ntpServers>
+              <ntpServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </ntpServer>
+            </ntpServers>
+            <TimeZone>UTC</TimeZone>
+            <DefaultGatewayNet>cwl100425exdd011.cwl100051qfab.admincwl1.oraclevcn.com_admin</DefaultGatewayNet>
+            <virtual>false</virtual>
+            <version>version2</version>
+            <osType>LinuxKVM</osType>
+            <physicalMemorySize>1536GB</physicalMemorySize>
+        </machine>
+        <machine id="cwl100425exdcompute12_id">
+            <hostName>cwl100425exdd012.cwl100051qfab.admincwl1.oraclevcn.com</hostName>
+            <iloms>
+                <ilom id="cwl100425exdd012lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom"/>
+            </iloms>
+            <networks>
+                <network id="cwl100425exdd012.cwl100051qfab.admincwl1.oraclevcn.com_admin"/>
+                <network id="cwl100425exddb12-priv.cwl100051qfab.admincwl1.oraclevcn.com_private1"/>
+                <network id="cwl100425exddb12-priv.cwl100051qfab.admincwl1.oraclevcn.com_private2"/>
+            </networks>
+            <networkPools>
+                <networkPool id="6951831c-05c2-5a9b-e6c2-c744a227ddc6_dbAdminPool"/>
+                <networkPool id="66dce7e7-bfc0-154e-2a6c-609ad73a3606_dbIlomPool"/>
+                <networkPool id="109f326f-04a6-e2a2-7e7c-fc6918cbe0da_dbPrivPool"/>
+            </networkPools>
+            <machineType>compute</machineType>
+            <dnsServers>
+              <dnsServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </dnsServer>
+            </dnsServers>
+            <ntpServers>
+              <ntpServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </ntpServer>
+            </ntpServers>
+            <TimeZone>UTC</TimeZone>
+            <DefaultGatewayNet>cwl100425exdd012.cwl100051qfab.admincwl1.oraclevcn.com_admin</DefaultGatewayNet>
+            <virtual>false</virtual>
+            <version>version2</version>
+            <osType>LinuxKVM</osType>
+            <physicalMemorySize>1536GB</physicalMemorySize>
+        </machine>
+        <machine id="cwl100425exdcompute13_id">
+            <hostName>cwl100425exdd013.cwl100051qfab.admincwl1.oraclevcn.com</hostName>
+            <iloms>
+                <ilom id="cwl100425exdd013lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom"/>
+            </iloms>
+            <networks>
+                <network id="cwl100425exdd013.cwl100051qfab.admincwl1.oraclevcn.com_admin"/>
+                <network id="cwl100425exddb13-priv.cwl100051qfab.admincwl1.oraclevcn.com_private1"/>
+                <network id="cwl100425exddb13-priv.cwl100051qfab.admincwl1.oraclevcn.com_private2"/>
+            </networks>
+            <networkPools>
+                <networkPool id="6951831c-05c2-5a9b-e6c2-c744a227ddc6_dbAdminPool"/>
+                <networkPool id="66dce7e7-bfc0-154e-2a6c-609ad73a3606_dbIlomPool"/>
+                <networkPool id="109f326f-04a6-e2a2-7e7c-fc6918cbe0da_dbPrivPool"/>
+            </networkPools>
+            <machineType>compute</machineType>
+            <dnsServers>
+              <dnsServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </dnsServer>
+            </dnsServers>
+            <ntpServers>
+              <ntpServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </ntpServer>
+            </ntpServers>
+            <TimeZone>UTC</TimeZone>
+            <DefaultGatewayNet>cwl100425exdd013.cwl100051qfab.admincwl1.oraclevcn.com_admin</DefaultGatewayNet>
+            <virtual>false</virtual>
+            <version>version2</version>
+            <osType>LinuxKVM</osType>
+            <physicalMemorySize>1536GB</physicalMemorySize>
+        </machine>
+        <machine id="cwl100425exdcompute14_id">
+            <hostName>cwl100425exdd014.cwl100051qfab.admincwl1.oraclevcn.com</hostName>
+            <iloms>
+                <ilom id="cwl100425exdd014lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom"/>
+            </iloms>
+            <networks>
+                <network id="cwl100425exdd014.cwl100051qfab.admincwl1.oraclevcn.com_admin"/>
+                <network id="cwl100425exddb14-priv.cwl100051qfab.admincwl1.oraclevcn.com_private1"/>
+                <network id="cwl100425exddb14-priv.cwl100051qfab.admincwl1.oraclevcn.com_private2"/>
+            </networks>
+            <networkPools>
+                <networkPool id="6951831c-05c2-5a9b-e6c2-c744a227ddc6_dbAdminPool"/>
+                <networkPool id="66dce7e7-bfc0-154e-2a6c-609ad73a3606_dbIlomPool"/>
+                <networkPool id="109f326f-04a6-e2a2-7e7c-fc6918cbe0da_dbPrivPool"/>
+            </networkPools>
+            <machineType>compute</machineType>
+            <dnsServers>
+              <dnsServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </dnsServer>
+            </dnsServers>
+            <ntpServers>
+              <ntpServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </ntpServer>
+            </ntpServers>
+            <TimeZone>UTC</TimeZone>
+            <DefaultGatewayNet>cwl100425exdd014.cwl100051qfab.admincwl1.oraclevcn.com_admin</DefaultGatewayNet>
+            <virtual>false</virtual>
+            <version>version2</version>
+            <osType>LinuxKVM</osType>
+            <physicalMemorySize>1536GB</physicalMemorySize>
+        </machine>
+        <machine id="cwl100425exdcompute15_id">
+            <hostName>cwl100425exdd015.cwl100051qfab.admincwl1.oraclevcn.com</hostName>
+            <iloms>
+                <ilom id="cwl100425exdd015lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom"/>
+            </iloms>
+            <networks>
+                <network id="cwl100425exdd015.cwl100051qfab.admincwl1.oraclevcn.com_admin"/>
+                <network id="cwl100425exddb15-priv.cwl100051qfab.admincwl1.oraclevcn.com_private1"/>
+                <network id="cwl100425exddb15-priv.cwl100051qfab.admincwl1.oraclevcn.com_private2"/>
+            </networks>
+            <networkPools>
+                <networkPool id="6951831c-05c2-5a9b-e6c2-c744a227ddc6_dbAdminPool"/>
+                <networkPool id="66dce7e7-bfc0-154e-2a6c-609ad73a3606_dbIlomPool"/>
+                <networkPool id="109f326f-04a6-e2a2-7e7c-fc6918cbe0da_dbPrivPool"/>
+            </networkPools>
+            <machineType>compute</machineType>
+            <dnsServers>
+              <dnsServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </dnsServer>
+            </dnsServers>
+            <ntpServers>
+              <ntpServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </ntpServer>
+            </ntpServers>
+            <TimeZone>UTC</TimeZone>
+            <DefaultGatewayNet>cwl100425exdd015.cwl100051qfab.admincwl1.oraclevcn.com_admin</DefaultGatewayNet>
+            <virtual>false</virtual>
+            <version>version2</version>
+            <osType>LinuxKVM</osType>
+            <physicalMemorySize>1536GB</physicalMemorySize>
+        </machine>
+        <machine id="cwl100425exdcompute16_id">
+            <hostName>cwl100425exdd016.cwl100051qfab.admincwl1.oraclevcn.com</hostName>
+            <iloms>
+                <ilom id="cwl100425exdd016lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom"/>
+            </iloms>
+            <networks>
+                <network id="cwl100425exdd016.cwl100051qfab.admincwl1.oraclevcn.com_admin"/>
+                <network id="cwl100425exddb16-priv.cwl100051qfab.admincwl1.oraclevcn.com_private1"/>
+                <network id="cwl100425exddb16-priv.cwl100051qfab.admincwl1.oraclevcn.com_private2"/>
+            </networks>
+            <networkPools>
+                <networkPool id="6951831c-05c2-5a9b-e6c2-c744a227ddc6_dbAdminPool"/>
+                <networkPool id="66dce7e7-bfc0-154e-2a6c-609ad73a3606_dbIlomPool"/>
+                <networkPool id="109f326f-04a6-e2a2-7e7c-fc6918cbe0da_dbPrivPool"/>
+            </networkPools>
+            <machineType>compute</machineType>
+            <dnsServers>
+              <dnsServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </dnsServer>
+            </dnsServers>
+            <ntpServers>
+              <ntpServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </ntpServer>
+            </ntpServers>
+            <TimeZone>UTC</TimeZone>
+            <DefaultGatewayNet>cwl100425exdd016.cwl100051qfab.admincwl1.oraclevcn.com_admin</DefaultGatewayNet>
+            <virtual>false</virtual>
+            <version>version2</version>
+            <osType>LinuxKVM</osType>
+            <physicalMemorySize>1536GB</physicalMemorySize>
+        </machine>
+        <machine id="cwl100425exdcompute17_id">
+            <hostName>cwl100425exdd017.cwl100051qfab.admincwl1.oraclevcn.com</hostName>
+            <iloms>
+                <ilom id="cwl100425exdd017lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom"/>
+            </iloms>
+            <networks>
+                <network id="cwl100425exdd017.cwl100051qfab.admincwl1.oraclevcn.com_admin"/>
+                <network id="cwl100425exddb17-priv.cwl100051qfab.admincwl1.oraclevcn.com_private1"/>
+                <network id="cwl100425exddb17-priv.cwl100051qfab.admincwl1.oraclevcn.com_private2"/>
+            </networks>
+            <networkPools>
+                <networkPool id="6951831c-05c2-5a9b-e6c2-c744a227ddc6_dbAdminPool"/>
+                <networkPool id="66dce7e7-bfc0-154e-2a6c-609ad73a3606_dbIlomPool"/>
+                <networkPool id="109f326f-04a6-e2a2-7e7c-fc6918cbe0da_dbPrivPool"/>
+            </networkPools>
+            <machineType>compute</machineType>
+            <dnsServers>
+              <dnsServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </dnsServer>
+            </dnsServers>
+            <ntpServers>
+              <ntpServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </ntpServer>
+            </ntpServers>
+            <TimeZone>UTC</TimeZone>
+            <DefaultGatewayNet>cwl100425exdd017.cwl100051qfab.admincwl1.oraclevcn.com_admin</DefaultGatewayNet>
+            <virtual>false</virtual>
+            <version>version2</version>
+            <osType>LinuxKVM</osType>
+            <physicalMemorySize>1536GB</physicalMemorySize>
+        </machine>
+        <machine id="cwl100425exdcompute18_id">
+            <hostName>cwl100425exdd018.cwl100051qfab.admincwl1.oraclevcn.com</hostName>
+            <iloms>
+                <ilom id="cwl100425exdd018lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom"/>
+            </iloms>
+            <networks>
+                <network id="cwl100425exdd018.cwl100051qfab.admincwl1.oraclevcn.com_admin"/>
+                <network id="cwl100425exddb18-priv.cwl100051qfab.admincwl1.oraclevcn.com_private1"/>
+                <network id="cwl100425exddb18-priv.cwl100051qfab.admincwl1.oraclevcn.com_private2"/>
+            </networks>
+            <networkPools>
+                <networkPool id="6951831c-05c2-5a9b-e6c2-c744a227ddc6_dbAdminPool"/>
+                <networkPool id="66dce7e7-bfc0-154e-2a6c-609ad73a3606_dbIlomPool"/>
+                <networkPool id="109f326f-04a6-e2a2-7e7c-fc6918cbe0da_dbPrivPool"/>
+            </networkPools>
+            <machineType>compute</machineType>
+            <dnsServers>
+              <dnsServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </dnsServer>
+            </dnsServers>
+            <ntpServers>
+              <ntpServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </ntpServer>
+            </ntpServers>
+            <TimeZone>UTC</TimeZone>
+            <DefaultGatewayNet>cwl100425exdd018.cwl100051qfab.admincwl1.oraclevcn.com_admin</DefaultGatewayNet>
+            <virtual>false</virtual>
+            <version>version2</version>
+            <osType>LinuxKVM</osType>
+            <physicalMemorySize>1536GB</physicalMemorySize>
+        </machine>
+    </machines>
+    <iloms>
+        <ilom id="cwl100425exdd001lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom">
+            <networks>
+                <network id="cwl100425exdd001lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom"/>
+            </networks>
+            <dnsServers>
+              <dnsServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </dnsServer>
+            </dnsServers>
+            <ntpServers>
+              <ntpServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </ntpServer>
+            </ntpServers>
+            <ilomTimeZone>UTC</ilomTimeZone>
+            <ilomName>cwl100425exdd001lo Ilom</ilomName>
+            <version>12</version>
+        </ilom>
+        <ilom id="cwl100425exdd002lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom">
+            <networks>
+                <network id="cwl100425exdd002lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom"/>
+            </networks>
+            <dnsServers>
+              <dnsServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </dnsServer>
+            </dnsServers>
+            <ntpServers>
+              <ntpServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </ntpServer>
+            </ntpServers>
+            <ilomTimeZone>UTC</ilomTimeZone>
+            <ilomName>cwl100425exdd002lo Ilom</ilomName>
+            <version>12</version>
+        </ilom>
+        <ilom id="cwl100425exdd003lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom">
+            <networks>
+                <network id="cwl100425exdd003lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom"/>
+            </networks>
+            <dnsServers>
+              <dnsServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </dnsServer>
+            </dnsServers>
+            <ntpServers>
+              <ntpServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </ntpServer>
+            </ntpServers>
+            <ilomTimeZone>UTC</ilomTimeZone>
+            <ilomName>cwl100425exdd003lo Ilom</ilomName>
+            <version>12</version>
+        </ilom>
+        <ilom id="cwl100425exdd004lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom">
+            <networks>
+                <network id="cwl100425exdd004lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom"/>
+            </networks>
+            <dnsServers>
+              <dnsServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </dnsServer>
+            </dnsServers>
+            <ntpServers>
+              <ntpServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </ntpServer>
+            </ntpServers>
+            <ilomTimeZone>UTC</ilomTimeZone>
+            <ilomName>cwl100425exdd004lo Ilom</ilomName>
+            <version>12</version>
+        </ilom>
+        <ilom id="cwl100425exdd005lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom">
+            <networks>
+                <network id="cwl100425exdd005lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom"/>
+            </networks>
+            <dnsServers>
+              <dnsServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </dnsServer>
+            </dnsServers>
+            <ntpServers>
+              <ntpServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </ntpServer>
+            </ntpServers>
+            <ilomTimeZone>UTC</ilomTimeZone>
+            <ilomName>cwl100425exdd005lo Ilom</ilomName>
+            <version>12</version>
+        </ilom>
+        <ilom id="cwl100425exdd006lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom">
+            <networks>
+                <network id="cwl100425exdd006lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom"/>
+            </networks>
+            <dnsServers>
+              <dnsServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </dnsServer>
+            </dnsServers>
+            <ntpServers>
+              <ntpServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </ntpServer>
+            </ntpServers>
+            <ilomTimeZone>UTC</ilomTimeZone>
+            <ilomName>cwl100425exdd006lo Ilom</ilomName>
+            <version>12</version>
+        </ilom>
+        <ilom id="cwl100425exdd007lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom">
+            <networks>
+                <network id="cwl100425exdd007lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom"/>
+            </networks>
+            <dnsServers>
+              <dnsServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </dnsServer>
+            </dnsServers>
+            <ntpServers>
+              <ntpServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </ntpServer>
+            </ntpServers>
+            <ilomTimeZone>UTC</ilomTimeZone>
+            <ilomName>cwl100425exdd007lo Ilom</ilomName>
+            <version>12</version>
+        </ilom>
+        <ilom id="cwl100425exdd008lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom">
+            <networks>
+                <network id="cwl100425exdd008lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom"/>
+            </networks>
+            <dnsServers>
+              <dnsServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </dnsServer>
+            </dnsServers>
+            <ntpServers>
+              <ntpServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </ntpServer>
+            </ntpServers>
+            <ilomTimeZone>UTC</ilomTimeZone>
+            <ilomName>cwl100425exdd008lo Ilom</ilomName>
+            <version>12</version>
+        </ilom>
+        <ilom id="cwl100425exdd009lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom">
+            <networks>
+                <network id="cwl100425exdd009lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom"/>
+            </networks>
+            <dnsServers>
+              <dnsServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </dnsServer>
+            </dnsServers>
+            <ntpServers>
+              <ntpServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </ntpServer>
+            </ntpServers>
+            <ilomTimeZone>UTC</ilomTimeZone>
+            <ilomName>cwl100425exdd009lo Ilom</ilomName>
+            <version>12</version>
+        </ilom>
+        <ilom id="cwl100425exdd010lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom">
+            <networks>
+                <network id="cwl100425exdd010lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom"/>
+            </networks>
+            <dnsServers>
+              <dnsServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </dnsServer>
+            </dnsServers>
+            <ntpServers>
+              <ntpServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </ntpServer>
+            </ntpServers>
+            <ilomTimeZone>UTC</ilomTimeZone>
+            <ilomName>cwl100425exdd010lo Ilom</ilomName>
+            <version>12</version>
+        </ilom>
+        <ilom id="cwl100425exdd011lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom">
+            <networks>
+                <network id="cwl100425exdd011lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom"/>
+            </networks>
+            <dnsServers>
+              <dnsServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </dnsServer>
+            </dnsServers>
+            <ntpServers>
+              <ntpServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </ntpServer>
+            </ntpServers>
+            <ilomTimeZone>UTC</ilomTimeZone>
+            <ilomName>cwl100425exdd011lo Ilom</ilomName>
+            <version>12</version>
+        </ilom>
+        <ilom id="cwl100425exdd012lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom">
+            <networks>
+                <network id="cwl100425exdd012lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom"/>
+            </networks>
+            <dnsServers>
+              <dnsServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </dnsServer>
+            </dnsServers>
+            <ntpServers>
+              <ntpServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </ntpServer>
+            </ntpServers>
+            <ilomTimeZone>UTC</ilomTimeZone>
+            <ilomName>cwl100425exdd012lo Ilom</ilomName>
+            <version>12</version>
+        </ilom>
+        <ilom id="cwl100425exdd013lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom">
+            <networks>
+                <network id="cwl100425exdd013lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom"/>
+            </networks>
+            <dnsServers>
+              <dnsServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </dnsServer>
+            </dnsServers>
+            <ntpServers>
+              <ntpServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </ntpServer>
+            </ntpServers>
+            <ilomTimeZone>UTC</ilomTimeZone>
+            <ilomName>cwl100425exdd013lo Ilom</ilomName>
+            <version>12</version>
+        </ilom>
+        <ilom id="cwl100425exdd014lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom">
+            <networks>
+                <network id="cwl100425exdd014lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom"/>
+            </networks>
+            <dnsServers>
+              <dnsServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </dnsServer>
+            </dnsServers>
+            <ntpServers>
+              <ntpServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </ntpServer>
+            </ntpServers>
+            <ilomTimeZone>UTC</ilomTimeZone>
+            <ilomName>cwl100425exdd014lo Ilom</ilomName>
+            <version>12</version>
+        </ilom>
+        <ilom id="cwl100425exdd015lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom">
+            <networks>
+                <network id="cwl100425exdd015lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom"/>
+            </networks>
+            <dnsServers>
+              <dnsServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </dnsServer>
+            </dnsServers>
+            <ntpServers>
+              <ntpServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </ntpServer>
+            </ntpServers>
+            <ilomTimeZone>UTC</ilomTimeZone>
+            <ilomName>cwl100425exdd015lo Ilom</ilomName>
+            <version>12</version>
+        </ilom>
+        <ilom id="cwl100425exdd016lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom">
+            <networks>
+                <network id="cwl100425exdd016lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom"/>
+            </networks>
+            <dnsServers>
+              <dnsServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </dnsServer>
+            </dnsServers>
+            <ntpServers>
+              <ntpServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </ntpServer>
+            </ntpServers>
+            <ilomTimeZone>UTC</ilomTimeZone>
+            <ilomName>cwl100425exdd016lo Ilom</ilomName>
+            <version>12</version>
+        </ilom>
+        <ilom id="cwl100425exdd017lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom">
+            <networks>
+                <network id="cwl100425exdd017lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom"/>
+            </networks>
+            <dnsServers>
+              <dnsServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </dnsServer>
+            </dnsServers>
+            <ntpServers>
+              <ntpServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </ntpServer>
+            </ntpServers>
+            <ilomTimeZone>UTC</ilomTimeZone>
+            <ilomName>cwl100425exdd017lo Ilom</ilomName>
+            <version>12</version>
+        </ilom>
+        <ilom id="cwl100425exdd018lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom">
+            <networks>
+                <network id="cwl100425exdd018lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom"/>
+            </networks>
+            <dnsServers>
+              <dnsServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </dnsServer>
+            </dnsServers>
+            <ntpServers>
+              <ntpServer>
+                <ipAddress>169.254.169.254</ipAddress>
+              </ntpServer>
+            </ntpServers>
+            <ilomTimeZone>UTC</ilomTimeZone>
+            <ilomName>cwl100425exdd018lo Ilom</ilomName>
+            <version>12</version>
+        </ilom>
+    </iloms>
+    <users/>
+    <groups/>
+    <userGroupCollections/>
+    <networks>
+        <network id="cwl100425exdd001.cwl100051qfab.admincwl1.oraclevcn.com_admin">
+            <networkName>cwl100425exdd001 admin</networkName>
+            <networkType>admin</networkType>
+            <version>2</version>
+            <hostName>cwl100425exdd001</hostName>
+            <ipAddress>10.0.135.2</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.0.128.1</gateway>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>eth0</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exdd002.cwl100051qfab.admincwl1.oraclevcn.com_admin">
+            <networkName>cwl100425exdd002 admin</networkName>
+            <networkType>admin</networkType>
+            <version>2</version>
+            <hostName>cwl100425exdd002</hostName>
+            <ipAddress>10.0.135.3</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.0.128.1</gateway>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>eth0</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exdd003.cwl100051qfab.admincwl1.oraclevcn.com_admin">
+            <networkName>cwl100425exdd003 admin</networkName>
+            <networkType>admin</networkType>
+            <version>2</version>
+            <hostName>cwl100425exdd003</hostName>
+            <ipAddress>10.0.135.4</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.0.128.1</gateway>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>eth0</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exdd004.cwl100051qfab.admincwl1.oraclevcn.com_admin">
+            <networkName>cwl100425exdd004 admin</networkName>
+            <networkType>admin</networkType>
+            <version>2</version>
+            <hostName>cwl100425exdd004</hostName>
+            <ipAddress>10.0.135.5</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.0.128.1</gateway>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>eth0</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exdd005.cwl100051qfab.admincwl1.oraclevcn.com_admin">
+            <networkName>cwl100425exdd005 admin</networkName>
+            <networkType>admin</networkType>
+            <version>2</version>
+            <hostName>cwl100425exdd005</hostName>
+            <ipAddress>10.0.135.6</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.0.128.1</gateway>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>eth0</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exdd006.cwl100051qfab.admincwl1.oraclevcn.com_admin">
+            <networkName>cwl100425exdd006 admin</networkName>
+            <networkType>admin</networkType>
+            <version>2</version>
+            <hostName>cwl100425exdd006</hostName>
+            <ipAddress>10.0.135.7</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.0.128.1</gateway>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>eth0</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exdd007.cwl100051qfab.admincwl1.oraclevcn.com_admin">
+            <networkName>cwl100425exdd007 admin</networkName>
+            <networkType>admin</networkType>
+            <version>2</version>
+            <hostName>cwl100425exdd007</hostName>
+            <ipAddress>10.0.135.8</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.0.128.1</gateway>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>eth0</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exdd008.cwl100051qfab.admincwl1.oraclevcn.com_admin">
+            <networkName>cwl100425exdd008 admin</networkName>
+            <networkType>admin</networkType>
+            <version>2</version>
+            <hostName>cwl100425exdd008</hostName>
+            <ipAddress>10.0.135.9</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.0.128.1</gateway>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>eth0</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exdd009.cwl100051qfab.admincwl1.oraclevcn.com_admin">
+            <networkName>cwl100425exdd009 admin</networkName>
+            <networkType>admin</networkType>
+            <version>2</version>
+            <hostName>cwl100425exdd009</hostName>
+            <ipAddress>10.0.135.10</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.0.128.1</gateway>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>eth0</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exdd010.cwl100051qfab.admincwl1.oraclevcn.com_admin">
+            <networkName>cwl100425exdd010 admin</networkName>
+            <networkType>admin</networkType>
+            <version>2</version>
+            <hostName>cwl100425exdd010</hostName>
+            <ipAddress>10.0.135.11</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.0.128.1</gateway>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>eth0</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exdd011.cwl100051qfab.admincwl1.oraclevcn.com_admin">
+            <networkName>cwl100425exdd011 admin</networkName>
+            <networkType>admin</networkType>
+            <version>2</version>
+            <hostName>cwl100425exdd011</hostName>
+            <ipAddress>10.0.135.12</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.0.128.1</gateway>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>eth0</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exdd012.cwl100051qfab.admincwl1.oraclevcn.com_admin">
+            <networkName>cwl100425exdd012 admin</networkName>
+            <networkType>admin</networkType>
+            <version>2</version>
+            <hostName>cwl100425exdd012</hostName>
+            <ipAddress>10.0.135.13</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.0.128.1</gateway>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>eth0</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exdd013.cwl100051qfab.admincwl1.oraclevcn.com_admin">
+            <networkName>cwl100425exdd013 admin</networkName>
+            <networkType>admin</networkType>
+            <version>2</version>
+            <hostName>cwl100425exdd013</hostName>
+            <ipAddress>10.0.135.14</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.0.128.1</gateway>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>eth0</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exdd014.cwl100051qfab.admincwl1.oraclevcn.com_admin">
+            <networkName>cwl100425exdd014 admin</networkName>
+            <networkType>admin</networkType>
+            <version>2</version>
+            <hostName>cwl100425exdd014</hostName>
+            <ipAddress>10.0.135.15</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.0.128.1</gateway>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>eth0</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exdd015.cwl100051qfab.admincwl1.oraclevcn.com_admin">
+            <networkName>cwl100425exdd015 admin</networkName>
+            <networkType>admin</networkType>
+            <version>2</version>
+            <hostName>cwl100425exdd015</hostName>
+            <ipAddress>10.0.135.16</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.0.128.1</gateway>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>eth0</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exdd016.cwl100051qfab.admincwl1.oraclevcn.com_admin">
+            <networkName>cwl100425exdd016 admin</networkName>
+            <networkType>admin</networkType>
+            <version>2</version>
+            <hostName>cwl100425exdd016</hostName>
+            <ipAddress>10.0.135.17</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.0.128.1</gateway>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>eth0</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exdd017.cwl100051qfab.admincwl1.oraclevcn.com_admin">
+            <networkName>cwl100425exdd017 admin</networkName>
+            <networkType>admin</networkType>
+            <version>2</version>
+            <hostName>cwl100425exdd017</hostName>
+            <ipAddress>10.0.135.18</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.0.128.1</gateway>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>eth0</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exdd018.cwl100051qfab.admincwl1.oraclevcn.com_admin">
+            <networkName>cwl100425exdd018 admin</networkName>
+            <networkType>admin</networkType>
+            <version>2</version>
+            <hostName>cwl100425exdd018</hostName>
+            <ipAddress>10.0.135.19</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.0.128.1</gateway>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>eth0</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exdd001lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom">
+            <networkName>cwl100425exdd001lo Ilom</networkName>
+            <networkType>Ilom</networkType>
+            <version>2</version>
+            <hostName>cwl100425exdd001lo</hostName>
+            <ipAddress>10.0.135.20</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.0.128.1</gateway>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+        </network>
+        <network id="cwl100425exdd002lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom">
+            <networkName>cwl100425exdd002lo Ilom</networkName>
+            <networkType>Ilom</networkType>
+            <version>2</version>
+            <hostName>cwl100425exdd002lo</hostName>
+            <ipAddress>10.0.135.21</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.0.128.1</gateway>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+        </network>
+        <network id="cwl100425exdd003lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom">
+            <networkName>cwl100425exdd003lo Ilom</networkName>
+            <networkType>Ilom</networkType>
+            <version>2</version>
+            <hostName>cwl100425exdd003lo</hostName>
+            <ipAddress>10.0.135.22</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.0.128.1</gateway>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+        </network>
+        <network id="cwl100425exdd004lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom">
+            <networkName>cwl100425exdd004lo Ilom</networkName>
+            <networkType>Ilom</networkType>
+            <version>2</version>
+            <hostName>cwl100425exdd004lo</hostName>
+            <ipAddress>10.0.135.23</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.0.128.1</gateway>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+        </network>
+        <network id="cwl100425exdd005lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom">
+            <networkName>cwl100425exdd005lo Ilom</networkName>
+            <networkType>Ilom</networkType>
+            <version>2</version>
+            <hostName>cwl100425exdd005lo</hostName>
+            <ipAddress>10.0.135.24</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.0.128.1</gateway>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+        </network>
+        <network id="cwl100425exdd006lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom">
+            <networkName>cwl100425exdd006lo Ilom</networkName>
+            <networkType>Ilom</networkType>
+            <version>2</version>
+            <hostName>cwl100425exdd006lo</hostName>
+            <ipAddress>10.0.135.25</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.0.128.1</gateway>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+        </network>
+        <network id="cwl100425exdd007lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom">
+            <networkName>cwl100425exdd007lo Ilom</networkName>
+            <networkType>Ilom</networkType>
+            <version>2</version>
+            <hostName>cwl100425exdd007lo</hostName>
+            <ipAddress>10.0.135.26</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.0.128.1</gateway>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+        </network>
+        <network id="cwl100425exdd008lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom">
+            <networkName>cwl100425exdd008lo Ilom</networkName>
+            <networkType>Ilom</networkType>
+            <version>2</version>
+            <hostName>cwl100425exdd008lo</hostName>
+            <ipAddress>10.0.135.27</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.0.128.1</gateway>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+        </network>
+        <network id="cwl100425exdd009lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom">
+            <networkName>cwl100425exdd009lo Ilom</networkName>
+            <networkType>Ilom</networkType>
+            <version>2</version>
+            <hostName>cwl100425exdd009lo</hostName>
+            <ipAddress>10.0.135.28</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.0.128.1</gateway>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+        </network>
+        <network id="cwl100425exdd010lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom">
+            <networkName>cwl100425exdd010lo Ilom</networkName>
+            <networkType>Ilom</networkType>
+            <version>2</version>
+            <hostName>cwl100425exdd010lo</hostName>
+            <ipAddress>10.0.135.29</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.0.128.1</gateway>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+        </network>
+        <network id="cwl100425exdd011lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom">
+            <networkName>cwl100425exdd011lo Ilom</networkName>
+            <networkType>Ilom</networkType>
+            <version>2</version>
+            <hostName>cwl100425exdd011lo</hostName>
+            <ipAddress>10.0.135.30</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.0.128.1</gateway>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+        </network>
+        <network id="cwl100425exdd012lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom">
+            <networkName>cwl100425exdd012lo Ilom</networkName>
+            <networkType>Ilom</networkType>
+            <version>2</version>
+            <hostName>cwl100425exdd012lo</hostName>
+            <ipAddress>10.0.135.31</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.0.128.1</gateway>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+        </network>
+        <network id="cwl100425exdd013lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom">
+            <networkName>cwl100425exdd013lo Ilom</networkName>
+            <networkType>Ilom</networkType>
+            <version>2</version>
+            <hostName>cwl100425exdd013lo</hostName>
+            <ipAddress>10.0.135.32</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.0.128.1</gateway>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+        </network>
+        <network id="cwl100425exdd014lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom">
+            <networkName>cwl100425exdd014lo Ilom</networkName>
+            <networkType>Ilom</networkType>
+            <version>2</version>
+            <hostName>cwl100425exdd014lo</hostName>
+            <ipAddress>10.0.135.33</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.0.128.1</gateway>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+        </network>
+        <network id="cwl100425exdd015lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom">
+            <networkName>cwl100425exdd015lo Ilom</networkName>
+            <networkType>Ilom</networkType>
+            <version>2</version>
+            <hostName>cwl100425exdd015lo</hostName>
+            <ipAddress>10.0.135.34</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.0.128.1</gateway>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+        </network>
+        <network id="cwl100425exdd016lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom">
+            <networkName>cwl100425exdd016lo Ilom</networkName>
+            <networkType>Ilom</networkType>
+            <version>2</version>
+            <hostName>cwl100425exdd016lo</hostName>
+            <ipAddress>10.0.135.35</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.0.128.1</gateway>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+        </network>
+        <network id="cwl100425exdd017lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom">
+            <networkName>cwl100425exdd017lo Ilom</networkName>
+            <networkType>Ilom</networkType>
+            <version>2</version>
+            <hostName>cwl100425exdd017lo</hostName>
+            <ipAddress>10.0.135.36</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.0.128.1</gateway>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+        </network>
+        <network id="cwl100425exdd018lo.cwl100051qfab.admincwl1.oraclevcn.com_Ilom">
+            <networkName>cwl100425exdd018lo Ilom</networkName>
+            <networkType>Ilom</networkType>
+            <version>2</version>
+            <hostName>cwl100425exdd018lo</hostName>
+            <ipAddress>10.0.135.37</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.0.128.1</gateway>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+        </network>
+        <network id="cwl100425exdsweth0.cwl100051qfab.admincwl1.oraclevcn.com_admin">
+            <networkName>cwl100425exdsweth0 admin</networkName>
+            <networkType>admin</networkType>
+            <version>2.0</version>
+            <hostName>cwl100425exdsweth0</hostName>
+            <ipAddress>10.0.135.38</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.0.128.1</gateway>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+        </network>
+        <network id="cwl100425exdrocea0.cwl100051qfab.admincwl1.oraclevcn.com_admin">
+            <networkName>cwl100425exdrocea0 admin</networkName>
+            <networkType>admin</networkType>
+            <version>2.0</version>
+            <hostName>cwl100425exdrocea0</hostName>
+            <ipAddress>10.0.135.45</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.0.128.1</gateway>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+        </network>
+        <network id="cwl100425exdroceb0.cwl100051qfab.admincwl1.oraclevcn.com_admin">
+            <networkName>cwl100425exdroceb0 admin</networkName>
+            <networkType>admin</networkType>
+            <version>2.0</version>
+            <hostName>cwl100425exdroceb0</hostName>
+            <ipAddress>10.0.135.46</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.0.128.1</gateway>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+        </network>
+        <network id="cwl100425exdpda0.cwl100051qfab.admincwl1.oraclevcn.com_admin">
+            <networkName>cwl100425exdpda0 admin</networkName>
+            <networkType>admin</networkType>
+            <version>2.0</version>
+            <hostName>cwl100425exdpda0</hostName>
+            <ipAddress>10.0.135.39</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.0.128.1</gateway>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+        </network>
+        <network id="cwl100425exdpdb0.cwl100051qfab.admincwl1.oraclevcn.com_admin">
+            <networkName>cwl100425exdpdb0 admin</networkName>
+            <networkType>admin</networkType>
+            <version>2.0</version>
+            <hostName>cwl100425exdpdb0</hostName>
+            <ipAddress>10.0.135.40</ipAddress>
+            <netMask>255.255.240.0</netMask>
+            <gateway>10.0.128.1</gateway>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+        </network>
+        <network id="cwl100425exddb01-priv.cwl100051qfab.admincwl1.oraclevcn.com_private1">
+            <networkName>cwl100425exddb01-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>cwl100425exddb01-priv1</hostName>
+            <ipAddress>192.168.10.1</ipAddress>
+            <netMask>255.255.252.0</netMask>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>re0</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exddb01-priv.cwl100051qfab.admincwl1.oraclevcn.com_private2">
+            <networkName>cwl100425exddb01-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>cwl100425exddb01-priv2</hostName>
+            <ipAddress>192.168.10.2</ipAddress>
+            <netMask>255.255.252.0</netMask>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>re1</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exddb02-priv.cwl100051qfab.admincwl1.oraclevcn.com_private1">
+            <networkName>cwl100425exddb02-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>cwl100425exddb02-priv1</hostName>
+            <ipAddress>192.168.10.3</ipAddress>
+            <netMask>255.255.252.0</netMask>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>re0</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exddb02-priv.cwl100051qfab.admincwl1.oraclevcn.com_private2">
+            <networkName>cwl100425exddb02-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>cwl100425exddb02-priv2</hostName>
+            <ipAddress>192.168.10.4</ipAddress>
+            <netMask>255.255.252.0</netMask>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>re1</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exddb03-priv.cwl100051qfab.admincwl1.oraclevcn.com_private1">
+            <networkName>cwl100425exddb03-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>cwl100425exddb03-priv1</hostName>
+            <ipAddress>192.168.10.5</ipAddress>
+            <netMask>255.255.252.0</netMask>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>re0</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exddb03-priv.cwl100051qfab.admincwl1.oraclevcn.com_private2">
+            <networkName>cwl100425exddb03-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>cwl100425exddb03-priv2</hostName>
+            <ipAddress>192.168.10.6</ipAddress>
+            <netMask>255.255.252.0</netMask>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>re1</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exddb04-priv.cwl100051qfab.admincwl1.oraclevcn.com_private1">
+            <networkName>cwl100425exddb04-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>cwl100425exddb04-priv1</hostName>
+            <ipAddress>192.168.10.7</ipAddress>
+            <netMask>255.255.252.0</netMask>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>re0</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exddb04-priv.cwl100051qfab.admincwl1.oraclevcn.com_private2">
+            <networkName>cwl100425exddb04-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>cwl100425exddb04-priv2</hostName>
+            <ipAddress>192.168.10.8</ipAddress>
+            <netMask>255.255.252.0</netMask>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>re1</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exddb05-priv.cwl100051qfab.admincwl1.oraclevcn.com_private1">
+            <networkName>cwl100425exddb05-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>cwl100425exddb05-priv1</hostName>
+            <ipAddress>192.168.10.9</ipAddress>
+            <netMask>255.255.252.0</netMask>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>re0</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exddb05-priv.cwl100051qfab.admincwl1.oraclevcn.com_private2">
+            <networkName>cwl100425exddb05-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>cwl100425exddb05-priv2</hostName>
+            <ipAddress>192.168.10.10</ipAddress>
+            <netMask>255.255.252.0</netMask>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>re1</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exddb06-priv.cwl100051qfab.admincwl1.oraclevcn.com_private1">
+            <networkName>cwl100425exddb06-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>cwl100425exddb06-priv1</hostName>
+            <ipAddress>192.168.10.11</ipAddress>
+            <netMask>255.255.252.0</netMask>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>re0</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exddb06-priv.cwl100051qfab.admincwl1.oraclevcn.com_private2">
+            <networkName>cwl100425exddb06-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>cwl100425exddb06-priv2</hostName>
+            <ipAddress>192.168.10.12</ipAddress>
+            <netMask>255.255.252.0</netMask>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>re1</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exddb07-priv.cwl100051qfab.admincwl1.oraclevcn.com_private1">
+            <networkName>cwl100425exddb07-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>cwl100425exddb07-priv1</hostName>
+            <ipAddress>192.168.10.13</ipAddress>
+            <netMask>255.255.252.0</netMask>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>re0</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exddb07-priv.cwl100051qfab.admincwl1.oraclevcn.com_private2">
+            <networkName>cwl100425exddb07-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>cwl100425exddb07-priv2</hostName>
+            <ipAddress>192.168.10.14</ipAddress>
+            <netMask>255.255.252.0</netMask>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>re1</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exddb08-priv.cwl100051qfab.admincwl1.oraclevcn.com_private1">
+            <networkName>cwl100425exddb08-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>cwl100425exddb08-priv1</hostName>
+            <ipAddress>192.168.10.15</ipAddress>
+            <netMask>255.255.252.0</netMask>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>re0</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exddb08-priv.cwl100051qfab.admincwl1.oraclevcn.com_private2">
+            <networkName>cwl100425exddb08-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>cwl100425exddb08-priv2</hostName>
+            <ipAddress>192.168.10.16</ipAddress>
+            <netMask>255.255.252.0</netMask>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>re1</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exddb09-priv.cwl100051qfab.admincwl1.oraclevcn.com_private1">
+            <networkName>cwl100425exddb09-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>cwl100425exddb09-priv1</hostName>
+            <ipAddress>192.168.10.17</ipAddress>
+            <netMask>255.255.252.0</netMask>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>re0</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exddb09-priv.cwl100051qfab.admincwl1.oraclevcn.com_private2">
+            <networkName>cwl100425exddb09-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>cwl100425exddb09-priv2</hostName>
+            <ipAddress>192.168.10.18</ipAddress>
+            <netMask>255.255.252.0</netMask>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>re1</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exddb10-priv.cwl100051qfab.admincwl1.oraclevcn.com_private1">
+            <networkName>cwl100425exddb10-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>cwl100425exddb10-priv1</hostName>
+            <ipAddress>192.168.10.19</ipAddress>
+            <netMask>255.255.252.0</netMask>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>re0</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exddb10-priv.cwl100051qfab.admincwl1.oraclevcn.com_private2">
+            <networkName>cwl100425exddb10-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>cwl100425exddb10-priv2</hostName>
+            <ipAddress>192.168.10.20</ipAddress>
+            <netMask>255.255.252.0</netMask>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>re1</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exddb11-priv.cwl100051qfab.admincwl1.oraclevcn.com_private1">
+            <networkName>cwl100425exddb11-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>cwl100425exddb11-priv1</hostName>
+            <ipAddress>192.168.10.21</ipAddress>
+            <netMask>255.255.252.0</netMask>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>re0</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exddb11-priv.cwl100051qfab.admincwl1.oraclevcn.com_private2">
+            <networkName>cwl100425exddb11-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>cwl100425exddb11-priv2</hostName>
+            <ipAddress>192.168.10.22</ipAddress>
+            <netMask>255.255.252.0</netMask>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>re1</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exddb12-priv.cwl100051qfab.admincwl1.oraclevcn.com_private1">
+            <networkName>cwl100425exddb12-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>cwl100425exddb12-priv1</hostName>
+            <ipAddress>192.168.10.23</ipAddress>
+            <netMask>255.255.252.0</netMask>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>re0</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exddb12-priv.cwl100051qfab.admincwl1.oraclevcn.com_private2">
+            <networkName>cwl100425exddb12-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>cwl100425exddb12-priv2</hostName>
+            <ipAddress>192.168.10.24</ipAddress>
+            <netMask>255.255.252.0</netMask>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>re1</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exddb13-priv.cwl100051qfab.admincwl1.oraclevcn.com_private1">
+            <networkName>cwl100425exddb13-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>cwl100425exddb13-priv1</hostName>
+            <ipAddress>192.168.10.25</ipAddress>
+            <netMask>255.255.252.0</netMask>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>re0</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exddb13-priv.cwl100051qfab.admincwl1.oraclevcn.com_private2">
+            <networkName>cwl100425exddb13-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>cwl100425exddb13-priv2</hostName>
+            <ipAddress>192.168.10.26</ipAddress>
+            <netMask>255.255.252.0</netMask>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>re1</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exddb14-priv.cwl100051qfab.admincwl1.oraclevcn.com_private1">
+            <networkName>cwl100425exddb14-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>cwl100425exddb14-priv1</hostName>
+            <ipAddress>192.168.10.27</ipAddress>
+            <netMask>255.255.252.0</netMask>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>re0</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exddb14-priv.cwl100051qfab.admincwl1.oraclevcn.com_private2">
+            <networkName>cwl100425exddb14-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>cwl100425exddb14-priv2</hostName>
+            <ipAddress>192.168.10.28</ipAddress>
+            <netMask>255.255.252.0</netMask>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>re1</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exddb15-priv.cwl100051qfab.admincwl1.oraclevcn.com_private1">
+            <networkName>cwl100425exddb15-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>cwl100425exddb15-priv1</hostName>
+            <ipAddress>192.168.10.29</ipAddress>
+            <netMask>255.255.252.0</netMask>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>re0</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exddb15-priv.cwl100051qfab.admincwl1.oraclevcn.com_private2">
+            <networkName>cwl100425exddb15-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>cwl100425exddb15-priv2</hostName>
+            <ipAddress>192.168.10.30</ipAddress>
+            <netMask>255.255.252.0</netMask>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>re1</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exddb16-priv.cwl100051qfab.admincwl1.oraclevcn.com_private1">
+            <networkName>cwl100425exddb16-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>cwl100425exddb16-priv1</hostName>
+            <ipAddress>192.168.10.31</ipAddress>
+            <netMask>255.255.252.0</netMask>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>re0</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exddb16-priv.cwl100051qfab.admincwl1.oraclevcn.com_private2">
+            <networkName>cwl100425exddb16-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>cwl100425exddb16-priv2</hostName>
+            <ipAddress>192.168.10.32</ipAddress>
+            <netMask>255.255.252.0</netMask>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>re1</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exddb17-priv.cwl100051qfab.admincwl1.oraclevcn.com_private1">
+            <networkName>cwl100425exddb17-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>cwl100425exddb17-priv1</hostName>
+            <ipAddress>192.168.10.33</ipAddress>
+            <netMask>255.255.252.0</netMask>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>re0</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exddb17-priv.cwl100051qfab.admincwl1.oraclevcn.com_private2">
+            <networkName>cwl100425exddb17-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>cwl100425exddb17-priv2</hostName>
+            <ipAddress>192.168.10.34</ipAddress>
+            <netMask>255.255.252.0</netMask>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>re1</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exddb18-priv.cwl100051qfab.admincwl1.oraclevcn.com_private1">
+            <networkName>cwl100425exddb18-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>cwl100425exddb18-priv1</hostName>
+            <ipAddress>192.168.10.35</ipAddress>
+            <netMask>255.255.252.0</netMask>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>re0</master>
+            <slave></slave>
+        </network>
+        <network id="cwl100425exddb18-priv.cwl100051qfab.admincwl1.oraclevcn.com_private2">
+            <networkName>cwl100425exddb18-priv private</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>cwl100425exddb18-priv2</hostName>
+            <ipAddress>192.168.10.36</ipAddress>
+            <netMask>255.255.252.0</netMask>
+            <domainName>cwl100051qfab.admincwl1.oraclevcn.com</domainName>
+            <master>re1</master>
+            <slave></slave>
+        </network>
+    </networks>
+    <switches>
+        <switch id="dbm0cisco01_id">
+            <switchDescription>Exadata Admin Switch</switchDescription>
+            <networks>
+                <network id="cwl100425exdsweth0.cwl100051qfab.admincwl1.oraclevcn.com_admin"/>
+            </networks>
+        </switch>
+        <switch id="dbm0ibl02_id">
+            <switchDescription>Exadata Leaf Switch</switchDescription>
+            <networks>
+                <network id="cwl100425exdrocea0.cwl100051qfab.admincwl1.oraclevcn.com_admin"/>
+            </networks>
+        </switch>
+        <switch id="dbm0ibl03_id">
+            <switchDescription>Exadata Leaf Switch</switchDescription>
+            <networks>
+                <network id="cwl100425exdroceb0.cwl100051qfab.admincwl1.oraclevcn.com_admin"/>
+            </networks>
+        </switch>
+        <switch id="dbm0pdu04_id">
+            <switchDescription>Exadata PDU Switch</switchDescription>
+            <networks>
+                <network id="cwl100425exdpda0.cwl100051qfab.admincwl1.oraclevcn.com_admin"/>
+            </networks>
+        </switch>
+        <switch id="dbm0pdu05_id">
+            <switchDescription>Exadata PDU Switch</switchDescription>
+            <networks>
+                <network id="cwl100425exdpdb0.cwl100051qfab.admincwl1.oraclevcn.com_admin"/>
+            </networks>
+        </switch>
+    </switches>
+    <esRacks>
+        <esRack id="b8874227-b373-cf19-9a47-dc0475329040">
+            <esRackItem id="cwl100425exdcompute01_id">
+                <rackLocation>UNKNOWN rackItem_1</rackLocation>
+                <uLocation>1</uLocation>
+                <uHeight>1</uHeight>
+                <rackItemDescription>Exadata X8M-2 Compute Node</rackItemDescription>
+                <rackItemSerialNumber>UNKNOWN</rackItemSerialNumber>
+                <rackItemFamily>X8M</rackItemFamily>
+                <version>version2</version>
+            </esRackItem>
+            <esRackItem id="cwl100425exdcompute02_id">
+                <rackLocation>UNKNOWN rackItem_2</rackLocation>
+                <uLocation>2</uLocation>
+                <uHeight>1</uHeight>
+                <rackItemDescription>Exadata X8M-2 Compute Node</rackItemDescription>
+                <rackItemSerialNumber>UNKNOWN</rackItemSerialNumber>
+                <rackItemFamily>X8M</rackItemFamily>
+                <version>version2</version>
+            </esRackItem>
+            <esRackItem id="cwl100425exdcompute03_id">
+                <rackLocation>UNKNOWN rackItem_3</rackLocation>
+                <uLocation>3</uLocation>
+                <uHeight>1</uHeight>
+                <rackItemDescription>Exadata X8M-2 Compute Node</rackItemDescription>
+                <rackItemSerialNumber>UNKNOWN</rackItemSerialNumber>
+                <rackItemFamily>X8M</rackItemFamily>
+                <version>version2</version>
+            </esRackItem>
+            <esRackItem id="cwl100425exdcompute04_id">
+                <rackLocation>UNKNOWN rackItem_4</rackLocation>
+                <uLocation>4</uLocation>
+                <uHeight>1</uHeight>
+                <rackItemDescription>Exadata X8M-2 Compute Node</rackItemDescription>
+                <rackItemSerialNumber>UNKNOWN</rackItemSerialNumber>
+                <rackItemFamily>X8M</rackItemFamily>
+                <version>version2</version>
+            </esRackItem>
+            <esRackItem id="cwl100425exdcompute05_id">
+                <rackLocation>UNKNOWN rackItem_5</rackLocation>
+                <uLocation>5</uLocation>
+                <uHeight>1</uHeight>
+                <rackItemDescription>Exadata X8M-2 Compute Node</rackItemDescription>
+                <rackItemSerialNumber>UNKNOWN</rackItemSerialNumber>
+                <rackItemFamily>X8M</rackItemFamily>
+                <version>version2</version>
+            </esRackItem>
+            <esRackItem id="cwl100425exdcompute06_id">
+                <rackLocation>UNKNOWN rackItem_6</rackLocation>
+                <uLocation>6</uLocation>
+                <uHeight>1</uHeight>
+                <rackItemDescription>Exadata X8M-2 Compute Node</rackItemDescription>
+                <rackItemSerialNumber>UNKNOWN</rackItemSerialNumber>
+                <rackItemFamily>X8M</rackItemFamily>
+                <version>version2</version>
+            </esRackItem>
+            <esRackItem id="cwl100425exdcompute07_id">
+                <rackLocation>UNKNOWN rackItem_7</rackLocation>
+                <uLocation>7</uLocation>
+                <uHeight>1</uHeight>
+                <rackItemDescription>Exadata X8M-2 Compute Node</rackItemDescription>
+                <rackItemSerialNumber>UNKNOWN</rackItemSerialNumber>
+                <rackItemFamily>X8M</rackItemFamily>
+                <version>version2</version>
+            </esRackItem>
+            <esRackItem id="cwl100425exdcompute08_id">
+                <rackLocation>UNKNOWN rackItem_8</rackLocation>
+                <uLocation>8</uLocation>
+                <uHeight>1</uHeight>
+                <rackItemDescription>Exadata X8M-2 Compute Node</rackItemDescription>
+                <rackItemSerialNumber>UNKNOWN</rackItemSerialNumber>
+                <rackItemFamily>X8M</rackItemFamily>
+                <version>version2</version>
+            </esRackItem>
+            <esRackItem id="cwl100425exdcompute09_id">
+                <rackLocation>UNKNOWN rackItem_9</rackLocation>
+                <uLocation>9</uLocation>
+                <uHeight>1</uHeight>
+                <rackItemDescription>Exadata X8M-2 Compute Node</rackItemDescription>
+                <rackItemSerialNumber>UNKNOWN</rackItemSerialNumber>
+                <rackItemFamily>X8M</rackItemFamily>
+                <version>version2</version>
+            </esRackItem>
+            <esRackItem id="cwl100425exdcompute10_id">
+                <rackLocation>UNKNOWN rackItem_10</rackLocation>
+                <uLocation>10</uLocation>
+                <uHeight>1</uHeight>
+                <rackItemDescription>Exadata X8M-2 Compute Node</rackItemDescription>
+                <rackItemSerialNumber>UNKNOWN</rackItemSerialNumber>
+                <rackItemFamily>X8M</rackItemFamily>
+                <version>version2</version>
+            </esRackItem>
+            <esRackItem id="cwl100425exdcompute11_id">
+                <rackLocation>UNKNOWN rackItem_11</rackLocation>
+                <uLocation>11</uLocation>
+                <uHeight>1</uHeight>
+                <rackItemDescription>Exadata X8M-2 Compute Node</rackItemDescription>
+                <rackItemSerialNumber>UNKNOWN</rackItemSerialNumber>
+                <rackItemFamily>X8M</rackItemFamily>
+                <version>version2</version>
+            </esRackItem>
+            <esRackItem id="cwl100425exdcompute12_id">
+                <rackLocation>UNKNOWN rackItem_12</rackLocation>
+                <uLocation>12</uLocation>
+                <uHeight>1</uHeight>
+                <rackItemDescription>Exadata X8M-2 Compute Node</rackItemDescription>
+                <rackItemSerialNumber>UNKNOWN</rackItemSerialNumber>
+                <rackItemFamily>X8M</rackItemFamily>
+                <version>version2</version>
+            </esRackItem>
+            <esRackItem id="cwl100425exdcompute13_id">
+                <rackLocation>UNKNOWN rackItem_13</rackLocation>
+                <uLocation>13</uLocation>
+                <uHeight>1</uHeight>
+                <rackItemDescription>Exadata X8M-2 Compute Node</rackItemDescription>
+                <rackItemSerialNumber>UNKNOWN</rackItemSerialNumber>
+                <rackItemFamily>X8M</rackItemFamily>
+                <version>version2</version>
+            </esRackItem>
+            <esRackItem id="cwl100425exdcompute14_id">
+                <rackLocation>UNKNOWN rackItem_14</rackLocation>
+                <uLocation>14</uLocation>
+                <uHeight>1</uHeight>
+                <rackItemDescription>Exadata X8M-2 Compute Node</rackItemDescription>
+                <rackItemSerialNumber>UNKNOWN</rackItemSerialNumber>
+                <rackItemFamily>X8M</rackItemFamily>
+                <version>version2</version>
+            </esRackItem>
+            <esRackItem id="cwl100425exdcompute15_id">
+                <rackLocation>UNKNOWN rackItem_15</rackLocation>
+                <uLocation>15</uLocation>
+                <uHeight>1</uHeight>
+                <rackItemDescription>Exadata X8M-2 Compute Node</rackItemDescription>
+                <rackItemSerialNumber>UNKNOWN</rackItemSerialNumber>
+                <rackItemFamily>X8M</rackItemFamily>
+                <version>version2</version>
+            </esRackItem>
+            <esRackItem id="cwl100425exdcompute16_id">
+                <rackLocation>UNKNOWN rackItem_16</rackLocation>
+                <uLocation>16</uLocation>
+                <uHeight>1</uHeight>
+                <rackItemDescription>Exadata X8M-2 Compute Node</rackItemDescription>
+                <rackItemSerialNumber>UNKNOWN</rackItemSerialNumber>
+                <rackItemFamily>X8M</rackItemFamily>
+                <version>version2</version>
+            </esRackItem>
+            <esRackItem id="cwl100425exdcompute17_id">
+                <rackLocation>UNKNOWN rackItem_17</rackLocation>
+                <uLocation>17</uLocation>
+                <uHeight>1</uHeight>
+                <rackItemDescription>Exadata X8M-2 Compute Node</rackItemDescription>
+                <rackItemSerialNumber>UNKNOWN</rackItemSerialNumber>
+                <rackItemFamily>X8M</rackItemFamily>
+                <version>version2</version>
+            </esRackItem>
+            <esRackItem id="cwl100425exdcompute18_id">
+                <rackLocation>UNKNOWN rackItem_18</rackLocation>
+                <uLocation>18</uLocation>
+                <uHeight>1</uHeight>
+                <rackItemDescription>Exadata X8M-2 Compute Node</rackItemDescription>
+                <rackItemSerialNumber>UNKNOWN</rackItemSerialNumber>
+                <rackItemFamily>X8M</rackItemFamily>
+                <version>version2</version>
+            </esRackItem>
+            <esRackItem id="dbm0cisco01_id">
+                <rackLocation>UNKNOWN rackItem_1</rackLocation>
+                <uLocation>30</uLocation>
+                <uHeight>1</uHeight>
+                <rackItemDescription>Exadata Admin Switch</rackItemDescription>
+                <rackItemSerialNumber>UNKNOWN</rackItemSerialNumber>
+                <version>version2</version>
+            </esRackItem>
+            <esRackItem id="dbm0ibl02_id">
+                <rackLocation>UNKNOWN rackItem_2</rackLocation>
+                <uLocation>35</uLocation>
+                <uHeight>1</uHeight>
+                <rackItemDescription>Exadata Leaf Switch</rackItemDescription>
+                <rackItemSerialNumber>UNKNOWN</rackItemSerialNumber>
+                <version>version2</version>
+            </esRackItem>
+            <esRackItem id="dbm0ibl03_id">
+                <rackLocation>UNKNOWN rackItem_3</rackLocation>
+                <uLocation>38</uLocation>
+                <uHeight>1</uHeight>
+                <rackItemDescription>Exadata Leaf Switch</rackItemDescription>
+                <rackItemSerialNumber>UNKNOWN</rackItemSerialNumber>
+                <version>version2</version>
+            </esRackItem>
+            <esRackItem id="dbm0pdu04_id">
+                <rackLocation>UNKNOWN rackItem_4</rackLocation>
+                <uLocation>40</uLocation>
+                <uHeight>0</uHeight>
+                <rackItemDescription>Exadata PDU Switch</rackItemDescription>
+                <rackItemSerialNumber>UNKNOWN</rackItemSerialNumber>
+                <version>version2</version>
+            </esRackItem>
+            <esRackItem id="dbm0pdu05_id">
+                <rackLocation>UNKNOWN rackItem_5</rackLocation>
+                <uLocation>41</uLocation>
+                <uHeight>0</uHeight>
+                <rackItemDescription>Exadata PDU Switch</rackItemDescription>
+                <rackItemSerialNumber>UNKNOWN</rackItemSerialNumber>
+                <version>version2</version>
+            </esRackItem>
+            <rackPrefix>dbm0</rackPrefix>
+            <esRackFamily>Exadata</esRackFamily>
+            <rackType>1035</rackType>
+            <customerName>Oracle</customerName>
+            <applicationName>Test</applicationName>
+            <region>America</region>
+            <timezone>New_York</timezone>
+            <rackDescription>X8M-2 Elastic Rack HC 14TB</rackDescription>
+            <cloudDescription>exacs</cloudDescription>
+            <rackUSize>42</rackUSize>
+            <rackSerialNumber>UNKNOWN</rackSerialNumber>
+            <version>version2</version>
+            <enableWriteBackFlashCache>automatic</enableWriteBackFlashCache>
+        </esRack>
+    </esRacks>
+    <software>
+        <clusters>
+            <clusterScans/>
+        </clusters>
+        <databaseHomes/>
+    </software>
+    <databases/>
+    <storage>
+        <diskGroups/>
+        <localDisks/>
+    </storage>
+    <alerts/>
+    <networkPools>
+        <networkPool id="6951831c-05c2-5a9b-e6c2-c744a227ddc6_dbAdminPool">
+            <machines>
+                <machine id="cwl100425exdcompute01_id"/>
+                <machine id="cwl100425exdcompute02_id"/>
+                <machine id="cwl100425exdcompute03_id"/>
+                <machine id="cwl100425exdcompute04_id"/>
+                <machine id="cwl100425exdcompute05_id"/>
+                <machine id="cwl100425exdcompute06_id"/>
+                <machine id="cwl100425exdcompute07_id"/>
+                <machine id="cwl100425exdcompute08_id"/>
+                <machine id="cwl100425exdcompute09_id"/>
+                <machine id="cwl100425exdcompute10_id"/>
+                <machine id="cwl100425exdcompute11_id"/>
+                <machine id="cwl100425exdcompute12_id"/>
+                <machine id="cwl100425exdcompute13_id"/>
+                <machine id="cwl100425exdcompute14_id"/>
+                <machine id="cwl100425exdcompute15_id"/>
+                <machine id="cwl100425exdcompute16_id"/>
+                <machine id="cwl100425exdcompute17_id"/>
+                <machine id="cwl100425exdcompute18_id"/>
+            </machines>
+            <networkType>admin</networkType>
+            <gateway>10.0.128.1</gateway>
+            <domain>cwl100051qfab.admincwl1.oraclevcn.com</domain>
+            <startIp>10.0.135.2</startIp>
+            <networkMedia>copper</networkMedia>
+            <nameMask>cwl100425exdd0%%</nameMask>
+            <startId>1</startId>
+            <subnetMask>255.255.255.0</subnetMask>
+            <defaultGateway>false</defaultGateway>
+            <defaultHostname>true</defaultHostname>
+        </networkPool>
+        <networkPool id="66dce7e7-bfc0-154e-2a6c-609ad73a3606_dbIlomPool">
+            <machines>
+                <machine id="cwl100425exdcompute01_id"/>
+                <machine id="cwl100425exdcompute02_id"/>
+                <machine id="cwl100425exdcompute03_id"/>
+                <machine id="cwl100425exdcompute04_id"/>
+                <machine id="cwl100425exdcompute05_id"/>
+                <machine id="cwl100425exdcompute06_id"/>
+                <machine id="cwl100425exdcompute07_id"/>
+                <machine id="cwl100425exdcompute08_id"/>
+                <machine id="cwl100425exdcompute09_id"/>
+                <machine id="cwl100425exdcompute10_id"/>
+                <machine id="cwl100425exdcompute11_id"/>
+                <machine id="cwl100425exdcompute12_id"/>
+                <machine id="cwl100425exdcompute13_id"/>
+                <machine id="cwl100425exdcompute14_id"/>
+                <machine id="cwl100425exdcompute15_id"/>
+                <machine id="cwl100425exdcompute16_id"/>
+                <machine id="cwl100425exdcompute17_id"/>
+                <machine id="cwl100425exdcompute18_id"/>
+            </machines>
+            <networkType>Ilom</networkType>
+            <gateway>10.0.128.1</gateway>
+            <domain>cwl100051qfab.admincwl1.oraclevcn.com</domain>
+            <startIp>10.0.135.20</startIp>
+            <nameMask>cwl100425exdd0%%lo</nameMask>
+            <startId>1</startId>
+            <subnetMask>255.255.255.0</subnetMask>
+        </networkPool>
+        <networkPool id="109f326f-04a6-e2a2-7e7c-fc6918cbe0da_dbPrivPool">
+            <machines>
+                <machine id="cwl100425exdcompute01_id"/>
+                <machine id="cwl100425exdcompute02_id"/>
+                <machine id="cwl100425exdcompute03_id"/>
+                <machine id="cwl100425exdcompute04_id"/>
+                <machine id="cwl100425exdcompute05_id"/>
+                <machine id="cwl100425exdcompute06_id"/>
+                <machine id="cwl100425exdcompute07_id"/>
+                <machine id="cwl100425exdcompute08_id"/>
+                <machine id="cwl100425exdcompute09_id"/>
+                <machine id="cwl100425exdcompute10_id"/>
+                <machine id="cwl100425exdcompute11_id"/>
+                <machine id="cwl100425exdcompute12_id"/>
+                <machine id="cwl100425exdcompute13_id"/>
+                <machine id="cwl100425exdcompute14_id"/>
+                <machine id="cwl100425exdcompute15_id"/>
+                <machine id="cwl100425exdcompute16_id"/>
+                <machine id="cwl100425exdcompute17_id"/>
+                <machine id="cwl100425exdcompute18_id"/>
+            </machines>
+            <networkType>private</networkType>
+            <domain>cwl100051qfab.admincwl1.oraclevcn.com</domain>
+            <startIp>192.168.10.1</startIp>
+            <networkMedia>infiniband</networkMedia>
+            <nameMask>cwl100425exddb%%-priv</nameMask>
+            <startId>1</startId>
+            <subnetMask>255.255.252.0</subnetMask>
+            <isActiveBonded>true</isActiveBonded>
+        </networkPool>
+    </networkPools>
+    <switchNetworkPools>
+        <switchNetworkPool id="66bf9597-dbee-fa02-8e6a-2ba3efb5d2d4_switchPool">
+            <version>1.0</version>
+            <networkPool id="6951831c-05c2-5a9b-e6c2-c744a227ddc6_dbAdminPool">
+                <machines>
+                    <machine id="cwl100425exdcompute01_id"/>
+                    <machine id="cwl100425exdcompute02_id"/>
+                    <machine id="cwl100425exdcompute03_id"/>
+                    <machine id="cwl100425exdcompute04_id"/>
+                    <machine id="cwl100425exdcompute05_id"/>
+                    <machine id="cwl100425exdcompute06_id"/>
+                    <machine id="cwl100425exdcompute07_id"/>
+                    <machine id="cwl100425exdcompute08_id"/>
+                    <machine id="cwl100425exdcompute09_id"/>
+                    <machine id="cwl100425exdcompute10_id"/>
+                    <machine id="cwl100425exdcompute11_id"/>
+                    <machine id="cwl100425exdcompute12_id"/>
+                    <machine id="cwl100425exdcompute13_id"/>
+                    <machine id="cwl100425exdcompute14_id"/>
+                    <machine id="cwl100425exdcompute15_id"/>
+                    <machine id="cwl100425exdcompute16_id"/>
+                    <machine id="cwl100425exdcompute17_id"/>
+                    <machine id="cwl100425exdcompute18_id"/>
+                </machines>
+                <networkType>admin</networkType>
+                <gateway>10.0.128.1</gateway>
+                <domain>cwl100051qfab.admincwl1.oraclevcn.com</domain>
+                <startIp>10.0.135.38</startIp>
+                <networkMedia>copper</networkMedia>
+                <nameMask>cwl100425exdd0%%</nameMask>
+                <startId>1</startId>
+                <subnetMask>255.255.255.0</subnetMask>
+                <defaultGateway>false</defaultGateway>
+                <defaultHostname>true</defaultHostname>
+            </networkPool>
+            <rackId>b8874227-b373-cf19-9a47-dc0475329040</rackId>
+            <ciscoswitchMask>cwl100425exdsweth%</ciscoswitchMask>
+            <kvmswitchMask>cwl100425exdsw-kvm%</kvmswitchMask>
+            <pduaMask>cwl100425exdpda%</pduaMask>
+            <pdubMask>cwl100425exdpdb%</pdubMask>
+            <infinibandLeaf1>cwl100425exdrocea%</infinibandLeaf1>
+            <infinibandLeaf2>cwl100425exdroceb%</infinibandLeaf2>
+            <infinibandSpine>cwl100425exdroces%</infinibandSpine>
+            <createPduNetworks>true</createPduNetworks>
+        </switchNetworkPool>
+    </switchNetworkPools>
+    <comments>
+        <comment id="1">
+            <commentLine>Note 1: for VM's UEK2 and UEK4 can not be mixed.</commentLine>
+        </comment>
+        <comment id="2">
+            <commentLine>Dom0 needs to be equal or higher than DomU.</commentLine>
+        </comment>
+        <comment id="3">
+            <commentLine>Note 2: As part of the deployment,</commentLine>
+        </comment>
+        <comment id="4">
+            <commentLine>Oracle always installs the latest Exadata Storage software.</commentLine>
+        </comment>
+        <comment id="5">
+            <commentLine>This means that different machines could have different versions of</commentLine>
+        </comment>
+        <comment id="6">
+            <commentLine>the Storage software even if they are deployed around the same time.</commentLine>
+        </comment>
+        <comment id="7">
+            <commentLine>An example of the difference between machines would be the Kernel</commentLine>
+        </comment>
+        <comment id="8">
+            <commentLine>version that is installed. Please review the Exadata Storage</commentLine>
+        </comment>
+        <comment id="9">
+            <commentLine>software version to be deployed with the Engineer during the</commentLine>
+        </comment>
+        <comment id="10">
+            <commentLine>planning phase of the deployment.</commentLine>
+        </comment>
+        <comment id="11">
+            <commentLine></commentLine>
+        </comment>
+        <comment id="12">
+            <commentLine>Generic Questions:</commentLine>
+        </comment>
+        <comment id="13">
+            <commentLine>Q1: For compute and storage nodes, will you want the current latest image?</commentLine>
+        </comment>
+        <comment id="14">
+            <commentLine>If not, please indicate desired OS image.</commentLine>
+        </comment>
+        <comment id="15">
+            <commentLine>A1 :</commentLine>
+        </comment>
+        <comment id="16">
+            <commentLine>Q2: For internal Cisco switch on the mgmt network (adm/ilom) STP is enabled by default,</commentLine>
+        </comment>
+        <comment id="17">
+            <commentLine>Do you have BPDU Guard disabled on your uplink switch?</commentLine>
+        </comment>
+        <comment id="18">
+            <commentLine>if not, we'll need to disable Spanning Tree Protocol on our side.</commentLine>
+        </comment>
+        <comment id="19">
+            <commentLine>A2 :</commentLine>
+        </comment>
+        <comment id="20">
+            <commentLine></commentLine>
+        </comment>
+        <comment id="21">
+            <commentLine>Compute Node Questions:</commentLine>
+        </comment>
+        <comment id="22">
+            <commentLine>Q3: For 10G/25G Optical cables, do you have existing certified SFP Modules/Tranceivers?</commentLine>
+        </comment>
+        <comment id="23">
+            <commentLine>A3 :</commentLine>
+        </comment>
+        <comment id="24">
+            <commentLine>Q4: For LACP, will you use default bond options?</commentLine>
+        </comment>
+        <comment id="25">
+            <commentLine>If not, please specify desired bond options.</commentLine>
+        </comment>
+        <comment id="26">
+            <commentLine>A4 :</commentLine>
+        </comment>
+        <comment id="27">
+            <commentLine>Q5: For DR machines,</commentLine>
+        </comment>
+        <comment id="28">
+            <commentLine>have you ensured the RDBMS version matches the production/primary version?</commentLine>
+        </comment>
+        <comment id="29">
+            <commentLine>A5 :</commentLine>
+        </comment>
+        <comment id="30">
+            <commentLine>Q6: For grid/oracle User Security with LDAP Servers,</commentLine>
+        </comment>
+        <comment id="31">
+            <commentLine>have you confirmed the UID/GID's are matching your LDAP servers?</commentLine>
+        </comment>
+        <comment id="32">
+            <commentLine>A6 :</commentLine>
+        </comment>
+        <comment id="33">
+            <commentLine></commentLine>
+        </comment>
+        <comment id="34">
+            <commentLine>Expansion Questions:</commentLine>
+        </comment>
+        <comment id="35">
+            <commentLine>Q7: Is this a fresh stand alone install?</commentLine>
+        </comment>
+        <comment id="36">
+            <commentLine>If not, what other/existing engineered system will this machine</commentLine>
+        </comment>
+        <comment id="37">
+            <commentLine>or these parts be connected to via Private (IB/RoCE) network.</commentLine>
+        </comment>
+        <comment id="38">
+            <commentLine>A7 :</commentLine>
+        </comment>
+        <comment id="39">
+            <commentLine>Q8: Have you ensured that the Private (IB/RoCE) IPs do not overlap</commentLine>
+        </comment>
+        <comment id="40">
+            <commentLine>and that they are in the proper subnet to match existing environment?</commentLine>
+        </comment>
+        <comment id="41">
+            <commentLine>please confirm by checking /etc/hosts</commentLine>
+        </comment>
+        <comment id="42">
+            <commentLine>A8 :</commentLine>
+        </comment>
+        <comment id="43">
+            <commentLine>Q9: Will the default client VIP suffice for SQL communication?</commentLine>
+        </comment>
+        <comment id="44">
+            <commentLine>if not, a private VIP over the (IB/RoCE) fabric can be created,</commentLine>
+        </comment>
+        <comment id="45">
+            <commentLine>please specify private vip hostnames and ips.</commentLine>
+        </comment>
+        <comment id="46">
+            <commentLine>A9 :</commentLine>
+        </comment>
+        <comment id="47">
+            <commentLine>Q10: Have you ensured that the private IB/RoCE subnet does not overlap the</commentLine>
+        </comment>
+        <comment id="48">
+            <commentLine>client, mgmt, and backup networks?</commentLine>
+        </comment>
+        <comment id="49">
+            <commentLine>A10 :</commentLine>
+        </comment>
+        <comment id="50">
+            <commentLine>Q11: For storage expansion, do you want only new ASM diskgroups created?</commentLine>
+        </comment>
+        <comment id="51">
+            <commentLine>A11 :</commentLine>
+        </comment>
+        <comment id="52">
+            <commentLine>Q12: For PXE imaging, we will bring an isolated switch, can you please provide</commentLine>
+        </comment>
+        <comment id="53">
+            <commentLine>ethernet cable?</commentLine>
+        </comment>
+        <comment id="54">
+            <commentLine>A12 :</commentLine>
+        </comment>
+        <comment id="55">
+            <commentLine></commentLine>
+        </comment>
+        <comment id="56">
+            <commentLine>Additional Comments:</commentLine>
+        </comment>
+    </comments>
+</engineeredSystem>

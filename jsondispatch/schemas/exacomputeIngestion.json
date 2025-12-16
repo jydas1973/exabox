@@ -1,0 +1,13 @@
+{
+    "title": "JSON Exacompute Ingestion schema",
+    "description": "JSON Dispatch Exacompute Ingestion schema",
+    "type": "object",
+    "required": [
+        "hostname"
+    ],
+    "properties": {
+        "hostname": {
+            "type": "string"
+        }
+    }
+}

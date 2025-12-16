@@ -1,0 +1,12 @@
+{
+    "properties": {
+        "dom0_name": {
+            "type": "string"
+        }
+    },
+    "required": [
+        "dom0_name"
+    ],
+    "type": "object"
+}
+

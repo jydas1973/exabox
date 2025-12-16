@@ -1,0 +1,73 @@
+-P INPUT ACCEPT
+-P FORWARD DROP
+-P OUTPUT ACCEPT
+-N FI-vnet100
+-N FI-vnet101
+-N FO-vnet100
+-N FO-vnet101
+-N HI-vnet100
+-N HI-vnet101
+-N libvirt-host-in
+-N libvirt-in
+-N libvirt-in-post
+-N libvirt-out
+-A INPUT -j libvirt-host-in
+-A INPUT -i lo -j ACCEPT
+-A INPUT -i vmeth0 -j ACCEPT
+-A INPUT -j DROP
+-A FORWARD -j libvirt-in
+-A FORWARD -j libvirt-out
+-A FORWARD -j libvirt-in-post
+-A FORWARD -o vmeth100 -p tcp -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A FORWARD -o vmeth100 -p icmp -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A FORWARD -i vmeth100 -p tcp -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A FORWARD -i vmeth100 -p icmp -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A FORWARD -o vmeth100 -p tcp -m tcp --dport 22 -j ACCEPT
+-A FORWARD -o vmeth100 -p icmp -m icmp --icmp-type 8 -j ACCEPT
+-A FORWARD -o vmeth200 -p tcp -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A FORWARD -o vmeth200 -p icmp -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A FORWARD -i vmeth200 -p tcp -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A FORWARD -i vmeth200 -p icmp -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A FORWARD -o vmeth200 -p tcp -m tcp --dport 22 -j ACCEPT
+-A FORWARD -o vmeth200 -p icmp -m icmp --icmp-type 8 -j ACCEPT
+-A FORWARD -o vmeth201 -p tcp -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A FORWARD -o vmeth201 -p icmp -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A FORWARD -i vmeth201 -p tcp -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A FORWARD -i vmeth201 -p icmp -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A FORWARD -o vmeth201 -p tcp -m tcp --dport 22 -j ACCEPT
+-A FORWARD -o vmeth201 -p icmp -m icmp --icmp-type 8 -j ACCEPT
+-A FORWARD -m limit --limit 2/min -j LOG --log-prefix "IPTables-FORWARD Dropped: "
+-A OUTPUT -o lo -j ACCEPT
+-A OUTPUT -o vmeth0 -j ACCEPT
+-A FI-vnet100 -d 169.254.169.254/32 -p tcp -m tcp --sport 7060 -m conntrack --ctstate ESTABLISHED -m conntrack --ctdir REPLY -j RETURN
+-A FI-vnet100 -d 169.254.169.254/32 -p tcp -m tcp --sport 7070 -m conntrack --ctstate ESTABLISHED -m conntrack --ctdir REPLY -j RETURN
+-A FI-vnet100 -p tcp -m tcp --sport 7060 -j DROP
+-A FI-vnet100 -p tcp -m tcp --sport 7070 -j DROP
+-A FI-vnet100 -j RETURN
+-A FI-vnet101 -p tcp -m tcp --sport 7060 -j DROP
+-A FI-vnet101 -p tcp -m tcp --sport 7070 -j DROP
+-A FI-vnet101 -j RETURN
+-A FO-vnet100 -s 169.254.169.254/32 -p tcp -m tcp --dport 7060 -m conntrack --ctstate NEW,ESTABLISHED -m conntrack --ctdir ORIGINAL -j ACCEPT
+-A FO-vnet100 -s 169.254.169.254/32 -p tcp -m tcp --dport 7070 -m conntrack --ctstate NEW,ESTABLISHED -m conntrack --ctdir ORIGINAL -j ACCEPT
+-A FO-vnet100 -p tcp -m tcp --dport 7060 -j DROP
+-A FO-vnet100 -p tcp -m tcp --dport 7070 -j DROP
+-A FO-vnet100 -j ACCEPT
+-A FO-vnet101 -p tcp -m tcp --dport 7060 -j DROP
+-A FO-vnet101 -p tcp -m tcp --dport 7070 -j DROP
+-A FO-vnet101 -j ACCEPT
+-A HI-vnet100 -d 169.254.169.254/32 -p tcp -m tcp --sport 7060 -m conntrack --ctstate ESTABLISHED -m conntrack --ctdir REPLY -j RETURN
+-A HI-vnet100 -d 169.254.169.254/32 -p tcp -m tcp --sport 7070 -m conntrack --ctstate ESTABLISHED -m conntrack --ctdir REPLY -j RETURN
+-A HI-vnet100 -p tcp -m tcp --sport 7060 -j DROP
+-A HI-vnet100 -p tcp -m tcp --sport 7070 -j DROP
+-A HI-vnet100 -j RETURN
+-A HI-vnet101 -p tcp -m tcp --sport 7060 -j DROP
+-A HI-vnet101 -p tcp -m tcp --sport 7070 -j DROP
+-A HI-vnet101 -j RETURN
+-A libvirt-host-in -m physdev --physdev-in vnet100 -g HI-vnet100
+-A libvirt-host-in -m physdev --physdev-in vnet101 -g HI-vnet101
+-A libvirt-in -m physdev --physdev-in vnet100 -g FI-vnet100
+-A libvirt-in -m physdev --physdev-in vnet101 -g FI-vnet101
+-A libvirt-in-post -m physdev --physdev-in vnet100 -j ACCEPT
+-A libvirt-in-post -m physdev --physdev-in vnet101 -j ACCEPT
+-A libvirt-out -m physdev --physdev-out vnet100 --physdev-is-bridged -g FO-vnet100
+-A libvirt-out -m physdev --physdev-out vnet101 --physdev-is-bridged -g FO-vnet101

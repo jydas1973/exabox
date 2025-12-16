@@ -1,0 +1,319 @@
+/
+/ $Header: ecs/exacloud/exabox/infrapatching/cps/cpsos_upgrade_manual.txt /main/1 2021/03/18 11:32:34 araghave Exp $
+/
+/ cpsos_upgrade_manual.txt
+/
+/ Copyright (c) 2019, 2021, Oracle and/or its affiliates. 
+/
+/   NAME
+/     cpsos_upgrade_manual.txt - <one-line expansion of the name>
+/
+/   DESCRIPTION
+/     <short description of component this file declares/defines>
+/
+/   NOTES
+/     <other useful comments, qualifications, etc.>
+/
+/   MODIFIED   (MM/DD/YY)
+/   araghave 03/06/21 - ER 32489351 - Refactor cps os patching code inline with
+/                       Infra patching
+/   nmallego    07/31/19 - ER BugX64_190718 - User document for CPS OS Upgrade
+/                          on OCI ExaCC
+/   nmallego    07/31/19 - Creation
+/
+
+Note: 
+  Please refer updated info in below link:
+     https://confluence.oraclecorp.com/confluence/display/ExaCM/Steps+to+upgrade+CPS+OS+image+using+remoteec
+
+
+The following detail describe the steps on how to upgrade the CPS OS image on OCI ExaCC env and also how one can switch over the cps master node to standby.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+1) Ensure we have below two scripts within cps nodes for a particular cps node to upgrade.
+Example:
+
+ls /opt/oci/exacc/exacloud/exabox/infrapatching/cps/
+cps-os-upgrader 
+cps-os-upgrader  -> Script to be called by remotec
+
+2) Ensure we have downloaded the cps os image bits to both cps nodes.
+Example:
+/u01/downloads/cpsos/19.2.4.0.0.190709_190709
+ PatchPayloads -> exadata cps os image files downloaded here:
+
+3) Connect to ecra
+Example:
+Connect to Ecra:
+----------------
+ssh -i ./key-vpnvm opc@129.213.165.241
+ssh -i ./key-vpnvm opc@100.106.1.4
+
+[opc@primecra ~]$ cd /scratch2/opc/ecra_installs/ecraAnandTest/ecracli/ 
+[opc@primecra ecracli]$ ./ecracli
+Enter 'username': 
+Enter 'password': 
+* Ecracli -19.207
+* host : http://primecra.ecra.ociexacc.oraclevcn.com:9112/ecra/endpoint
+* username : sdi
+* password : ****
+* created exaunits
+* <id> : <rackname> : <exaname> : <rackstate> : <ongoing op> : <dbSIDs> : <workflowId>
+* 4 : iad138394exd-sujat-scaqak01XXX-clu01 : iad138394exd-sujat-scaqak01XXX-clu01 : PROVISIONED : : suja190(ERROR) : 
+* Connecting to endpoint and getting version info...
+* status : 200
+* status-detail : success
+* label : ECS_19.2.1.0.0_LINUX.X64_190726.1100
+* op : version_get
+* dborch_version : 19.207
+
+
+4) Connect to remoteec using exaccocid for a particular CPS node.
+
+Example:
+ecra> remoteec reload exaccocid="ocid1.exadatainfrastructure.oc1.sea.abzwklsscaqak01adm0304clu6"
+* Reload Complete
+
+
+5) Please note the standby and master node before running the patching operations.
+Ideally, where ever /etc/keepalived/MASTER is located, that itself is master node and other one is standby.
+
+Example: 
+Standby node:
+[root@scaqak01cps01 ~]# ls /etc/keepalived/
+check-services.sh failover.sh keepalived.conf manual-switchover.sh services.list setup-ha.sh standby-services.list
+
+Master node:
+[root@scaqak01cps02 ~]# ls /etc/keepalived/
+MASTER check-services.sh failover.sh keepalived.conf manual-switchover.sh services.list setup-ha.sh standby-services.list
+
+
+OR
+
+Run the remoteec command get the quick status on master and standby node:
+
+Example:
+
+ecra {scaqak01cps01.us.oracle.com}> remoteec cps upgrade type="cpsos" bundle="/u01/downloads/cpsos/19.2.4.0.0.190709_190709" args="switchoverstatus"
+* ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Master CPS Node = scaqak01cps01
+Standby CPS Node = scaqak01cps02
+
+* ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+6) Run exadata patchmgr prereq check using remoteec and you can specify the bundle version either 'latest' or patch for the bundle '.
+Example:
+a) In below case, remoteec would fail if ActiveVersion.json is not having the correct version mapped.
+
+ecra {scaqak01cps01.us.oracle.com}> remoteec cps upgrade type="cpsos" bundle="latest" args="patch_prereq_check"
+* Error: *** Error on HTTP Call: (500)
+* Error: /opt/oci/exacc/exacloud/exabox/infrapatching/cps/cps-os-upgrader does not exists
+
+
+b) So, specify the path of the target version:
+Example:
+ecra {scaqak01cps01.us.oracle.com}> remoteec cps upgrade type="cpsos" bundle="/u01/downloads/cpsos/19.2.4.0.0.190709_190709" args="patch_prereq_check"
+...
+...
+019-07-29 07:49:28 -0700 :INFO : SUMMARY FOR ALL NODES:
+2019-07-29 07:48:56 -0700 :SUCCESS: scaqak01cps01 has state: SUCCESS WITH WARNING(S)
+2019-07-29 07:49:28 -0700 :SUCCESS: DONE: Initiate precheck on node(s).
+[INFO ] Collected dbnodeupdate diag in file: Diag_patchmgr_dbnode_precheck_290719074344.tbz
+-rw-r--r-- 1 root root 3700164 Jul 29 07:49 Diag_patchmgr_dbnode_precheck_290719074344.tbz
+2019-07-29 07:49:30 -0700 :SUCCESS: Completed run of command: /u01/downloads/cpsos/19.2.4.0.0.190709_190709/PatchPayloads/19.2.4.0.0.190709/DBPatchFile/dbserver_patch_19.190709/patchmgr --dbnodes /u01/downloads/cpsos/19.2.4.0.0.190709_190709/dbs_grp --precheck --nomodify_at_prereq --log_dir auto --target_version 19.2.4.0.0.190709 --iso_repo /u01/downloads/cpsos/19.2.4.0.0.190709_190709/PatchPayloads/19.2.4.0.0.190709/DomuYumRepository/exadata_ol7_19.2.4.0.0.190709_Linux-x86-64.zip
+2019-07-29 07:49:30 -0700 :INFO : Precheck attempted on nodes in file /u01/downloads/cpsos/19.2.4.0.0.190709_190709/dbs_grp: [scaqak01cps01]
+2019-07-29 07:49:30 -0700 :INFO : Current image version on dbnode(s) is:
+2019-07-29 07:49:30 -0700 :INFO : scaqak01cps01: 19.2.4.0.0.190706
+2019-07-29 07:49:30 -0700 :INFO : For details, check the following files in /u01/downloads/cpsos/19.2.4.0.0.190709_190709/PatchPayloads/19.2.4.0.0.190709/DBPatchFile/dbserver_patch_19.190709/log/scaqak01cps01_30f83185:
+2019-07-29 07:49:30 -0700 :INFO : - <dbnode_name>_dbnodeupdate.log
+2019-07-29 07:49:30 -0700 :INFO : - patchmgr.log
+2019-07-29 07:49:30 -0700 :INFO : - patchmgr.trc
+2019-07-29 07:49:30 -0700 :INFO : Exit status:0
+2019-07-29 07:49:30 -0700 :INFO : Exiting.
+
+
+INFO : Patch Precheck for the standby CPS node completed successfully.
+
+
+7) Run the patch upgrade on the standby node:
+ecra {scaqak01cps01.us.oracle.com}> remoteec cps upgrade type="cpsos" bundle="/u01/downloads/cpsos/19.2.4.0.0.190709_190709" args="patch"
+...
+...
+SUMMARY OF WARNINGS AND KNOWN ISSUE(S) FOR scaqak01cps02:
+
+scaqak01cps02: # The following file lists the commands that would have been executed for removing rpms when specifying -M flag. #
+scaqak01cps02: # File: /var/log/cellos/nomodify_results.290719044937.sh. #
+scaqak01cps02: WARNING: Grid Infrastructure Home not found.
+scaqak01cps02: The following known issues will be checked for but require manual follow-up:
+scaqak01cps02: (*) - Yum rolling update requires fix for 11768055 when Grid Infrastructure is below 11.2.0.2 BP12
+...
+...
+2019-07-29 04:54:52 -0700 :INFO : SUMMARY FOR ALL NODES:
+2019-07-29 04:54:36 -0700 :SUCCESS: scaqak01cps02 has state: SUCCESS WITH WARNING(S)
+2019-07-29 04:54:52 -0700 :SUCCESS: DONE: Initiate precheck on node(s).
+[INFO ] Collected dbnodeupdate diag in file: Diag_patchmgr_dbnode_precheck_290719044937.tbz
+-rw-r--r-- 1 root root 1381419 Jul 29 04:54 Diag_patchmgr_dbnode_precheck_290719044937.tbz
+2019-07-29 04:54:53 -0700 :SUCCESS: Completed run of command: /u01/downloads/cpsos/19.2.4.0.0.190709_190709/PatchPayloads/19.2.4.0.0.190709/DBPatchFile/dbserver_patch_19.190709/patchmgr --dbnodes /u01/downloads/cpsos/19.2.4.0.0.190709_190709/dbs_grp --precheck --nomodify_at_prereq --log_dir auto --target_version 19.2.4.0.0.190709 --iso_repo /u01/downloads/cpsos/19.2.4.0.0.190709_190709/PatchPayloads/19.2.4.0.0.190709/DomuYumRepository/exadata_ol7_19.2.4.0.0.190709_Linux-x86-64.zip
+2019-07-29 04:54:53 -0700 :INFO : Precheck attempted on nodes in file /u01/downloads/cpsos/19.2.4.0.0.190709_190709/dbs_grp: [scaqak01cps02]
+2019-07-29 04:54:53 -0700 :INFO : Current image version on dbnode(s) is:
+2019-07-29 04:54:53 -0700 :INFO : scaqak01cps02: 19.2.4.0.0.190706
+2019-07-29 04:54:53 -0700 :INFO : For details, check the following files in /u01/downloads/cpsos/19.2.4.0.0.190709_190709/PatchPayloads/19.2.4.0.0.190709/DBPatchFile/dbserver_patch_19.190709/log/scaqak01cps02_e823c50e:
+2019-07-29 04:54:53 -0700 :INFO : - <dbnode_name>_dbnodeupdate.log
+2019-07-29 04:54:53 -0700 :INFO : - patchmgr.log
+2019-07-29 04:54:53 -0700 :INFO : - patchmgr.trc
+2019-07-29 04:54:53 -0700 :INFO : Exit status:0
+2019-07-29 04:54:53 -0700 :INFO : Exiting.
+
+INFO : Patch Precheck for the standby CPS node completed successfully.
+++++++++++++++++++++++++++++++++++++++++++++++
+
+8) Run the rollback prereq on the standby node:
+ecra {scaqak01cps01.us.oracle.com}> remoteec cps upgrade type="cpsos" bundle="/u01/downloads/cpsos/19.2.4.0.0.190709_190709" args="rollback_prereq_check"
+...
+...
+2019-07-29 05:34:48 -0700 :Working: DO: Check free space on scaqak01cps02
+2019-07-29 05:34:50 -0700 :SUCCESS: DONE: Check free space on scaqak01cps02
+2019-07-29 05:34:51 -0700 :SEEMS ALREADY UP TO DATE: scaqak01cps02
+2019-07-29 05:34:51 -0700 :SUCCESS: DONE: Initiate precheck on 1 node(s)
+2019-07-29 05:34:51 -0700 :SUCCESS: Completed run of command: /u01/downloads/cpsos/19.2.4.0.0.190709_190709/PatchPayloads/19.2.4.0.0.190709/DBPatchFile/dbserver_patch_19.190709/patchmgr --dbnodes /u01/downloads/cpsos/19.2.4.0.0.190709_190709/dbs_grp --precheck --nomodify_at_prereq --log_dir auto --target_version 19.2.4.0.0.190709 --iso_repo /u01/downloads/cpsos/19.2.4.0.0.190709_190709/PatchPayloads/19.2.4.0.0.190709/DomuYumRepository/exadata_ol7_19.2.4.0.0.190709_Linux-x86-64.zip
+2019-07-29 05:34:51 -0700 :INFO : Precheck attempted on nodes in file /u01/downloads/cpsos/19.2.4.0.0.190709_190709/dbs_grp: [scaqak01cps02]
+2019-07-29 05:34:51 -0700 :INFO : Current image version on dbnode(s) is:
+2019-07-29 05:34:51 -0700 :INFO : scaqak01cps02: 19.2.4.0.0.190709
+2019-07-29 05:34:51 -0700 :INFO : For details, check the following files in /u01/downloads/cpsos/19.2.4.0.0.190709_190709/PatchPayloads/19.2.4.0.0.190709/DBPatchFile/dbserver_patch_19.190709/log/scaqak01cps02_e823c50e:
+2019-07-29 05:34:52 -0700 :INFO : - <dbnode_name>_dbnodeupdate.log
+2019-07-29 05:34:52 -0700 :INFO : - patchmgr.log
+2019-07-29 05:34:52 -0700 :INFO : - patchmgr.trc
+2019-07-29 05:34:52 -0700 :INFO : Exit status:0
+2019-07-29 05:34:52 -0700 :INFO : Exiting.
+
+INFO : Patch Precheck for the standby CPS node completed successfully.
+
+* ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+9) Run the rollback on the standby node:
+ecra {scaqak01cps01.us.oracle.com}> remoteec cps upgrade type="cpsos" bundle="/u01/downloads/cpsos/19.2.4.0.0.190709_190709" args="rollback"
+....
+....
+2019-07-29 05:46:33 -0700 :SUCCESS: DONE: Initiate rollback on node(s).
+2019-07-29 05:46:33 -0700 :SUCCESS: DONE: Initiate rollback on all node(s)
+2019-07-29 05:46:33 -0700 :SUCCESS: DONE: Initiate rollback on 1 node(s).
+2019-07-29 05:46:33 -0700 :SUCCESS: Completed run of command: /u01/downloads/cpsos/19.2.4.0.0.190709_190709/PatchPayloads/19.2.4.0.0.190709/DBPatchFile/dbserver_patch_19.190709/patchmgr -dbnodes /u01/downloads/cpsos/19.2.4.0.0.190709_190709/dbs_grp -rollback -target_version 19.2.4.0.0.190709
+2019-07-29 05:46:33 -0700 :INFO : Rollback attempted on nodes in file /u01/downloads/cpsos/19.2.4.0.0.190709_190709/dbs_grp: [scaqak01cps02]
+2019-07-29 05:46:33 -0700 :INFO : Current image version on dbnode(s) is:
+2019-07-29 05:46:33 -0700 :INFO : scaqak01cps02: 19.2.4.0.0.190706
+2019-07-29 05:46:33 -0700 :INFO : For details, check the following files in /u01/downloads/cpsos/19.2.4.0.0.190709_190709/PatchPayloads/19.2.4.0.0.190709/DBPatchFile/dbserver_patch_19.190709:
+2019-07-29 05:46:33 -0700 :INFO : - <dbnode_name>_dbnodeupdate.log
+2019-07-29 05:46:33 -0700 :INFO : - patchmgr.log
+2019-07-29 05:46:33 -0700 :INFO : - patchmgr.trc
+2019-07-29 05:46:34 -0700 :INFO : Exit status:0
+2019-07-29 05:46:34 -0700 :INFO : Exiting.
+
+INFO : Rollback completed for the standby CPS node successfully.
+
+
+10) Run the switchoverstatus using remoteec before running actual switchover.
+Example:
+a) In the following case, please note the master and standby nodes (good case ) and you are good to go for switchover step.
+
+ecra {scaqak01cps01.us.oracle.com}> remoteec cps upgrade type="cpsos" bundle="/u01/downloads/cpsos/19.2.4.0.0.190709_190709" args="switchoverstatus"
+* ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Master CPS Node = scaqak01cps01
+Standby CPS Node = scaqak01cps02
+
+* ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+b) In the following case, we see problem in detecting the master node. In that case, please check why we don't find the master node where all the cps s/w services suppose to run. Once you figure out the master node, then only run the node switcherover which is mentioned in step #11 below.
+
+ecra {scaqak01cps02.us.oracle.com}> remoteec cps upgrade type="cpsos" bundle="/u01/downloads/cpsos/19.2.4.0.0.190709_190709" args="switchoverstatus"
+* ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Error in confirming Master CPS Node = scaqak01cps02     <<--- Issue here.
+Standby CPS Node = scaqak01cps01
+
+* ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+11) Run the switchover using remoteec.
+Run the switcher command and review the log generated for the detail on the switchover process on specified node.
+
+Example:
+ecra {scaqak01cps02.us.oracle.com}> remoteec cps upgrade type="cpsos" bundle="/u01/downloads/cpsos/19.2.4.0.0.190709_190709" args="switchover"
+* ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Initiating CPS node Switchover. Verify master node by running remoteec reload.
+Please refer /opt/oci/exacc/exacloud/log/threads/cpsos_patchclu_apply_31_07_2019_02_21.log on cps node scaqak01cps02.us.oracle.com for more detail
+
+* ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+12) After the switchover if you try to run remoteec command from the same cps node, we will get below error.
+Example:
+ecra {scaqak01cps01.us.oracle.com}> remoteec cps upgrade type="cpsos" bundle="/u01/downloads/cpsos/19.2.4.0.0.190709_190709" args="switchover"
+* ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Jul 29 06:04:57 scaqak01cps01 Keepalived_vrrp[102638]: Manual switchover triggered
+Jul 29 06:04:57 scaqak01cps01 Keepalived_vrrp[102638]: Manually switching over to BACKUP
+Redirecting to /bin/systemctl stop keepalived.service* Error: Error (500): Process id does not exists
+++++++++++++++++++++++++++
+
+Which means, still few cps services are switching over to another node. Let's wait for sometime and then re-run.
+
+13) We might need to re-run the reload remote management process to reflect the master node:
+ecra {scaqak01cps01.us.oracle.com}> remoteec reload exaccocid="ocid1.exadatainfrastructure.oc1.sea.abzwklsscaqak01adm0304clu6"
+* Reload Complete
+ecra {scaqak01cps02.us.oracle.com}>
+
+
+14) Re-run the switchoverstatus using remoteec to check whether node switchover done.
+Example:
+
+a) In below case, the switchover done correctly from scaqak01cps01 to scaqak01cps02.
+
+ecra {scaqak01cps02.us.oracle.com}> remoteec cps upgrade type="cpsos" bundle="/u01/downloads/cpsos/19.2.4.0.0.190709_190709" args="switchoverstatus"
+* ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Master CPS Node = scaqak01cps02
+Standby CPS Node = scaqak01cps01
+
+* ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+b) In below case, some issues occurred and we can't figure out the master cps node. You can wait for sometime (may be 5 to 10 mins) and then re-try. Still the same issue? If so, contact operation or development team to find out why node switcher not happened. 
+
+ecra {scaqak01cps02.us.oracle.com}> remoteec cps upgrade type="cpsos" bundle="/u01/downloads/cpsos/19.2.4.0.0.190709_190709" args="switchoverstatus"
+* ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Error in confirming Master CPS Node = scaqak01cps02     <<--- Issue here.
+Standby CPS Node = scaqak01cps01
+
+* ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+15) We need to repeat the steps #6 and #7 to upgrade another standby node.
+
+16) We can also run just backup of cps os node and also run patching without backup.
+Example:
+
+Take just backup:
+ecra {scaqak01cps01.us.oracle.com}> remoteec cps upgrade type="cpsos" bundle="/u01/downloads/cpsos/19.2.4.0.0.190709_190709" args="backup"
+______________
+...
+...
+2019-07-29 06:44:21 -0700 :SUCCESS: DONE: Initiate backup on node(s).
+2019-07-29 06:44:21 -0700 :SUCCESS: DONE: Initiate backup on 1 node(s).
+2019-07-29 06:44:25 -0700 :SUCCESS: Completed run of command: /u01/downloads/cpsos/19.2.4.0.0.190709_190709/PatchPayloads/19.2.4.0.0.190709/DBPatchFile/dbserver_patch_19.190709/patchmgr -dbnodes /u01/downloads/cpsos/19.2.4.0.0.190709_190709/dbs_grp -backup
+2019-07-29 06:44:25 -0700 :INFO : Backup attempted on nodes in file /u01/downloads/cpsos/19.2.4.0.0.190709_190709/dbs_grp: [scaqak01cps01]
+2019-07-29 06:44:25 -0700 :INFO : Current image version on dbnode(s) is:
+2019-07-29 06:44:25 -0700 :INFO : scaqak01cps01: 19.2.4.0.0.190706
+2019-07-29 06:44:25 -0700 :INFO : For details, check the following files in /u01/downloads/cpsos/19.2.4.0.0.190709_190709/PatchPayloads/19.2.4.0.0.190709/DBPatchFile/dbserver_patch_19.190709:
+2019-07-29 06:44:25 -0700 :INFO : - <dbnode_name>_dbnodeupdate.log
+2019-07-29 06:44:25 -0700 :INFO : - patchmgr.log
+2019-07-29 06:44:25 -0700 :INFO : - patchmgr.trc
+2019-07-29 06:44:25 -0700 :INFO : Exit status:0
+2019-07-29 06:44:25 -0700 :INFO : Exiting.
+
+INFO : Backup completed for the standby CPS node successfully.
+--------------------------------------------------------------
+
+17) Similarly, we can also upgrade cps node without taking backup:
+ecra {scaqak01cps01.us.oracle.com}> remoteec cps upgrade type="cpsos" bundle="/u01/downloads/cpsos/19.2.4.0.0.190709_190709" args="patch BACKUP_MODE=no"

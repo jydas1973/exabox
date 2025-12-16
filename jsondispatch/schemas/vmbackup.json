@@ -1,0 +1,5 @@
+{
+    "title": "JSON Dispatch vmbackup schema",
+    "description": "JSON Dispatch vmbackup schema",
+    "type": "object"
+}

@@ -1,0 +1,158 @@
+{
+  "pkeyconf": "False",
+  "patchcluinterface": "False",
+  "sshkey": "None",
+  "disablepkey": "False",
+  "cmd": "vmgi_install",
+  "vmid": "None",
+  "configpath": "../PodRepo/rack_scaqab10adm0102-clu-1_updated_xml.xml",
+  "jsonconf": {
+    "customer": {
+      "entitlement_id": "100000000",
+      "csi": "12345",
+      "id": "1a031e6c-3c94-4510-a4d4-ad548cadb361",
+      "name": "dummy_not_used"
+    },
+    "dbaas_api": {
+      "outputfile": "/tmp/cloudProperties_2018.07.09.12.46.53",
+      "object": "os",
+      "FLAGS": "",
+      "action": "set",
+      "params": {
+        "diag": {
+          "em": {
+            "em_host": "pqr.us.oracle.com",
+            "em_port": "7802",
+            "em_passwd": "nnqdBcnEAGwiQG8SJEFOTQ==",
+            "em_user": "sysman"
+          },
+          "logstash": {
+            "logstash_user": "abc",
+            "logstash_host": "abc.us.oracle.com",
+            "logstash_port": "1234",
+            "logstash_passwd": "nnqdBcnEAGwiQG8SJEFOTQ=="
+          },
+          "tfaweb": {
+            "tfaweb_user": "xyz",
+            "tfaweb_port": "5678",
+            "tfaweb_passwd": "nnqdBcnEAGwiQG8SJEFOTQ==",
+            "tfaweb_host": "xyz.us.oracle.com"
+          }
+        },
+        "ords": {
+          "enable": "False"
+        },
+        "cns": {
+          "enabled": "False"
+        },
+        "atp": {
+          "enabled": "False"
+        }
+      },
+      "operation": "cloud_properties"
+    },
+    "customer_network": {
+        "timezone": "UTC",
+        "nodes": [
+            {
+                "vip": {
+                    "ip": "10.0.20.49",
+                    "hostname": "sea2214c1v1n1-vip",
+                    "domainname": "medatasn.michelvcn.oraclevcn.com"
+                },
+                "client": {
+                    "netmask": "255.255.255.0",
+                    "domainname": "medatasn.michelvcn.oraclevcn.com",
+                    "ip": "10.0.20.14",
+                    "hostname": "sea2214c1v1n1",
+                    "dom0_oracle_name": "scaqab10adm01",
+                    "vlantag": "222",
+                    "gateway": "10.0.20.1"
+                },
+                "backup": {
+                    "domainname": "mebackupsn.michelvcn.oraclevcn.com",
+                    "domu_oracle_name": "scaqab10adm01nat08",
+                    "ip": "10.0.21.6",
+                    "gateway": "10.0.21.1",
+                    "vlantag": "223",
+                    "hostname": "sea2214c1v1bk1",
+                    "netmask": "255.255.255.0"
+                }
+            },
+            {
+                "vip": {
+                    "ip": "10.0.20.52",
+                    "hostname": "sea2214c1v1n2-vip",
+                    "domainname": "medatasn.michelvcn.oraclevcn.com"
+                },
+                "client": {
+                    "netmask": "255.255.255.0",
+                    "domainname": "medatasn.michelvcn.oraclevcn.com",
+                    "ip": "10.0.20.15",
+                    "hostname": "sea2214c1v1n2",
+                    "dom0_oracle_name": "scaqab10adm02",
+                    "vlantag": "222",
+                    "gateway": "10.0.20.1"
+                },
+                "backup": {
+                    "domainname": "mebackupsn.michelvcn.oraclevcn.com",
+                    "ip": "10.0.21.7",
+                    "gateway": "10.0.21.1",
+                    "vlantag": "223",
+                    "hostname": "sea2214c1v1bk2",
+                    "dom0_oracle_name": "scaqab10adm02",
+                    "netmask": "255.255.255.0"
+                }
+            }
+        ],
+        "scan": {
+            "ips": [
+                "10.0.20.51",
+                "10.0.20.52",
+                "10.0.20.53"
+            ],
+            "hostname": "sea2214c1v1-scan.medatasn.michelvcn.oraclevcn.com",
+            "port": 1521
+        },
+        "network_services": {
+            "ntp": [
+                "169.254.169.254","22.22.22.22"
+            ],
+            "dns": [
+                "169.254.169.254","10.10.10.10"
+            ]
+        }
+    },
+
+    "vm": {
+      "cores": 4,
+      "gb_memory": 30,
+      "gb_ohsize": 60,
+      "size": "Large"
+    },
+    "cluster_id": "c7_clusterHome",
+    "ecraExaunitID": 6,
+    "operation": "create-service",
+    "tools_ssh": {
+      "ssh_passphrase": "xQVEpFjd9SUIzxQWVRAeYQ==",
+      "ssh_public_key": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAAAgQCZe56cWhjtYQcydGsi7Tsz9/AwtsBUWvRLRrkFms2dX0EGfT1u6Q8h8dhoeLr3yhPP5faKDWwhe17XX7usNSjMVbKPZ2C4pWUzb/svWflvmDdU+zt2osN3HF6NHmAaVYc9XwLlAL5sbePSdMzJ2BeDSmkwmzBSSg97ApT/zFIo1w== Public key\n",
+      "ssh_private_key": "RQD7s8LUcuraG2jvVkgJUIpl4czIR8eg/j++ZEDk/o/KBOwr3jgvWhx34a8/X9+Ng3mShU//ar9knQpapli+RvkVPl2mi2O2gwjPkRinFuVXVwTtbJpcAXdNJLJ+IVMp/AEcTaQCJVRfeCeMaTLZsASFkl9G8vytCKM4DRrn0Jo7BIR6e/1w9lZKUK9RudbLXMUHIUZWrYCXXYcF0Y2k5hbR6cX+VKHYnP4amy3YsCzsfNj26j4ifi650CAMw/ZZHMu9fzMXdBgGaMtot6tk6DSSWG7+d+RD2+B9AtrsdoIueM4yBZtwKSsyGtV4S9775MuCUDgnoU8A1qGiliCSx/1gcxVFx4qMJ9zkn1XFZ1+usCGIgvHDQWdwXiYsHwTU02FZL2Dqnut1g4aoVWmDZTaotmSGS0iKbhmLI3B6BToJVmHum6aTmnAxGBNvodxBuCVE/txGuHf8MrT4PqbIjCARpDL13r8VVLQ3+MLMbqENcspHf1QL6X6+I+ciHhnJoVZGPpZrlaEQ/XynEh7BRhUW8Esh7GBd3K0TOH7UgDWVuSrVX2zBpeb5arp8ZYUhyn4VYBFG0mcHaDRyinWiK8Et9i0YFeIWHPrUA33xwcfgbuyTSxW8nxkxQxscZymFaW4vIb2CZ0GeCW4lLBosMH7Js9dST9VlDx6fEW0TyC/bCuMxyIAyfaq5H5zyPn4VR4mys2s7kEspv1SRKq2PwWxRhbqzO8ZDsd3c2laYnICH/8PQLHswsw5hO5LxPqSoRKqpHFkjEJYpzXiF0jAYaQJ+ZIW0MlgorsAHa3zRDhKx51aNk/DZ1g6i96LivvCiV7Sq4RU4TQZdWm2Gbd09GUJnaK2o7kjwIPVHHcrUl7E/z0Hcw5oii+ZMzBT3rfxFtN4MVyokv9zBh5ATZlngNB0+dCJ43/LESdgSonLOl5VGcrZHvVZA0EG71SfzqbBlCbstz78Cv1O3dijr5mXBwSe9Fa6O2wxP7mOHoyc7CNmQdZqzPv/rqo/20Rx4+VKIAeS2piNcMqDKnQlTxSjrrBxSTAk7yOwTb59mraKsHlg6Q/cygOG6hTwxauBhNCocbuDoAnoo4jXFddkhHr8I99Za5kTLboHgU/058CuSM6ODK2FJZxHXopX0LgM7+zQSA76r3FLSIATGrEyoE/FdUgHekSvE/hByhCTtUzRPn2BBXuA1EGf8lQwZTnCUepGMy8kPw0ZK7nro4k6x18B269iq0fwfkxX3PEOKnMj3ukBDPJQhrEp8ecv1AfkUxvwL"
+    },
+    "rack": {
+      "tb_storage_": 0,
+      "gb_storage": 3072,
+      "backup_disk": "False",
+      "create_sparse": "N",
+      "cores": 8,
+      "gb_memory": 60,
+      "size": "QUARTER-RACK",
+      "id": "841f19c3-83c3-4b6e-8123-d31fbd282b17",
+      "name": "club086e35"
+    }
+  },
+  "scriptname": "None",
+  "vmcmd": "None",
+  "skip_serase": "True",
+  "log_level": "INFO",
+  "hostname": "den02tai.us.oracle.com"
+}

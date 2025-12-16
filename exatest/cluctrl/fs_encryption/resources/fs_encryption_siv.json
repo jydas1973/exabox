@@ -1,0 +1,32 @@
+{
+    "kms_id": "ocid1.key.region1.sea.avpga2q7aaay2.abzwkljsfz7nlcz6ywkiwzujvqcnfixard3tcrd4ep7yqw3ensuepxvq7ara",
+    "kms_key_endpoint": "https://avpga2q7aaay2-crypto.kms.r1.oracleiaas.com",
+    "bucket_name": "ecs_encryption_test",
+    "bucket_namespace": "dbaasecracpsea2",
+    "bucket_id": "ocid1.bucket.region1.sea.aaaaaaaa2rui6wfm3mjfl4juf6y5mzwpvxz5f5ioin3g7oyvb5ltmfvniv4a",
+    "customer_tenancy_name": "dbaasexadatacustomersea1",
+    "customer_tenancy_id": "ocid1.tenancy.oc1..aaaaaaaajl3p2iquu45w7kfydtigbkmwcoshrlyxjjv5yn3deux3fa6cyxda",
+    "secret_compartment_id": "ocid1.tenancy.oc1..aaaaaaaakqhkiuvchkoxuxgpax4zcieeizobkzmszhegyaaqx3fkiyjzwkrq",
+    "cloud_vmcluster_id": "ocid1.cloudvmcluster.region1.sea.anzwkljsinjoekaanctdl6us736g4dpddfudyccf5gzcikio4ga734oa44jq",
+    "vault_id": "ocid1.vault.oc1..aaaaaaaajl3p2iquu45w7kfydtigbkmwcoshrlyxjjv5yn3deux3fa6cyasd",
+    "infraComponent": [
+        {
+            "encryption_mode": "enabled",
+            "infra_component": "dom0",
+            "target_filesystems": "all | [/EXAVMIMAGES ...]",
+            "key_source": "KMS"
+        },
+        {
+            "encryption_mode": "enabled",
+            "infra_component": "domU",
+            "target_filesystems": "[/u01, /u02]",
+            "key_source": "SIV"
+        },
+        {
+            "encryption_mode": "enabled",
+            "infra_component": "cell",
+            "target_filesystems": "all",
+            "key_source": "KMS"
+        }
+   ]
+}

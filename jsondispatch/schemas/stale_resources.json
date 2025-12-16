@@ -1,0 +1,24 @@
+{
+    "properties": {
+        "free_dom0s": {
+            "type": "array",
+            "items": {"type": "string"}
+        },
+        "hostnames": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "dom0_fqdn": {
+                        "type": "string"
+                    },
+                    "vm_list": {
+                        "type": "array",
+                        "items": {"type": "array"}
+                    }
+                }
+            }
+        }
+    },
+    "type": "object"
+}

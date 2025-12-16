@@ -1,0 +1,47 @@
+{
+    "properties": {
+        "SLA": {
+            "properties": {
+                "servers": {
+                    "items": {
+                        "properties": {
+                            "hostname": {
+                                "type": "string"
+                            },
+                            "server_type": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "hostname",
+                            "server_type"
+                        ],
+                        "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                },
+                "last_run_time": {
+                    "type": "string"
+                },
+                "max_concurrency": {
+                    "minimum": 1,
+                    "type": "integer"
+                },
+                "scheduler_frequency": {
+                    "type": "integer"
+                }
+            },
+            "required": [
+                "servers",
+                "scheduler_frequency"
+            ],
+            "type": "object"
+        }
+    },
+    "required": [
+        "SLA"
+    ],
+    "type": "object"
+}
+

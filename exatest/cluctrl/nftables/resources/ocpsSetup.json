@@ -1,0 +1,114 @@
+{
+    "exaOcid": "ocid1.exadatainfrastructure.region1.sea.anzwkljs3vfwx6qaxwiwskvw2m7opz74ni7ww6b3dokusdr2nv7kvazijxjq",
+    "adminNetworkCidr": "10.133.40.0/21",
+    "ibNetworkCidr": "192.197.252.0/23",
+    "ntp": [
+        "10.31.138.20",
+        "10.246.6.36",
+        "10.231.225.76"
+    ],
+    "dns": [
+        "10.31.138.25",
+        "10.231.225.65",
+        "206.223.27.1"
+    ],
+    "serviceType": "nonATP",
+    "vpnHeIp": "http://100.106.1.68/exacc",
+    "ossUrl": "https://swiftobjectstorage.us-phoenix-1.oraclecloud.com/v1/intexadatateam/ImageManagement",
+    "oracle_home": "/u01/oracleclient",
+    "rackName": "iad133381exd-atpmg-scaqau04XXX-clu01",
+    "rackBaseName": "iad133381exd-atpmg-scaqau04XXX",
+    "cpsCn": "anzwkljs3vfwx6qaxwiwskvw2m7opz74ni7ww6b3dokusdr2nv7kvazijxjq",
+    "cpsCnStandby": "anzwkljs3vfwx6qaxwiwskvw2m7opz74ni7ww6b3dokusdr2nv7kvazijxjq-s",
+    "vpnHeFqdn": "vpn-he.sic-dbaas.exacc.oc9qadev.com",
+    "patchServer_ip": "10.133.44.181",
+    "patchServer_subnet": "10.133.40.0/21",
+    "patchServer_gateway": "10.133.40.1",
+    "netmask": "255.255.248.0",
+    "patchServer_host_network_interface": "eth0",
+    "forwardProxy_ip": "10.133.40.42",
+    "forwardProxy_port": "3080",
+    "forwardProxy_subnet": "10.133.40.0/21",
+    "forwardProxy_netmask": "255.255.248.0",
+    "forwardProxy_gateway": "10.133.40.1",
+    "forwardProxy_host_network_interface": "eth0",
+    "dhcp": "false",
+    "customer_netmask": "255.255.252.0",
+    "customer_gateway": "10.128.173.129",
+    "proxy": "http://www-proxy-hqdc.us.oracle.com:80",
+    "linux_users": {
+        "installation": "ecra",
+        "operations": "ops"
+    },
+    "linux_groups": {
+        "installation": "dba",
+        "operations": "docker"
+    },
+    "install_dir": "/opt/oci/exacc",
+    "SDO": "",
+    "exabox_updates": {"ociexacc": "True"},
+    "pkey": "null",
+    "vlan": "2744",
+    "servers": [
+        {
+            "hostname": "scaqau04cps01",
+            "username": "",
+            "agent_port": 7080,
+            "worker_port": 9100,
+            "remote_mgmt": 7071,
+            "cpsagent_port": 2081,
+            "dbcpagent_port": 7070,
+            "ib_interface_name": "stbondib00",
+            "adminIp": "10.133.44.177",
+            "ilomIp": "10.133.44.179",
+            "ibAdmin": [
+                "192.197.252.250",
+                "192.197.252.251"
+            ],
+            "ip": "10.128.173.191"
+        },
+        {
+            "hostname": "scaqau04cps02",
+            "username": "",
+            "agent_port": 7080,
+            "worker_port": 9100,
+            "remote_mgmt": 7071,
+            "cpsagent_port": 2081,
+            "dbcpagent_port": 7070,
+            "ib_interface_name": "stbondib00",
+            "adminIp": "10.133.44.178",
+            "ilomIp": "10.133.44.180",
+            "ibAdmin": [
+                "192.197.252.252",
+                "192.197.252.253"
+            ],
+            "ip": "10.128.173.192"
+        }
+    ],
+    "adminDomain": "us.oracle.com",
+    "ociAdminHeadEndType": "WSS",
+    "wssClientCertPassword": "NUgzUloxWlFHNg==",
+    "AdmWSSHeFqdn": [
+        "wsshea.oraclesccm.net",
+        "wsshea.oraclesccm.net",
+        "wsshea.oraclesccm.net"
+    ],
+    "MgmtWSSHeFqdn": [
+        "wsshem.oraclesccm.net",
+        "wsshem.oraclesccm.net",
+        "wsshem.oraclesccm.net",
+        "wsshem.oraclesccm.net",
+        "wsshem.oraclesccm.net",
+        "wsshem.oraclesccm.net"
+    ],
+    "iaasDomainComponent": "oracleiaas.com",
+    "realmDomainComponent": "oraclecloud.com",
+    "ociRegion": "us-ashburn-1",
+    "availabilityDomain": [
+        "ad1",
+        "ad2",
+        "ad3",
+        "pop1",
+        "pop2"
+    ]
+}

@@ -1,0 +1,76 @@
+#
+# $Header: ecs/exacloud/exabox/infrapatching/test/test_infrapatching_roceswitch.txt /main/6 2023/12/06 12:49:45 emekala Exp $
+#
+# test_infrapatching_roceswitch.py
+#
+# Copyright (c) 2020, 2023, Oracle and/or its affiliates.
+#
+#    NAME
+#      test_infrapatching_roceswitch.py - Unit test case script for all
+#                                         RoceSwitch operations.
+#
+#    DESCRIPTION
+#      Unit test case script for all RoceSwitch operations.
+#
+#    NOTES
+#      Unit test case script for all RoceSwitch operations.
+#
+#    MODIFIED   (MM/DD/YY)
+#    emekala     11/20/23 - ENH 35706149 - Changes required in infrapatching
+#                           test auomation files to support Pipeline execution
+#    sdevasek    09/14/22 - ENH 33924998 - TEST ADDITION TO DELETE ANY PENDING
+#                           RACK_PATCH_UPDATE OPERATIONS USING ABORT REQUEST
+#    sdevasek    03/30/22 - Enh-33321832 - GET CODE COVERAGE REPORT FOR
+#                           INFRAPATCHING PYTHON CODE
+#    sdevasek    02/11/22 - Enh-33819329 - TEST ADDITION TO THE INFRAPATCHING
+#                           AUTOMATION FOR INCLUDELIST FEATURE
+#    sdevasek    12/03/21 - Enh-33310641 - TEST ADDITION TO THE INFRAPATCHING
+#                           AUTOMATION FOR DCS AGENT BASED SANITY CHECKS
+#    sdevasek    09/13/21 - Enh 32929805 - Infrapatching CI/CD pipeline
+#                           implementation
+#    araghave    05/27/21 - Enh 32929805 - INFRA PATCHING TEST FRAMEWORK
+#    rkhemcha    08/28/20 - Creation
+#
+
+import pytest
+import unittest
+
+from utils import *
+from constants import *
+
+# Class which defines unit tests with roceswitches as target
+@pytest.mark.roceswitch
+class Test_roceswitch_class(unittest.TestCase):
+
+    # This method is to run something similar before every test execution.
+    def setUp(self):
+        mUpdateAdditionalOptionsInPayload("IncludeNodeList", "none")
+        mUpdateParamInPayload("EnablePlugins", "no")
+        mUpdateParamInPayload("PluginTypes", "none")
+        mDeletePendingFailedECRARequest()
+
+    @pytest.mark.roceswitch_patch_prereq_check
+    def test_roceswitch_patch_prereq_check(self):
+        _result, _status_output = mExecuteInfraPatchCommandWithDCSAgentChecks(TASK_PREREQ_CHECK, PATCH_ROCESWITCH)
+        self.assertTrue(_result, "Precheck operation failed.")
+
+    @pytest.mark.roceswitch_patch
+    def test_roceswitch_patch(self):
+        _result, _status_output = mExecuteInfraPatchCommandWithDCSAgentChecks(TASK_PATCH, PATCH_ROCESWITCH)
+        self.assertTrue(_result, "Patch operation failed.")
+
+    @pytest.mark.roceswitch_rollback_prereq_check
+    def test_roceswitch_rollback_prereq_check(self):
+        _result, _status_output = mExecuteInfraPatchCommandWithDCSAgentChecks(TASK_ROLLBACK_PREREQ_CHECK, PATCH_ROCESWITCH)
+        self.assertTrue(_result, "Rollback_prereq_check operation failed.")
+
+    @pytest.mark.roceswitch_rollback
+    def test_roceswitch_rollback(self):
+        _result, _status_output = mExecuteInfraPatchCommandWithDCSAgentChecks(TASK_ROLLBACK, PATCH_ROCESWITCH)
+        self.assertTrue(_result, "Rollback operation failed.")
+
+    @pytest.mark.roceswitch_postcheck
+    def test_roceswitch_postcheck(self):
+        _result, _status_output = mExecuteInfraPatchCommandWithDCSAgentChecks(TASK_POSTCHECK, PATCH_ROCESWITCH)
+        self.assertTrue(_result, "Postcheck operation failed.")
+

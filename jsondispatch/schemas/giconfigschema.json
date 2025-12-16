@@ -1,0 +1,8 @@
+{
+    "title": "JSON Dispatch GI config schema",
+    "description": "JSON Dispatch Gi config schema",
+    "type": "object",
+    "required": [
+        "image_type"
+    ]
+}

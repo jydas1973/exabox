@@ -1,0 +1,259 @@
+#
+# $Header: ecs/exacloud/exabox/infrapatching/test/test_infrapatching_switch.txt /main/6 2025/07/01 00:29:54 apotluri Exp $
+#
+# test_infrapatching_switch.py
+#
+# Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+#
+#    NAME
+#      test_infrapatching_switch.py - Unit test case script for all Switch
+#                                   operations.
+#
+#    DESCRIPTION
+#      Unit test case script for all Switch operations.
+#
+#    NOTES
+#      Unit test case script for all Switch operations.
+#
+#    MODIFIED   (MM/DD/YY)
+#    apotluri    06/24/25 - Enhancement Request 38109516 - INFRAPATCH TEST 
+#                           AUTOMATION : CREATE PRECHECK RETRY FAILURE FOR DOMU AND 
+#                           SWITCH
+#    apotluri    06/13/25 - Enhancement Request 37981656 - INFRAPATCH TEST
+#                           AUTOMATION : ADD TEST FOR PATCH RETRY CASE FOR
+#                           DOM0, DOMU AND SWITCH
+#    apotluri    05/21/25 - Bug 37941851 - INFRAPATCH TEST AUTOMATION: UPDATE
+#                           RETRY TESTS TO VALIDATE ECRA_ERROR WITH "RETRY ECRA
+#                           REQUEST ID .* HAS ALREADY FAILED BEFORE ECRA
+#                           UPGRADE WITH ERROR CODE 0X03010054\. FAILING
+#                           INFRAPATCHING ON RETRY AFTER ECRA UPGRADE
+#    apotluri    03/10/25 - Enhancement Request 37606958 - INFRAPATCH TEST
+#                           AUTOMATION - ADD RETRY TEST FOR SWITCH PATCH OP
+#    apotluri    01/24/25 - Enhancement Request 37515583 - INFRAPATCHING TEST
+#                           AUTOMATION : ADDITION OF TEST TO VALIDATE IBSWITCH
+#                           PATCH FAILURE SCENARIO BY FILLING UP FS
+#    araghave    11/22/24 - Enh 37241595 - TEST CHANGES TO REPLACE ALL IBSWITCH
+#                           REFERENCE WITH GENERIC SWITCH REFERENCES IN INFRA
+#                           PATCHING TEST CODE
+#    araghave    07/16/24 - Enh 36830077 - CLEANUP KSPLICE CODE FROM
+#                           INFRAPATCHING FILES
+#    emekala     11/20/23 - ENH 35706149 - Changes required in infrapatching
+#                           test auomation files to support Pipeline execution
+#    emekala     04/14/23 - ENH 35204492 - HEARTBEAT FAILURE ERROR CODE IS
+#                           GETTING OVERRIDDEN WITH GENERIC ERROR CODE
+#                           0X03010007 FOR DOM0 POSTCHECK FAILURE
+#    sdevasek    12/20/22 - ENH 33893463 - UPDATE INFRAPATCH TEST AUTOMATION TO
+#                           PROVIDE DIFFS OF TIME PROFILE FOR MAJOR OPERATIONS
+#                           ACROSS CURRENT AND PREVIOUS RUNS
+#    antamil     12/05/22 - ENH 34564371-IGNORE VALIDATION OF
+#                           TIME PROFILE DATA AND PLUGIN CONSOLE LOG FOR
+#                           ALREADY PATCHED NODE
+#    sdevasek    09/14/22 - ENH 33924998 - TEST ADDITION TO DELETE ANY PENDING
+#                           RACK_PATCH_UPDATE OPERATIONS USING ABORT REQUEST
+#    sdevasek    08/11/22 - ENH 34465298 - TEST ADDITION TO AUTOMATION TO LOOK
+#                           FOR TIME_PROFILE_DATA IN STATUS REPORT
+#    sdevasek    04/25/22 - ENH 34088744 - ENABLE TESTS FOR KSPLICE AND ONEOFF
+#                           OPERATIONS IN INFRAPTACHING AUTOMATION
+#    sdevasek    03/30/22 - Enh-33321832 - GET CODE COVERAGE REPORT FOR
+#                           INFRAPATCHING PYTHON CODE
+#    sdevasek    02/11/22 - Enh-33819329 - TEST ADDITION TO THE INFRAPATCHING
+#                           AUTOMATION FOR INCLUDELIST FEATURE
+#    sdevasek    12/03/21 - Enh-33310641 - TEST ADDITION TO THE INFRAPATCHING
+#                           AUTOMATION FOR DCS AGENT BASED SANITY CHECKS
+#    sdevasek    09/13/21 - Enh 32929805 - Infrapatching CI/CD pipeline
+#                           implementation
+#    araghave    05/27/21 - Enh 32929805 - INFRA PATCHING TEST FRAMEWORK
+#
+
+import pytest
+import unittest
+
+from utils import *
+from constants import *
+
+# Class which defines unit tests with switches as target
+@pytest.mark.switch
+class Test_switch_class(unittest.TestCase):
+    # Class level variables
+    __switches = []
+    __target_name = PATCH_IBSWITCH
+
+    @classmethod
+    def setUpClass(cls):
+        cls.__switches = mGetInfraPatchingTestConfigParam('switches')
+
+    def __init__(self, *initial_data, **kwargs):
+        super(Test_switch_class, self).__init__(*initial_data, **kwargs)
+        self.__operation = ""
+        self.__operation_style = OP_STYLE_AUTO
+        self.__non_required_nodes_in_node_progress_status = []
+        self.__patch_operation_status_result = False
+        self.__patch_operation_status_output = ""
+
+    # This method is to run something similar before every test execution.
+    def setUp(self):
+        mUpdateAdditionalOptionsInPayload("IncludeNodeList", "none")
+        mUpdateAdditionalOptionsInPayload("OneoffCustomPluginFile", "none")
+        mUpdateAdditionalOptionsInPayload("OneoffScriptArgs", "none")
+        mUpdateParamInPayload("BackupMode", "yes")
+        mUpdateParamInPayload("EnablePlugins", "no")
+        mUpdateParamInPayload("PluginTypes", "none")
+        mDeletePendingFailedECRARequest()
+
+    @pytest.mark.switch_patch_retry
+    def test_switch_patch_retry(self):
+        """
+        This test is to simulate patch prereq check retry scenario
+
+        The following things are done in this test
+        1. Execute patch and make it to fail at patch_mgr side
+        2. ecradb error code is changed to SUCCESS so that retry continutes and latches on the existing patchmgr session
+        3. Run patch_mgr cmd explicitly in the background
+        4. After certain time limit retry the workflow
+        5. Start monitoring status of the above request
+        """
+
+        _tmp = "/tmp"
+        _sample_file = f"{_tmp}/test_file"
+        _retval, _output = mExecuteRemoteExasshCmd(f"df -h {_tmp}", [Test_switch_class.__switches[0]])
+        _avail_space = _output[Test_switch_class.__switches[0]].split()[9][:-1]
+        _sample_file_size = int(_avail_space) - 100
+
+        mExecuteRemoteExasshCmd(f"/bin/dd if=/dev/zero of={_sample_file} bs=1M count={_sample_file_size}",
+                                [Test_switch_class.__switches[0]])
+
+        _patch_node_list = Test_switch_class.__switches
+        _failure_cmd = "echo 'simulate disk fill - already done above'"
+        _restore_cmd = f"rm -f {_sample_file}"
+
+        success, msg = mRunPatchRetryScenario(
+            PATCH_IBSWITCH, TASK_PATCH, _patch_node_list,
+            _failure_cmd, _restore_cmd, aErrorCode="0x03010045", aErrorMsg="patchmgr command failed with non-zero status.", aLaunchNode=mGetInfraPatchingTestConfigParam('dom0s')[0]
+        )
+        self.assertTrue(success, msg)
+
+
+    @pytest.mark.switch_patch_prereq_check_retry_failure
+    def test_switch_patch_prereq_check_retry_failure(self):
+        """
+        This test is to simulate patch prereq check retry failure scenario
+
+        The following things are done in this test
+        1. Execute patch and make it to fail at patch_mgr side
+        2. After certain time limit retry the workflow
+        3. Start monitoring status of the above request
+        4. Verify if retry failed with expected error message 
+        """
+        _tmp = "/tmp"
+        _sample_file = f"{_tmp}/test_file"
+        _retval, _output = mExecuteRemoteExasshCmd(f"df -h {_tmp}", [Test_switch_class.__switches[0]])
+        _avail_space = _output[Test_switch_class.__switches[0]].split()[9][:-1]
+        _sample_file_size = int(_avail_space) - 100
+        _failure_cmd = f"/bin/dd if=/dev/zero of={_sample_file} bs=1M count={_sample_file_size}"
+        _restore_cmd = f"/bin/rm -f {_sample_file}"
+        _error_code = "0x03010045"
+        _result, _msg = mValidatePatchPrereqCheckRetryFailure([Test_switch_class.__switches[0]], PATCH_IBSWITCH, _failure_cmd, _restore_cmd, _error_code)
+        self.assertTrue(_result, _msg)
+
+    @pytest.mark.switch_patch_prereq_check
+    def test_switch_patch_prereq_check(self):
+        _result, _status_output = mExecuteInfraPatchCommandWithDCSAgentChecks(TASK_PREREQ_CHECK, PATCH_IBSWITCH)
+        self.assertTrue(_result, "Precheck operation failed.")
+        _copy_time_profile_diff_data = mCopyTimeStatsFileForTimeDiffAnalysis(_status_output)
+        self.assertEqual(_copy_time_profile_diff_data, EXIT_SUCCESS, "Copying time profile data failed.")
+
+    @pytest.mark.switch_patch_prereq_check_failure
+    def test_switch_patch_prereq_check_failure(self):
+        """
+        This test is to simulate patchmgr failure by filling up /tmp. The min required free space is 150M
+        1. Get the available space of /tmp from switch
+        2. Create a file under /tmp using dd so with size (available - 100M)
+        2. Run the precheck
+        3. remove created file under /tmp
+        4. Check for error code to ascertain the test fail or success
+        """
+
+        _dd_binary = "/bin/dd"
+        _tmp = "/tmp"
+        _sample_file = "%s/test_file" % _tmp
+
+        # Get the existing size from the switch and create file less that required min free space
+        # for /tmp min required is 150M so we create file with size (available space - 100)
+        _retval, _output = mExecuteRemoteExasshCmd("df -h %s" % _tmp,
+                                                   [Test_switch_class.__switches[0]])
+        _avail_space = _output[Test_switch_class.__switches[0]].split()[9][:-1]
+        _sample_file_size = int(_avail_space) - 100
+
+        mExecuteRemoteExasshCmd("%s if=/dev/zero of=%s bs=1M count=%s" % (_dd_binary, _sample_file, _sample_file_size),
+                                [Test_switch_class.__switches[0]])
+        # Execute precheck and make it to fail
+        _result, _status_output = mExecuteInfraPatchCommand(TASK_PREREQ_CHECK, PATCH_IBSWITCH, OP_STYLE_ROLLING)
+
+        # remove created file
+        mExecuteRemoteExasshCmd("rm -f %s" % _sample_file,
+                                [Test_switch_class.__switches[0]])
+
+        # Verify if it failed with expected error code
+        _status_json = json.loads(_status_output)
+        _error_code = _status_json["errorCode"]
+        self.assertEqual(_error_code, "0x03010045", "switch precheck didn't fail with expected error code")
+
+    @pytest.mark.switch_one_off
+    def test_switch_one_off(self):
+        self.__operation = TASK_ONEOFF
+        self.__operation_style = OP_STYLE_AUTO
+        _one_off_script_file_path = mCreateOneOffScriptFile(self.__operation)
+        if not _one_off_script_file_path:
+            self.assertTrue(False, "Failed to create one-off script file.")
+        mUpdateAdditionalOptionsInPayload("OneoffCustomPluginFile", _one_off_script_file_path)
+        mUpdateAdditionalOptionsInPayload("OneoffScriptArgs", "stage=Pre,EXACS=yes,root_access=True")
+        mUpdateParamInPayload("BackupMode", "no")
+        self.__patch_operation_status_result, self.__patch_operation_status_output = \
+            mExecuteInfraPatchCommandWithDCSAgentChecks(self.__operation, Test_switch_class.__target_name,
+                                                        self.__operation_style)
+        self.assertTrue(self.__patch_operation_status_result,
+                        "%s operation failed." % (self.__operation.capitalize()))
+
+        _script_execution_validator = OneOffPluginScriptExecutionValidator(Test_switch_class.__target_name,
+                                                                                   self.__operation,self.__operation_style )
+        self.assertTrue(_script_execution_validator.mValidate(self.__patch_operation_status_output,
+                                                                      Test_switch_class.__switches ),
+                        "One-off script execution failed.")
+
+    @pytest.mark.switch_patch
+    def test_switch_patch(self):
+        _updated_patch_list = []
+        _result, _status_output = mExecuteInfraPatchCommandWithDCSAgentChecks(TASK_PATCH, PATCH_IBSWITCH)
+        self.assertTrue(_result, "Patch operation failed.")
+        _updated_patch_list = mGetNodesWithPatchOperation(_status_output)
+
+        _time_profile_data_validator = TimeProfileDataValidator(Test_switch_class.__target_name,TASK_PATCH,OP_STYLE_ROLLING)
+        self.assertTrue(_time_profile_data_validator.mValidate(_status_output,_updated_patch_list,[]),
+                        "time_profile_data validation failed.")
+        _copy_time_profile_diff_data = mCopyTimeStatsFileForTimeDiffAnalysis(_status_output)
+        self.assertEqual(_copy_time_profile_diff_data, EXIT_SUCCESS, "Copying time profile data failed.")
+
+    @pytest.mark.switch_postcheck
+    def test_switch_postcheck(self):
+        _result, _status_output = mExecuteInfraPatchCommandWithDCSAgentChecks(TASK_POSTCHECK, PATCH_IBSWITCH)
+        self.assertTrue(_result, "Postcheck operation failed.")
+
+    @pytest.mark.switch_rollback_prereq_check
+    def test_switch_rollback_prereq_check(self):
+        _result, _status_output = mExecuteInfraPatchCommandWithDCSAgentChecks(TASK_ROLLBACK_PREREQ_CHECK, PATCH_IBSWITCH)
+        self.assertTrue(_result, "Rollback_prereq_check operation failed.")
+        _copy_time_profile_diff_data = mCopyTimeStatsFileForTimeDiffAnalysis(_status_output)
+        self.assertEqual(_copy_time_profile_diff_data, EXIT_SUCCESS, "Copying time profile data failed.")
+
+    @pytest.mark.switch_rollback
+    def test_switch_rollback(self):
+        _updated_patch_list = []
+        _result, _status_output = mExecuteInfraPatchCommandWithDCSAgentChecks(TASK_ROLLBACK, PATCH_IBSWITCH)
+        self.assertTrue(_result, "Rollback operation failed.")
+        _updated_patch_list = mGetNodesWithPatchOperation(_status_output)
+        _time_profile_data_validator = TimeProfileDataValidator(Test_switch_class.__target_name,TASK_ROLLBACK,OP_STYLE_ROLLING)
+        self.assertTrue(_time_profile_data_validator.mValidate(_status_output,_updated_patch_list,[]),
+                        "time_profile_data validation failed.")
+        _copy_time_profile_diff_data = mCopyTimeStatsFileForTimeDiffAnalysis(_status_output)
+        self.assertEqual(_copy_time_profile_diff_data, EXIT_SUCCESS, "Copying time profile data failed.")
+

@@ -1,0 +1,47 @@
+acpi = 1  
+apic = 1  
+pae = 1  
+builder = 'hvm'  
+kernel = '/usr/lib/xen/boot/hvmloader'  
+device_model = '/usr/lib/xen/bin/qemu-dm'  
+# To make VMs with more than 12 vCPUs work on exadata server
+#   1: Processor Info and Feature Bits
+#   This returns the CPU's stepping, model, and family information in EAX (also called the signature of a CPU),
+#   feature flags in EDX and ECX, and additional feature info in EBX.
+#   The format of the information in EAX is as follows:
+#     3:0   - Stepping
+#     7:4   - Model
+#     11:8  - Family
+#     13:12 - Processor Type
+#     19:16 - Extended Model
+#     27:20 - Extended Family
+# Each register has 32 bits with 31st bit in the left end and 0 bit in the right end.
+#   edx register:
+#     12 bit - Memory Type Range Registers. Force to 0 set uncached access mode to memory ranges.
+# Each successive character represent a lesser-significant bit:
+#     '1' -> force the corresponding bit to 1
+#     '0' -> force to 0
+#     'x' -> Get a safe value (pass through and mask with the default policy)
+#     'k' -> pass through the host bit value
+#     's' -> as 'k' but preserve across save/restore and migration
+#               33222222222211111111110000000000
+#               10987654321098765432109876543210
+cpuid = ['1:edx=xxxxxxxxxxxxxxxxxxx0xxxxxxxxxxxx']  
+disk = ['file:/OVS/Repositories/f94739ba9fc34977a858c93da813e7af/VirtualDisks/3fd616ac54d44ccaa1d1e474d61a62b8.img,xvda,w', 'file:/OVS/Repositories/f94739ba9fc34977a858c93da813e7af/VirtualDisks/2a9c8c9c70414c26913df9d8f2f61e1d.img,xvdb,w', 'file:/OVS/Repositories/f94739ba9fc34977a858c93da813e7af/VirtualDisks/3cad10d3bbcc4c7f8bafa990462daf39.img,xvdh,w', 'file:///EXAVMIMAGES/GuestImages/scaqab10adm01vm07.us.oracle.com/u02_extra.img,xvdi,w','file:///EXAVMIMAGES/GuestImages/scaqab10adm01vm07.us.oracle.com/20227130819_u01ext.img,xvdc,w']  
+memory = '32768'  
+maxmem = '32768'  
+OVM_simple_name = 'exaclu-127'  
+name = 'scaqab10adm01vm07.us.oracle.com'  
+OVM_os_type = 'Oracle Linux 7'  
+vcpus = 32  
+maxvcpus = 84  
+uuid = 'f94739ba9fc34977a858c93da813e7af'  
+on_crash = 'coredump-restart'  
+on_reboot = 'restart'  
+serial = 'pty'  
+keymap = 'en-us'  
+vif = ['type=netfront,mac=00:16:3e:2d:4a:89,bridge=vmbondeth0','type=netfront,mac=00:16:3e:b9:b2:a0,bridge=vmbondeth1','type=netfront,mac=00:16:3e:55:c1:25,bridge=vmeth1']  
+timer_mode = 2  
+ib_pfs = ['03:00.0']  
+ib_pkeys = [{'pf':'03:00.0','port':'1','pkey':['0x2a12','0xa127',]},{'pf':'03:00.0','port':'2','pkey':['0x2a12','0xa127',]},]  
+cpus = '30-61' 

@@ -1,0 +1,23 @@
+<domain>
+    <devices>
+        <interface type="bridge">
+            <mac address="02:00:17:0e:bb:df" />
+            <source bridge="vmbondeth0.400" />
+            <target dev="vnet100" />
+            <model type="virtio" />
+            <driver queues="8" />
+            <filterref filter="c3714n5c1.clientmvm.devx8mroce.oraclevcn.com-net0-exabm" />
+            <alias name="net0" />
+            <address bus="0x00" domain="0x0000" function="0x0" slot="0x03" type="pci" />
+        </interface>
+        <interface type="bridge">
+            <mac address="02:00:17:03:ac:be" />
+            <source bridge="vmbondeth0.401" />
+            <target dev="vnet101" />
+            <model type="virtio" />
+            <driver queues="8" />
+            <alias name="net1" />
+            <address bus="0x00" domain="0x0000" function="0x0" slot="0x04" type="pci" />
+        </interface>
+    </devices>
+</domain>

@@ -1,0 +1,30 @@
+[client]
+socket             = _REPLACE_EXACLOUD_METADATA_PATH_/mysql__REPLACE_MYSQL_ID_.sock
+
+[mysqld]
+# Basic Settings
+plugin-load-add    = auth_socket.so
+skip-networking    = TRUE
+skip-log-bin       = TRUE
+user               = _REPLACE_MYSQL_USER_
+pid-file           = _REPLACE_EXACLOUD_METADATA_PATH_/mysqld__REPLACE_MYSQL_ID_.pid
+socket             = _REPLACE_EXACLOUD_METADATA_PATH_/mysql__REPLACE_MYSQL_ID_.sock
+basedir            = _REPLACE_EXACLOUD_PATH_/latest
+datadir            = _REPLACE_EXACLOUD_DATA_PATH_
+tmpdir             = _REPLACE_EXACLOUD_PATH_/tmp
+secure_file_priv   = _REPLACE_EXACLOUD_PATH_/mysql-files
+mysqlx             = OFF
+max-connections    = 600
+max_allowed_packet = 201326592
+wait_timeout       = 300
+interactive_timeout= 300
+auto_generate_certs= OFF
+sha256_password_auto_generate_rsa_keys= OFF
+caching_sha2_password_auto_generate_rsa_keys= OFF
+
+# LOGGING
+general_log_file   = _REPLACE_EXACLOUD_LOG_PATH_/mysql.log
+log-error          = _REPLACE_EXACLOUD_LOG_PATH_/mysql-error.log
+
+[exacloud]
+mysql-id           = _REPLACE_MYSQL_ID_

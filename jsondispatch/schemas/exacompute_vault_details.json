@@ -1,0 +1,34 @@
+{
+    "properties": {
+        "exarootuser": {
+            "type": "string"
+        },
+        "exarooturl": {
+            "type": "string"
+        },
+        "hostname": {
+            "type": "string"
+        },
+        "vaultaccess": {
+            "type": "string"
+        },
+        "vaultid": {
+            "type": "string"
+        },
+        "trustcertificates": {
+            "items": {
+                "type": "string"
+            },
+            "type": "array"
+        }
+    },
+    "required": [
+        "exarootuser",
+        "exarooturl",
+        "hostname",
+        "vaultaccess",
+        "vaultid",
+        "trustcertificates"
+    ],
+    "type": "object"
+}

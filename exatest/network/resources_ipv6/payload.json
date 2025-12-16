@@ -1,0 +1,272 @@
+{
+        "exaunitAllocations": {"memoryGb": "10"},
+        "adb_s": "False",
+        "bonding_operation": "create-service",
+        "customer_network": {
+            "network_services": {
+                "dns": [
+                    "169.254.169.254"
+                ],
+                "ntp": [
+                    "169.254.169.254"
+                ]
+            },
+            "nodes": [
+                {
+                    "backup": {
+                        "dom0_oracle_name": "iad103716exdd011",
+                        "domainname": "backupsubnet.devx8melastic.oraclevcn.com",
+                        "domu_oracle_name": "iad103716exddu1101",
+                        "gateway": "10.0.32.1",
+                        "v6gateway": "fe80::17ff:fe13:5d90",
+                        "hostname": "c3716n11b1",
+                        "hw_node_id": 5,
+                        "ip": "10.0.38.38",
+                        "ipv6": "fe80::17ff:fe13:5d91",
+                        "mac": "00:00:17:00:11:3F",
+                        "netmask": "255.255.224.0",
+                        "v6netmask": "64",
+                        "vlantag": "2",
+                        "v6vip": "fe80::17ff:fe13:5d92"
+                    },
+                    "client": {
+                        "dom0_oracle_name": "iad103716exdd011",
+                        "domainname": "clientsubnet.devx8melastic.oraclevcn.com",
+                        "domu_oracle_name": "iad103716exddu1101",
+                        "gateway": "10.0.0.1",
+                        "v6gateway": "fe80::17ff:fe13:5c90",
+                        "hostname": "c3716n11c1",
+                        "hw_node_id": 5,
+                        "ip": "10.0.8.185",
+                        "ipv6": "fe80::17ff:fe13:5c91",
+                        "mac": "02:00:17:12:15:D4",
+                        "natdomainname": "iad103716exd.adminiad1.oraclevcn.com",
+                        "natmask": "255.255.255.128",
+                        "netmask": "255.255.224.0",
+                        "v6netmask": "64",
+                        "vlantag": "1"
+                    },
+                    "fqdn": "iad103716exdd011.iad103716exd.adminiad1.oraclevcn.com",
+                    "monitoring": {
+                        "bond0": {
+                            "cavium_ids": [
+                                {
+                                    "id": "4.0G2004-GBC000913",
+                                    "networkinterface": "eth1"
+                                },
+                                {
+                                    "id": "4.0G2001-GBC001819",
+                                    "networkinterface": "eth2"
+                                }
+                            ],
+                            "gateway": "192.168.1.1",
+                            "ip": "192.168.1.145",
+                            "netmask": "255.255.255.0",
+                            "preferred_interface": "eth1",
+                            "vlantag": 0
+                        }
+                    },
+                    "vip": {
+                        "domainname": "clientsubnet.devx8melastic.oraclevcn.com",
+                        "hostname": "c3716n11c1-vip",
+                        "ip": "10.0.3.203",
+                        "ipv6": "fe80::17ff:fe13:5c92"
+                    }
+                },
+                {
+                    "backup": {
+                        "dom0_oracle_name": "iad103716exdd012",
+                        "domainname": "backupsubnet.devx8melastic.oraclevcn.com",
+                        "domu_oracle_name": "iad103716exddu1201",
+                        "gateway": "10.0.32.1",
+                        "v6gateway": "fe80::17ff:fe13:5d90",
+                        "hostname": "c3716n12b1",
+                        "hw_node_id": 5,
+                        "ip": "10.0.33.197",
+                        "ipv6": "fe80::17ff:fe13:5d93",
+                        "mac": "02:00:17:03:58:72",
+                        "netmask": "255.255.224.0",
+                        "v6netmask": "64",
+                        "vlantag": "2"
+                    },
+                    "client": {
+                        "dom0_oracle_name": "iad103716exdd012",
+                        "domainname": "clientsubnet.devx8melastic.oraclevcn.com",
+                        "domu_oracle_name": "iad103716exddu1201",
+                        "gateway": "10.0.0.1",
+                        "v6gateway": "fe80::17ff:fe13:5c90",
+                        "hostname": "c3716n12c1",
+                        "hw_node_id": 5,
+                        "ip": "10.0.11.73",
+                        "ipv6": "fe80::17ff:fe13:5c94",
+                        "mac": "02:00:17:12:BD:52",
+                        "natdomainname": "iad103716exd.adminiad1.oraclevcn.com",
+                        "natmask": "255.255.255.128",
+                        "netmask": "255.255.224.0",
+                        "v6netmask": "64",
+                        "vlantag": "1"
+                    },
+                    "fqdn": "iad103716exdd012.iad103716exd.adminiad1.oraclevcn.com",
+                    "monitoring": {
+                        "bond0": {
+                            "cavium_ids": [
+                                {
+                                    "id": "4.0G2001-GBC001134",
+                                    "networkinterface": "eth1"
+                                },
+                                {
+                                    "id": "4.0G1949-GBC000006",
+                                    "networkinterface": "eth2"
+                                }
+                            ],
+                            "gateway": "192.168.1.1",
+                            "ip": "192.168.1.209",
+                            "netmask": "255.255.255.0",
+                            "preferred_interface": "eth2",
+                            "vlantag": 0
+                        }
+                    },
+                    "vip": {
+                        "domainname": "clientsubnet.devx8melastic.oraclevcn.com",
+                        "hostname": "c3716n12c1-vip",
+                        "ip": "10.0.27.136",
+                        "ipv6": "fe80::17ff:fe13:5c93"
+                    }
+                }
+            ],
+            "scan": {
+                "hostname": "idc3716-clu01scan",
+                "ips": [
+                    "10.0.9.124",
+                    "10.0.25.120",
+                    "10.0.0.121"
+                ],
+                "v6ips": [
+                    "fe80::17ff:fe13:5c95",
+                    "fe80::17ff:fe13:5c96",
+                    "fe80::17ff:fe13:5c97"
+                ],
+                "port": 1521
+            },
+            "timezone": "UTC"
+        },
+        "dbaas_api": {
+            "FLAGS": "",
+            "action": "set",
+            "object": "os",
+            "operation": "cloud_properties",
+            "outputfile": "/tmp/cloudProperties_2024.05.20.12.50.29",
+            "params": {
+                "adb_s": {
+                    "enabled": "False"
+                },
+                "atp": {
+                    "enabled": "False"
+                },
+                "cns": {
+                    "enabled": "False"
+                },
+                "common": {
+                    "fedramp": "disabled",
+                    "fips_compliance": "disabled",
+                    "oss_url": "https://swiftobjectstorage.us-ashburn-1.oraclecloud.com",
+                    "se_linux": "disabled"
+                },
+                "diag": {},
+                "ords": {
+                    "enable": "False"
+                }
+            }
+        },
+        "delete_domu_keys": "false",
+        "dom0_bonding": "true",
+        "eth0_removed": "false",
+        "fedramp": "N",
+        "filesystems": {
+            "mountpoints": {
+                "/": "15G",
+                "/home": "4G",
+                "/tmp": "10G",
+                "/u01": "250G",
+                "/var": "10G",
+                "/var/log": "30G",
+                "/var/log/audit": "3G",
+                "grid": "50G"
+            }
+        },
+        "grid_version": "19",
+        "kvmroce": {
+            "ComputeNetmask": "255.255.0.0",
+            "StorageNetmask": "255.255.0.0",
+            "computeNetwork": {
+                "c3716n11c1.clientsubnet.devx8melastic.oraclevcn.com": {
+                    "clusterInterconnectIps": [
+                        "100.107.0.2",
+                        "100.107.0.3"
+                    ],
+                    "storageIps": [
+                        "100.106.64.0",
+                        "100.106.64.1"
+                    ]
+                },
+                "c3716n12c1.clientsubnet.devx8melastic.oraclevcn.com": {
+                    "clusterInterconnectIps": [
+                        "100.107.0.4",
+                        "100.107.0.5"
+                    ],
+                    "storageIps": [
+                        "100.106.64.2",
+                        "100.106.64.3"
+                    ]
+                }
+            },
+            "computeVlanId": "541",
+            "storageNetwork": {
+                "iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com": {
+                    "storageIps": [
+                        "100.106.30.6",
+                        "100.106.30.7"
+                    ]
+                },
+                "iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com": {
+                    "storageIps": [
+                        "100.106.30.14",
+                        "100.106.30.15"
+                    ]
+                },
+                "iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com": {
+                    "storageIps": [
+                        "100.106.30.16",
+                        "100.106.30.17"
+                    ]
+                }
+            },
+            "storageVlanId": "551"
+        },
+        "operation": "create-service",
+        "rack": {
+            "asmss": "true",
+            "backup_disk": "false",
+            "cores": 30,
+            "create_sparse": "false",
+            "ecra_db_rack_name": "iad1-d2-cl3-025ac6a3-0f7e-4e61-a008-01d7847825d0-clu01",
+            "gb_memory": "90",
+            "gb_storage": 30720,
+            "id": "b773f219-3344-4b00-a07b-02da6d0e6354",
+            "model": "X8M-2",
+            "model_subtype": "elastic",
+            "name": "myclu1",
+            "size": "ELASTIC-RACK",
+            "tb_storage_": "30.0"
+        },
+        "shared_env": "true",
+        "skip_sysimage_version_check": "true",
+        "vm": {
+            "adminPassword": "UnY0I0R5NSMjXzVfTyM=",
+            "cores": 15,
+            "gb_memory": 45,
+            "gb_ohsize": 200,
+            "size": "Large",
+            "sshkey": "c3NoLXJzYSBBQUFBQjNOemFDMXljMkVBQUFBREFRQUJBQUFCQVFEckVxZ2N3aGR6RzVXRHE4SU4xR0ZYODg0YStwdUZWeWRZUU5iZlNPbXRQVnFkQnoxWXJlL3QwM21FWXA4K1EzYktFZjR4RVRKM1F1R0k1YnZiOFBHcVVqOW1kdW9MSncwbDlPdTRLSGxCNFJHMmxiYit0QnlEMzVLck1FeHdycTVzVFg0U254eE5obmtXc0k0anM4UU40bXgxZzZZVlF3V0lrWFk5cXF0dkE1bVRoSkkwakFpYVVkc1pDVlFsQXN6b2Iyd0NPL1RpUXhiV3dKWWg5OXFzRXNQQUtkUFJHd2VjZ2tZMHhaQ2dKZXVxeEFGQ0Z3WW5IRzQ1YWNzMksrVjhZOElaKzRORnBTN3pwbDdMNEtXSEdNOE1wZkV4U3czVWl3SUdsVVVYVWJEa2s4ZldSWEpZMTNjNFdaelFQQUF3WTRtWm1BWDU2d0NJVm1TbDZ6amIgb3JhY2xlQGlhZDFkZXZlY3JhMQ=="
+        }
+}

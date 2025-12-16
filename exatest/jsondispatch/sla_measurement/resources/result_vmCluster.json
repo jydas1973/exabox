@@ -1,0 +1,38 @@
+{
+   "clu01cel01":{
+      "errors":[
+
+      ],
+      "network_status":null,
+      "server_status":1,
+      "timestamp":"",
+      "type":"storage"
+   },
+   "clu02cel02":{
+      "errors":[
+
+      ],
+      "network_status":null,
+      "server_status":0,
+      "timestamp":"",
+      "type":"storage"
+   },
+   "clu01adm01":{
+      "errors":[
+        "Timeout for compute server clu01adm01."  
+      ],
+      "network_status":0,
+      "server_status":0,
+      "timestamp":"",
+      "type":"compute"
+   },
+   "clu01adm02":{
+      "errors":[
+        "Timeout for compute server clu01adm02."  
+      ],
+      "network_status":0,
+      "server_status":0,
+      "timestamp":"",
+      "type":"compute"
+   }
+}

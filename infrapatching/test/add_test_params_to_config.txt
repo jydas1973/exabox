@@ -1,0 +1,101 @@
+#!/bin/python
+#
+# $Header: ecs/exacloud/exabox/infrapatching/test/add_test_params_to_config.txt /main/6 2025/07/22 09:41:33 apotluri Exp $
+#
+# add_test_params_to_config.py
+#
+# Copyright (c) 2023, 2025, Oracle and/or its affiliates.
+#
+#    NAME
+#      add_test_params_to_config.py - This module checks and adds infra patching test config params to config file
+#
+#    DESCRIPTION
+#      This module checks and adds infra patching test config params to config file
+#
+#    NOTES
+#      <other useful comments, qualifications, etc.>
+#
+#    MODIFIED   (MM/DD/YY)
+#    apotluri    07/21/25 - Enhancement Request 37982406 - COMBINE COVERAGE
+#                           REPORTS FROM CLUSTERLESS SETUP AND REGULAR COVERAGE
+#                           RUN SETUP
+#    antamil     05/27/25 - Enable clusterless test for dom0 and use 
+#                           management host as launch node
+#    antamil     04/23/25 - Enable cell test for clusterless patching
+#    apotluri    11/11/24 - Enhancement Request 36845243 - TEST ADDITION TO
+#                           PERFORM PATCH OPERATIONS ON SINGLE VM CLUSTER
+#    apotluri    07/16/24 - Enhancement Request 36664566 - INFRAPATCHING TEST
+#                           AUTOMATION : ADDITION OF TEST TO VALIDATE PDB
+#                           DOWNTIME SCENARIO
+#    emekala     07/20/23 - ENH 35579094 - INFRAPATCHING TEST AUTOMATION -
+#                           ecraupgrade.sh must backup and restore rack
+#                           specific test config and payload files to make the
+#                           script generic
+#    emekala     07/20/23 - Creation
+#
+
+import json
+import traceback
+from utils import mPatchLogPrint, mPatchLogError
+from constants import TEST_INFRAPATCHING_CONFIG_FILE_LOCATION, EXIT_SUCCESS, EXIT_FAILURE
+
+INFRA_PATCHING_TEST_CONFIG_PARAMS  = """{
+    "max_sanity_check_status_poll_time_in_seconds": 600,
+    "dbcs_agent_port": 7070,
+    "ignore_dcs_agent_sanity_checks": "True",
+    "last_completed_test_execution_step_for_code_coverage": 0,
+    "disable_exacloud_plugin_execution": "False",
+    "disable_time_profile_data_validation": "False",
+    "enable_time_diff_analysis": "True",
+    "is_r1_env": "False",
+    "is_exacompute": "False",
+    "is_clusterless": "False",
+    "cell_cabinet": "SEA201402",
+    "compute_cabinet": "SEA201419",
+    "management_host_name": "sea2edcsmgmtdev3.emagent.adminsea2.oraclevcn.com",
+    "node_selection_method": "IncludeNodeList",
+    "oracle_dbname": "orclcdb",
+    "oracle_dbuser": "sys",
+    "oracle_dbsecret": "Welcome#123",
+    "single_node_vm_cluster_patching": "False",
+    "single_node_vm_cluster": "None",
+    "clusterless_exacloud_path": ""
+}"""
+
+
+def addInfraPatchingTestParamsToConfig():
+    
+    """
+    This is a generic method to check and add new test config parameters into config json file.
+    """
+    try:
+        with open(TEST_INFRAPATCHING_CONFIG_FILE_LOCATION) as configFile:
+            configFile_dict = json.load(configFile)
+        configFile.close()
+
+        for key, value in json.loads(INFRA_PATCHING_TEST_CONFIG_PARAMS).items():
+            if key not in configFile_dict:
+                configFile_dict[key] = value
+                mPatchLogPrint ("[SUCCESS]---> key: '%s' is missing in config file hence adding the key with value: %s into config file: %s" % (key, value, TEST_INFRAPATCHING_CONFIG_FILE_LOCATION))
+            else:
+                if value != configFile_dict[key]:
+                    if key == 'last_completed_test_execution_step_for_code_coverage':
+                        configFile_dict[key] = value
+                        mPatchLogPrint ("[SUCCESS]---> key: '%s' value reset to: %s in config file: %s" % (key, value, TEST_INFRAPATCHING_CONFIG_FILE_LOCATION))
+                    else:
+                        mPatchLogPrint ("[WARNING] key: '%s' already present in config file: %s. Its value: %s in config file could be customized to the env hence skipping updating the config value with the default value: %s" % (key, TEST_INFRAPATCHING_CONFIG_FILE_LOCATION, configFile_dict[key], value))
+                else:
+                    mPatchLogPrint ("key: '%s' already present in config file: %s and its config value: %s matches with the default value: %s" % (key, TEST_INFRAPATCHING_CONFIG_FILE_LOCATION, configFile_dict[key], value))
+
+        with open(TEST_INFRAPATCHING_CONFIG_FILE_LOCATION, 'w') as configFile:
+            json.dump(configFile_dict, configFile, indent = 4)
+        configFile.close()
+
+        return EXIT_SUCCESS
+    except Exception as E:
+        mPatchLogError("Addition config parameters to config file: %s failed." % (TEST_INFRAPATCHING_CONFIG_FILE_LOCATION))
+        mPatchLogPrint(traceback.format_exc())
+        return EXIT_FAILURE
+
+if __name__ == '__main__':
+    addInfraPatchingTestParamsToConfig()

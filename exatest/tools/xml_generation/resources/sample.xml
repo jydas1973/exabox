@@ -1,0 +1,1207 @@
+<?xml version="1.0" ?>
+<engineeredSystem filetype="PAAS" oedaversion="17.089.19:00" xmlns="model">
+    <actions>
+        <action>
+            <subCommand/>
+        </action>
+    </actions>
+    <configKeys>
+        <configKey/>
+    </configKeys>
+    <customerName/>
+    <databases>
+        <database id="cdb0_db_id">
+            <cdbId>_db_id</cdbId>
+            <characterset>AL32UTF8</characterset>
+            <databaseBlockSize>8192</databaseBlockSize>
+            <databaseHome id="c0_dbhome_id"/>
+            <databaseOwner>oracle_id</databaseOwner>
+            <databaseSid>cdb0</databaseSid>
+            <databaseTemplate>OLTP</databaseTemplate>
+            <databaseType>cdb</databaseType>
+            <diskGroups>
+                <diskGroup id="recodg_id"/>
+                <diskGroup id="datadg_id"/>
+            </diskGroups>
+            <language>all_langs</language>
+            <machines>
+                <machine id="nshqaw12adm04vm01.us.oracle.com_id"/>
+                <machine id="nshqaw12adm03vm01.us.oracle.com_id"/>
+            </machines>
+            <version>2</version>
+        </database>
+        <database id="pdb0_db_id">
+            <cdbId>cdb0_db_id</cdbId>
+            <characterset>AL32UTF8</characterset>
+            <databaseHome id="c0_dbhome_id"/>
+            <databaseOwner>oracle_id</databaseOwner>
+            <databaseSid>pdb0</databaseSid>
+            <databaseTemplate>OLTP</databaseTemplate>
+            <databaseType>pdb</databaseType>
+            <language>all_langs</language>
+            <machines>
+                <machine id="nshqaw12adm04vm01.us.oracle.com_id"/>
+                <machine id="nshqaw12adm03vm01.us.oracle.com_id"/>
+            </machines>
+            <version>2</version>
+        </database>
+    </databases>
+    <departmentName/>
+    <esPrefix/>
+    <esRacks>
+        <esRack id="rack_c0">
+            <esRackItem id="nshqaw12celadm06.us.oracle.com_id">
+                <rackItemDescription>EXADATA</rackItemDescription>
+                <rackLocation>UNKNOWN</rackLocation>
+                <uHeight>1</uHeight>
+                <uLocation>2</uLocation>
+                <version>version1</version>
+            </esRackItem>
+            <esRackItem id="nshqaw12celadm05.us.oracle.com_id">
+                <rackItemDescription>EXADATA</rackItemDescription>
+                <rackLocation>UNKNOWN</rackLocation>
+                <uHeight>1</uHeight>
+                <uLocation>2</uLocation>
+                <version>version1</version>
+            </esRackItem>
+            <esRackItem id="nshqaw12celadm04.us.oracle.com_id">
+                <rackItemDescription>EXADATA</rackItemDescription>
+                <rackLocation>UNKNOWN</rackLocation>
+                <uHeight>1</uHeight>
+                <uLocation>2</uLocation>
+                <version>version1</version>
+            </esRackItem>
+            <rackDescription>X7-2 Elastic</rackDescription>
+            <rackType>761</rackType>
+            <version>version1</version>
+        </esRack>
+    </esRacks>
+    <exacloud_signature>
+        <exacloud_server/>
+        <exacloud_version/>
+        <last_update/>
+        <operation/>
+    </exacloud_signature>
+    <groups>
+        <group id="1003g_id">
+            <groupId>1003</groupId>
+            <groupName>racoper</groupName>
+            <groupType>OPER_GROUP</groupType>
+            <version>version1</version>
+        </group>
+        <group id="1002g_id">
+            <groupId>1002</groupId>
+            <groupName>dba</groupName>
+            <groupType>DBA_GROUP</groupType>
+            <version>version1</version>
+        </group>
+        <group id="1006g_id">
+            <groupId>1006</groupId>
+            <groupName>asmadmin</groupName>
+            <groupType>OSASM</groupType>
+            <version>version1</version>
+        </group>
+        <group id="1005g_id">
+            <groupId>1005</groupId>
+            <groupName>asmoper</groupName>
+            <groupType>OSOPER</groupType>
+            <version>version1</version>
+        </group>
+        <group id="1004g_id">
+            <groupId>1004</groupId>
+            <groupName>asmdba</groupName>
+            <groupType>OSDBA</groupType>
+            <version>version1</version>
+        </group>
+        <group id="1001g_id">
+            <groupId>1001</groupId>
+            <groupName>oinstall</groupName>
+            <groupType>OINSTALLGROUP</groupType>
+            <version>version1</version>
+        </group>
+    </groups>
+    <iloms>
+        <ilom id="nshqaw12celadm06-c.us.oracle.com_id">
+            <dnsServers/>
+            <ilomName>nshqaw12celadm06-c.us.oracle.com ILOM</ilomName>
+            <ilomTimeZone>America/Los_Angeles</ilomTimeZone>
+            <networks>
+                <network id="nshqaw12celadm06-c.us.oracle.com_id"/>
+            </networks>
+            <ntpServers/>
+            <version>12</version>
+        </ilom>
+        <ilom id="nshqaw12celadm05-c.us.oracle.com_id">
+            <dnsServers/>
+            <ilomName>nshqaw12celadm05-c.us.oracle.com ILOM</ilomName>
+            <ilomTimeZone>America/Los_Angeles</ilomTimeZone>
+            <networks>
+                <network id="nshqaw12celadm05-c.us.oracle.com_id"/>
+            </networks>
+            <ntpServers/>
+            <version>12</version>
+        </ilom>
+        <ilom id="nshqaw12celadm04-c.us.oracle.com_id">
+            <dnsServers/>
+            <ilomName>nshqaw12celadm04-c.us.oracle.com ILOM</ilomName>
+            <ilomTimeZone>America/Los_Angeles</ilomTimeZone>
+            <networks>
+                <network id="nshqaw12celadm04-c.us.oracle.com_id"/>
+            </networks>
+            <ntpServers/>
+            <version>12</version>
+        </ilom>
+        <ilom id="nshqaw12adm04-c.us.oracle.com_id">
+            <dnsServers/>
+            <ilomName>nshqaw12adm04-c.us.oracle.com ILOM</ilomName>
+            <ilomTimeZone>America/Los_Angeles</ilomTimeZone>
+            <networks>
+                <network id="nshqaw12adm04-c.us.oracle.com_id"/>
+            </networks>
+            <ntpServers/>
+            <version>12</version>
+        </ilom>
+        <ilom id="nshqaw12adm03-c.us.oracle.com_id">
+            <dnsServers/>
+            <ilomName>nshqaw12adm03-c.us.oracle.com ILOM</ilomName>
+            <ilomTimeZone>America/Los_Angeles</ilomTimeZone>
+            <networks>
+                <network id="nshqaw12adm03-c.us.oracle.com_id"/>
+            </networks>
+            <ntpServers/>
+            <version>12</version>
+        </ilom>
+        <version/>
+    </iloms>
+    <machines>
+        <machine id="nshqaw12celadm06.us.oracle.com_id">
+            <TimeZone>America/Los_Angeles</TimeZone>
+            <dnsServers/>
+            <hostName>nshqaw12celadm06.us.oracle.com</hostName>
+            <iloms>
+                <ilom id="nshqaw12celadm06-c.us.oracle.com_id"/>
+            </iloms>
+            <machineType>storage</machineType>
+            <networks>
+                <network id="nshqaw12cell06vmclu01-priv2.us.oracle.com_id"/>
+                <network id="nshqaw12cell06vmclu01-priv1.us.oracle.com_id"/>
+                <network id="nshqaw12celadm06.us.oracle.com_id"/>
+            </networks>
+            <ntpServers/>
+            <osType>LinuxPhysical</osType>
+            <storage>
+                <localDisks>
+                    <localDisk id="nshqaw12celadm06.us.oracle.com_CD_10"/>
+                    <localDisk id="nshqaw12celadm06.us.oracle.com_CD_9"/>
+                    <localDisk id="nshqaw12celadm06.us.oracle.com_CD_8"/>
+                    <localDisk id="nshqaw12celadm06.us.oracle.com_CD_7"/>
+                    <localDisk id="nshqaw12celadm06.us.oracle.com_CD_6"/>
+                    <localDisk id="nshqaw12celadm06.us.oracle.com_CD_5"/>
+                    <localDisk id="nshqaw12celadm06.us.oracle.com_CD_4"/>
+                    <localDisk id="nshqaw12celadm06.us.oracle.com_CD_3"/>
+                    <localDisk id="nshqaw12celadm06.us.oracle.com_CD_2"/>
+                    <localDisk id="nshqaw12celadm06.us.oracle.com_CD_1"/>
+                    <localDisk id="nshqaw12celadm06.us.oracle.com_CD_0"/>
+                </localDisks>
+            </storage>
+            <version>version1</version>
+            <virtual>false</virtual>
+            <writeBackFlashCache>true</writeBackFlashCache>
+        </machine>
+        <machine id="nshqaw12celadm05.us.oracle.com_id">
+            <TimeZone>America/Los_Angeles</TimeZone>
+            <dnsServers/>
+            <hostName>nshqaw12celadm05.us.oracle.com</hostName>
+            <iloms>
+                <ilom id="nshqaw12celadm05-c.us.oracle.com_id"/>
+            </iloms>
+            <machineType>storage</machineType>
+            <networks>
+                <network id="nshqaw12cell05vmclu01-priv2.us.oracle.com_id"/>
+                <network id="nshqaw12cell05vmclu01-priv1.us.oracle.com_id"/>
+                <network id="nshqaw12celadm05.us.oracle.com_id"/>
+            </networks>
+            <ntpServers/>
+            <osType>LinuxPhysical</osType>
+            <storage>
+                <localDisks>
+                    <localDisk id="nshqaw12celadm05.us.oracle.com_CD_10"/>
+                    <localDisk id="nshqaw12celadm05.us.oracle.com_CD_9"/>
+                    <localDisk id="nshqaw12celadm05.us.oracle.com_CD_8"/>
+                    <localDisk id="nshqaw12celadm05.us.oracle.com_CD_7"/>
+                    <localDisk id="nshqaw12celadm05.us.oracle.com_CD_6"/>
+                    <localDisk id="nshqaw12celadm05.us.oracle.com_CD_5"/>
+                    <localDisk id="nshqaw12celadm05.us.oracle.com_CD_4"/>
+                    <localDisk id="nshqaw12celadm05.us.oracle.com_CD_3"/>
+                    <localDisk id="nshqaw12celadm05.us.oracle.com_CD_2"/>
+                    <localDisk id="nshqaw12celadm05.us.oracle.com_CD_1"/>
+                    <localDisk id="nshqaw12celadm05.us.oracle.com_CD_0"/>
+                </localDisks>
+            </storage>
+            <version>version1</version>
+            <virtual>false</virtual>
+            <writeBackFlashCache>true</writeBackFlashCache>
+        </machine>
+        <machine id="nshqaw12celadm04.us.oracle.com_id">
+            <TimeZone>America/Los_Angeles</TimeZone>
+            <dnsServers/>
+            <hostName>nshqaw12celadm04.us.oracle.com</hostName>
+            <iloms>
+                <ilom id="nshqaw12celadm04-c.us.oracle.com_id"/>
+            </iloms>
+            <machineType>storage</machineType>
+            <networks>
+                <network id="nshqaw12cell04vmclu01-priv2.us.oracle.com_id"/>
+                <network id="nshqaw12cell04vmclu01-priv1.us.oracle.com_id"/>
+                <network id="nshqaw12celadm04.us.oracle.com_id"/>
+            </networks>
+            <ntpServers/>
+            <osType>LinuxPhysical</osType>
+            <storage>
+                <localDisks>
+                    <localDisk id="nshqaw12celadm04.us.oracle.com_CD_10"/>
+                    <localDisk id="nshqaw12celadm04.us.oracle.com_CD_9"/>
+                    <localDisk id="nshqaw12celadm04.us.oracle.com_CD_8"/>
+                    <localDisk id="nshqaw12celadm04.us.oracle.com_CD_7"/>
+                    <localDisk id="nshqaw12celadm04.us.oracle.com_CD_6"/>
+                    <localDisk id="nshqaw12celadm04.us.oracle.com_CD_5"/>
+                    <localDisk id="nshqaw12celadm04.us.oracle.com_CD_4"/>
+                    <localDisk id="nshqaw12celadm04.us.oracle.com_CD_3"/>
+                    <localDisk id="nshqaw12celadm04.us.oracle.com_CD_2"/>
+                    <localDisk id="nshqaw12celadm04.us.oracle.com_CD_1"/>
+                    <localDisk id="nshqaw12celadm04.us.oracle.com_CD_0"/>
+                </localDisks>
+            </storage>
+            <version>version1</version>
+            <virtual>false</virtual>
+            <writeBackFlashCache>true</writeBackFlashCache>
+        </machine>
+        <machine id="nshqaw12adm03vm01.us.oracle.com_id">
+            <DefaultGatewayNet>nshqaw12adm03vm01.us.oracle.com_client</DefaultGatewayNet>
+            <DomUImageName>default</DomUImageName>
+            <ImageVersion>default</ImageVersion>
+            <TimeZone>America/Los_Angeles</TimeZone>
+            <dnsServers/>
+            <guestCores/>
+            <guestMemory/>
+            <hostName>nshqaw12adm03vm01.us.oracle.com</hostName>
+            <machineType>compute</machineType>
+            <networks>
+                <network id="nshqaw12db01vm01str-priv2.us.oracle.com_id"/>
+                <network id="nshqaw12db01vm01str-priv1.us.oracle.com_id"/>
+                <network id="nshqaw12adm03vm01-bk.us.oracle.com_id"/>
+                <network id="nshqaw12client01vm01.us.oracle.com_id"/>
+                <network id="nshqaw12adm03vm01.us.oracle.com_id"/>
+                <network id="nshqaw12db01vmclu01-priv2.us.oracle.com_id"/>
+                <network id="nshqaw12db01vmclu01-priv1.us.oracle.com_id"/>
+            </networks>
+            <ntpServers/>
+            <osType>LinuxGuest</osType>
+            <software>
+                <clusters>
+                    <cluster id="c0_clusterHome"/>
+                </clusters>
+                <databaseHomes>
+                    <databaseHome id="c0_dbhome_id"/>
+                </databaseHomes>
+            </software>
+            <version>version1</version>
+            <virtual>true</virtual>
+            <vmSizeName id="Large"/>
+        </machine>
+        <machine id="nshqaw12adm03.us.oracle.com_id">
+            <DefaultGatewayNet>nshqaw12adm03.us.oracle.com_admin</DefaultGatewayNet>
+            <TimeZone>America/Los_Angeles</TimeZone>
+            <dnsServers/>
+            <hostName>nshqaw12adm03.us.oracle.com</hostName>
+            <iloms>
+                <ilom id="nshqaw12adm03-c.us.oracle.com_id"/>
+            </iloms>
+            <machine id="nshqaw12adm03vm01.us.oracle.com_id"/>
+            <machineType>compute</machineType>
+            <networks>
+                <network id="nshqaw12adm03-priv2.us.oracle.com_id"/>
+                <network id="nshqaw12adm03-priv1.us.oracle.com_id"/>
+                <network id="nshqaw12adm03.us.oracle.com_id"/>
+            </networks>
+            <ntpServers/>
+            <osType>LinuxDom0</osType>
+            <version>version1</version>
+            <virtual>false</virtual>
+        </machine>
+        <machine id="nshqaw12adm04vm01.us.oracle.com_id">
+            <DefaultGatewayNet>nshqaw12adm04vm01.us.oracle.com_client</DefaultGatewayNet>
+            <DomUImageName>default</DomUImageName>
+            <ImageVersion>default</ImageVersion>
+            <TimeZone>America/Los_Angeles</TimeZone>
+            <dnsServers/>
+            <guestCores/>
+            <guestMemory/>
+            <hostName>nshqaw12adm04vm01.us.oracle.com</hostName>
+            <machineType>compute</machineType>
+            <networks>
+                <network id="nshqaw12db02vm01str-priv2.us.oracle.com_id"/>
+                <network id="nshqaw12db02vm01str-priv1.us.oracle.com_id"/>
+                <network id="nshqaw12adm04vm01-bk.us.oracle.com_id"/>
+                <network id="nshqaw12client02vm01.us.oracle.com_id"/>
+                <network id="nshqaw12adm04vm01.us.oracle.com_id"/>
+                <network id="nshqaw12db02vmclu01-priv2.us.oracle.com_id"/>
+                <network id="nshqaw12db02vmclu01-priv1.us.oracle.com_id"/>
+            </networks>
+            <ntpServers/>
+            <osType>LinuxGuest</osType>
+            <software>
+                <clusters>
+                    <cluster id="c0_clusterHome"/>
+                </clusters>
+                <databaseHomes>
+                    <databaseHome id="c0_dbhome_id"/>
+                </databaseHomes>
+            </software>
+            <version>version1</version>
+            <virtual>true</virtual>
+            <vmSizeName id="Large"/>
+        </machine>
+        <machine id="nshqaw12adm04.us.oracle.com_id">
+            <DefaultGatewayNet>nshqaw12adm04.us.oracle.com_admin</DefaultGatewayNet>
+            <TimeZone>America/Los_Angeles</TimeZone>
+            <dnsServers/>
+            <hostName>nshqaw12adm04.us.oracle.com</hostName>
+            <iloms>
+                <ilom id="nshqaw12adm04-c.us.oracle.com_id"/>
+            </iloms>
+            <machine id="nshqaw12adm04vm01.us.oracle.com_id"/>
+            <machineType>compute</machineType>
+            <networks>
+                <network id="nshqaw12adm04-priv2.us.oracle.com_id"/>
+                <network id="nshqaw12adm04-priv1.us.oracle.com_id"/>
+                <network id="nshqaw12adm04.us.oracle.com_id"/>
+            </networks>
+            <ntpServers/>
+            <osType>LinuxDom0</osType>
+            <version>version1</version>
+            <virtual>false</virtual>
+        </machine>
+    </machines>
+    <networks>
+        <network id="nshqaw12celadm06-c.us.oracle.com_id">
+            <domainName>us.oracle.com</domainName>
+            <gateway>10.31.16.1</gateway>
+            <hostName>nshqaw12celadm06-c</hostName>
+            <ipAddress>10.31.16.113</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <networkName>nshqaw12celadm06-c.us.oracle.com ILOM</networkName>
+            <networkType>Ilom</networkType>
+            <vlanId/>
+        </network>
+        <network id="nshqaw12cell06vmclu01-priv2.us.oracle.com_id">
+            <domainName>us.oracle.com</domainName>
+            <hostName>nshqaw12cell06vmclu01-priv2</hostName>
+            <ipAddress>192.168.12.120</ipAddress>
+            <master>ib1</master>
+            <netMask>255.255.255.0</netMask>
+            <networkName>nshqaw12cell06vmclu01-priv2.us.oracle.com Priv</networkName>
+            <networkType>private</networkType>
+            <pkey>0xa127</pkey>
+            <pkeyName>stib1</pkeyName>
+            <slave/>
+            <version>version1</version>
+            <vlanId/>
+        </network>
+        <network id="nshqaw12cell06vmclu01-priv1.us.oracle.com_id">
+            <domainName>us.oracle.com</domainName>
+            <hostName>nshqaw12cell06vmclu01-priv1</hostName>
+            <ipAddress>192.168.12.119</ipAddress>
+            <master>ib0</master>
+            <netMask>255.255.255.0</netMask>
+            <networkName>nshqaw12cell06vmclu01-priv1.us.oracle.com Priv</networkName>
+            <networkType>private</networkType>
+            <pkey>0xa127</pkey>
+            <pkeyName>stib0</pkeyName>
+            <slave/>
+            <version>version1</version>
+            <vlanId/>
+        </network>
+        <network id="nshqaw12celadm06.us.oracle.com_id">
+            <domainName>us.oracle.com</domainName>
+            <gateway>10.31.112.1</gateway>
+            <hostName>nshqaw12celadm06</hostName>
+            <ipAddress>10.31.112.14</ipAddress>
+            <master>eth0</master>
+            <netMask>255.255.255.0</netMask>
+            <networkName>nshqaw12celadm06.us.oracle.com Admin</networkName>
+            <networkType>admin</networkType>
+            <slave/>
+            <version>version1</version>
+            <vlanId/>
+        </network>
+        <network id="nshqaw12celadm05-c.us.oracle.com_id">
+            <domainName>us.oracle.com</domainName>
+            <gateway>10.31.16.1</gateway>
+            <hostName>nshqaw12celadm05-c</hostName>
+            <ipAddress>10.31.16.112</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <networkName>nshqaw12celadm05-c.us.oracle.com ILOM</networkName>
+            <networkType>Ilom</networkType>
+            <vlanId/>
+        </network>
+        <network id="nshqaw12cell05vmclu01-priv2.us.oracle.com_id">
+            <domainName>us.oracle.com</domainName>
+            <hostName>nshqaw12cell05vmclu01-priv2</hostName>
+            <ipAddress>192.168.12.118</ipAddress>
+            <master>ib1</master>
+            <netMask>255.255.255.0</netMask>
+            <networkName>nshqaw12cell05vmclu01-priv2.us.oracle.com Priv</networkName>
+            <networkType>private</networkType>
+            <pkey>0xa127</pkey>
+            <pkeyName>stib1</pkeyName>
+            <slave/>
+            <version>version1</version>
+            <vlanId/>
+        </network>
+        <network id="nshqaw12cell05vmclu01-priv1.us.oracle.com_id">
+            <domainName>us.oracle.com</domainName>
+            <hostName>nshqaw12cell05vmclu01-priv1</hostName>
+            <ipAddress>192.168.12.117</ipAddress>
+            <master>ib0</master>
+            <netMask>255.255.255.0</netMask>
+            <networkName>nshqaw12cell05vmclu01-priv1.us.oracle.com Priv</networkName>
+            <networkType>private</networkType>
+            <pkey>0xa127</pkey>
+            <pkeyName>stib0</pkeyName>
+            <slave/>
+            <version>version1</version>
+            <vlanId/>
+        </network>
+        <network id="nshqaw12celadm05.us.oracle.com_id">
+            <domainName>us.oracle.com</domainName>
+            <gateway>10.31.112.1</gateway>
+            <hostName>nshqaw12celadm05</hostName>
+            <ipAddress>10.31.112.13</ipAddress>
+            <master>eth0</master>
+            <netMask>255.255.255.0</netMask>
+            <networkName>nshqaw12celadm05.us.oracle.com Admin</networkName>
+            <networkType>admin</networkType>
+            <slave/>
+            <version>version1</version>
+            <vlanId/>
+        </network>
+        <network id="nshqaw12celadm04-c.us.oracle.com_id">
+            <domainName>us.oracle.com</domainName>
+            <gateway>10.31.16.1</gateway>
+            <hostName>nshqaw12celadm04-c</hostName>
+            <ipAddress>10.31.16.111</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <networkName>nshqaw12celadm04-c.us.oracle.com ILOM</networkName>
+            <networkType>Ilom</networkType>
+            <vlanId/>
+        </network>
+        <network id="nshqaw12cell04vmclu01-priv2.us.oracle.com_id">
+            <domainName>us.oracle.com</domainName>
+            <hostName>nshqaw12cell04vmclu01-priv2</hostName>
+            <ipAddress>192.168.12.116</ipAddress>
+            <master>ib1</master>
+            <netMask>255.255.255.0</netMask>
+            <networkName>nshqaw12cell04vmclu01-priv2.us.oracle.com Priv</networkName>
+            <networkType>private</networkType>
+            <pkey>0xa127</pkey>
+            <pkeyName>stib1</pkeyName>
+            <slave/>
+            <version>version1</version>
+            <vlanId/>
+        </network>
+        <network id="nshqaw12cell04vmclu01-priv1.us.oracle.com_id">
+            <domainName>us.oracle.com</domainName>
+            <hostName>nshqaw12cell04vmclu01-priv1</hostName>
+            <ipAddress>192.168.12.115</ipAddress>
+            <master>ib0</master>
+            <netMask>255.255.255.0</netMask>
+            <networkName>nshqaw12cell04vmclu01-priv1.us.oracle.com Priv</networkName>
+            <networkType>private</networkType>
+            <pkey>0xa127</pkey>
+            <pkeyName>stib0</pkeyName>
+            <slave/>
+            <version>version1</version>
+            <vlanId/>
+        </network>
+        <network id="nshqaw12celadm04.us.oracle.com_id">
+            <domainName>us.oracle.com</domainName>
+            <gateway>10.31.112.1</gateway>
+            <hostName>nshqaw12celadm04</hostName>
+            <ipAddress>10.31.112.12</ipAddress>
+            <master>eth0</master>
+            <netMask>255.255.255.0</netMask>
+            <networkName>nshqaw12celadm04.us.oracle.com Admin</networkName>
+            <networkType>admin</networkType>
+            <slave/>
+            <version>version1</version>
+            <vlanId/>
+        </network>
+        <network id="nshqaw12db02vm01str-priv2.us.oracle.com_id">
+            <domainName>us.oracle.com</domainName>
+            <hostName>nshqaw12db02vm01str-priv2</hostName>
+            <ipAddress>192.168.12.28</ipAddress>
+            <master>ib1</master>
+            <netMask>255.255.255.0</netMask>
+            <networkName>nshqaw12db02vm01str-priv2.us.oracle.com ClusterPriv</networkName>
+            <networkType>private</networkType>
+            <pkey>0xa127</pkey>
+            <pkeyName>clib1</pkeyName>
+            <slave/>
+            <version>version1</version>
+        </network>
+        <network id="nshqaw12db02vm01str-priv1.us.oracle.com_id">
+            <domainName>us.oracle.com</domainName>
+            <hostName>nshqaw12db02vm01str-priv1</hostName>
+            <ipAddress>192.168.12.27</ipAddress>
+            <master>ib1</master>
+            <netMask>255.255.255.0</netMask>
+            <networkName>nshqaw12db02vm01str-priv1.us.oracle.com ClusterPriv</networkName>
+            <networkType>private</networkType>
+            <pkey>0xa127</pkey>
+            <pkeyName>clib0</pkeyName>
+            <slave/>
+            <version>version1</version>
+        </network>
+        <network id="nshqaw12adm04vm01-bk.us.oracle.com_id">
+            <domainName>us.oracle.com</domainName>
+            <hostName>nshqaw12adm04vm01-bk</hostName>
+            <ipAddress>10.31.127.15</ipAddress>
+            <master>bondeth1</master>
+            <netMask>255.255.255.0</netMask>
+            <networkName>nshqaw12adm04vm01-bk.us.oracle.com Backup</networkName>
+            <networkType>backup</networkType>
+            <slave>eth4 eth5</slave>
+            <version>version1</version>
+            <vlanId/>
+        </network>
+        <network id="nshqaw12client02vm01.us.oracle.com_id">
+            <domainName>domus.oracle.com</domainName>
+            <gateway>10.31.124.1</gateway>
+            <hostName>nshqaw12client01vm01</hostName>
+            <ipAddress>10.31.124.64</ipAddress>
+            <master>eth0</master>
+            <netMask>255.255.254.0</netMask>
+            <networkName>nshqaw12client02vm01.us.oracle.com Admin</networkName>
+            <networkType>admin</networkType>
+            <slave/>
+            <version>version1</version>
+            <vlanId/>
+        </network>
+        <network id="nshqaw12adm04vm01.us.oracle.com_id">
+            <domainName>us.oracle.com</domainName>
+            <gateway/>
+            <hostName>nshqaw12adm04vm01</hostName>
+            <ipAddress>10.31.126.15</ipAddress>
+            <master>eth0</master>
+            <netMask>255.255.255.0</netMask>
+            <networkName>nshqaw12adm04vm01.us.oracle.com Admin</networkName>
+            <networkType>admin</networkType>
+            <slave/>
+            <version>version1</version>
+            <vlanId/>
+        </network>
+        <network id="nshqaw12db02vmclu01-priv2.us.oracle.com_id">
+            <domainName>us.oracle.com</domainName>
+            <hostName>nshqaw12db02vmclu01-priv2</hostName>
+            <ipAddress>192.168.124.4</ipAddress>
+            <master>ib1</master>
+            <netMask>255.255.255.0</netMask>
+            <networkName>nshqaw12db02vmclu01-priv2.us.oracle.com Priv</networkName>
+            <networkType>private</networkType>
+            <pkey>0xa127</pkey>
+            <pkeyName>stib1</pkeyName>
+            <slave/>
+            <version>version1</version>
+            <vlanId/>
+        </network>
+        <network id="nshqaw12db02vmclu01-priv1.us.oracle.com_id">
+            <domainName>us.oracle.com</domainName>
+            <hostName>nshqaw12db02vmclu01-priv1</hostName>
+            <ipAddress>192.168.124.3</ipAddress>
+            <master>ib0</master>
+            <netMask>255.255.255.0</netMask>
+            <networkName>nshqaw12db02vmclu01-priv1.us.oracle.com Priv</networkName>
+            <networkType>private</networkType>
+            <pkey>0xa127</pkey>
+            <pkeyName>stib0</pkeyName>
+            <slave/>
+            <version>version1</version>
+            <vlanId/>
+        </network>
+        <network id="nshqaw12adm04-c.us.oracle.com_id">
+            <domainName>us.oracle.com</domainName>
+            <gateway>10.31.16.1</gateway>
+            <hostName>nshqaw12adm04-c</hostName>
+            <ipAddress>10.31.16.104</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <networkName>nshqaw12adm04-c.us.oracle.com ILOM</networkName>
+            <networkType>Ilom</networkType>
+            <vlanId/>
+        </network>
+        <network id="nshqaw12adm04-priv2.us.oracle.com_id">
+            <domainName>us.oracle.com</domainName>
+            <hostName>nshqaw12adm04-priv2</hostName>
+            <ipAddress>192.168.128.6</ipAddress>
+            <master>ib1</master>
+            <netMask>255.255.255.0</netMask>
+            <networkName>nshqaw12adm04-priv2.us.oracle.com Priv</networkName>
+            <networkType>private</networkType>
+            <slave/>
+            <version>version1</version>
+            <vlanId/>
+        </network>
+        <network id="nshqaw12adm04-priv1.us.oracle.com_id">
+            <domainName>us.oracle.com</domainName>
+            <hostName>nshqaw12adm04-priv1</hostName>
+            <ipAddress>192.168.128.5</ipAddress>
+            <master>ib0</master>
+            <netMask>255.255.255.0</netMask>
+            <networkName>nshqaw12adm04-priv1.us.oracle.com Priv</networkName>
+            <networkType>private</networkType>
+            <slave/>
+            <version>version1</version>
+            <vlanId/>
+        </network>
+        <network id="nshqaw12adm04.us.oracle.com_id">
+            <domainName>us.oracle.com</domainName>
+            <gateway>10.31.112.1</gateway>
+            <hostName>nshqaw12adm04</hostName>
+            <ipAddress>10.31.112.5</ipAddress>
+            <master>eth0</master>
+            <netMask>255.255.255.0</netMask>
+            <networkName>nshqaw12adm04.us.oracle.com Admin</networkName>
+            <networkType>admin</networkType>
+            <slave/>
+            <version>version1</version>
+            <vlanId/>
+        </network>
+        <network id="nshqaw12db01vm01str-priv2.us.oracle.com_id">
+            <domainName>us.oracle.com</domainName>
+            <hostName>nshqaw12db01vm01str-priv2</hostName>
+            <ipAddress>192.168.12.26</ipAddress>
+            <master>ib1</master>
+            <netMask>255.255.255.0</netMask>
+            <networkName>nshqaw12db01vm01str-priv2.us.oracle.com ClusterPriv</networkName>
+            <networkType>private</networkType>
+            <pkey>0xa127</pkey>
+            <pkeyName>clib1</pkeyName>
+            <slave/>
+            <version>version1</version>
+        </network>
+        <network id="nshqaw12db01vm01str-priv1.us.oracle.com_id">
+            <domainName>us.oracle.com</domainName>
+            <hostName>nshqaw12db01vm01str-priv1</hostName>
+            <ipAddress>192.168.12.25</ipAddress>
+            <master>ib1</master>
+            <netMask>255.255.255.0</netMask>
+            <networkName>nshqaw12db01vm01str-priv1.us.oracle.com ClusterPriv</networkName>
+            <networkType>private</networkType>
+            <pkey>0xa127</pkey>
+            <pkeyName>clib0</pkeyName>
+            <slave/>
+            <version>version1</version>
+        </network>
+        <network id="nshqaw12adm03vm01-bk.us.oracle.com_id">
+            <domainName>us.oracle.com</domainName>
+            <hostName>nshqaw12adm03vm01-bk</hostName>
+            <ipAddress>10.31.127.14</ipAddress>
+            <master>bondeth1</master>
+            <netMask>255.255.255.0</netMask>
+            <networkName>nshqaw12adm03vm01-bk.us.oracle.com Backup</networkName>
+            <networkType>backup</networkType>
+            <slave>eth4 eth5</slave>
+            <version>version1</version>
+            <vlanId/>
+        </network>
+        <network id="nshqaw12client01vm01.us.oracle.com_id">
+            <domainName>domus.oracle.com</domainName>
+            <gateway>10.31.124.1</gateway>
+            <hostName>nshqaw12client01vm01</hostName>
+            <ipAddress>10.31.124.63</ipAddress>
+            <master>eth0</master>
+            <netMask>255.255.254.0</netMask>
+            <networkName>nshqaw12client01vm01.us.oracle.com Admin</networkName>
+            <networkType>admin</networkType>
+            <slave/>
+            <version>version1</version>
+            <vlanId/>
+        </network>
+        <network id="nshqaw12adm03vm01.us.oracle.com_id">
+            <domainName>us.oracle.com</domainName>
+            <gateway/>
+            <hostName>nshqaw12adm03vm01</hostName>
+            <ipAddress>10.31.126.14</ipAddress>
+            <master>eth0</master>
+            <netMask>255.255.255.0</netMask>
+            <networkName>nshqaw12adm03vm01.us.oracle.com Admin</networkName>
+            <networkType>admin</networkType>
+            <slave/>
+            <version>version1</version>
+            <vlanId/>
+        </network>
+        <network id="nshqaw12db01vmclu01-priv2.us.oracle.com_id">
+            <domainName>us.oracle.com</domainName>
+            <hostName>nshqaw12db01vmclu01-priv2</hostName>
+            <ipAddress>192.168.124.2</ipAddress>
+            <master>ib1</master>
+            <netMask>255.255.255.0</netMask>
+            <networkName>nshqaw12db01vmclu01-priv2.us.oracle.com Priv</networkName>
+            <networkType>private</networkType>
+            <pkey>0xa127</pkey>
+            <pkeyName>stib1</pkeyName>
+            <slave/>
+            <version>version1</version>
+            <vlanId/>
+        </network>
+        <network id="nshqaw12db01vmclu01-priv1.us.oracle.com_id">
+            <domainName>us.oracle.com</domainName>
+            <hostName>nshqaw12db01vmclu01-priv1</hostName>
+            <ipAddress>192.168.124.1</ipAddress>
+            <master>ib0</master>
+            <netMask>255.255.255.0</netMask>
+            <networkName>nshqaw12db01vmclu01-priv1.us.oracle.com Priv</networkName>
+            <networkType>private</networkType>
+            <pkey>0xa127</pkey>
+            <pkeyName>stib0</pkeyName>
+            <slave/>
+            <version>version1</version>
+            <vlanId/>
+        </network>
+        <network id="nshqaw12adm03-c.us.oracle.com_id">
+            <domainName>us.oracle.com</domainName>
+            <gateway>10.31.16.1</gateway>
+            <hostName>nshqaw12adm03-c</hostName>
+            <ipAddress>10.31.16.103</ipAddress>
+            <netMask>255.255.255.0</netMask>
+            <networkName>nshqaw12adm03-c.us.oracle.com ILOM</networkName>
+            <networkType>Ilom</networkType>
+            <vlanId/>
+        </network>
+        <network id="nshqaw12adm03-priv2.us.oracle.com_id">
+            <domainName>us.oracle.com</domainName>
+            <hostName>nshqaw12adm03-priv2</hostName>
+            <ipAddress>192.168.128.4</ipAddress>
+            <master>ib1</master>
+            <netMask>255.255.255.0</netMask>
+            <networkName>nshqaw12adm03-priv2.us.oracle.com Priv</networkName>
+            <networkType>private</networkType>
+            <slave/>
+            <version>version1</version>
+            <vlanId/>
+        </network>
+        <network id="nshqaw12adm03-priv1.us.oracle.com_id">
+            <domainName>us.oracle.com</domainName>
+            <hostName>nshqaw12adm03-priv1</hostName>
+            <ipAddress>192.168.128.3</ipAddress>
+            <master>ib0</master>
+            <netMask>255.255.255.0</netMask>
+            <networkName>nshqaw12adm03-priv1.us.oracle.com Priv</networkName>
+            <networkType>private</networkType>
+            <slave/>
+            <version>version1</version>
+            <vlanId/>
+        </network>
+        <network id="nshqaw12adm03.us.oracle.com_id">
+            <domainName>us.oracle.com</domainName>
+            <gateway>10.31.112.1</gateway>
+            <hostName>nshqaw12adm03</hostName>
+            <ipAddress>10.31.112.4</ipAddress>
+            <master>eth0</master>
+            <netMask>255.255.255.0</netMask>
+            <networkName>nshqaw12adm03.us.oracle.com Admin</networkName>
+            <networkType>admin</networkType>
+            <slave/>
+            <version>version1</version>
+            <vlanId/>
+        </network>
+        <network id="nshqaw12sw-ibb0.us.oracle.com_id">
+            <domainName/>
+            <gateway>10.31.112.1</gateway>
+            <hostName/>
+            <ipAddress>10.31.112.26</ipAddress>
+            <master>eth0</master>
+            <netMask>255.255.255.0</netMask>
+            <networkName>nshqaw12sw-ibb0.us.oracle.com Admin</networkName>
+            <networkType>admin</networkType>
+            <slave/>
+            <version>version1</version>
+            <vlanId/>
+        </network>
+        <network id="nshqaw12sw-iba0.us.oracle.com_id">
+            <domainName/>
+            <gateway>10.31.112.1</gateway>
+            <hostName/>
+            <ipAddress>10.31.112.25</ipAddress>
+            <master>eth0</master>
+            <netMask>255.255.255.0</netMask>
+            <networkName>nshqaw12sw-iba0.us.oracle.com Admin</networkName>
+            <networkType>admin</networkType>
+            <slave/>
+            <version>version1</version>
+            <vlanId/>
+        </network>
+        <network id="nshqaw12sw-adm0.us.oracle.com_id">
+            <domainName/>
+            <gateway>10.31.16.1</gateway>
+            <hostName/>
+            <ipAddress>10.31.16.125</ipAddress>
+            <master>eth0</master>
+            <netMask>255.255.255.0</netMask>
+            <networkName>nshqaw12sw-adm0.us.oracle.com Admin</networkName>
+            <networkType>admin</networkType>
+            <slave/>
+            <version>version1</version>
+            <vlanId/>
+        </network>
+    </networks>
+    <platinum>
+        <platinumEnabled/>
+        <version/>
+    </platinum>
+    <software>
+        <clusters>
+            <cluster id="c0_clusterHome">
+                <backupLocation>external</backupLocation>
+                <basedir>/u01/app/grid</basedir>
+                <clusterHome>/u01/app/12.1.0.2/grid</clusterHome>
+                <clusterName>c0</clusterName>
+                <clusterOwner>grid_id</clusterOwner>
+                <clusterScans/>
+                <clusterVersion>12.1.0.2.10</clusterVersion>
+                <clusterVips>
+                    <clusterVip id="nshqaw12client02vm01-vip.us.oracle.com_id">
+                        <domainName>us.oracle.com</domainName>
+                        <machines>
+                            <machine id="nshqaw12adm04vm01.us.oracle.com_id"/>
+                        </machines>
+                        <vipIpAddress>10.31.124.66</vipIpAddress>
+                        <vipName>nshqaw12client02vm01-vip</vipName>
+                    </clusterVip>
+                    <clusterVip id="nshqaw12client01vm01-vip.us.oracle.com_id">
+                        <domainName>us.oracle.com</domainName>
+                        <machines>
+                            <machine id="nshqaw12adm03vm01.us.oracle.com_id"/>
+                        </machines>
+                        <vipIpAddress>10.31.124.65</vipIpAddress>
+                        <vipName>nshqaw12client01vm01-vip</vipName>
+                    </clusterVip>
+                </clusterVips>
+                <diskGroups>
+                    <diskGroup id="recodg_id"/>
+                    <diskGroup id="datadg_id"/>
+                </diskGroups>
+                <inventoryLocation>/u01/app/oraInventory</inventoryLocation>
+                <language>all_langs</language>
+                <patches/>
+                <version>CloneInstall</version>
+            </cluster>
+            <clusterScans>
+                <clusterScan>
+                    <scanIps>
+                        <scanIp>
+                            <ipAddress/>
+                        </scanIp>
+                    </scanIps>
+                    <scanName/>
+                    <scanPort/>
+                    <scanType/>
+                </clusterScan>
+            </clusterScans>
+        </clusters>
+        <databaseHomes>
+            <databaseHome id="c0_dbhome_id">
+                <basedir>/u01/app/oracle</basedir>
+                <cluster id="c0_clusterHome"/>
+                <databaseHomeLoc>/u01/app/oracle/product/12.1.0.2/dbhome_1</databaseHomeLoc>
+                <databaseHomeName>cdb0_id</databaseHomeName>
+                <databaseSwOwner>oracle_id</databaseSwOwner>
+                <databaseVersion>12.1.0.2.10</databaseVersion>
+                <inventoryLocation>/u01/app/oraInventory</inventoryLocation>
+                <language>all_langs</language>
+                <machines>
+                    <machine id="nshqaw12adm04vm01.us.oracle.com_id"/>
+                    <machine id="nshqaw12adm03vm01.us.oracle.com_id"/>
+                </machines>
+                <patches/>
+                <useZfs>false</useZfs>
+                <version>CloneInstall</version>
+            </databaseHome>
+        </databaseHomes>
+    </software>
+    <storage>
+        <diskGroups>
+            <diskGroup id="recodg_id">
+                <cellDisks>ALL</cellDisks>
+                <diskGroupName>RECOC0</diskGroupName>
+                <diskGroupSize>612G</diskGroupSize>
+                <machines>
+                    <machine id="nshqaw12celadm06.us.oracle.com_id"/>
+                    <machine id="nshqaw12celadm05.us.oracle.com_id"/>
+                    <machine id="nshqaw12celadm04.us.oracle.com_id"/>
+                </machines>
+                <ocrVote>false</ocrVote>
+                <quorumDisk>false</quorumDisk>
+                <redundancy>HIGH</redundancy>
+                <sliceSize>51G</sliceSize>
+                <version>VirtualLayaout</version>
+            </diskGroup>
+            <diskGroup id="datadg_id">
+                <cellDisks>ALL</cellDisks>
+                <diskGroupName>DATAC0</diskGroupName>
+                <diskGroupSize>612G</diskGroupSize>
+                <machines>
+                    <machine id="nshqaw12celadm06.us.oracle.com_id"/>
+                    <machine id="nshqaw12celadm05.us.oracle.com_id"/>
+                    <machine id="nshqaw12celadm04.us.oracle.com_id"/>
+                </machines>
+                <ocrVote>false</ocrVote>
+                <quorumDisk>false</quorumDisk>
+                <redundancy>HIGH</redundancy>
+                <sliceSize>51G</sliceSize>
+                <version>VirtualLayaout</version>
+            </diskGroup>
+            <version/>
+        </diskGroups>
+        <localDisks>
+            <localDisk id="nshqaw12celadm06.us.oracle.com_CD_10">
+                <localDiskName>CD_10</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+                <version>Version12</version>
+            </localDisk>
+            <localDisk id="nshqaw12celadm06.us.oracle.com_CD_9">
+                <localDiskName>CD_9</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+                <version>Version12</version>
+            </localDisk>
+            <localDisk id="nshqaw12celadm06.us.oracle.com_CD_8">
+                <localDiskName>CD_8</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+                <version>Version12</version>
+            </localDisk>
+            <localDisk id="nshqaw12celadm06.us.oracle.com_CD_7">
+                <localDiskName>CD_7</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+                <version>Version12</version>
+            </localDisk>
+            <localDisk id="nshqaw12celadm06.us.oracle.com_CD_6">
+                <localDiskName>CD_6</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+                <version>Version12</version>
+            </localDisk>
+            <localDisk id="nshqaw12celadm06.us.oracle.com_CD_5">
+                <localDiskName>CD_5</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+                <version>Version12</version>
+            </localDisk>
+            <localDisk id="nshqaw12celadm06.us.oracle.com_CD_4">
+                <localDiskName>CD_4</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+                <version>Version12</version>
+            </localDisk>
+            <localDisk id="nshqaw12celadm06.us.oracle.com_CD_3">
+                <localDiskName>CD_3</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+                <version>Version12</version>
+            </localDisk>
+            <localDisk id="nshqaw12celadm06.us.oracle.com_CD_2">
+                <localDiskName>CD_2</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+                <version>Version12</version>
+            </localDisk>
+            <localDisk id="nshqaw12celadm06.us.oracle.com_CD_1">
+                <localDiskName>CD_1</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+                <version>Version12</version>
+            </localDisk>
+            <localDisk id="nshqaw12celadm06.us.oracle.com_CD_0">
+                <localDiskName>CD_0</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+                <version>Version12</version>
+            </localDisk>
+            <localDisk id="nshqaw12celadm05.us.oracle.com_CD_10">
+                <localDiskName>CD_10</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+                <version>Version12</version>
+            </localDisk>
+            <localDisk id="nshqaw12celadm05.us.oracle.com_CD_9">
+                <localDiskName>CD_9</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+                <version>Version12</version>
+            </localDisk>
+            <localDisk id="nshqaw12celadm05.us.oracle.com_CD_8">
+                <localDiskName>CD_8</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+                <version>Version12</version>
+            </localDisk>
+            <localDisk id="nshqaw12celadm05.us.oracle.com_CD_7">
+                <localDiskName>CD_7</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+                <version>Version12</version>
+            </localDisk>
+            <localDisk id="nshqaw12celadm05.us.oracle.com_CD_6">
+                <localDiskName>CD_6</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+                <version>Version12</version>
+            </localDisk>
+            <localDisk id="nshqaw12celadm05.us.oracle.com_CD_5">
+                <localDiskName>CD_5</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+                <version>Version12</version>
+            </localDisk>
+            <localDisk id="nshqaw12celadm05.us.oracle.com_CD_4">
+                <localDiskName>CD_4</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+                <version>Version12</version>
+            </localDisk>
+            <localDisk id="nshqaw12celadm05.us.oracle.com_CD_3">
+                <localDiskName>CD_3</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+                <version>Version12</version>
+            </localDisk>
+            <localDisk id="nshqaw12celadm05.us.oracle.com_CD_2">
+                <localDiskName>CD_2</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+                <version>Version12</version>
+            </localDisk>
+            <localDisk id="nshqaw12celadm05.us.oracle.com_CD_1">
+                <localDiskName>CD_1</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+                <version>Version12</version>
+            </localDisk>
+            <localDisk id="nshqaw12celadm05.us.oracle.com_CD_0">
+                <localDiskName>CD_0</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+                <version>Version12</version>
+            </localDisk>
+            <localDisk id="nshqaw12celadm04.us.oracle.com_CD_10">
+                <localDiskName>CD_10</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+                <version>Version12</version>
+            </localDisk>
+            <localDisk id="nshqaw12celadm04.us.oracle.com_CD_9">
+                <localDiskName>CD_9</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+                <version>Version12</version>
+            </localDisk>
+            <localDisk id="nshqaw12celadm04.us.oracle.com_CD_8">
+                <localDiskName>CD_8</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+                <version>Version12</version>
+            </localDisk>
+            <localDisk id="nshqaw12celadm04.us.oracle.com_CD_7">
+                <localDiskName>CD_7</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+                <version>Version12</version>
+            </localDisk>
+            <localDisk id="nshqaw12celadm04.us.oracle.com_CD_6">
+                <localDiskName>CD_6</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+                <version>Version12</version>
+            </localDisk>
+            <localDisk id="nshqaw12celadm04.us.oracle.com_CD_5">
+                <localDiskName>CD_5</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+                <version>Version12</version>
+            </localDisk>
+            <localDisk id="nshqaw12celadm04.us.oracle.com_CD_4">
+                <localDiskName>CD_4</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+                <version>Version12</version>
+            </localDisk>
+            <localDisk id="nshqaw12celadm04.us.oracle.com_CD_3">
+                <localDiskName>CD_3</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+                <version>Version12</version>
+            </localDisk>
+            <localDisk id="nshqaw12celadm04.us.oracle.com_CD_2">
+                <localDiskName>CD_2</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+                <version>Version12</version>
+            </localDisk>
+            <localDisk id="nshqaw12celadm04.us.oracle.com_CD_1">
+                <localDiskName>CD_1</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+                <version>Version12</version>
+            </localDisk>
+            <localDisk id="nshqaw12celadm04.us.oracle.com_CD_0">
+                <localDiskName>CD_0</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+                <version>Version12</version>
+            </localDisk>
+        </localDisks>
+        <version/>
+    </storage>
+    <storageDesc>
+        <stAttribute/>
+    </storageDesc>
+    <switches>
+        <switch id="nshqaw12sw-ibb0.us.oracle.com_id">
+            <networks>
+                <network id="nshqaw12sw-ibb0.us.oracle.com_id"/>
+            </networks>
+            <switchDescription>Exadata Admin Switch</switchDescription>
+            <version>version2</version>
+        </switch>
+        <switch id="nshqaw12sw-iba0.us.oracle.com_id">
+            <networks>
+                <network id="nshqaw12sw-iba0.us.oracle.com_id"/>
+            </networks>
+            <switchDescription>Exadata Admin Switch</switchDescription>
+            <version>version2</version>
+        </switch>
+        <switch id="nshqaw12sw-adm0.us.oracle.com_id">
+            <networks>
+                <network id="nshqaw12sw-adm0.us.oracle.com_id"/>
+            </networks>
+            <switchDescription>Exadata Admin Switch</switchDescription>
+            <version>version2</version>
+        </switch>
+    </switches>
+    <users>
+        <user id="grid_id">
+            <groups>
+                <group id="1006"/>
+                <group id="1005"/>
+                <group id="1004"/>
+                <group id="1001"/>
+            </groups>
+            <homedir>/home/grid</homedir>
+            <userType>grid</userType>
+            <userid>1000</userid>
+            <username>grid</username>
+            <version>version1</version>
+        </user>
+        <user id="oracle_id">
+            <groups>
+                <group id="1004"/>
+                <group id="1003"/>
+                <group id="1002"/>
+                <group id="1001"/>
+            </groups>
+            <homedir>/home/oracle</homedir>
+            <userType>oracle</userType>
+            <userid>1001</userid>
+            <username>oracle</username>
+            <version>version1</version>
+        </user>
+    </users>
+    <version/>
+    <vmSizes>
+        <vmSizeName id="Large">
+            <vmAttribute id="DiskSize">90Gb</vmAttribute>
+            <vmAttribute id="cpuCount">16</vmAttribute>
+            <vmAttribute id="MemSize">32Gb</vmAttribute>
+        </vmSizeName>
+        <vmSizeName id="Medium">
+            <vmAttribute id="DiskSize">90Gb</vmAttribute>
+            <vmAttribute id="cpuCount">16</vmAttribute>
+            <vmAttribute id="MemSize">32Gb</vmAttribute>
+        </vmSizeName>
+        <vmSizeName id="Small">
+            <vmAttribute id="DiskSize">90Gb</vmAttribute>
+            <vmAttribute id="cpuCount">16</vmAttribute>
+            <vmAttribute id="MemSize">32Gb</vmAttribute>
+        </vmSizeName>
+    </vmSizes>
+</engineeredSystem>

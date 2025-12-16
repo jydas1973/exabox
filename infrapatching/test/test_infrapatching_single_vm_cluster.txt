@@ -1,0 +1,248 @@
+#
+# $Header: ecs/exacloud/exabox/infrapatching/test/test_infrapatching_single_vm_cluster.txt /main/2 2025/09/26 16:25:32 sdevasek Exp $
+#
+# test_infrapatching_single_vm_cluster.py
+#
+# Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+#
+#    NAME
+#      test_infrapatching_domu.py - Unit test case script for all DomU operations.
+#
+#    DESCRIPTION
+#      Unit test case script for all DomU operations.
+#
+#    NOTES
+#      Unit test case script for all DomU operations.
+#
+#    MODIFIED   (MM/DD/YY)
+#    apotluri    08/31/25 - Bug 38301663 - EXACS:25.2.2.1:RAISE AN ERROR WHEN
+#                           THE EXTERNAL LAUNCH NODE IS UNAVAILABLE DUE TO
+#                           REACHING THE MAXIMUM ALLOWED CONCURRENT SESSIONS
+#    sdevasek    06/20/25 - Enh 38059211  - ENHANCE TESTS MAINTENABILITY BY
+#                           SEPARATING OUT CLUSTERLESS TESTS AND SINGLE VM
+#                           TESTS INTO SEPARATE FILES
+#    sdevasek    06/20/25 - Creation
+#
+
+import pytest
+import unittest
+
+from utils import *
+from constants import *
+
+# Class which defines unit tests as domu target for single vm cluster
+@pytest.mark.single_vm_cluster
+class Test_single_vm_cluster_class(unittest.TestCase):
+    __target_name = PATCH_DOMU
+
+    def __init__(self, *initial_data, **kwargs):
+        super(Test_single_vm_cluster_class, self).__init__(*initial_data, **kwargs)
+        self.__operation = ""
+        self.__operation_style = OP_STYLE_AUTO
+
+    # This method is to run something similar before every test execution.
+    def setUp(self):
+        mUpdateAdditionalOptionsInPayload("IncludeNodeList", "none")
+        mUpdateAdditionalOptionsInPayload("isSingleNodeUpgrade", "no")
+        mUpdateAdditionalOptionsInPayload("SingleUpgradeNodeName", "none")
+        mUpdateAdditionalOptionsInPayload("OneoffCustomPluginFile", "none")
+        mUpdateAdditionalOptionsInPayload("OneoffScriptArgs", "none")
+        mUpdateInfraPatchingTestConfigParam("node_selection_method", "IncludeNodeList")
+        mUpdateInfraPatchingTestConfigParam("single_node_vm_cluster_patching", "False")
+        mUpdateParamInPayload("BackupMode", "yes")
+        mUpdateParamInPayload("EnablePlugins", "no")
+        mUpdateParamInPayload("PluginTypes", "none")
+        mDeletePendingFailedECRARequest()
+
+    @pytest.mark.domu_patch_prereq_check_single_node_vm_cluster
+    def test_domu_patch_prereq_check_single_node_vm_cluster(self):
+        _op = TASK_PREREQ_CHECK
+        _result, _status_output = self.mPatchSingleNodeVm(_op)
+        self.assertTrue(_result, "%s operation failed." % _op)
+
+    @pytest.mark.domu_patch_single_node_vm_cluster
+    def test_domu_patch_single_node_vm_cluster(self):
+        _op = TASK_PATCH
+        _result, _status_output = self.mPatchSingleNodeVm(_op)
+        self.assertTrue(_result, "%s operation failed." % _op)
+
+    """
+    This test is to validate limiting patch sessions on External LaucnchNode is working or not..
+
+    The following are the steps followed in this test
+    1. Set MAX_CONCURRENT_PATCH_SESSIONS_ON_LAUNCHNODE to 1
+    2. Trigger two domu prechecks concurrently using MGMT_HOST as the launchnode on a single vm cluster
+    3. Validate whether second request is failing for insufficient no LaunchNodes
+    """
+    @pytest.mark.domu_patch_prereq_check_on_single_node_vm_cluster_to_validate_multiple_patch_sessions
+    def test_domu_patch_prereq_check_on_single_node_vm_cluster_to_validate_multiple_patch_sessions(self):
+        _op = TASK_PREREQ_CHECK
+        mSetECRAProperty("MAX_CONCURRENT_PATCH_SESSIONS_ON_LAUNCHNODE", "1")
+        import concurrent.futures
+
+        # send 2 concurrent precheck requests with MGMT_HOST as LaunchNode
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            f1 = executor.submit(self.mPatchSingleNodeVm, aOperation=_op, isConcurrentExecution = True)
+            time.sleep(5)
+            f2 = executor.submit(self.mPatchSingleNodeVm, aOperation=_op, isConcurrentExecution = True)
+
+        _ret1, _status_output1 = f1.result()
+        _ret2, _status_output2 = f2.result()
+
+        mSetECRAProperty("MAX_CONCURRENT_PATCH_SESSIONS_ON_LAUNCHNODE", "2")
+        _status_json = json.loads(_status_output2)
+        _error_code = _status_json["errorCode"]
+        # 2nd requests fails with insufficient launchnodes
+        self.assertEqual(_error_code, "0x030E0024", "Correct error code is not returned..")
+
+    @pytest.mark.domu_cleanup_patches_on_launchnode_for_single_vm_cluster
+    def test_domu_cleanup_patches_on_launchnode_for_single_vm_cluster(self):
+        """
+        This test verifies two things
+        1. When marker file is present on the directory to be purged, it does not delete the directory
+        2. When marker file is not present on the directory to be purged, it deletes the directory
+
+        """
+        _src_file = f"{mGetExacloudInstallPath()}/exabox/infrapatching/test/{TEST_INFRAPATCHING_CONFIG_FILE_LOCATION}"
+        with open(_src_file, "r") as _src:
+            _src_data = json.load(_src)
+            _src_cleanupMetadata = _src_data.get("cleanupMetadata", [])
+            _folderToPurge = _src_cleanupMetadata[0]["folderToPurge"]
+            _launch_node = _src_cleanupMetadata[0]["hostName"]
+
+        _folderToPurge = _folderToPurge.replace("*", "\\*")
+
+        _listing_dirs_cmd = f"ls -d {_folderToPurge}"
+        _result, _output_map = mExecuteRemoteExasshCmd(_listing_dirs_cmd, [_launch_node])
+        # scenario 1 : verification with marker file presence
+        # create marker file on the launchnode on the directory to be purged
+        _create_file_cmd = f"touch {str(_output_map[_launch_node])}/beb60342-fb6d-434a-a793-0c666dda3c8e_progress.txt"
+        _result, _output_map = mExecuteRemoteExasshCmd(_create_file_cmd, [_launch_node])
+
+        # Update cleanup_infrapatching_logs.conf to run the scheduler job
+        mUpdateCleanUpPatchingLogsConfig()
+        # scheduler is running every 5 mins so giving sufficient time for scheduler job task is executed at least once
+        time.sleep(360)
+        _result, _output_map = mExecuteRemoteExasshCmd(_listing_dirs_cmd, [_launch_node])
+
+        # verfiy the directory on the launchnode, the directory should not have got deleted
+        _search_str = "No such file or directory"
+        self.assertFalse(_search_str in _output_map[_launch_node],
+                        "Directory with pattern {_folderToPurge} does not exist on the {_launch_node}")
+
+        # scenario 2 : verification without  marker file presence
+        _remove_file_cmd = f"rm -f {_output_map[_launch_node]}/beb60342-fb6d-434a-a793-0c666dda3c8e_progress.txt"
+        _result, _output_map = mExecuteRemoteExasshCmd(_remove_file_cmd, [_launch_node])
+        # scheduler is running every 5 mins so giving sufficient time for scheduler job task is executed at least once
+        time.sleep(360)
+
+        _log_file = f"{mGetExacloudInstallPath()}/log/infrapatch_patchmgr_metadata_cleanup.log"
+        _search_str = "No such file or directory"
+        _folder_purged_str_search_cmd = f'grep "{_search_str}" {_log_file}'
+        # step-1 : Check for directory purge statement in the cleanup log
+        _out, _stat = mExecuteLocal(_folder_purged_str_search_cmd)
+        if _stat != 0:
+            self.assertTrue(False, "Folder is {_folderToPurge} is not purged on the launchnode")
+        # step-2 : Check for directory on the launchnode
+        _result, _output_map = mExecuteRemoteExasshCmd(_listing_dirs_cmd, [_launch_node])
+        # ls should not not return any dirctory list
+        if not _output_map:
+            self.assertTrue(True,"Directory with pattern {_folderToPurge} exists on the {_launch_node}")
+        mUpdateCleanUpPatchingLogsConfig(aUpdateWithEmptyList=True)
+
+    @pytest.mark.domu_rollback_single_node_vm_cluster
+    def test_domu_rollback_single_node_vm_cluster(self):
+        _op = TASK_ROLLBACK
+        _result, _status_output = self.mPatchSingleNodeVm(_op)
+        self.assertTrue(_result, "%s operation failed." % _op)
+
+    def mPatchSingleNodeVm(self, aOperation, isConcurrentExecution=False):
+        """
+        This method is used to run op on single node vm using launch node from different cluster
+
+        Parameters:
+        - aOperation: operation
+        - isConcurrentExecution : An optional parameter (default: False) indicating whether the method is being executed concurrently.
+
+        Returns:
+        1) True  -> when infra ,patch operation succeeds.
+           False -> when infra patch operation fails. It can fail if HTTP response does return 202 or HTTP response does not
+               have status_uri HTTP header or Infrapatch operation itself failed in the backend.
+        2) status call output
+        """
+
+        _dom0_domu_list = mGetInfraPatchingTestVms("domuNatHostname", "all")
+        _single_node_vm_cluster = mGetInfraPatchingTestConfigParam("single_node_vm_cluster")
+        _single_vm_domu_nat_host_name = mGetInfraPatchingTestVms("domuNatHostname", _single_node_vm_cluster)
+
+        # get the launch node
+        for _dom0s_list, _domus_list in _dom0_domu_list.items():
+            if _single_vm_domu_nat_host_name[0] in _domus_list:
+                for _domu in _domus_list:
+                    if _domu != _single_vm_domu_nat_host_name[0]:
+                        _launch_node = _domu
+                        mPatchLogInfo("_launch_node : %s" % _launch_node)
+                        break
+                break
+
+        # update payload and test config
+        launch_node_handler = LaunchNodeRegistrationHandler()
+        _data = '{"infraType": "SINGLE_VM_CLUSTER", "launchNodes": "%s", "launchNodeType": "MANAGEMENT_HOST"}' % (_launch_node)
+        _status, _ = launch_node_handler.mRegisterInfrapatchLaunchNode(_data)
+        self.assertFalse(_status, "Launch node registration failed.")
+        mUpdateInfraPatchingTestConfigParam("single_node_vm_cluster_patching", "True")
+
+        # Delete dbserver.* from /var/odo/InfraPatchBase/ to avoid space issues during patch/rollback
+        mExecuteRemoteExasshCmd("rm -rf /var/odo/InfraPatchBase/dbserver*", [_launch_node])
+
+        # start the infrapatch op
+        _result, _status_output = mExecuteInfraPatchCommandWithDCSAgentChecks(aOperation, PATCH_DOMU)
+        if not isConcurrentExecution:
+            _patching_metadata = mCreatePatchOperationMetaDataFromStatusOutput(_status_output)
+            _exacloud_path = mGetExacloudInstallPath()
+            _current_infra_patch_log_file = "%s/log/threads/0000-0000-0000-0000/00000000-0000-0000-0000-000000000000/%s_cluctrl.%s_domu.trc" % (
+                _exacloud_path,
+                _patching_metadata.mGetChildRequestUUID(), aOperation)
+            _single_vm_domu_nat_host_name = mGetInfraPatchingTestVms("domuNatHostname", _single_node_vm_cluster)
+            _verify_cmd = f"grep 'sudo ssh {_single_vm_domu_nat_host_name[0]}' {_current_infra_patch_log_file} | grep 'Executed on' | wc -l"
+            _out, _stat = mExecuteLocal(_verify_cmd)
+
+            #
+            # Following check ensures that NAT hostname was used to configure passwodless ssh
+            # We are verifying whether ssh connectivity has been done using nat hostname on the
+            # trace file
+            # We should have the following 3 entries on the trace file
+            # We should have three lines matching the pattern on the trace file , 1 for ssh verification done after configuring ssh for running patchmgr and
+            # 2 for ssh verification done after cleaning up ssh configuration after running patchmgr
+            #
+            #  [oracle@ecra-exacsdev7 00000000-0000-0000-0000-000000000000]$ grep "sudo ssh sea201323exddu1105.sea2mvm01roce.adminsea2.oraclevcn.com" 745b8380-b788-11ef-8820-00001701ee8d_cluctrl.patch_prereq_check_domu.trc | grep "Executed on"
+
+            # 2024-12-11 06:25:15,624 - dfltlog - DIAGNOSTIC - 10432 - exabox/infrapatching/core/clupatchhealthcheck.py[mSimpleExecuteCmd/_node_connectivity_check:2455] - mSimpleExecuteCmd :: Executed on sea201323exddu1101.sea2xx2xx0061qf.adminsea2.oraclevcn.com [RC:0] the command <+< sudo ssh sea201323exddu1105.sea2mvm01roce.adminsea2.oraclevcn.com 'uptime' >+>
+            # 2024-12-11 06:31:07,929 - dfltlog - DIAGNOSTIC - 10113 - exabox/infrapatching/core/clupatchhealthcheck.py[mSimpleExecuteCmd/_node_connectivity_check:2505] - mSimpleExecuteCmd :: Executed on sea201323exddu1101.sea2xx2xx0061qf.adminsea2.oraclevcn.com [RC:255] the command <+< sudo ssh sea201323exddu1105.sea2mvm01roce.adminsea2.oraclevcn.com 'uptime' >+>
+            # 2024-12-11 06:31:09,182 - dfltlog - DIAGNOSTIC - 10157 - exabox/infrapatching/core/clupatchhealthcheck.py[mSimpleExecuteCmd/_node_connectivity_check:2505] - mSimpleExecuteCmd :: Executed on sea201323exddu1101.sea2xx2xx0061qf.adminsea2.oraclevcn.com [RC:255] the command <+< sudo ssh sea201323exddu1105.sea2mvm01roce.adminsea2.oraclevcn.com 'uptime' >+>
+
+            mPatchLogInfo(f"out: {_out}")
+            if _stat != 0 and _out == 3:
+                self.assertTrue(_stat,
+                                f"Nathostname {_single_vm_domu_nat_host_name[0]} was not used for ssh config verification")
+            else:
+                mPatchLogInfo(f"Nathostname {_single_vm_domu_nat_host_name[0]} was used for ssh config verification")
+
+            # [oracle@ecra-exacsdev7 00000000-0000-0000-0000-000000000000]$ grep "Create node list:" 745b8380-b788-11ef-8820-00001701ee8d_cluctrl.patch_prereq_check_domu.trc | grep sea201323exddu1105.sea2mvm01roce.adminsea2.oraclevcn.com
+            # 2024-12-11 06:25:26,750 - dfltlog - INFO - 13293 - exabox/infrapatching/handlers/loghandler.py[mPatchLogInfo:51] - InfraPatchManager - Create node list: ['sea201323exddu1105.sea2mvm01roce.adminsea2.oraclevcn.com']
+            _verify_cmd = f"grep 'Create node list:' {_current_infra_patch_log_file} | grep {_single_vm_domu_nat_host_name[0]} "
+            _out, _stat = mExecuteLocal(_verify_cmd)
+
+            if _stat != 0:
+                self.assertTrue(_stat,
+                                f"Nathostname {_single_vm_domu_nat_host_name[0]} was not used to create node_list file")
+            else:
+                mPatchLogInfo(f"Nathostname {_single_vm_domu_nat_host_name[0]} was used to create node_list file")
+
+        # revert back values in payload and test config
+        _status, _ = launch_node_handler.mDeregisterInfrapatchLaunchNode(infraType='SINGLE_VM_CLUSTER')
+        mUpdateInfraPatchingTestConfigParam("single_node_vm_cluster_patching", "False")
+        if not isConcurrentExecution:
+            self.assertFalse(_status, "Launch node deregistration failed.")
+        return _result, _status_output
+

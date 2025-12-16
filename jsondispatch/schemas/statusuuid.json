@@ -1,0 +1,12 @@
+{
+    "properties": {
+        "status_uuid": {
+            "type": "string"
+        }
+    },
+    "required": [
+        "status_uuid"
+    ],
+    "type": "object"
+}
+

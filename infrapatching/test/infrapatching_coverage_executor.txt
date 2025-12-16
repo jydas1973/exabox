@@ -1,0 +1,293 @@
+#
+# $Header: ecs/exacloud/exabox/infrapatching/test/infrapatching_coverage_executor.txt /main/17 2025/12/04 04:10:46 araghave Exp $
+#
+# infrapatching_coverage_executor.py
+#
+# Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+#
+#    NAME
+#      infrapatching_coverage_executor.py - Command line utility to generate code coverage for infrapatching python code
+#
+#    DESCRIPTION
+#      Command line utility to execute code coverage for infrapatching python code. Provides options to be able to
+#      get coverage data in stepwise.
+#
+#    NOTES
+#      <other useful comments, qualifications, etc.>
+#
+#    MODIFIED   (MM/DD/YY)
+#    araghave    10/03/25 - Enhancement Request 38444755 - INFRAPATCHING TEST
+#                           AUTOMATION - TEST ADDITION TO PERFORM DOMU ELU
+#                           PATCH OPERATIONS
+#    araghave    11/22/24 - Enh 37241595 - TEST CHANGES TO REPLACE ALL IBSWITCH
+#                           REFERENCE WITH GENERIC SWITCH REFERENCES IN INFRA
+#                           PATCHING TEST CODE
+#    araghave    07/16/24 - Enh 36830077 - CLEANUP KSPLICE CODE FROM
+#                           INFRAPATCHING FILES
+#    apotluri    09/28/23 - ENH 35854482 - USE 230814 EXASPLICE VERSION IN
+#                           INFRAPATCHING AUTOMATION X9
+#    apotluri    09/19/23 - BUG 35821040 - INFRAPATCHING TEST AUTOMATION :
+#                           DOM0_BACKUP IMAGE TO BE MOVED OUT OF
+#                           DOM0_CELL_ROLLBACK_WITH_INCLUDENODE_LIST IN CODE
+#                           COVERAGE
+#    araghave    08/03/23 - Enh 35661378 - ADD DOM0 PATCHING CRS TESTS : DOM0
+#                           POSTCHECK SHOULD STARTUP CRS ON ALL VMS IF CRS IS
+#                           DOWN
+#    apotluri    07/24/23 - ENH 35610416 - INFRAPATCHING TEST AUTOMATION :
+#                           UPDATE INFRAPATCHING_COVERAGE_EXECUTOR.PY AND
+#                           UTILS.PY TO WORK FOR BOTH X5 AND X9
+#    emekala     07/18/23 - ENH 35610691 - INFRAPATCHING TEST AUTOMATION - Run
+#                           SMR (Exasplice) as part of code coverage test suite
+#    sdevasek    06/27/23 - ENH 35432876 - ADDITION OF TEST TO VALIDATE
+#                           PATCH RETRY SCENARIO
+#    emekala     04/14/23 - ENH 35204492 - HEARTBEAT FAILURE ERROR CODE IS
+#                           GETTING OVERRIDDEN WITH GENERIC ERROR CODE
+#                           0X03010007 FOR DOM0 POSTCHECK FAILURE
+#    emekala     02/15/23 - Enh 35027349 - ENABLE POSTCHECK AND BACKUP_IMAGE
+#                           TESTS IN INFRAPATCHING AUTOMATION
+#    araghave    01/15/23 - ENH 34513424 - TEST ADDITION TO INFRAPATCH
+#                           AUTOMATION TO COVER EXACOMPUTE PATCHING FLOW
+#    sdevasek    01/13/23 - ENH 33893463 - UPDATE INFRAPATCH TEST AUTOMATION TO
+#                           PROVIDE DIFFS OF TIME PROFILE FOR MAJOR OPERATIONS
+#                           ACROSS CURRENT AND PREVIOUS RUNS
+#    sdevasek    01/09/23 - ENH 34862465 - UPDATE INFRAPATCHING TEST CODE FOR
+#                           ECRA UPGRADE TO WORK IN X9M R1 ENV
+#    antamil     11/22/22 - ENH 34513424 - ADDED EXACOMPUTE PATCH TEST FOR COVERAGE
+#    sdevasek    04/26/22 - ENH 34088744 - ENABLE TESTS FOR KSPLICE AND ONEOFF
+#                           OPERATIONS IN INFRAPTACHING AUTOMATION
+#    sdevasek    03/11/22 - Enh-33321832 - GET CODE COVERAGE REPORT FOR
+#                           INFRAPATCHING PYTHON CODE
+#
+import sys
+import getopt
+import os
+import utils
+from constants import *
+from infrapatching_coverage import CodeCoverageCalculator
+
+argumentList = sys.argv[1:]
+
+
+class Code_Coverage_Executor:
+    def __init__(self):
+        self.__cov_obj = CodeCoverageCalculator()
+
+    def mUsage(self):
+        """
+        This method is used to display help message.
+        """
+        print("Usage: %s [ -h ] [ -e ] [ -c test_results_location ] [ -g report_file ] \n" % (sys.argv[0]))
+        print(" -h, --help                                                      Display help message")
+        print(
+            " -e, --enable_exacloud_agent_in_code_coverage_mode                 Enable exacloud environment with code coverage")
+        print(" -c test_results_location, --collect_coverage_data=test_results_location  "
+                                                                                "Collect code coverage by running tests")
+        print(" -t time_profile_diff_file, --prepare_time_profile_data_diff=time_profile_diff_file"
+              "                                                                 Provide time profile diff for infrapatch operations")
+        print(" -g report_file, --generate_code_coverage_report=report_file     Generate code coverage report")
+
+    def mExecuteCmdLineOptions(self):
+        """
+        This method is used to parse command line options and execute corresponding action based on cmdline options.
+        """
+
+        _short_options = "hec:t:g:"
+
+        _long_options = ["help", "enable_exacloud_agent_in_code_coverage_mode", "collect_coverage_data=",
+                         "prepare_time_profile_data_diff=", "generate_code_coverage_report="]
+        _ret = EXIT_FAILURE
+
+        try:
+            # parse cmd line arguments
+            _arguments, _values = getopt.getopt(argumentList, _short_options, _long_options)
+
+            # If no argument passed then display help
+            if len(_arguments) == 0:
+                self.mUsage()
+            else:
+                # checking arguments
+                for _current_argument, _current_value in _arguments:
+                    if _current_argument in ["-h", "--help"]:
+                        self.mUsage()
+
+                    elif _current_argument in ["-e", "--enable_exacloud_agent_in_code_coverage_mode"]:
+                        # Enable exacloud env to be able to capture the code coverage
+                        _ret = self.__cov_obj.mPrepareCodeCoverageEnvironment()
+
+                    elif _current_argument in ["-c", "--collect_coverage_data"]:
+                        _test_results_location = _current_value
+                        # Run the tests to capture the coverage data
+                        _ret = self.mExecuteTestsuite(_test_results_location)
+
+                    elif _current_argument in ["-t", "--prepare_time_profile_data_diff"]:
+                        # Generate time profile diff data for all the successfully completed infrapatch operations
+                        _time_profile_diff_file = _current_value
+                        _ret = self.mGenerateTimeProfileDiffData(_time_profile_diff_file)
+
+                    elif _current_argument in ["-g", "--generate_code_coverage_report"]:
+                        _report_filename = _current_value
+                        # Generate code coverage report
+                        _ret = self.__cov_obj.mGenerateCodeCoverageReportData(_report_filename)
+
+            if _ret == EXIT_FAILURE:
+                sys.exit(EXIT_FAILURE)
+
+        except Exception as e:
+            utils.mPatchLogError(str(e))
+            sys.exit(EXIT_FAILURE)
+
+    def mExecuteTestsuite(self, aTestResultsLocation):
+        """
+        This method is used to execute testsuite to get coverage data.
+        """
+        _ret = EXIT_SUCCESS
+
+        _env = utils.mGetInfraPatchingTestConfigParam('is_r1_env')
+        if _env in "True":
+           _test_markers_map = {
+              "dom0_cell_patch_with_includenode_list": "cell_patch_prereq_check_with_include_list or "
+                                                       "cell_patch_with_include_list or "
+                                                       "cell_postcheck_with_include_list or "
+                                                       "dom0_patch_prereq_check_with_include_list or "
+                                                       "dom0_patch_with_include_list or "
+                                                       "dom0_postcheck_with_include_list ",
+              "dom0_cell_rollback_with_includenode_list": "cell_rollback_prereq_check_with_include_list or "
+                                                          "cell_rollback_with_include_list or "
+                                                          "dom0_one_off or cell_one_off or "
+                                                          "dom0_rollback_with_include_list ",
+              "backup_dom0_image_after_dom0_rollback_with_include_list": "dom0_backup_image ",
+              "patch_dom0_cell_smr": "cell_patch_prereq_check_smr or "
+                                           "cell_patch_smr",
+              "rollback_dom0_cell_smr": "cell_rollback_prereq_check_smr or "
+                                              "cell_rollback_smr or ",
+              "patch_domu_elu": "domu_patch_prereq_check_elu or "
+                                           "domu_patch_elu or "
+                                      "domu_patch_prereq_check_elu_full or "
+                                           "domu_patch_elu_full ",
+              "rollback_domu_elu": "domu_rollback_elu or "
+                                         "domu_rollback_elu_full ",
+              "backup_dom0_image_after_dom0_rollback_elu": "dom0_backup_image ",
+              "domu_with_includenode_list": "domu_patch_prereq_check_with_include_list or domu_patch_with_include_list "
+                                             "or domu_one_off or domu_rollback_with_include_list or domu_backup_image or domu_postcheck_with_include_list ",
+              "dom0_cell_patch_non_rolling": "cell_patch_prereq_check or cell_patch_non_rolling or "
+                                             "dom0_patch_prereq_check or dom0_patch_non_rolling ",
+              "dom0_cell_rollback_non_rolling": "cell_rollback_non_rolling  or cell_rollback_prereq_check or "
+                                                "dom0_rollback_non_rolling ",
+              "domu_patch_retry":"domu_patch_retry or domu_rollback ",
+              "crs_checks": "dom0_postcheck_crs_validation"
+           }
+        else:
+          _test_markers_map = {
+              "dom0_cell_patch_with_includenode_list": "cell_patch_prereq_check_with_include_list or "
+                                                       "cell_patch_with_include_list or "
+                                                       "cell_postcheck_with_include_list or "
+                                                       "dom0_patch_prereq_check_with_include_list or "
+                                                       "dom0_patch_with_include_list or "
+                                                       "dom0_postcheck_with_include_list ",
+              "dom0_cell_rollback_with_includenode_list": "cell_rollback_prereq_check_with_include_list or "
+                                                          "cell_rollback_with_include_list or "
+                                                          "dom0_one_off or cell_one_off or "
+                                                          "dom0_rollback_with_include_list ",
+              "backup_dom0_image_after_dom0_rollback_with_include_list": "dom0_backup_image ",
+              "patch_dom0_cell_smr": "cell_patch_prereq_check_smr or "
+                                           "cell_patch_smr ",
+              "rollback_dom0_cell_smr": "cell_rollback_prereq_check_smr or "
+                                              "cell_rollback_smr ",
+              "backup_dom0_image_after_dom0_rollback_elu": "dom0_backup_image ",
+              "domu_with_includenode_list": "domu_patch_prereq_check_with_include_list or domu_patch_with_include_list "
+                                            "or domu_one_off or domu_rollback_with_include_list or domu_backup_image or domu_postcheck_with_include_list ",
+              "switch": "switch_patch_prereq_check or switch_patch or switch_rollback or "
+                          "switch_one_off or switch_rollback_prereq_check or switch_postcheck ",
+              "dom0_cell_patch_non_rolling": "cell_patch_prereq_check or cell_patch_non_rolling or "
+                                             "dom0_patch_prereq_check or dom0_patch_non_rolling ",
+              "dom0_cell_rollback_non_rolling": "cell_rollback_non_rolling  or cell_rollback_prereq_check or "
+                                                "dom0_rollback_non_rolling ",
+              "domu_patch_retry":"domu_patch_retry or domu_rollback ",
+              "crs_checks": "dom0_postcheck_crs_validation",
+              "exacompute": "exacompute_precheck or exacompute_backup_image or exacompute_patch or "
+                            "exacompute_rollback or exacompute_postcheck"
+          }
+
+        if not os.path.exists(aTestResultsLocation):
+            utils.mPatchLogError("%s does not exist. Please provide correct directory path to store test result files." %aTestResultsLocation)
+            return EXIT_FAILURE
+
+        _code_coverage_test_execution_steps = list(_test_markers_map.keys())
+
+        _cur_test_execution_step_for_code_coverage = 0
+        _last_completed_test_execution_step_for_code_coverage = \
+            utils.mGetInfraPatchingTestConfigParam("last_completed_test_execution_step_for_code_coverage")
+
+        if not _last_completed_test_execution_step_for_code_coverage:
+            _last_completed_test_execution_step_for_code_coverage = 0
+
+        _total_test_execution_steps = len(_code_coverage_test_execution_steps)
+        if _last_completed_test_execution_step_for_code_coverage >= _total_test_execution_steps:
+            utils.mPatchLogError("Invalid last_completed_test_execution_step_for_code_coverage, the value present is %d"
+                                 % _last_completed_test_execution_step_for_code_coverage)
+            return EXIT_FAILURE
+        else:
+            _cur_test_execution_step_for_code_coverage = _last_completed_test_execution_step_for_code_coverage
+
+        utils.mPatchLogInfo("Executing testsuite started.")
+        while _cur_test_execution_step_for_code_coverage < _total_test_execution_steps:
+            _test_suite_name = _code_coverage_test_execution_steps[_cur_test_execution_step_for_code_coverage]
+            # Store the test results
+            _test_results_file = "%s/%s.xml" % (aTestResultsLocation, _test_suite_name)
+            if os.path.exists(_test_results_file):
+                os.remove(_test_results_file)
+
+            _pytest_cmd = "python3 -m pytest -vv -ra -s -m '%s' --junitxml=%s" % (
+                _test_markers_map[_test_suite_name], _test_results_file)
+            utils.mPatchLogInfo("Executing test step %d and command used is %s." %
+                                (_cur_test_execution_step_for_code_coverage + 1, _pytest_cmd))
+            _output, _stat = utils.mExecuteLocal(_pytest_cmd)
+            utils.mPatchLogPrint(_output)
+            if _stat != 0:
+                utils.mPatchLogError("Failed executing command %s." % _pytest_cmd)
+                _ret = EXIT_FAILURE
+                break
+            else:
+                _cur_test_execution_step_for_code_coverage += 1
+                utils.mUpdateInfraPatchingTestConfigParam("last_completed_test_execution_step_for_code_coverage",
+                                                          _cur_test_execution_step_for_code_coverage)
+
+        utils.mPatchLogInfo("Executing testsuite completed.")
+        if _cur_test_execution_step_for_code_coverage == _total_test_execution_steps:
+            utils.mPatchLogInfo("All the tests are executed.")
+            utils.mUpdateInfraPatchingTestConfigParam("last_completed_test_execution_step_for_code_coverage", 0)
+
+        return _ret
+
+    def mGenerateTimeProfileDiffData(self, aTimeProfileDiffFile):
+        _ret = EXIT_SUCCESS
+        try:
+            # 1. Get the diff data for all the infrapatch operations
+            _time_diff_map = utils.mPrepareTimeDiffData()
+            # 2. Write the time profile diff data into a file
+            if os.path.exists(aTimeProfileDiffFile):
+                os.remove(aTimeProfileDiffFile)
+            _file = open(aTimeProfileDiffFile, "a")
+            for _operation in _time_diff_map:
+                _file.write(
+                    '{0:<43}{1:>13}{2:>25}{3:>25} {4:<60}\n'.format("Operation", "Stage", "Cur_duration_in_sec", "Prev_duration_in_sec", "Node_names"))
+                _file.write(
+                    "______________________________________________________________________________________________________________________________________________________________\n")
+                _node_patching_time_stats = _time_diff_map[_operation]
+                for _time_stat in _node_patching_time_stats:
+                    _file.write('{0:<43}{1:>13}{2:>25}{3:>25} {4:<60}\n'.format(_operation, _time_stat["stage"],
+                                                                              _time_stat["cur_duration_in_sec"],
+                                                                              _time_stat["prev_duration_in_sec"],
+                                                                              _time_stat["node_names"]))
+                _file.write(
+                    "______________________________________________________________________________________________________________________________________________________________\n")
+            _file.close()
+
+        except Exception as e:
+            utils.mPatchLogWarn("Exception %s occurred while generating time profile diff data." % str(e))
+
+        return _ret
+
+if __name__ == '__main__':
+    Code_Coverage_Executor().mExecuteCmdLineOptions()
+

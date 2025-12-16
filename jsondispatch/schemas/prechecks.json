@@ -1,0 +1,13 @@
+{
+    "title": "JSON Exacompute Prechecks",
+    "description": "JSON Dispatch Exacompute Prechecks schema",
+    "type": "object",
+    "required": [
+        "hostname"
+    ],
+    "properties": {
+        "hostname": {
+            "type": "string"
+        }
+    }
+}

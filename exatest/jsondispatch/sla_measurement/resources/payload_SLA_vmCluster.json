@@ -1,0 +1,25 @@
+{
+    "SLA": {
+        "servers": [
+            {
+                "hostname": "clu01adm01",
+                "server_type": "compute"
+            },
+            {
+                "hostname": "clu01adm02",
+                "server_type": "compute"
+            },
+            {
+                "hostname": "clu01cel01",
+                "server_type": "storage"
+            },
+            {
+                "hostname": "clu02cel02",
+                "server_type": "storage"
+            }
+        ],
+        "last_run_time": "",
+        "max_concurrency": 16,
+        "scheduler_frequency": 300
+    }
+}

@@ -1,0 +1,530 @@
+<domain type='kvm' id='2'>
+    <name>scaqab10adm01vm08.us.oracle.com</name>
+  <uuid>33df0887-c03e-4d40-aeed-ee99bf15523d</uuid>
+  <memory unit='KiB'>1457520640</memory>
+  <currentMemory unit='KiB'>1457520640</currentMemory>
+  <memoryBacking>
+    <hugepages>
+      <page size='2048' unit='KiB'/>
+    </hugepages>
+    <locked/>
+  </memoryBacking>
+  <vnuma mode='host' distribution='contiguous'>
+    <memory unit='KiB'>1457520640</memory>
+  </vnuma>
+  <vcpu placement='static'>100</vcpu>
+  <vcpus>
+    <vcpu id='0' enabled='yes' hotpluggable='no' order='1'/>
+    <vcpu id='1' enabled='yes' hotpluggable='no' order='2'/>
+    <vcpu id='2' enabled='yes' hotpluggable='yes' order='3'/>
+    <vcpu id='3' enabled='yes' hotpluggable='yes' order='4'/>
+    <vcpu id='4' enabled='yes' hotpluggable='yes' order='5'/>
+    <vcpu id='5' enabled='yes' hotpluggable='yes' order='6'/>
+    <vcpu id='6' enabled='yes' hotpluggable='yes' order='7'/>
+    <vcpu id='7' enabled='yes' hotpluggable='yes' order='8'/>
+    <vcpu id='8' enabled='yes' hotpluggable='yes' order='9'/>
+    <vcpu id='9' enabled='yes' hotpluggable='yes' order='10'/>
+    <vcpu id='10' enabled='yes' hotpluggable='yes' order='11'/>
+    <vcpu id='11' enabled='yes' hotpluggable='yes' order='12'/>
+    <vcpu id='12' enabled='yes' hotpluggable='yes' order='13'/>
+    <vcpu id='13' enabled='yes' hotpluggable='yes' order='14'/>
+    <vcpu id='14' enabled='yes' hotpluggable='yes' order='15'/>
+    <vcpu id='15' enabled='yes' hotpluggable='yes' order='16'/>
+    <vcpu id='16' enabled='yes' hotpluggable='yes' order='17'/>
+    <vcpu id='17' enabled='yes' hotpluggable='yes' order='18'/>
+    <vcpu id='18' enabled='yes' hotpluggable='yes' order='19'/>
+    <vcpu id='19' enabled='yes' hotpluggable='yes' order='20'/>
+    <vcpu id='20' enabled='yes' hotpluggable='yes' order='21'/>
+    <vcpu id='21' enabled='yes' hotpluggable='yes' order='22'/>
+    <vcpu id='22' enabled='yes' hotpluggable='yes' order='23'/>
+    <vcpu id='23' enabled='yes' hotpluggable='yes' order='24'/>
+    <vcpu id='24' enabled='yes' hotpluggable='yes' order='25'/>
+    <vcpu id='25' enabled='yes' hotpluggable='yes' order='26'/>
+    <vcpu id='26' enabled='yes' hotpluggable='yes' order='27'/>
+    <vcpu id='27' enabled='yes' hotpluggable='yes' order='28'/>
+    <vcpu id='28' enabled='yes' hotpluggable='yes' order='29'/>
+    <vcpu id='29' enabled='yes' hotpluggable='yes' order='30'/>
+    <vcpu id='30' enabled='yes' hotpluggable='yes' order='31'/>
+    <vcpu id='31' enabled='yes' hotpluggable='yes' order='32'/>
+    <vcpu id='32' enabled='yes' hotpluggable='yes' order='33'/>
+    <vcpu id='33' enabled='yes' hotpluggable='yes' order='34'/>
+    <vcpu id='34' enabled='yes' hotpluggable='yes' order='35'/>
+    <vcpu id='35' enabled='yes' hotpluggable='yes' order='36'/>
+    <vcpu id='36' enabled='yes' hotpluggable='yes' order='37'/>
+    <vcpu id='37' enabled='yes' hotpluggable='yes' order='38'/>
+    <vcpu id='38' enabled='yes' hotpluggable='yes' order='39'/>
+    <vcpu id='39' enabled='yes' hotpluggable='yes' order='40'/>
+    <vcpu id='40' enabled='yes' hotpluggable='yes' order='41'/>
+    <vcpu id='41' enabled='yes' hotpluggable='yes' order='42'/>
+    <vcpu id='42' enabled='yes' hotpluggable='yes' order='43'/>
+    <vcpu id='43' enabled='yes' hotpluggable='yes' order='44'/>
+    <vcpu id='44' enabled='yes' hotpluggable='yes' order='45'/>
+    <vcpu id='45' enabled='yes' hotpluggable='yes' order='46'/>
+    <vcpu id='46' enabled='yes' hotpluggable='yes' order='47'/>
+    <vcpu id='47' enabled='yes' hotpluggable='yes' order='48'/>
+    <vcpu id='48' enabled='yes' hotpluggable='yes' order='49'/>
+    <vcpu id='49' enabled='yes' hotpluggable='yes' order='50'/>
+    <vcpu id='50' enabled='yes' hotpluggable='yes' order='51'/>
+    <vcpu id='51' enabled='yes' hotpluggable='yes' order='52'/>
+    <vcpu id='52' enabled='yes' hotpluggable='yes' order='53'/>
+    <vcpu id='53' enabled='yes' hotpluggable='yes' order='54'/>
+    <vcpu id='54' enabled='yes' hotpluggable='yes' order='55'/>
+    <vcpu id='55' enabled='yes' hotpluggable='yes' order='56'/>
+    <vcpu id='56' enabled='yes' hotpluggable='yes' order='57'/>
+    <vcpu id='57' enabled='yes' hotpluggable='yes' order='58'/>
+    <vcpu id='58' enabled='yes' hotpluggable='yes' order='59'/>
+    <vcpu id='59' enabled='yes' hotpluggable='yes' order='60'/>
+    <vcpu id='60' enabled='yes' hotpluggable='yes' order='61'/>
+    <vcpu id='61' enabled='yes' hotpluggable='yes' order='62'/>
+    <vcpu id='62' enabled='yes' hotpluggable='yes' order='63'/>
+    <vcpu id='63' enabled='yes' hotpluggable='yes' order='64'/>
+    <vcpu id='64' enabled='yes' hotpluggable='yes' order='65'/>
+    <vcpu id='65' enabled='yes' hotpluggable='yes' order='66'/>
+    <vcpu id='66' enabled='yes' hotpluggable='yes' order='67'/>
+    <vcpu id='67' enabled='yes' hotpluggable='yes' order='68'/>
+    <vcpu id='68' enabled='yes' hotpluggable='yes' order='69'/>
+    <vcpu id='69' enabled='yes' hotpluggable='yes' order='70'/>
+    <vcpu id='70' enabled='yes' hotpluggable='yes' order='71'/>
+    <vcpu id='71' enabled='yes' hotpluggable='yes' order='72'/>
+    <vcpu id='72' enabled='yes' hotpluggable='yes' order='73'/>
+    <vcpu id='73' enabled='yes' hotpluggable='yes' order='74'/>
+    <vcpu id='74' enabled='yes' hotpluggable='yes' order='75'/>
+    <vcpu id='75' enabled='yes' hotpluggable='yes' order='76'/>
+    <vcpu id='76' enabled='yes' hotpluggable='yes' order='77'/>
+    <vcpu id='77' enabled='yes' hotpluggable='yes' order='78'/>
+    <vcpu id='78' enabled='yes' hotpluggable='yes' order='79'/>
+    <vcpu id='79' enabled='yes' hotpluggable='yes' order='80'/>
+    <vcpu id='80' enabled='yes' hotpluggable='yes' order='81'/>
+    <vcpu id='81' enabled='yes' hotpluggable='yes' order='82'/>
+    <vcpu id='82' enabled='yes' hotpluggable='yes' order='83'/>
+    <vcpu id='83' enabled='yes' hotpluggable='yes' order='84'/>
+    <vcpu id='84' enabled='yes' hotpluggable='yes' order='85'/>
+    <vcpu id='85' enabled='yes' hotpluggable='yes' order='86'/>
+    <vcpu id='86' enabled='yes' hotpluggable='yes' order='87'/>
+    <vcpu id='87' enabled='yes' hotpluggable='yes' order='88'/>
+    <vcpu id='88' enabled='yes' hotpluggable='yes' order='89'/>
+    <vcpu id='89' enabled='yes' hotpluggable='yes' order='90'/>
+    <vcpu id='90' enabled='yes' hotpluggable='yes' order='91'/>
+    <vcpu id='91' enabled='yes' hotpluggable='yes' order='92'/>
+    <vcpu id='92' enabled='yes' hotpluggable='yes' order='93'/>
+    <vcpu id='93' enabled='yes' hotpluggable='yes' order='94'/>
+    <vcpu id='94' enabled='yes' hotpluggable='yes' order='95'/>
+    <vcpu id='95' enabled='yes' hotpluggable='yes' order='96'/>
+    <vcpu id='96' enabled='yes' hotpluggable='yes' order='97'/>
+    <vcpu id='97' enabled='yes' hotpluggable='yes' order='98'/>
+    <vcpu id='98' enabled='yes' hotpluggable='yes' order='99'/>
+    <vcpu id='99' enabled='yes' hotpluggable='yes' order='100'/>
+  </vcpus>
+  <cputune>
+    <vcpupin vcpu='0' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='1' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='2' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='3' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='4' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='5' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='6' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='7' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='8' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='9' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='10' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='11' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='12' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='13' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='14' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='15' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='16' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='17' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='18' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='19' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='20' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='21' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='22' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='23' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='24' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='25' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='26' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='27' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='28' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='29' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='30' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='31' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='32' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='33' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='34' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='35' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='36' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='37' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='38' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='39' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='40' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='41' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='42' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='43' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='44' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='45' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='46' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='47' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='48' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='49' cpuset='0-25,52-77'/>
+    <vcpupin vcpu='50' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='51' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='52' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='53' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='54' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='55' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='56' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='57' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='58' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='59' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='60' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='61' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='62' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='63' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='64' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='65' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='66' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='67' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='68' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='69' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='70' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='71' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='72' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='73' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='74' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='75' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='76' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='77' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='78' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='79' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='80' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='81' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='82' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='83' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='84' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='85' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='86' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='87' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='88' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='89' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='90' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='91' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='92' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='93' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='94' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='95' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='96' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='97' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='98' cpuset='26-51,78-103'/>
+    <vcpupin vcpu='99' cpuset='26-51,78-103'/>
+  </cputune>
+  <numatune>
+    <memnode cellid='0' mode='strict' nodeset='0'/>
+    <memnode cellid='1' mode='strict' nodeset='1'/>
+  </numatune>
+  <resource>
+    <partition>/machine</partition>
+  </resource>
+  <os>
+    <type arch='x86_64' machine='pc-q35-3.1'>hvm</type>
+    <boot dev='hd'/>
+  </os>
+  <features>
+    <acpi/>
+    <apic eoi='off'/>
+    <kvm>
+      <hint-dedicated state='off'/>
+      <mem-lock state='on'/>
+      <cpu-pm state='off'/>
+      <host-phys-bits state='on'/>
+    </kvm>
+  </features>
+  <cpu mode='host-passthrough' check='none'>
+    <topology sockets='2' cores='25' threads='2'/>
+    <feature policy='force' name='invtsc'/>
+    <feature policy='require' name='arch-capabilities'/>
+    <numa>
+      <cell id='0' cpus='0-49' memory='728760320' unit='KiB'>
+        <distances>
+          <sibling id='0' value='10'/>
+          <sibling id='1' value='21'/>
+        </distances>
+      </cell>
+      <cell id='1' cpus='50-99' memory='728760320' unit='KiB'>
+        <distances>
+          <sibling id='0' value='21'/>
+          <sibling id='1' value='10'/>
+        </distances>
+      </cell>
+    </numa>
+  </cpu>
+  <clock offset='utc'>
+    <timer name='rtc' tickpolicy='catchup'/>
+    <timer name='pit' tickpolicy='delay'/>
+    <timer name='hpet' present='no'/>
+  </clock>
+  <on_poweroff>destroy</on_poweroff>
+  <on_reboot>restart</on_reboot>
+  <on_crash>destroy</on_crash>
+  <pm>
+    <suspend-to-mem enabled='no'/>
+    <suspend-to-disk enabled='no'/>
+  </pm>
+  <devices>
+    <emulator>/usr/bin/qemu-system-x86_64</emulator>
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='raw' cache='writethrough'/>
+      <source file='/EXAVMIMAGES/GuestImages/scaqab10adm01vm08.us.oracle.com/System.img'/>
+      <backingStore/>
+      <target dev='sda' bus='scsi'/>
+      <alias name='scsi0-0-0-0'/>
+      <address type='drive' controller='0' bus='0' target='0' unit='0'/>
+    </disk>
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='raw' cache='writethrough'/>
+      <source file='/EXAVMIMAGES/GuestImages/scaqab10adm01vm08.us.oracle.com/grid19.0.0.0.200714.img'/>
+      <backingStore/>
+      <target dev='sdb' bus='scsi'/>
+      <alias name='scsi0-0-0-1'/>
+      <address type='drive' controller='0' bus='0' target='0' unit='1'/>
+    </disk>
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='raw' cache='writethrough'/>
+      <source file='/EXAVMIMAGES/GuestImages/scaqab10adm01vm08.us.oracle.com/db19.0.0.0.200714-3.img'/>
+      <backingStore/>
+      <target dev='sdc' bus='scsi'/>
+      <alias name='scsi0-0-0-2'/>
+      <address type='drive' controller='0' bus='0' target='0' unit='2'/>
+    </disk>
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='raw' cache='writethrough'/>
+      <source file='/EXAVMIMAGES/GuestImages/scaqab10adm01vm08.us.oracle.com/db18.1.0.0.200714-4.img'/>
+      <backingStore/>
+      <target dev='sdd' bus='scsi'/>
+      <alias name='scsi0-0-0-3'/>
+      <address type='drive' controller='0' bus='0' target='0' unit='3'/>
+    </disk>
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='raw' cache='writethrough'/>
+      <source file='/EXAVMIMAGES/GuestImages/scaqab10adm01vm08.us.oracle.com/db12.2.0.1.200714-5.img'/>
+      <backingStore/>
+      <target dev='sde' bus='scsi'/>
+      <alias name='scsi0-0-0-4'/>
+      <address type='drive' controller='0' bus='0' target='0' unit='4'/>
+    </disk>
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='raw' cache='writethrough'/>
+      <source file='/EXAVMIMAGES/GuestImages/scaqab10adm01vm08.us.oracle.com/db12.1.0.2.200714-6.img'/>
+      <backingStore/>
+      <target dev='sdf' bus='scsi'/>
+      <alias name='scsi0-0-0-5'/>
+      <address type='drive' controller='0' bus='0' target='0' unit='5'/>
+    </disk>
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='raw' cache='writethrough'/>
+      <source file='/EXAVMIMAGES/GuestImages/scaqab10adm01vm08.us.oracle.com/db11.2.0.4.200714-7.img'/>
+      <backingStore/>
+      <target dev='sdg' bus='scsi'/>
+      <alias name='scsi0-0-0-6'/>
+      <address type='drive' controller='0' bus='0' target='0' unit='6'/>
+    </disk>
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='raw' cache='writethrough'/>
+      <source file='/EXAVMIMAGES/GuestImages/scaqab10adm01vm08.us.oracle.com/pv1_vgexadb.img'/>
+      <backingStore/>
+      <target dev='sdh' bus='scsi'/>
+      <alias name='scsi1-0-0-0'/>
+      <address type='drive' controller='1' bus='0' target='0' unit='0'/>
+    </disk>
+    <controller type='usb' index='0' model='qemu-xhci'>
+      <alias name='usb'/>
+      <address type='pci' domain='0x0000' bus='0x01' slot='0x00' function='0x0'/>
+    </controller>
+    <controller type='pci' index='0' model='pcie-root'>
+      <alias name='pcie.0'/>
+    </controller>
+    <controller type='pci' index='1' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='1' port='0x8'/>
+      <alias name='pci.1'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x01' function='0x0' multifunction='on'/>
+    </controller>
+    <controller type='pci' index='2' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='2' port='0x9'/>
+      <alias name='pci.2'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x01' function='0x1'/>
+    </controller>
+    <controller type='pci' index='3' model='pcie-expander-bus'>
+      <model name='pxb-pcie'/>
+      <target busNr='254'>
+        <node>1</node>
+      </target>
+      <alias name='pci.3'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x02' function='0x0'/>
+    </controller>
+    <controller type='pci' index='4' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='4' port='0x0'/>
+      <alias name='pci.4'/>
+      <address type='pci' domain='0x0000' bus='0x03' slot='0x00' function='0x0' multifunction='on'/>
+    </controller>
+    <controller type='pci' index='5' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='5' port='0xa'/>
+      <alias name='pci.5'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x01' function='0x2'/>
+    </controller>
+    <controller type='pci' index='6' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='6' port='0xb'/>
+      <alias name='pci.6'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x01' function='0x3'/>
+    </controller>
+    <controller type='pci' index='7' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='7' port='0xc'/>
+      <alias name='pci.7'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x01' function='0x4'/>
+    </controller>
+    <controller type='pci' index='8' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='8' port='0xd'/>
+      <alias name='pci.8'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x01' function='0x5'/>
+    </controller>
+    <controller type='pci' index='9' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='9' port='0xe'/>
+      <alias name='pci.9'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x01' function='0x6'/>
+    </controller>
+    <controller type='pci' index='10' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='10' port='0xf'/>
+      <alias name='pci.10'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x01' function='0x7'/>
+    </controller>
+    <controller type='pci' index='11' model='pcie-root-port'>
+      <model name='pcie-root-port'/>
+      <target chassis='11' port='0x10'/>
+      <alias name='pci.11'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x06' function='0x0'/>
+    </controller>
+    <controller type='scsi' index='0' model='virtio-scsi'>
+      <driver queues='100'/>
+      <alias name='scsi0'/>
+      <address type='pci' domain='0x0000' bus='0x07' slot='0x00' function='0x0'/>
+    </controller>
+    <controller type='scsi' index='1' model='virtio-scsi'>
+      <driver queues='100'/>
+      <alias name='scsi1'/>
+      <address type='pci' domain='0x0000' bus='0x08' slot='0x00' function='0x0'/>
+    </controller>
+    <controller type='scsi' index='2' model='virtio-scsi'>
+      <driver queues='100'/>
+      <alias name='scsi2'/>
+      <address type='pci' domain='0x0000' bus='0x09' slot='0x00' function='0x0'/>
+    </controller>
+    <controller type='scsi' index='3' model='virtio-scsi'>
+      <driver queues='100'/>
+      <alias name='scsi3'/>
+      <address type='pci' domain='0x0000' bus='0x0a' slot='0x00' function='0x0'/>
+    </controller>
+    <controller type='sata' index='0'>
+      <alias name='ide'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x1f' function='0x2'/>
+    </controller>
+    <interface type='bridge'>
+      <mac address='00:10:51:57:8f:fc'/>
+      <source bridge='vmbondeth0'/>
+      <target dev='vnet100'/>
+      <model type='virtio'/>
+      <driver queues='8'/>
+      <alias name='net0'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x03' function='0x0'/>
+    </interface>
+    <interface type='bridge'>
+      <mac address='00:00:17:01:a8:51'/>
+      <source bridge='vmbondeth0.1'/>
+      <target dev='vnet101'/>
+      <model type='virtio'/>
+      <driver queues='8'/>
+      <alias name='net1'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x04' function='0x0'/>
+    </interface>
+    <interface type='bridge'>
+      <mac address='52:54:00:58:e7:48'/>
+      <source bridge='vmeth200'/>
+      <target dev='vnet102'/>
+      <model type='virtio'/>
+      <driver queues='8'/>
+      <alias name='net2'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x05' function='0x0'/>
+    </interface>
+    <interface type='hostdev' managed='yes'>
+      <mac address='52:54:00:56:16:a1'/>
+      <driver name='vfio'/>
+      <source>
+        <address type='pci' domain='0x0000' bus='0xaf' slot='0x00' function='0x2'/>
+      </source>
+      <alias name='hostdev0'/>
+      <address type='pci' domain='0x0000' bus='0x04' slot='0x00' function='0x0' multifunction='on'/>
+    </interface>
+    <interface type='hostdev' managed='yes'>
+      <mac address='52:54:00:9c:4e:0e'/>
+      <driver name='vfio'/>
+      <source>
+        <address type='pci' domain='0x0000' bus='0xaf' slot='0x03' function='0x2'/>
+      </source>
+      <alias name='hostdev1'/>
+      <address type='pci' domain='0x0000' bus='0x04' slot='0x00' function='0x1'/>
+    </interface>
+    <interface type='hostdev' managed='yes'>
+      <mac address='52:54:00:52:2a:50'/>
+      <driver name='vfio'/>
+      <source>
+        <address type='pci' domain='0x0000' bus='0xaf' slot='0x00' function='0x3'/>
+      </source>
+      <alias name='hostdev2'/>
+      <address type='pci' domain='0x0000' bus='0x04' slot='0x00' function='0x2'/>
+    </interface>
+    <interface type='hostdev' managed='yes'>
+      <mac address='52:54:00:36:a8:71'/>
+      <driver name='vfio'/>
+      <source>
+        <address type='pci' domain='0x0000' bus='0xaf' slot='0x03' function='0x3'/>
+      </source>
+      <alias name='hostdev3'/>
+      <address type='pci' domain='0x0000' bus='0x04' slot='0x00' function='0x3'/>
+    </interface>
+    <serial type='pty'>
+      <source path='/dev/pts/1'/>
+      <target type='isa-serial' port='0'>
+        <model name='isa-serial'/>
+      </target>
+      <alias name='serial0'/>
+    </serial>
+    <console type='pty' tty='/dev/pts/1'>
+      <source path='/dev/pts/1'/>
+      <target type='serial' port='0'/>
+      <alias name='serial0'/>
+    </console>
+    <input type='mouse' bus='ps2'>
+      <alias name='input0'/>
+    </input>
+    <input type='keyboard' bus='ps2'>
+      <alias name='input1'/>
+    </input>
+    <memballoon model='virtio'>
+      <alias name='balloon0'/>
+      <address type='pci' domain='0x0000' bus='0x02' slot='0x00' function='0x0'/>
+    </memballoon>
+    <iommu model='intel'>
+      <driver aw_bits='48'/>
+    </iommu>
+  </devices>
+  <seclabel type='dynamic' model='dac' relabel='yes'>
+    <label>+0:+0</label>
+    <imagelabel>+0:+0</imagelabel>
+  </seclabel>
+</domain>

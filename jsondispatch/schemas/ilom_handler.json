@@ -1,0 +1,52 @@
+{
+    "title": "JSON Schema for Ilom Password Reset",
+    "type": "object",
+    "properties":
+    {
+        "jsonconf":
+        {
+            "type": "object",
+            "properties":
+            {
+                "servers":
+                {
+                    "type": "array",
+                    "minItems": 1,
+                    "items":
+                    {
+                        "type": "object",
+                        "properties":
+                        {
+                            "host":
+                            {
+                                "type": "string"
+                            },
+                            "ilomhost":
+                            {
+                                "type": "string"
+                            },
+                            "new_sct":
+                            {
+                                "type": "string"
+                            }
+                        },
+                        "required":
+                        [
+                            "host",
+                            "ilomhost",
+                            "new_sct"
+                        ]
+                    }
+                }
+            },
+            "required":
+            [
+                "servers"
+            ]
+        }
+    },
+    "required":
+    [
+        "jsonconf"
+    ]
+}

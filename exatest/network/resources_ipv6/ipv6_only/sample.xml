@@ -1,0 +1,1433 @@
+<?xml version="1.0"?>
+
+<!--  $Header: ecs/exacloud/exabox/exatest/network/resources_ipv6/ipv6_only/sample.xml /main/1 2025/09/23 07:26:34 aararora Exp $ -->
+
+<!-- 
+ Copyright (c) 2025, Oracle and/or its affiliates. 
+
+   NAME
+     sample.xml - <one-line expansion of the name>
+
+   DESCRIPTION
+     <short description of component this file declares/defines>
+
+   NOTES
+     <other useful comments, qualifications, etc.>
+
+   MODIFIED   (MM/DD/YY)
+   aararora    08/06/25 - Creation
+
+-->
+<engineeredSystem filetype="PAAS" oedaversion="17.089.19:00">
+    <customerName>iad1-d2-cl3-025ac6a3-0f7e-4e61-a008-01d7847825d0-clu01</customerName>
+    <departmentName />
+    <esPrefix />
+    <version>2</version>
+    <actions>
+        <action deployed="true" id="1" merged="true">
+            <subCommand>DELETE DATABASE  WHERE ID="pdb0_db_id"</subCommand>
+        </action>
+        <action deployed="true" id="2" merged="true">
+            <subCommand>DELETE DATABASE  WHERE ID="cdb0_db_id"</subCommand>
+        </action>
+        <action deployed="true" id="3" merged="true">
+            <subCommand>ALTER MACHINE VMEM="45GB" ACTION="SETVMEM" WHERE ID="iad103716exddu1201.iad103716exd.adminiad1.oraclevcn.com_id"</subCommand>
+        </action>
+        <action deployed="true" id="4" merged="true">
+            <subCommand>ALTER MACHINE VCPU="30" ACTION="SETVCPU" WHERE ID="iad103716exddu1201.iad103716exd.adminiad1.oraclevcn.com_id"</subCommand>
+        </action>
+        <action deployed="true" id="5" merged="true">
+            <subCommand>ALTER MACHINE VMEM="45GB" ACTION="SETVMEM" WHERE ID="iad103716exddu1101.iad103716exd.adminiad1.oraclevcn.com_id"</subCommand>
+        </action>
+        <action deployed="true" id="6" merged="true">
+            <subCommand>ALTER MACHINE VCPU="30" ACTION="SETVCPU" WHERE ID="iad103716exddu1101.iad103716exd.adminiad1.oraclevcn.com_id"</subCommand>
+        </action>
+        <action deployed="true" id="7" merged="true">
+            <subCommand>ALTER MACHINE VMEM="45GB" ACTION="SETVMEM" WHERE ID="iad103716exddu1201.iad103716exd.adminiad1.oraclevcn.com_id"</subCommand>
+        </action>
+        <action deployed="true" id="8" merged="true">
+            <subCommand>ALTER MACHINE VCPU="30" ACTION="SETVCPU" WHERE ID="iad103716exddu1201.iad103716exd.adminiad1.oraclevcn.com_id"</subCommand>
+        </action>
+        <action deployed="true" id="9" merged="true">
+            <subCommand>ALTER MACHINE VMEM="45GB" ACTION="SETVMEM" WHERE ID="iad103716exddu1101.iad103716exd.adminiad1.oraclevcn.com_id"</subCommand>
+        </action>
+        <action deployed="true" id="10" merged="true">
+            <subCommand>ALTER MACHINE VCPU="30" ACTION="SETVCPU" WHERE ID="iad103716exddu1101.iad103716exd.adminiad1.oraclevcn.com_id"</subCommand>
+        </action>
+        <action deployed="true" id="11" merged="true">
+            <subCommand>ALTER MACHINE NTPSERVERS="169.254.169.254" DNSSERVERS="169.254.169.254" WHERE ID="iad103716exddu1201.iad103716exd.adminiad1.oraclevcn.com_id"</subCommand>
+        </action>
+        <action deployed="true" id="12" merged="true">
+            <subCommand>ALTER MACHINE NTPSERVERS="169.254.169.254" DNSSERVERS="169.254.169.254" WHERE ID="iad103716exddu1101.iad103716exd.adminiad1.oraclevcn.com_id"</subCommand>
+        </action>
+        <action deployed="true" id="13" merged="true">
+            <subCommand>DELETE DATABASEHOME  WHERE ID="c1_dbhome_id"</subCommand>
+        </action>
+        <action deployed="true" id="14" merged="true">
+            <subCommand>ALTER NETWORK VLANID="551" NETMASK="255.255.0.0" IP="100.106.64.3" WHERE ID="iad103716exddu1201.iad103716exd.adminiad1.oraclevcn.com_priv2"</subCommand>
+        </action>
+        <action deployed="true" id="15" merged="true">
+            <subCommand>ALTER NETWORK VLANID="551" NETMASK="255.255.0.0" IP="100.106.64.2" WHERE ID="iad103716exddu1201.iad103716exd.adminiad1.oraclevcn.com_priv1"</subCommand>
+        </action>
+        <action deployed="true" id="16" merged="true">
+            <subCommand>ALTER NETWORK VLANID="541" NETMASK="255.255.0.0" IP="100.107.0.5" WHERE ID="iad103716exddu1201.iad103716exd.adminiad1.oraclevcn.com_clusterpriv2"</subCommand>
+        </action>
+        <action deployed="true" id="17" merged="true">
+            <subCommand>ALTER NETWORK VLANID="541" NETMASK="255.255.0.0" IP="100.107.0.4" WHERE ID="iad103716exddu1201.iad103716exd.adminiad1.oraclevcn.com_clusterpriv1"</subCommand>
+        </action>
+        <action deployed="true" id="18" merged="true">
+            <subCommand>ALTER NETWORK VLANID="1" NETMASK="255.255.224.0" NATNETMASK="255.255.255.128" MAC="02:00:17:12:bd:52" IP="10.0.11.73" HOSTNAME="c3716n12c1" GATEWAY="10.0.0.1" DOMAINNAME="clientsubnet.devx8melastic.oraclevcn.com" WHERE ID="iad103716exddu1201.iad103716exd.adminiad1.oraclevcn.com_client"</subCommand>
+        </action>
+        <action deployed="true" id="19" merged="true">
+            <subCommand>ALTER NETWORK VLANID="2" NETMASK="255.255.224.0" MAC="02:00:17:03:58:72" IP="10.0.33.197" HOSTNAME="c3716n12b1" GATEWAY="10.0.32.1" DOMAINNAME="backupsubnet.devx8melastic.oraclevcn.com" WHERE ID="iad103716exddu1201.iad103716exd.adminiad1.oraclevcn.com_backup"</subCommand>
+        </action>
+        <action deployed="true" id="20" merged="true">
+            <subCommand>ALTER NETWORK VLANID="551" NETMASK="255.255.0.0" IP="100.106.64.1" WHERE ID="iad103716exddu1101.iad103716exd.adminiad1.oraclevcn.com_priv2"</subCommand>
+        </action>
+        <action deployed="true" id="21" merged="true">
+            <subCommand>ALTER NETWORK VLANID="551" NETMASK="255.255.0.0" IP="100.106.64.0" WHERE ID="iad103716exddu1101.iad103716exd.adminiad1.oraclevcn.com_priv1"</subCommand>
+        </action>
+        <action deployed="true" id="22" merged="true">
+            <subCommand>ALTER NETWORK VLANID="541" NETMASK="255.255.0.0" IP="100.107.0.3" WHERE ID="iad103716exddu1101.iad103716exd.adminiad1.oraclevcn.com_clusterpriv2"</subCommand>
+        </action>
+        <action deployed="true" id="23" merged="true">
+            <subCommand>ALTER NETWORK VLANID="541" NETMASK="255.255.0.0" IP="100.107.0.2" WHERE ID="iad103716exddu1101.iad103716exd.adminiad1.oraclevcn.com_clusterpriv1"</subCommand>
+        </action>
+        <action deployed="true" id="24" merged="true">
+            <subCommand>ALTER NETWORK VLANID="1" NETMASK="255.255.224.0" NATNETMASK="255.255.255.128" MAC="02:00:17:12:15:d4" IP="10.0.8.185" HOSTNAME="c3716n11c1" GATEWAY="10.0.0.1" DOMAINNAME="clientsubnet.devx8melastic.oraclevcn.com" WHERE ID="iad103716exddu1101.iad103716exd.adminiad1.oraclevcn.com_client"</subCommand>
+        </action>
+        <action deployed="true" id="25" merged="true">
+            <subCommand>ALTER NETWORK VLANID="2" NETMASK="255.255.224.0" MAC="00:00:17:00:11:3f" IP="10.0.38.38" HOSTNAME="c3716n11b1" GATEWAY="10.0.32.1" DOMAINNAME="backupsubnet.devx8melastic.oraclevcn.com" WHERE ID="iad103716exddu1101.iad103716exd.adminiad1.oraclevcn.com_backup"</subCommand>
+        </action>
+        <action deployed="true" id="26" merged="true">
+            <subCommand>ALTER NETWORK VLANID="551" NETMASK="255.255.0.0" WHERE ID="iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com_priv2"</subCommand>
+        </action>
+        <action deployed="true" id="27" merged="true">
+            <subCommand>ALTER NETWORK VLANID="551" NETMASK="255.255.0.0" WHERE ID="iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com_priv1"</subCommand>
+        </action>
+        <action deployed="true" id="28" merged="true">
+            <subCommand>ALTER NETWORK VLANID="551" NETMASK="255.255.0.0" WHERE ID="iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com_priv2"</subCommand>
+        </action>
+        <action deployed="true" id="29" merged="true">
+            <subCommand>ALTER NETWORK VLANID="551" NETMASK="255.255.0.0" WHERE ID="iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com_priv1"</subCommand>
+        </action>
+        <action deployed="true" id="30" merged="true">
+            <subCommand>ALTER NETWORK VLANID="551" NETMASK="255.255.0.0" WHERE ID="iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com_priv2"</subCommand>
+        </action>
+        <action deployed="true" id="31" merged="true">
+            <subCommand>ALTER NETWORK VLANID="551" NETMASK="255.255.0.0" WHERE ID="iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com_priv1"</subCommand>
+        </action>
+        <action deployed="true" id="32" merged="true">
+            <subCommand>ALTER CLUSTER GIVERSION="19.0.0.0.231017" CLUSTERNAME="myclu1" GIHOMELOC="/u01/app/19.0.0.0/grid" ASMSCOPEDSECURITY="true" PATCHLIST="36233126,35940989,35642822,35319490,35037840,34762026,34416665,34130714,33803476,33509923,33182768,32895426,32545008,32226239,31750108,31305339,30899722,30501910,30116789,29708769" WHERE ID="c1_clusterHome"</subCommand>
+        </action>
+        <action deployed="true" id="33" merged="true">
+            <subCommand>ALTER VIP NAME="c3716n12c1-vip" IP="10.0.27.136" DOMAINNAME="clientsubnet.devx8melastic.oraclevcn.com" WHERE ID="iad103716exddu1201-vip.iad103716exd.adminiad1.oraclevcn.com_id"</subCommand>
+        </action>
+        <action deployed="true" id="34" merged="true">
+            <subCommand>ALTER VIP NAME="c3716n11c1-vip" IP="10.0.3.203" DOMAINNAME="clientsubnet.devx8melastic.oraclevcn.com" WHERE ID="iad103716exddu1101-vip.iad103716exd.adminiad1.oraclevcn.com_id"</subCommand>
+        </action>
+        <action deployed="true" id="35" merged="true">
+            <subCommand>ALTER SCAN SCANNAME="idc3716-clu01scan" SCANIPS="10.0.9.124,10.0.25.120,10.0.0.121" WHERE CLUSTERID="c1_clusterHome"</subCommand>
+        </action>
+        <action deployed="true" id="36" merged="true">
+            <subCommand>ALTER DISKGROUP QUORUMDISK="true" DISKGROUPSIZE="6144G" WHERE ID="recodg_id"</subCommand>
+        </action>
+        <action deployed="true" id="37" merged="true">
+            <subCommand>ALTER DISKGROUP QUORUMDISK="true" OCRVOTE="true" DISKGROUPSIZE="24576G" ACFSSIZE="560" ACFSNAME="acfsvol01" ACFSPATH="/acfs01" WHERE ID="datadg_id"</subCommand>
+        </action>
+    </actions>
+    <machines>
+        <machine id="iad103716exdd011.iad103716exd.adminiad1.oraclevcn.com_id">
+            <hostName>iad103716exdd011.iad103716exd.adminiad1.oraclevcn.com</hostName>
+            <iloms>
+                <ilom id="iad103716exdd011.iad103716exd.adminiad1.oraclevcn.com_ilom" />
+            </iloms>
+            <networks>
+                <network id="iad103716exdd011.iad103716exd.adminiad1.oraclevcn.com_admin" />
+                <network id="iad103716exdd011.iad103716exd.adminiad1.oraclevcn.com_priv1" />
+                <network id="iad103716exdd011.iad103716exd.adminiad1.oraclevcn.com_priv2" />
+            </networks>
+            <machineType>compute</machineType>
+            <dnsServers>
+                <dnsServer>
+                    <ipAddress />
+                </dnsServer>
+            </dnsServers>
+            <ntpServers>
+                <ntpServer>
+                    <ipAddress />
+                </ntpServer>
+            </ntpServers>
+            <TimeZone>UTC</TimeZone>
+            <DefaultGatewayNet>iad103716exdd011.iad103716exd.adminiad1.oraclevcn.com_admin</DefaultGatewayNet>
+            <virtual>false</virtual>
+            <version>version2</version>
+            <osType>LinuxKVM</osType>
+            <machine id="iad103716exddu1101.iad103716exd.adminiad1.oraclevcn.com_id" />
+        </machine>
+        <machine id="iad103716exddu1101.iad103716exd.adminiad1.oraclevcn.com_id">
+            <hostName>c3716n11c1.clientsubnet.devx8melastic.oraclevcn.com</hostName>
+            <users>
+                <user id="c1_grid" />
+                <user id="c1_oracle" />
+            </users>
+            <networks>
+                <network id="iad103716exddu1101.iad103716exd.adminiad1.oraclevcn.com_client" />
+                <network id="iad103716exddu1101.iad103716exd.adminiad1.oraclevcn.com_backup" />
+                <network id="iad103716exddu1101.iad103716exd.adminiad1.oraclevcn.com_priv1" />
+                <network id="iad103716exddu1101.iad103716exd.adminiad1.oraclevcn.com_priv2" />
+                <network id="iad103716exddu1101.iad103716exd.adminiad1.oraclevcn.com_clusterpriv1" />
+                <network id="iad103716exddu1101.iad103716exd.adminiad1.oraclevcn.com_clusterpriv2" />
+            </networks>
+            <software>
+                <clusters>
+                    <cluster id="c1_clusterHome" />
+                </clusters>
+                <databaseHomes />
+            </software>
+            <machineType>compute</machineType>
+            <dnsServers>
+                <dnsServer><ipAddress>169.254.169.254</ipAddress></dnsServer></dnsServers>
+            <ntpServers>
+                <ntpServer><ipAddress>169.254.169.254</ipAddress></ntpServer></ntpServers>
+            <TimeZone>UTC</TimeZone>
+            <DefaultGatewayNet>iad103716exddu1101.iad103716exd.adminiad1.oraclevcn.com_client</DefaultGatewayNet>
+            <ImageVersion>default</ImageVersion>
+            <DomUImageName>default</DomUImageName>
+            <virtual>true</virtual>
+            <version>version2</version>
+            <osType>LinuxKVMGuest</osType>
+            <guestCores>30</guestCores>
+            <guestMemory>45GB</guestMemory>
+            <guestLocalDiskSize>20GB</guestLocalDiskSize>
+        </machine>
+        <machine id="iad103716exdd012.iad103716exd.adminiad1.oraclevcn.com_id">
+            <hostName>iad103716exdd012.iad103716exd.adminiad1.oraclevcn.com</hostName>
+            <iloms>
+                <ilom id="iad103716exdd012.iad103716exd.adminiad1.oraclevcn.com_ilom" />
+            </iloms>
+            <networks>
+                <network id="iad103716exdd012.iad103716exd.adminiad1.oraclevcn.com_admin" />
+                <network id="iad103716exdd012.iad103716exd.adminiad1.oraclevcn.com_priv1" />
+                <network id="iad103716exdd012.iad103716exd.adminiad1.oraclevcn.com_priv2" />
+            </networks>
+            <machineType>compute</machineType>
+            <dnsServers>
+                <dnsServer>
+                    <ipAddress />
+                </dnsServer>
+            </dnsServers>
+            <ntpServers>
+                <ntpServer>
+                    <ipAddress />
+                </ntpServer>
+            </ntpServers>
+            <TimeZone>UTC</TimeZone>
+            <DefaultGatewayNet>iad103716exdd012.iad103716exd.adminiad1.oraclevcn.com_admin</DefaultGatewayNet>
+            <virtual>false</virtual>
+            <version>version2</version>
+            <osType>LinuxKVM</osType>
+            <machine id="iad103716exddu1201.iad103716exd.adminiad1.oraclevcn.com_id" />
+        </machine>
+        <machine id="iad103716exddu1201.iad103716exd.adminiad1.oraclevcn.com_id">
+            <hostName>c3716n12c1.clientsubnet.devx8melastic.oraclevcn.com</hostName>
+            <users>
+                <user id="c1_grid" />
+                <user id="c1_oracle" />
+            </users>
+            <networks>
+                <network id="iad103716exddu1201.iad103716exd.adminiad1.oraclevcn.com_client" />
+                <network id="iad103716exddu1201.iad103716exd.adminiad1.oraclevcn.com_backup" />
+                <network id="iad103716exddu1201.iad103716exd.adminiad1.oraclevcn.com_priv1" />
+                <network id="iad103716exddu1201.iad103716exd.adminiad1.oraclevcn.com_priv2" />
+                <network id="iad103716exddu1201.iad103716exd.adminiad1.oraclevcn.com_clusterpriv1" />
+                <network id="iad103716exddu1201.iad103716exd.adminiad1.oraclevcn.com_clusterpriv2" />
+            </networks>
+            <software>
+                <clusters>
+                    <cluster id="c1_clusterHome" />
+                </clusters>
+                <databaseHomes />
+            </software>
+            <machineType>compute</machineType>
+            <dnsServers>
+                <dnsServer><ipAddress>169.254.169.254</ipAddress></dnsServer></dnsServers>
+            <ntpServers>
+                <ntpServer><ipAddress>169.254.169.254</ipAddress></ntpServer></ntpServers>
+            <TimeZone>UTC</TimeZone>
+            <DefaultGatewayNet>iad103716exddu1201.iad103716exd.adminiad1.oraclevcn.com_client</DefaultGatewayNet>
+            <ImageVersion>default</ImageVersion>
+            <DomUImageName>default</DomUImageName>
+            <virtual>true</virtual>
+            <version>version2</version>
+            <osType>LinuxKVMGuest</osType>
+            <guestCores>30</guestCores>
+            <guestMemory>45GB</guestMemory>
+            <guestLocalDiskSize>20GB</guestLocalDiskSize>
+        </machine>
+        <machine id="iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com_id">
+            <hostName>iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com</hostName>
+            <iloms>
+                <ilom id="iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com_ilom" />
+            </iloms>
+            <writeBackFlashCache>true</writeBackFlashCache>
+            <networks>
+                <network id="iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com_admin" />
+                <network id="iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com_priv1" />
+                <network id="iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com_priv2" />
+            </networks>
+            <storage>
+                <localDisks>
+                    <localDisk id="iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com_CD_0" />
+                    <localDisk id="iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com_CD_1" />
+                    <localDisk id="iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com_CD_2" />
+                    <localDisk id="iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com_CD_3" />
+                    <localDisk id="iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com_CD_4" />
+                    <localDisk id="iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com_CD_5" />
+                    <localDisk id="iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com_CD_6" />
+                    <localDisk id="iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com_CD_7" />
+                    <localDisk id="iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com_CD_8" />
+                    <localDisk id="iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com_CD_9" />
+                    <localDisk id="iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com_CD_10" />
+                    <localDisk id="iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com_CD_11" />
+                </localDisks>
+            </storage>
+            <machineType>storage</machineType>
+            <dnsServers>
+                <dnsServer>
+                    <ipAddress />
+                </dnsServer>
+            </dnsServers>
+            <ntpServers>
+                <ntpServer>
+                    <ipAddress />
+                </ntpServer>
+            </ntpServers>
+            <TimeZone>UTC</TimeZone>
+            <virtual>false</virtual>
+            <version>version2</version>
+            <osType>LinuxPhysical</osType>
+        </machine>
+        <machine id="iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com_id">
+            <hostName>iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com</hostName>
+            <iloms>
+                <ilom id="iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com_ilom" />
+            </iloms>
+            <writeBackFlashCache>true</writeBackFlashCache>
+            <networks>
+                <network id="iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com_admin" />
+                <network id="iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com_priv1" />
+                <network id="iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com_priv2" />
+            </networks>
+            <storage>
+                <localDisks>
+                    <localDisk id="iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com_CD_0" />
+                    <localDisk id="iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com_CD_1" />
+                    <localDisk id="iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com_CD_2" />
+                    <localDisk id="iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com_CD_3" />
+                    <localDisk id="iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com_CD_4" />
+                    <localDisk id="iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com_CD_5" />
+                    <localDisk id="iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com_CD_6" />
+                    <localDisk id="iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com_CD_7" />
+                    <localDisk id="iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com_CD_8" />
+                    <localDisk id="iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com_CD_9" />
+                    <localDisk id="iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com_CD_10" />
+                    <localDisk id="iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com_CD_11" />
+                </localDisks>
+            </storage>
+            <machineType>storage</machineType>
+            <dnsServers>
+                <dnsServer>
+                    <ipAddress />
+                </dnsServer>
+            </dnsServers>
+            <ntpServers>
+                <ntpServer>
+                    <ipAddress />
+                </ntpServer>
+            </ntpServers>
+            <TimeZone>UTC</TimeZone>
+            <virtual>false</virtual>
+            <version>version2</version>
+            <osType>LinuxPhysical</osType>
+        </machine>
+        <machine id="iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com_id">
+            <hostName>iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com</hostName>
+            <iloms>
+                <ilom id="iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com_ilom" />
+            </iloms>
+            <writeBackFlashCache>true</writeBackFlashCache>
+            <networks>
+                <network id="iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com_admin" />
+                <network id="iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com_priv1" />
+                <network id="iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com_priv2" />
+            </networks>
+            <storage>
+                <localDisks>
+                    <localDisk id="iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com_CD_0" />
+                    <localDisk id="iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com_CD_1" />
+                    <localDisk id="iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com_CD_2" />
+                    <localDisk id="iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com_CD_3" />
+                    <localDisk id="iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com_CD_4" />
+                    <localDisk id="iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com_CD_5" />
+                    <localDisk id="iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com_CD_6" />
+                    <localDisk id="iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com_CD_7" />
+                    <localDisk id="iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com_CD_8" />
+                    <localDisk id="iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com_CD_9" />
+                    <localDisk id="iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com_CD_10" />
+                    <localDisk id="iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com_CD_11" />
+                </localDisks>
+            </storage>
+            <machineType>storage</machineType>
+            <dnsServers>
+                <dnsServer>
+                    <ipAddress />
+                </dnsServer>
+            </dnsServers>
+            <ntpServers>
+                <ntpServer>
+                    <ipAddress />
+                </ntpServer>
+            </ntpServers>
+            <TimeZone>UTC</TimeZone>
+            <virtual>false</virtual>
+            <version>version2</version>
+            <osType>LinuxPhysical</osType>
+        </machine>
+    </machines>
+    <iloms>
+        <ilom id="iad103716exdd011.iad103716exd.adminiad1.oraclevcn.com_ilom">
+            <networks>
+                <network id="iad103716exdd011.iad103716exd.adminiad1.oraclevcn.com_ilom" />
+            </networks>
+            <dnsServers>
+                <dnsServer>
+                    <ipAddress />
+                </dnsServer>
+            </dnsServers>
+            <ntpServers>
+                <ntpServer>
+                    <ipAddress />
+                </ntpServer>
+            </ntpServers>
+            <ilomTimeZone>UTC</ilomTimeZone>
+            <ilomName>iad103716exdd011lo.iad103716exd.adminiad1.oraclevcn.com ILOM</ilomName>
+            <version>12</version>
+        </ilom>
+        <ilom id="iad103716exdd012.iad103716exd.adminiad1.oraclevcn.com_ilom">
+            <networks>
+                <network id="iad103716exdd012.iad103716exd.adminiad1.oraclevcn.com_ilom" />
+            </networks>
+            <dnsServers>
+                <dnsServer>
+                    <ipAddress />
+                </dnsServer>
+            </dnsServers>
+            <ntpServers>
+                <ntpServer>
+                    <ipAddress />
+                </ntpServer>
+            </ntpServers>
+            <ilomTimeZone>UTC</ilomTimeZone>
+            <ilomName>iad103716exdd012lo.iad103716exd.adminiad1.oraclevcn.com ILOM</ilomName>
+            <version>12</version>
+        </ilom>
+        <ilom id="iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com_ilom">
+            <networks>
+                <network id="iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com_ilom" />
+            </networks>
+            <dnsServers>
+                <dnsServer>
+                    <ipAddress />
+                </dnsServer>
+            </dnsServers>
+            <ntpServers>
+                <ntpServer>
+                    <ipAddress />
+                </ntpServer>
+            </ntpServers>
+            <ilomTimeZone>UTC</ilomTimeZone>
+            <ilomName>iad103712exdcl03lo.iad103712exd.adminiad1.oraclevcn.com ILOM</ilomName>
+            <version>12</version>
+        </ilom>
+        <ilom id="iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com_ilom">
+            <networks>
+                <network id="iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com_ilom" />
+            </networks>
+            <dnsServers>
+                <dnsServer>
+                    <ipAddress />
+                </dnsServer>
+            </dnsServers>
+            <ntpServers>
+                <ntpServer>
+                    <ipAddress />
+                </ntpServer>
+            </ntpServers>
+            <ilomTimeZone>UTC</ilomTimeZone>
+            <ilomName>iad103712exdcl02lo.iad103712exd.adminiad1.oraclevcn.com ILOM</ilomName>
+            <version>12</version>
+        </ilom>
+        <ilom id="iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com_ilom">
+            <networks>
+                <network id="iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com_ilom" />
+            </networks>
+            <dnsServers>
+                <dnsServer>
+                    <ipAddress />
+                </dnsServer>
+            </dnsServers>
+            <ntpServers>
+                <ntpServer>
+                    <ipAddress />
+                </ntpServer>
+            </ntpServers>
+            <ilomTimeZone>UTC</ilomTimeZone>
+            <ilomName>iad103712exdcl01lo.iad103712exd.adminiad1.oraclevcn.com ILOM</ilomName>
+            <version>12</version>
+        </ilom>
+        <version>2</version>
+    </iloms>
+    <users>
+        <user id="c1_oracle">
+            <version>version1</version>
+            <userType>oracle</userType>
+            <username>oracle</username>
+            <homedir>/home/oracle</homedir>
+            <userid>1001</userid>
+            <groups>
+                <group id="c1_1001" />
+                <group id="c1_1002" />
+                <group id="c1_1003" />
+                <group id="c1_1004" />
+            </groups>
+        </user>
+        <user id="c1_grid">
+            <version>version1</version>
+            <userType>grid</userType>
+            <username>grid</username>
+            <homedir>/home/grid</homedir>
+            <userid>1000</userid>
+            <groups>
+                <group id="c1_1001" />
+                <group id="c1_1004" />
+                <group id="c1_1005" />
+                <group id="c1_1006" />
+            </groups>
+        </user>
+    </users>
+    <groups>
+        <group id="c1_1001">
+            <version>version1</version>
+            <groupId>1001</groupId>
+            <groupName>oinstall</groupName>
+            <groupType>OINSTALLGROUP</groupType>
+        </group>
+        <group id="c1_1004">
+            <version>version1</version>
+            <groupId>1004</groupId>
+            <groupName>asmdba</groupName>
+            <groupType>OSDBA</groupType>
+        </group>
+        <group id="c1_1005">
+            <version>version1</version>
+            <groupId>1005</groupId>
+            <groupName>asmoper</groupName>
+            <groupType>OSOPER</groupType>
+        </group>
+        <group id="c1_1006">
+            <version>version1</version>
+            <groupId>1006</groupId>
+            <groupName>asmadmin</groupName>
+            <groupType>OSASM</groupType>
+        </group>
+        <group id="c1_1002">
+            <version>version1</version>
+            <groupId>1002</groupId>
+            <groupName>dba</groupName>
+            <groupType>DBA_GROUP</groupType>
+        </group>
+        <group id="c1_1003">
+            <version>version1</version>
+            <groupId>1003</groupId>
+            <groupName>racoper</groupName>
+            <groupType>OPER_GROUP</groupType>
+        </group>
+    </groups>
+    <networks>
+        <network id="iad103716exddu1101.iad103716exd.adminiad1.oraclevcn.com_client">
+            <networkName>iad103716exddu1101.us.oracle.com Client</networkName>
+            <networkType>client</networkType>
+            <version>2</version>
+            <hostName>c3716n11c1</hostName>
+            <ipAddress>fe80::17ff:fe13:5c91</ipAddress>
+            <nathostName>iad103716exddu1101</nathostName>
+            <natipAddress>10.0.7.185</natipAddress>
+            <natdomainName>iad103716exd.adminiad1.oraclevcn.com</natdomainName>
+            <natnetMask>255.255.255.128</natnetMask>
+            <netMask>64</netMask>
+            <gateway>fe80::17ff:fe13:5c90</gateway>
+            <domainName>clientsubnet.devx8melastic.oraclevcn.com</domainName>
+            <master>bondeth0</master>
+            <macAddress>02:00:17:12:15:d4</macAddress>
+            <slave>eth1 eth2</slave>
+            <linkSpeed>25000</linkSpeed>
+            <lacp>false</lacp>
+            <vlanId>1</vlanId>
+        </network>
+        <network id="iad103716exddu1201.iad103716exd.adminiad1.oraclevcn.com_client">
+            <networkName>iad103716exddu1201.us.oracle.com Client</networkName>
+            <networkType>client</networkType>
+            <version>2</version>
+            <hostName>c3716n12c1</hostName>
+            <ipAddress>fe80::17ff:fe13:5c94</ipAddress>
+            <nathostName>iad103716exddu1201</nathostName>
+            <natipAddress>10.0.7.186</natipAddress>
+            <natdomainName>iad103716exd.adminiad1.oraclevcn.com</natdomainName>
+            <natnetMask>255.255.255.128</natnetMask>
+            <netMask>64</netMask>
+            <gateway>fe80::17ff:fe13:5c90</gateway>
+            <domainName>clientsubnet.devx8melastic.oraclevcn.com</domainName>
+            <master>bondeth0</master>
+            <macAddress>02:00:17:12:bd:52</macAddress>
+            <slave>eth2 eth1</slave>
+            <linkSpeed>25000</linkSpeed>
+            <lacp>false</lacp>
+            <vlanId>1</vlanId>
+        </network>
+        <network id="iad103716exddu1101.iad103716exd.adminiad1.oraclevcn.com_backup">
+            <networkName>iad103716exddu1101-backup.iad103716exd.adminiad1.oraclevcn.com Backup</networkName>
+            <networkType>backup</networkType>
+            <version>2</version>
+            <hostName>c3716n11b1</hostName>
+            <ipAddress>fe80::17ff:fe13:5d91</ipAddress>
+            <netMask>64</netMask>
+            <gateway>fe80::17ff:fe13:5d90</gateway>
+            <domainName>backupsubnet.devx8melastic.oraclevcn.com</domainName>
+            <master>bondeth1</master>
+            <macAddress>00:00:17:00:11:3f</macAddress>
+            <slave>eth1 eth2</slave>
+            <vlanId>2</vlanId>
+            <lacp>false</lacp>
+        </network>
+        <network id="iad103716exddu1201.iad103716exd.adminiad1.oraclevcn.com_backup">
+            <networkName>iad103716exddu1201-backup.iad103716exd.adminiad1.oraclevcn.com Backup</networkName>
+            <networkType>backup</networkType>
+            <version>2</version>
+            <hostName>c3716n12b1</hostName>
+            <ipAddress>fe80::17ff:fe13:5d93</ipAddress>
+            <netMask>64</netMask>
+            <gateway>fe80::17ff:fe13:5d90</gateway>
+            <domainName>backupsubnet.devx8melastic.oraclevcn.com</domainName>
+            <master>bondeth1</master>
+            <macAddress>02:00:17:03:58:72</macAddress>
+            <slave>eth2 eth1</slave>
+            <vlanId>2</vlanId>
+            <lacp>false</lacp>
+        </network>
+        <network id="iad103716exdd011.iad103716exd.adminiad1.oraclevcn.com_admin">
+            <networkName>iad103716exdd011.iad103716exd.adminiad1.oraclevcn.com Admin</networkName>
+            <networkType>admin</networkType>
+            <version>2</version>
+            <hostName>iad103716exdd011</hostName>
+            <ipAddress>10.0.7.140</ipAddress>
+            <netMask>255.255.255.128</netMask>
+            <gateway>10.0.7.129</gateway>
+            <domainName>iad103716exd.adminiad1.oraclevcn.com</domainName>
+            <master>eth0</master>
+            <macAddress />
+            <slave />
+            <vlanId />
+        </network>
+        <network id="iad103716exdd011.iad103716exd.adminiad1.oraclevcn.com_priv1">
+            <networkName>iad103716exdd011-priv1.iad103716exd.adminiad1.oraclevcn.com Priv</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>iad103716exdd011-priv1</hostName>
+            <ipAddress>192.168.132.16</ipAddress>
+            <netMask>255.255.254.0</netMask>
+            <gateway>192.168.132.1</gateway>
+            <domainName>iad103716exd.adminiad1.oraclevcn.com</domainName>
+            <master>re0</master>
+            <macAddress />
+            <slave />
+            <vlanId />
+        </network>
+        <network id="iad103716exdd011.iad103716exd.adminiad1.oraclevcn.com_priv2">
+            <networkName>iad103716exdd011-priv2.iad103716exd.adminiad1.oraclevcn.com Priv</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>iad103716exdd011-priv2</hostName>
+            <ipAddress>192.168.132.17</ipAddress>
+            <netMask>255.255.254.0</netMask>
+            <gateway>192.168.132.1</gateway>
+            <domainName>iad103716exd.adminiad1.oraclevcn.com</domainName>
+            <master>re1</master>
+            <macAddress />
+            <slave />
+            <vlanId />
+        </network>
+        <network id="iad103716exdd011.iad103716exd.adminiad1.oraclevcn.com_ilom">
+            <networkName>iad103716exdd011lo.iad103716exd.adminiad1.oraclevcn.com ILOM</networkName>
+            <networkType>Ilom</networkType>
+            <version>2</version>
+            <hostName>iad103716exdd011lo</hostName>
+            <ipAddress>10.0.7.158</ipAddress>
+            <netMask>255.255.255.128</netMask>
+            <gateway>10.0.7.129</gateway>
+            <domainName>iad103716exd.adminiad1.oraclevcn.com</domainName>
+            <macAddress />
+            <vlanId />
+        </network>
+        <network id="iad103716exddu1101.iad103716exd.adminiad1.oraclevcn.com_priv1">
+            <networkName>iad103716exddu1101-stre0.iad103716exd.adminiad1.oraclevcn.com Priv</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>iad103716exddu1101-stre0</hostName>
+            <ipAddress>100.106.64.0</ipAddress>
+            <netMask>255.255.0.0</netMask>
+            <domainName>iad103716exd.adminiad1.oraclevcn.com</domainName>
+            <master>re0</master>
+            <macAddress />
+            <slave />
+            <vlanId>551</vlanId>
+            <interfaceName>stre0</interfaceName>
+        </network>
+        <network id="iad103716exddu1101.iad103716exd.adminiad1.oraclevcn.com_priv2">
+            <networkName>iad103716exddu1101-stre1.iad103716exd.adminiad1.oraclevcn.com Priv</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>iad103716exddu1101-stre1</hostName>
+            <ipAddress>100.106.64.1</ipAddress>
+            <netMask>255.255.0.0</netMask>
+            <domainName>iad103716exd.adminiad1.oraclevcn.com</domainName>
+            <master>re1</master>
+            <macAddress />
+            <slave />
+            <vlanId>551</vlanId>
+            <interfaceName>stre1</interfaceName>
+        </network>
+        <network id="iad103716exddu1101.iad103716exd.adminiad1.oraclevcn.com_clusterpriv1">
+            <networkName>iad103716exddu1101-clre0.iad103716exd.adminiad1.oraclevcn.com ClusterPriv</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>iad103716exddu1101-clre0</hostName>
+            <ipAddress>100.107.0.2</ipAddress>
+            <netMask>255.255.0.0</netMask>
+            <domainName>iad103716exd.adminiad1.oraclevcn.com</domainName>
+            <master>re0</master>
+            <macAddress />
+            <slave />
+            <vlanId>541</vlanId>
+            <interfaceName>clre0</interfaceName>
+        </network>
+        <network id="iad103716exddu1101.iad103716exd.adminiad1.oraclevcn.com_clusterpriv2">
+            <networkName>iad103716exddu1101-clre1.iad103716exd.adminiad1.oraclevcn.com ClusterPriv</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>iad103716exddu1101-clre1</hostName>
+            <ipAddress>100.107.0.3</ipAddress>
+            <netMask>255.255.0.0</netMask>
+            <domainName>iad103716exd.adminiad1.oraclevcn.com</domainName>
+            <master>re1</master>
+            <macAddress />
+            <slave />
+            <vlanId>541</vlanId>
+            <interfaceName>clre1</interfaceName>
+        </network>
+        <network id="iad103716exdd012.iad103716exd.adminiad1.oraclevcn.com_admin">
+            <networkName>iad103716exdd012.iad103716exd.adminiad1.oraclevcn.com Admin</networkName>
+            <networkType>admin</networkType>
+            <version>2</version>
+            <hostName>iad103716exdd012</hostName>
+            <ipAddress>10.0.7.141</ipAddress>
+            <netMask>255.255.255.128</netMask>
+            <gateway>10.0.7.129</gateway>
+            <domainName>iad103716exd.adminiad1.oraclevcn.com</domainName>
+            <master>eth0</master>
+            <macAddress />
+            <slave />
+            <vlanId />
+        </network>
+        <network id="iad103716exdd012.iad103716exd.adminiad1.oraclevcn.com_priv1">
+            <networkName>iad103716exdd012-priv1.iad103716exd.adminiad1.oraclevcn.com Priv</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>iad103716exdd012-priv1</hostName>
+            <ipAddress>192.168.132.14</ipAddress>
+            <netMask>255.255.254.0</netMask>
+            <gateway>192.168.132.1</gateway>
+            <domainName>iad103716exd.adminiad1.oraclevcn.com</domainName>
+            <master>re0</master>
+            <macAddress />
+            <slave />
+            <vlanId />
+        </network>
+        <network id="iad103716exdd012.iad103716exd.adminiad1.oraclevcn.com_priv2">
+            <networkName>iad103716exdd012-priv2.iad103716exd.adminiad1.oraclevcn.com Priv</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>iad103716exdd012-priv2</hostName>
+            <ipAddress>192.168.132.15</ipAddress>
+            <netMask>255.255.254.0</netMask>
+            <gateway>192.168.132.1</gateway>
+            <domainName>iad103716exd.adminiad1.oraclevcn.com</domainName>
+            <master>re1</master>
+            <macAddress />
+            <slave />
+            <vlanId />
+        </network>
+        <network id="iad103716exdd012.iad103716exd.adminiad1.oraclevcn.com_ilom">
+            <networkName>iad103716exdd012lo.iad103716exd.adminiad1.oraclevcn.com ILOM</networkName>
+            <networkType>Ilom</networkType>
+            <version>2</version>
+            <hostName>iad103716exdd012lo</hostName>
+            <ipAddress>10.0.7.159</ipAddress>
+            <netMask>255.255.255.128</netMask>
+            <gateway>10.0.7.129</gateway>
+            <domainName>iad103716exd.adminiad1.oraclevcn.com</domainName>
+            <macAddress />
+            <vlanId />
+        </network>
+        <network id="iad103716exddu1201.iad103716exd.adminiad1.oraclevcn.com_priv1">
+            <networkName>iad103716exddu1201-stre0.iad103716exd.adminiad1.oraclevcn.com Priv</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>iad103716exddu1201-stre0</hostName>
+            <ipAddress>100.106.64.2</ipAddress>
+            <netMask>255.255.0.0</netMask>
+            <domainName>iad103716exd.adminiad1.oraclevcn.com</domainName>
+            <master>re0</master>
+            <macAddress />
+            <slave />
+            <vlanId>551</vlanId>
+            <interfaceName>stre0</interfaceName>
+        </network>
+        <network id="iad103716exddu1201.iad103716exd.adminiad1.oraclevcn.com_priv2">
+            <networkName>iad103716exddu1201-stre1.iad103716exd.adminiad1.oraclevcn.com Priv</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>iad103716exddu1201-stre1</hostName>
+            <ipAddress>100.106.64.3</ipAddress>
+            <netMask>255.255.0.0</netMask>
+            <domainName>iad103716exd.adminiad1.oraclevcn.com</domainName>
+            <master>re1</master>
+            <macAddress />
+            <slave />
+            <vlanId>551</vlanId>
+            <interfaceName>stre1</interfaceName>
+        </network>
+        <network id="iad103716exddu1201.iad103716exd.adminiad1.oraclevcn.com_clusterpriv1">
+            <networkName>iad103716exddu1201-clre0.iad103716exd.adminiad1.oraclevcn.com ClusterPriv</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>iad103716exddu1201-clre0</hostName>
+            <ipAddress>100.107.0.4</ipAddress>
+            <netMask>255.255.0.0</netMask>
+            <domainName>iad103716exd.adminiad1.oraclevcn.com</domainName>
+            <master>re0</master>
+            <macAddress />
+            <slave />
+            <vlanId>541</vlanId>
+            <interfaceName>clre0</interfaceName>
+        </network>
+        <network id="iad103716exddu1201.iad103716exd.adminiad1.oraclevcn.com_clusterpriv2">
+            <networkName>iad103716exddu1201-clre1.iad103716exd.adminiad1.oraclevcn.com ClusterPriv</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>iad103716exddu1201-clre1</hostName>
+            <ipAddress>100.107.0.5</ipAddress>
+            <netMask>255.255.0.0</netMask>
+            <domainName>iad103716exd.adminiad1.oraclevcn.com</domainName>
+            <master>re1</master>
+            <macAddress />
+            <slave />
+            <vlanId>541</vlanId>
+            <interfaceName>clre1</interfaceName>
+        </network>
+        <network id="iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com_admin">
+            <networkName>iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com Admin</networkName>
+            <networkType>admin</networkType>
+            <version>2</version>
+            <hostName>iad103712exdcl03</hostName>
+            <ipAddress>10.0.4.132</ipAddress>
+            <netMask>255.255.255.128</netMask>
+            <gateway>10.0.4.129</gateway>
+            <domainName>iad103712exd.adminiad1.oraclevcn.com</domainName>
+            <master>eth0</master>
+            <macAddress />
+            <slave />
+            <vlanId />
+        </network>
+        <network id="iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com_priv1">
+            <networkName>iad103712exdcl03-priv1.iad103712exd.adminiad1.oraclevcn.com Priv</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>iad103712exdcl03-priv1</hostName>
+            <ipAddress>100.106.30.16</ipAddress>
+            <netMask>255.255.0.0</netMask>
+            <gateway>100.106.30.1</gateway>
+            <domainName>iad103712exd.adminiad1.oraclevcn.com</domainName>
+            <master>re0</master>
+            <macAddress />
+            <slave />
+            <vlanId>551</vlanId>
+            <interfaceName>stre0</interfaceName>
+        </network>
+        <network id="iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com_priv2">
+            <networkName>iad103712exdcl03-priv2.iad103712exd.adminiad1.oraclevcn.com Priv</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>iad103712exdcl03-priv2</hostName>
+            <ipAddress>100.106.30.17</ipAddress>
+            <netMask>255.255.0.0</netMask>
+            <gateway>100.106.30.1</gateway>
+            <domainName>iad103712exd.adminiad1.oraclevcn.com</domainName>
+            <master>re1</master>
+            <macAddress />
+            <slave />
+            <vlanId>551</vlanId>
+            <interfaceName>stre1</interfaceName>
+        </network>
+        <network id="iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com_ilom">
+            <networkName>iad103712exdcl03lo.iad103712exd.adminiad1.oraclevcn.com ILOM</networkName>
+            <networkType>Ilom</networkType>
+            <version>2</version>
+            <hostName>iad103712exdcl03lo</hostName>
+            <ipAddress>10.0.4.147</ipAddress>
+            <netMask>255.255.255.128</netMask>
+            <gateway>10.0.4.129</gateway>
+            <domainName>iad103712exd.adminiad1.oraclevcn.com</domainName>
+            <macAddress />
+            <vlanId />
+        </network>
+        <network id="iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com_admin">
+            <networkName>iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com Admin</networkName>
+            <networkType>admin</networkType>
+            <version>2</version>
+            <hostName>iad103712exdcl02</hostName>
+            <ipAddress>10.0.4.131</ipAddress>
+            <netMask>255.255.255.128</netMask>
+            <gateway>10.0.4.129</gateway>
+            <domainName>iad103712exd.adminiad1.oraclevcn.com</domainName>
+            <master>eth0</master>
+            <macAddress />
+            <slave />
+            <vlanId />
+        </network>
+        <network id="iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com_priv1">
+            <networkName>iad103712exdcl02-priv1.iad103712exd.adminiad1.oraclevcn.com Priv</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>iad103712exdcl02-priv1</hostName>
+            <ipAddress>100.106.30.14</ipAddress>
+            <netMask>255.255.0.0</netMask>
+            <gateway>100.106.30.1</gateway>
+            <domainName>iad103712exd.adminiad1.oraclevcn.com</domainName>
+            <master>re0</master>
+            <macAddress />
+            <slave />
+            <vlanId>551</vlanId>
+            <interfaceName>stre0</interfaceName>
+        </network>
+        <network id="iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com_priv2">
+            <networkName>iad103712exdcl02-priv2.iad103712exd.adminiad1.oraclevcn.com Priv</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>iad103712exdcl02-priv2</hostName>
+            <ipAddress>100.106.30.15</ipAddress>
+            <netMask>255.255.0.0</netMask>
+            <gateway>100.106.30.1</gateway>
+            <domainName>iad103712exd.adminiad1.oraclevcn.com</domainName>
+            <master>re1</master>
+            <macAddress />
+            <slave />
+            <vlanId>551</vlanId>
+            <interfaceName>stre1</interfaceName>
+        </network>
+        <network id="iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com_ilom">
+            <networkName>iad103712exdcl02lo.iad103712exd.adminiad1.oraclevcn.com ILOM</networkName>
+            <networkType>Ilom</networkType>
+            <version>2</version>
+            <hostName>iad103712exdcl02lo</hostName>
+            <ipAddress>10.0.4.146</ipAddress>
+            <netMask>255.255.255.128</netMask>
+            <gateway>10.0.4.129</gateway>
+            <domainName>iad103712exd.adminiad1.oraclevcn.com</domainName>
+            <macAddress />
+            <vlanId />
+        </network>
+        <network id="iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com_admin">
+            <networkName>iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com Admin</networkName>
+            <networkType>admin</networkType>
+            <version>2</version>
+            <hostName>iad103712exdcl01</hostName>
+            <ipAddress>10.0.4.130</ipAddress>
+            <netMask>255.255.255.128</netMask>
+            <gateway>10.0.4.129</gateway>
+            <domainName>iad103712exd.adminiad1.oraclevcn.com</domainName>
+            <master>eth0</master>
+            <macAddress />
+            <slave />
+            <vlanId />
+        </network>
+        <network id="iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com_priv1">
+            <networkName>iad103712exdcl01-priv1.iad103712exd.adminiad1.oraclevcn.com Priv</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>iad103712exdcl01-priv1</hostName>
+            <ipAddress>100.106.30.6</ipAddress>
+            <netMask>255.255.0.0</netMask>
+            <gateway>100.106.30.1</gateway>
+            <domainName>iad103712exd.adminiad1.oraclevcn.com</domainName>
+            <master>re0</master>
+            <macAddress />
+            <slave />
+            <vlanId>551</vlanId>
+            <interfaceName>stre0</interfaceName>
+        </network>
+        <network id="iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com_priv2">
+            <networkName>iad103712exdcl01-priv2.iad103712exd.adminiad1.oraclevcn.com Priv</networkName>
+            <networkType>private</networkType>
+            <version>2</version>
+            <hostName>iad103712exdcl01-priv2</hostName>
+            <ipAddress>100.106.30.7</ipAddress>
+            <netMask>255.255.0.0</netMask>
+            <gateway>100.106.30.1</gateway>
+            <domainName>iad103712exd.adminiad1.oraclevcn.com</domainName>
+            <master>re1</master>
+            <macAddress />
+            <slave />
+            <vlanId>551</vlanId>
+            <interfaceName>stre1</interfaceName>
+        </network>
+        <network id="iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com_ilom">
+            <networkName>iad103712exdcl01lo.iad103712exd.adminiad1.oraclevcn.com ILOM</networkName>
+            <networkType>Ilom</networkType>
+            <version>2</version>
+            <hostName>iad103712exdcl01lo</hostName>
+            <ipAddress>10.0.4.145</ipAddress>
+            <netMask>255.255.255.128</netMask>
+            <gateway>10.0.4.129</gateway>
+            <domainName>iad103712exd.adminiad1.oraclevcn.com</domainName>
+            <macAddress />
+            <vlanId />
+        </network>
+        <network id="iad103716exdre02.iad103716exd.adminiad1.oraclevcn.com_admin">
+            <networkName>iad103716exdre02.iad103716exd.adminiad1.oraclevcn.com Admin</networkName>
+            <networkType>admin</networkType>
+            <version>version2</version>
+            <hostName>iad103716exdre02</hostName>
+            <ipAddress>192.168.0.2</ipAddress>
+            <netMask>255.255.255.128</netMask>
+            <gateway>10.0.7.129</gateway>
+            <domainName>iad103716exd.adminiad1.oraclevcn.com</domainName>
+            <master>eth0</master>
+            <macAddress />
+            <slave />
+            <vlanId />
+        </network>
+        <network id="iad103716exdre01.iad103716exd.adminiad1.oraclevcn.com_admin">
+            <networkName>iad103716exdre01.iad103716exd.adminiad1.oraclevcn.com Admin</networkName>
+            <networkType>admin</networkType>
+            <version>version2</version>
+            <hostName>iad103716exdre01</hostName>
+            <ipAddress>192.168.0.1</ipAddress>
+            <netMask>255.255.255.128</netMask>
+            <gateway>10.0.7.129</gateway>
+            <domainName>iad103716exd.adminiad1.oraclevcn.com</domainName>
+            <master>eth0</master>
+            <macAddress />
+            <slave />
+            <vlanId />
+        </network>
+    </networks>
+    <switches>
+        <switch id="iad103716exdre02.iad103716exd.adminiad1.oraclevcn.com_id">
+            <switchDescription>Exadata Admin Switch</switchDescription>
+            <networks>
+                <network id="iad103716exdre02.iad103716exd.adminiad1.oraclevcn.com_admin" />
+            </networks>
+            <version>version2</version>
+        </switch>
+        <switch id="iad103716exdre01.iad103716exd.adminiad1.oraclevcn.com_id">
+            <switchDescription>Exadata Admin Switch</switchDescription>
+            <networks>
+                <network id="iad103716exdre01.iad103716exd.adminiad1.oraclevcn.com_admin" />
+            </networks>
+            <version>version2</version>
+        </switch>
+    </switches>
+    <esRacks>
+        <esRack id="rack_c1">
+            <esRackItem id="iad103716exdd011.iad103716exd.adminiad1.oraclevcn.com_id">
+                <rackLocation>UNKNOWN</rackLocation>
+                <uLocation>1</uLocation>
+                <uHeight>1</uHeight>
+                <rackItemDescription>EXADATA X8M-2 COMPUTE NODE</rackItemDescription>
+                <rackItemFamily>X8M-2</rackItemFamily>
+                <version>version1</version>
+            </esRackItem>
+            <esRackItem id="iad103716exdd012.iad103716exd.adminiad1.oraclevcn.com_id">
+                <rackLocation>UNKNOWN</rackLocation>
+                <uLocation>2</uLocation>
+                <uHeight>1</uHeight>
+                <rackItemDescription>EXADATA X8M-2 COMPUTE NODE</rackItemDescription>
+                <rackItemFamily>X8M-2</rackItemFamily>
+                <version>version1</version>
+            </esRackItem>
+            <esRackItem id="iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com_id">
+                <rackLocation>UNKNOWN</rackLocation>
+                <uLocation>3</uLocation>
+                <uHeight>1</uHeight>
+                <rackItemDescription>EXADATA X8M-2 STORAGE NODE</rackItemDescription>
+                <rackItemFamily>X8M-2</rackItemFamily>
+                <version>version1</version>
+            </esRackItem>
+            <esRackItem id="iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com_id">
+                <rackLocation>UNKNOWN</rackLocation>
+                <uLocation>4</uLocation>
+                <uHeight>1</uHeight>
+                <rackItemDescription>EXADATA X8M-2 STORAGE NODE</rackItemDescription>
+                <rackItemFamily>X8M-2</rackItemFamily>
+                <version>version1</version>
+            </esRackItem>
+            <esRackItem id="iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com_id">
+                <rackLocation>UNKNOWN</rackLocation>
+                <uLocation>5</uLocation>
+                <uHeight>1</uHeight>
+                <rackItemDescription>EXADATA X8M-2 STORAGE NODE</rackItemDescription>
+                <rackItemFamily>X8M-2</rackItemFamily>
+                <version>version1</version>
+            </esRackItem>
+            <rackType>1035</rackType>
+            <rackDescription>X8M-2 Elastic Rack HC 14TB</rackDescription>
+            <version>version1</version>
+        </esRack>
+    </esRacks>
+    <software>
+        <clusters>
+            <cluster id="c1_clusterHome">
+                <version>CloneInstall</version>
+                <clusterName>myclu1</clusterName>
+                <clusterOwner>c1_grid</clusterOwner>
+                <clusterVersion>19.0.0.0.231017</clusterVersion>
+                <clusterHome>/u01/app/19.0.0.0/grid</clusterHome>
+                <inventoryLocation>/u01/app/oraInventory</inventoryLocation>
+                <asmScopedSecurity>true</asmScopedSecurity>
+                <clusterVips>
+                    <clusterVip id="iad103716exddu1101-vip.iad103716exd.adminiad1.oraclevcn.com_id">
+                        <vipName>c3716n11c1-vip</vipName>
+                        <domainName>clientsubnet.devx8melastic.oraclevcn.com</domainName>
+                        <vipIpAddress>10.0.3.203</vipIpAddress>
+                        <machines>
+                            <machine id="iad103716exddu1101.iad103716exd.adminiad1.oraclevcn.com_id" />
+                        </machines>
+                    </clusterVip>
+                    <clusterVip id="iad103716exddu1101-vip.iad103716exd.adminiad1.oraclevcn.local_id">
+                        <vipName>c3716n11c1-vip</vipName>
+                        <domainName>clientsubnet.devx8melastic.oraclevcn.com</domainName>
+                        <vipIpAddress>fe80::17ff:fe13:5c92</vipIpAddress>
+                        <vipNetmask>64</vipNetmask>
+                        <vipAddrType>IPV6</vipAddrType>
+                        <machines>
+                            <machine id="iad103716exddu1101.iad103716exd.adminiad1.oraclevcn.com_id" />
+                        </machines>
+                    </clusterVip>
+                    <clusterVip id="iad103716exddu1201-vip.iad103716exd.adminiad1.oraclevcn.com_id">
+                        <vipName>c3716n12c1-vip</vipName>
+                        <domainName>clientsubnet.devx8melastic.oraclevcn.com</domainName>
+                        <vipIpAddress>10.0.27.136</vipIpAddress>
+                        <machines>
+                            <machine id="iad103716exddu1201.iad103716exd.adminiad1.oraclevcn.com_id" />
+                        </machines>
+                    </clusterVip>
+                    <clusterVip id="iad103716exddu1201-vip.iad103716exd.adminiad1.oraclevcn.local_id">
+                        <vipName>c3716n12c1-vip</vipName>
+                        <domainName>clientsubnet.devx8melastic.oraclevcn.com</domainName>
+                        <vipIpAddress>fe80::17ff:fe13:5c93</vipIpAddress>
+                        <vipNetmask>64</vipNetmask>
+                        <vipAddrType>IPV6</vipAddrType>
+                        <machines>
+                            <machine id="iad103716exddu1201.iad103716exd.adminiad1.oraclevcn.com_id" />
+                        </machines>
+                    </clusterVip>
+                </clusterVips>
+                <clusterScans>
+                    <clusterScan id="c1_clusterScan_client" />
+                </clusterScans>
+                <diskGroups>
+                    <diskGroup id="datadg_id" />
+                    <diskGroup id="recodg_id" />
+                </diskGroups>
+                <basedir>/u01/app/grid</basedir>
+                <backupLocation>external</backupLocation>
+                <language>all_langs</language>
+                <patches><patch><patchNumber>29708769</patchNumber></patch><patch><patchNumber>30116789</patchNumber></patch><patch><patchNumber>30501910</patchNumber></patch><patch><patchNumber>30899722</patchNumber></patch><patch><patchNumber>31305339</patchNumber></patch><patch><patchNumber>31750108</patchNumber></patch><patch><patchNumber>32226239</patchNumber></patch><patch><patchNumber>32545008</patchNumber></patch><patch><patchNumber>32895426</patchNumber></patch><patch><patchNumber>33182768</patchNumber></patch><patch><patchNumber>33509923</patchNumber></patch><patch><patchNumber>33803476</patchNumber></patch><patch><patchNumber>34130714</patchNumber></patch><patch><patchNumber>34416665</patchNumber></patch><patch><patchNumber>34762026</patchNumber></patch><patch><patchNumber>35037840</patchNumber></patch><patch><patchNumber>35319490</patchNumber></patch><patch><patchNumber>35642822</patchNumber></patch><patch><patchNumber>35940989</patchNumber></patch><patch><patchNumber>36233126</patchNumber></patch></patches></cluster>
+            <clusterScans>
+                <clusterScan id="c1_clusterScan_client">
+                    <scanName>idc3716-clu01scan</scanName>
+                    <scanType>client</scanType>
+                    <scanPort>1521</scanPort>
+                    <scanIps>
+                        <scanIp>
+                            <ipAddress>10.0.9.124</ipAddress>
+                        </scanIp>
+                        <scanIp>
+                            <ipAddress>10.0.25.120</ipAddress>
+                        </scanIp>
+                        <scanIp>
+                            <ipAddress>10.0.0.121</ipAddress>
+                        </scanIp>
+                    </scanIps>
+                </clusterScan>
+            </clusterScans>
+        </clusters>
+        <databaseHomes />
+    </software>
+    <databases />
+    <storage>
+        <version>2</version>
+        <diskGroups>
+            <version>2</version>
+            <diskGroup id="datadg_id">
+                <version>VirtualLayout</version>
+                <diskGroupName>DATAC1</diskGroupName>
+                <redundancy>HIGH</redundancy>
+                <sliceSize>2048G</sliceSize>
+                <machines>
+                    <machine id="iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com_id" />
+                    <machine id="iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com_id" />
+                    <machine id="iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com_id" />
+                </machines>
+                <cellDisks>ALL</cellDisks>
+                <diskGroupSize>24576G</diskGroupSize>
+                <ocrVote>true</ocrVote>
+                <quorumDisk>true</quorumDisk>
+                <acfsVolumeName>acfsvol01</acfsVolumeName>
+                <acfsVolumeSize>560</acfsVolumeSize>
+                <acfsMountPath>/acfs01</acfsMountPath>
+                <diskGroupType>data</diskGroupType>
+            </diskGroup>
+            <diskGroup id="recodg_id">
+                <version>VirtualLayout</version>
+                <diskGroupName>RECOC1</diskGroupName>
+                <redundancy>HIGH</redundancy>
+                <sliceSize>512G</sliceSize>
+                <machines>
+                    <machine id="iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com_id" />
+                    <machine id="iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com_id" />
+                    <machine id="iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com_id" />
+                </machines>
+                <cellDisks>ALL</cellDisks>
+                <diskGroupSize>6144G</diskGroupSize>
+                <ocrVote>false</ocrVote>
+                <quorumDisk>true</quorumDisk>
+                <diskGroupType>reco</diskGroupType>
+            </diskGroup>
+        </diskGroups>
+        <localDisks>
+            <localDisk id="iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com_CD_0">
+                <version>Version12</version>
+                <localDiskName>CD_0</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+            </localDisk>
+            <localDisk id="iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com_CD_1">
+                <version>Version12</version>
+                <localDiskName>CD_1</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+            </localDisk>
+            <localDisk id="iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com_CD_2">
+                <version>Version12</version>
+                <localDiskName>CD_2</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+            </localDisk>
+            <localDisk id="iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com_CD_3">
+                <version>Version12</version>
+                <localDiskName>CD_3</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+            </localDisk>
+            <localDisk id="iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com_CD_4">
+                <version>Version12</version>
+                <localDiskName>CD_4</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+            </localDisk>
+            <localDisk id="iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com_CD_5">
+                <version>Version12</version>
+                <localDiskName>CD_5</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+            </localDisk>
+            <localDisk id="iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com_CD_6">
+                <version>Version12</version>
+                <localDiskName>CD_6</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+            </localDisk>
+            <localDisk id="iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com_CD_7">
+                <version>Version12</version>
+                <localDiskName>CD_7</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+            </localDisk>
+            <localDisk id="iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com_CD_8">
+                <version>Version12</version>
+                <localDiskName>CD_8</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+            </localDisk>
+            <localDisk id="iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com_CD_9">
+                <version>Version12</version>
+                <localDiskName>CD_9</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+            </localDisk>
+            <localDisk id="iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com_CD_10">
+                <version>Version12</version>
+                <localDiskName>CD_10</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+            </localDisk>
+            <localDisk id="iad103712exdcl03.iad103712exd.adminiad1.oraclevcn.com_CD_11">
+                <version>Version12</version>
+                <localDiskName>CD_11</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+            </localDisk>
+            <localDisk id="iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com_CD_0">
+                <version>Version12</version>
+                <localDiskName>CD_0</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+            </localDisk>
+            <localDisk id="iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com_CD_1">
+                <version>Version12</version>
+                <localDiskName>CD_1</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+            </localDisk>
+            <localDisk id="iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com_CD_2">
+                <version>Version12</version>
+                <localDiskName>CD_2</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+            </localDisk>
+            <localDisk id="iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com_CD_3">
+                <version>Version12</version>
+                <localDiskName>CD_3</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+            </localDisk>
+            <localDisk id="iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com_CD_4">
+                <version>Version12</version>
+                <localDiskName>CD_4</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+            </localDisk>
+            <localDisk id="iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com_CD_5">
+                <version>Version12</version>
+                <localDiskName>CD_5</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+            </localDisk>
+            <localDisk id="iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com_CD_6">
+                <version>Version12</version>
+                <localDiskName>CD_6</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+            </localDisk>
+            <localDisk id="iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com_CD_7">
+                <version>Version12</version>
+                <localDiskName>CD_7</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+            </localDisk>
+            <localDisk id="iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com_CD_8">
+                <version>Version12</version>
+                <localDiskName>CD_8</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+            </localDisk>
+            <localDisk id="iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com_CD_9">
+                <version>Version12</version>
+                <localDiskName>CD_9</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+            </localDisk>
+            <localDisk id="iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com_CD_10">
+                <version>Version12</version>
+                <localDiskName>CD_10</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+            </localDisk>
+            <localDisk id="iad103712exdcl02.iad103712exd.adminiad1.oraclevcn.com_CD_11">
+                <version>Version12</version>
+                <localDiskName>CD_11</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+            </localDisk>
+            <localDisk id="iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com_CD_0">
+                <version>Version12</version>
+                <localDiskName>CD_0</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+            </localDisk>
+            <localDisk id="iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com_CD_1">
+                <version>Version12</version>
+                <localDiskName>CD_1</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+            </localDisk>
+            <localDisk id="iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com_CD_2">
+                <version>Version12</version>
+                <localDiskName>CD_2</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+            </localDisk>
+            <localDisk id="iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com_CD_3">
+                <version>Version12</version>
+                <localDiskName>CD_3</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+            </localDisk>
+            <localDisk id="iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com_CD_4">
+                <version>Version12</version>
+                <localDiskName>CD_4</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+            </localDisk>
+            <localDisk id="iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com_CD_5">
+                <version>Version12</version>
+                <localDiskName>CD_5</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+            </localDisk>
+            <localDisk id="iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com_CD_6">
+                <version>Version12</version>
+                <localDiskName>CD_6</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+            </localDisk>
+            <localDisk id="iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com_CD_7">
+                <version>Version12</version>
+                <localDiskName>CD_7</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+            </localDisk>
+            <localDisk id="iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com_CD_8">
+                <version>Version12</version>
+                <localDiskName>CD_8</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+            </localDisk>
+            <localDisk id="iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com_CD_9">
+                <version>Version12</version>
+                <localDiskName>CD_9</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+            </localDisk>
+            <localDisk id="iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com_CD_10">
+                <version>Version12</version>
+                <localDiskName>CD_10</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+            </localDisk>
+            <localDisk id="iad103712exdcl01.iad103712exd.adminiad1.oraclevcn.com_CD_11">
+                <version>Version12</version>
+                <localDiskName>CD_11</localDiskName>
+                <localDiskSize>8000</localDiskSize>
+            </localDisk>
+        </localDisks>
+    </storage>
+    <platinum>
+        <version>2</version>
+        <platinumEnabled />
+    </platinum>
+    <storageDesc><stAttribute id="TotalStorageSize">30720G</stAttribute></storageDesc><vmSizes>
+        <vmSizeName id="Small">
+            <vmAttribute id="MemSize">45GB</vmAttribute>
+            <vmAttribute id="cpuCount">30</vmAttribute>
+            <vmAttribute id="DiskSize">20GB</vmAttribute>
+        </vmSizeName>
+        <vmSizeName id="Medium">
+            <vmAttribute id="MemSize">45GB</vmAttribute>
+            <vmAttribute id="cpuCount">30</vmAttribute>
+            <vmAttribute id="DiskSize">20GB</vmAttribute>
+        </vmSizeName>
+        <vmSizeName id="Large">
+            <vmAttribute id="MemSize">45GB</vmAttribute>
+            <vmAttribute id="cpuCount">30</vmAttribute>
+            <vmAttribute id="DiskSize">20GB</vmAttribute>
+        </vmSizeName>
+    </vmSizes>
+</engineeredSystem>

@@ -1,0 +1,240 @@
+{
+    "clusterless": "true",
+    "reshaped_node_subset": {
+        "ostype": "kvm",
+        "added_computes": [
+            {
+                "compute_node_alias": "scaqab10adm01",
+                "compute_node_hostname": "scaqab10adm01.us.oracle.com",
+                "network_info": {
+                    "computenetworks": [
+                        {
+                            "admin": [
+                                {
+                                    "fqdn": "scaqab10adm01.us.oracle.com",
+                                    "ipaddr": "10.31.112.4",
+                                    "gateway": "10.31.112.1",
+                                    "master": "eth0",
+                                    "netmask": "255.255.255.0"
+                                }
+                            ]
+                        },
+                        {
+                            "private": [
+                                {
+                                    "fqdn": "scaqab10adm01-priv1.us.oracle.com",
+                                    "netmask": "255.255.255.0",
+                                    "ipaddr": "192.168.128.3"
+                                },
+                                {
+                                    "fqdn": "scaqab10adm01-priv2.us.oracle.com",
+                                    "netmask": "255.255.255.0",
+                                    "ipaddr": "192.168.128.4"
+                                }
+                            ]
+                        },
+                        {
+                            "ilom": [
+                                {
+                                    "fqdn": "scaqab10adm01-c.us.oracle.com",
+                                    "ipaddr": "10.31.16.103",
+                                    "gateway": "10.31.16.1",
+                                    "netmask": "255.255.255.0"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "rack_info": {
+                    "uloc": 2,
+                    "uheight": 1
+                }
+            },
+            {
+                "compute_node_alias": "scaqab10adm02",
+                "compute_node_hostname": "scaqab10adm02.us.oracle.com",
+                "network_info": {
+                    "computenetworks": [
+                        {
+                            "admin": [
+                                {
+                                    "fqdn": "scaqab10adm02.us.oracle.com",
+                                    "ipaddr": "10.31.112.5",
+                                    "gateway": "10.31.112.1",
+                                    "master": "eth0",
+                                    "netmask": "255.255.255.0"
+                                }
+                            ]
+                        },
+                        {
+                            "private": [
+                                {
+                                    "fqdn": "scaqab10adm02-priv1.us.oracle.com",
+                                    "netmask": "255.255.255.0",
+                                    "ipaddr": "192.168.128.5"
+                                },
+                                {
+                                    "fqdn": "scaqab10adm02-priv2.us.oracle.com",
+                                    "netmask": "255.255.255.0",
+                                    "ipaddr": "192.168.128.6"
+                                }
+                            ]
+                        },
+                        {
+                            "ilom": [
+                                {
+                                    "fqdn": "scaqab10adm02-c.us.oracle.com",
+                                    "ipaddr": "10.31.16.104",
+                                    "gateway": "10.31.16.1",
+                                    "netmask": "255.255.255.0"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "rack_info": {
+                    "uloc": 2,
+                    "uheight": 1
+                }
+            }
+        ],
+        "added_cells": [
+            {
+                "network_info": {
+                    "cellnetworks": [
+                        {
+                            "admin": [
+                                {
+                                    "ipaddr": "10.31.112.12",
+                                    "fqdn": "scaqab10celadm01.us.oracle.com",
+                                    "gateway": "10.31.112.1",
+                                    "netmask": "255.255.255.0"
+                                }
+                            ]
+                        },
+                        {
+                            "private": [
+                                {
+                                    "ipaddr": "192.168.12.115",
+                                    "netmask": "255.255.255.0",
+                                    "fqdn": "scaqab10cell01vmclu01-priv1.us.oracle.com"
+                                },
+                                {
+                                    "ipaddr": "192.168.12.116",
+                                    "netmask": "255.255.255.0",
+                                    "fqdn": "scaqab10cell01vmclu01-priv2.us.oracle.com"
+                                }
+                            ]
+                        },
+                        {
+                            "ilom": [
+                                {
+                                    "ipaddr": "10.31.16.111",
+                                    "fqdn": "scaqab10celadm01-c.us.oracle.com",
+                                    "gateway": "10.31.16.1",
+                                    "netmask": "255.255.255.0"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "cell_hostname": "scaqab10celadm01.us.oracle.com",
+                "rack_info": {
+                    "uloc": 2,
+                    "uheight": 1
+                }
+            },
+            {
+                "network_info": {
+                    "cellnetworks": [
+                        {
+                            "admin": [
+                                {
+                                    "ipaddr": "10.31.112.13",
+                                    "fqdn": "scaqab10celadm02.us.oracle.com",
+                                    "gateway": "10.31.112.1",
+                                    "netmask": "255.255.255.0"
+                                }
+                            ]
+                        },
+                        {
+                            "private": [
+                                {
+                                    "ipaddr": "192.168.12.117",
+                                    "netmask": "255.255.255.0",
+                                    "fqdn": "scaqab10cell02vmclu01-priv1.us.oracle.com"
+                                },
+                                {
+                                    "ipaddr": "192.168.12.118",
+                                    "netmask": "255.255.255.0",
+                                    "fqdn": "scaqab10cell02vmclu01-priv2.us.oracle.com"
+                                }
+                            ]
+                        },
+                        {
+                            "ilom": [
+                                {
+                                    "ipaddr": "10.31.16.112",
+                                    "fqdn": "scaqab10celadm02-c.us.oracle.com",
+                                    "gateway": "10.31.16.1",
+                                    "netmask": "255.255.255.0"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "cell_hostname": "scaqab10celadm02.us.oracle.com",
+                "rack_info": {
+                    "uloc": 2,
+                    "uheight": 1
+                }
+            },
+            {
+                "network_info": {
+                    "cellnetworks": [
+                        {
+                            "admin": [
+                                {
+                                    "ipaddr": "10.31.112.14",
+                                    "fqdn": "scaqab10celadm03.us.oracle.com",
+                                    "gateway": "10.31.112.1",
+                                    "netmask": "255.255.255.0"
+                                }
+                            ]
+                        },
+                        {
+                            "private": [
+                                {
+                                    "ipaddr": "192.168.12.119",
+                                    "netmask": "255.255.255.0",
+                                    "fqdn": "scaqab10cell03vmclu01-priv1.us.oracle.com"
+                                },
+                                {
+                                    "ipaddr": "192.168.12.120",
+                                    "netmask": "255.255.255.0",
+                                    "fqdn": "scaqab10cell03vmclu01-priv2.us.oracle.com"
+                                }
+                            ]
+                        },
+                        {
+                            "ilom": [
+                                {
+                                    "ipaddr": "10.31.16.113",
+                                    "fqdn": "scaqab10celadm03-c.us.oracle.com",
+                                    "gateway": "10.31.16.1",
+                                    "netmask": "255.255.255.0"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "cell_hostname": "scaqab10celadm03.us.oracle.com",
+                "rack_info": {
+                    "uloc": 2,
+                    "uheight": 1
+                }
+            }
+        ]
+    }
+}
+

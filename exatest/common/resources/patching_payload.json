@@ -1,0 +1,75 @@
+{
+    "AdditionalOptions": [
+        {
+            "FpCrId": "4551f52c-7c3f-49bb-abed-56d65b4ebbd2",
+            "LaunchNode": "",
+            "exaOcid": "",
+            "exasplice": "no",
+            "exaunitId": "2",
+            "serviceType": "EXACS"
+        }
+    ],
+    "BackupMode": "yes",
+    "CellPatchFile": "/u01/ecraha/admin/exacloud/PatchPayloads/23.1.10.0.0.240208/CellPatchFile/23.1.10.0.0.240208.patch.zip",
+    "ClusterID": "2",
+    "ComputeNodeList": [
+        "scaqab10adm01.us.oracle.com",
+        "scaqab10adm02.us.oracle.com"
+    ],
+    "ComputeNodeListByAlias": [
+        {
+            "scaqab10adm01.us.oracle.com": "dbserver-1",
+            "scaqab10adm02.us.oracle.com": "dbserver-2"
+        }
+    ],
+    "Dom0domUDetails": {
+        "scaqab10adm01.us.oracle.com": {
+            "domuDetails": [
+                {
+                    "AutonomousDb": "N",
+                    "clusterName": "sea200220exd-d0-03-04-cl-04-06-clu01",
+                    "customerHostname": "r1srg2-g0cvi1.dbqadatannew2.dbqavcninvm.oraclevcn.com",
+                    "domuNatHostname": "scaqab10adm01vm01.us.oracle.com",
+                    "exaunitId": "2",
+                    "isSingleNodeVMCluster": "no",
+                    "meterocpus": "5"
+                }
+            ]
+        },
+        "scaqab10adm02.us.oracle.com": {
+            "domuDetails": [
+                {
+                    "AutonomousDb": "N",
+                    "clusterName": "sea200220exd-d0-03-04-cl-04-06-clu01",
+                    "customerHostname": "r1srg2-g0cvi2.dbqadatannew2.dbqavcninvm.oraclevcn.com",
+                    "domuNatHostname": "scaqab10adm02vm01.us.oracle.com",
+                    "exaunitId": "2",
+                    "isSingleNodeVMCluster": "no",
+                    "meterocpus": "5"
+                }
+            ]
+        }
+    },
+    "EnablePlugins": "no",
+    "Fedramp": "DISABLED",
+    "Idempotency": {},
+    "Operation": "patch_prereq_check",
+    "OperationStyle": "auto",
+    "PayloadType": "exadata_release",
+    "PluginTypes": "",
+    "RackName": "sea200220exd-d0-03-04-cl-04-06-clu01",
+    "RequestId": "1d9a1bd4-e3ba-40d2-bd93-9dce3cd9325c",
+    "Retry": "no",
+    "StorageNodeList": [
+        "scaqab10celadm01.us.oracle.com",
+        "scaqab10celadm02.us.oracle.com",
+        "scaqab10celadm03.us.oracle.com"
+    ],
+    "TargetEnv": "production",
+    "TargetType": [
+        "cell"
+    ],
+    "TargetVersion": "23.1.10.0.0.240208",
+    "XmlOeda": "log/patch/359aeda4-d25d-11ee-9ced-000017015e88/exadata_patching_oedaxml_sea200220_cluster_name_6.xml",
+    "isMVM": "no"
+}

@@ -1,0 +1,46 @@
+{
+    "dom0": "sea201602exdd002.sea201602exd.adminsea2.oraclevcn.com",
+    "vmboss": {
+        "su_config_file": {
+            "fingerprint": "84:a0:b4:47:ee:6c:87:f2:b7:5b:fa:f6:f5:e9:14:fc",
+            "key_file": "/u02/ecra_preprov/oracle/ecra_installs/exacloudmvmdev/mw_home/user_projects/domains/exacloud/tmp/payloads/ecra_super_user.pem",
+            "region": "us-seattle-1",
+            "tenancy": "ocid1.tenancy.oc1..aaaaaaaajl3p2iquu45w7kfydtigbkmwcoshrlyxjjv5yn3deux3fa6cyxda",
+            "user": "ocid1.user.region1..aaaaaaaaxu3fluepqmkjbq3qnwz544wupltqzf5fjwxsiaongmsff4v2smva"
+        },
+        "vmboss_map": [
+            {
+                "customer_tenancy_ocid": "ocid1.tenancy.oc1..aaaaaaaa5wztl2qlgueiumbtn52zx5lzgwur2ixkmpjdmib2o6nuhj6kfksq",
+                "dom0": "sea201602exdd002.sea201602exd.adminsea2.oraclevcn.com",
+                "domu": "jorgeclu3vmboss-ur65p2.client.exaclouddev.oraclevcn.com",
+                "vmboss_bucket": "vmboss_bucket_ocid1.tenancy.oc1..aaaaaaaa5wztl2qlgueiumbtn52zx5lzgwur2ixkmpjdmib2o6nuhj6kfksq_sea201602exd-d0-01-02-cl-01-03-clu03",
+                "vmboss_compartment": "vmboss_comp_ocid1.tenancy.oc1..aaaaaaaa5wztl2qlgueiumbtn52zx5lzgwur2ixkmpjdmib2o6nuhj6kfksq",
+                "vmboss_user": "vmboss_user_ocid1.tenancy.oc1..aaaaaaaa5wztl2qlgueiumbtn52zx5lzgwur2ixkmpjdmib2o6nuhj6kfksq"
+            },
+            {
+                "customer_tenancy_ocid": "ocid1.tenancy.oc1..aaaaaaaa5wztl2qlgueiumbtn52zx5lzgwur2ixkmpjdmib2o6nuhj6kfksq",
+                "dom0": "sea201602exdd002.sea201602exd.adminsea2.oraclevcn.com",
+                "domu": "jesandov-vm-p8g9f2.client.exaclouddev.oraclevcn.com",
+                "vmboss_bucket": "vmboss_bucket_ocid1.tenancy.oc1..aaaaaaaa5wztl2qlgueiumbtn52zx5lzgwur2ixkmpjdmib2o6nuhj6kfksq_sea201602exd-d0-01-02-cl-01-03-clu04",
+                "vmboss_compartment": "vmboss_comp_ocid1.tenancy.oc1..aaaaaaaa5wztl2qlgueiumbtn52zx5lzgwur2ixkmpjdmib2o6nuhj6kfksq",
+                "vmboss_user": "vmboss_user_ocid1.tenancy.oc1..aaaaaaaa5wztl2qlgueiumbtn52zx5lzgwur2ixkmpjdmib2o6nuhj6kfksq"
+            },
+            {
+                "customer_tenancy_ocid": "ocid1.tenancy.oc1..aaaaaaaa5wztl2qlgueiumbtn52zx5lzgwur2ixkmpjdmib2o6nuhj6kfksq",
+                "dom0": "sea201602exdd002.sea201602exd.adminsea2.oraclevcn.com",
+                "domu": "ganesh-clu1-xvd8f2.client.exaclouddev.oraclevcn.com",
+                "vmboss_bucket": "vmboss_bucket_ocid1.tenancy.oc1..aaaaaaaa5wztl2qlgueiumbtn52zx5lzgwur2ixkmpjdmib2o6nuhj6kfksq_sea201602exd-d0-01-02-cl-01-03-clu01",
+                "vmboss_compartment": "vmboss_comp_ocid1.tenancy.oc1..aaaaaaaa5wztl2qlgueiumbtn52zx5lzgwur2ixkmpjdmib2o6nuhj6kfksq",
+                "vmboss_user": "vmboss_user_ocid1.tenancy.oc1..aaaaaaaa5wztl2qlgueiumbtn52zx5lzgwur2ixkmpjdmib2o6nuhj6kfksq"
+            },
+            {
+                "customer_tenancy_ocid": "ocid1.tenancy.oc1..aaaaaaaa5wztl2qlgueiumbtn52zx5lzgwur2ixkmpjdmib2o6nuhj6kfksq",
+                "dom0": "sea201602exdd002.sea201602exd.adminsea2.oraclevcn.com",
+                "domu": "vmbpk-nogold-ehij32.client.exaclouddev.oraclevcn.com",
+                "vmboss_bucket": "vmboss_bucket_ocid1.tenancy.oc1..aaaaaaaa5wztl2qlgueiumbtn52zx5lzgwur2ixkmpjdmib2o6nuhj6kfksq_sea201602exd-d0-01-02-cl-01-03-clu02",
+                "vmboss_compartment": "vmboss_comp_ocid1.tenancy.oc1..aaaaaaaa5wztl2qlgueiumbtn52zx5lzgwur2ixkmpjdmib2o6nuhj6kfksq",
+                "vmboss_user": "vmboss_user_ocid1.tenancy.oc1..aaaaaaaa5wztl2qlgueiumbtn52zx5lzgwur2ixkmpjdmib2o6nuhj6kfksq"
+            }
+        ]
+    }
+}

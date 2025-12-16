@@ -1,0 +1,497 @@
+# 
+# $Header: ecs/exacloud/exabox/infrapatching/test/test_infrapatching_exacompute.txt /main/16 2025/12/04 04:10:46 araghave Exp $
+#
+# test_infrapatching_exacompute.py
+#
+# Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+#
+#    NAME
+#      test_infrapatching_exacompute.py - Unit test case script for all
+#                                         Exacompute operations.
+#
+#    DESCRIPTION
+#      Unit test case script for all Exacompute operations.
+#
+#    NOTES
+#      Unit test case script for all Exacompute operations.
+#
+#
+#    MODIFIED   (MM/DD/YY)
+#    araghave    10/03/25 - Enhancement Request 38444755 - INFRAPATCHING TEST
+#                           AUTOMATION - TEST ADDITION TO PERFORM DOMU ELU
+#                           PATCH OPERATIONS
+#    apotluri    04/02/25 - Enhancement Request 37780245 - INFRAPATCH TEST
+#                           AUTOMATION : DISABLE DCS AGENT SANITY CHECKS
+#    apotluri    11/14/24 - Enhancement Request 37277808 - INFRAPATCH TEST
+#                           AUTOMATION : NEW TEST FOR EXACOMPUTE TO MAKE
+#                           PRECHECK FAIL FEW NODES AND PROCEED WITH PATCH ON
+#                           OTHER NODES
+#    apotluri    10/03/24 - Bug 37130718 - TEST FAILURE DUE TO SYNTAX ISSUE
+#                           IN EXACOMPUTE_PATCH_FAILURE TEST
+#    antamil     09/18/24 - Bug 37040164 - Remove nodes with VM powered from
+#                           patch list
+#    apotluri    09/09/24 - Enhancement Request 36171242 - ADDITION OF TEST TO
+#                           VALIDATE EXACOMPUTE PATCHING WHEN THE NODES HAVE VM
+#                           RUNNING TO VALIDATE STATUS OUTPUT SHOWS ALL THE
+#                           NODES DATA
+#    apotluri    01/25/24 - Enhancement Request 36171207 - ADDITION OF TEST TO
+#                           VALIDATE PRECHECK/PATCH FAILURE IN EXACOMPUTE
+#                           PATCHING
+#    apotluri    11/22/23 - Enhancement Request 35888310 - INFRAPATCH TEST
+#                           AUTMATION : ENABLE EXACOMPUTE TESTS IN X9
+#    emekala     11/20/23 - ENH 35706149 - Changes required in infrapatching
+#                           test auomation files to support Pipeline execution
+#    sdevasek    10/20/23 - ENH 35930718 - TEST ADDITION TO VALIDATE EXACOMPUTE
+#                           PATCH WHEN COMPUTE NODE HAS VMS RUNNING
+#    ririgoye    09/01/23 - Bug 35769896 - PROTECT YIELD KEYWORDS WITH
+#                           TRY-EXCEPT BLOCKS
+#    araghave    06/30/23 - Enh 35552878 - EXACOMPUTE TEST ADDITION FOR
+#                           EXASPLICE PATCH OPERATIONS
+#    emekala     04/14/23 - ENH 35204492 - HEARTBEAT FAILURE ERROR CODE IS
+#                           GETTING OVERRIDDEN WITH GENERIC ERROR CODE
+#                           0X03010007 FOR DOM0 POSTCHECK FAILURE
+#    emekala     03/13/23 - Enh 35173839 - TEST DEPENDENCY ADDITION FOR 
+#                           EXACOMPUTE_BACKUP TESTS WITH ROLLBACK TESTS
+#    araghave    01/15/23 - ENH 34513424 - TEST ADDITION TO INFRAPATCH
+#                           AUTOMATION TO COVER EXACOMPUTE PATCHING FLOW
+#    antamil    11/15/22 - ENH 34513424 Test addition for exacompute patch
+
+import pytest
+import unittest
+from utils import *
+
+from utils import *
+from constants import *
+
+# Class which defines unit tests with exacompute as target
+@pytest.mark.exacompute
+class Test_exacompute_class(unittest.TestCase):
+    # Class level variables
+    __dom0s = []
+    __target_name = PATCH_DOM0
+
+    #
+    # The following function,will get called for every testcase
+    # 1. Sets is_exacompute to true on test config
+    # 2. Actual test runs reports PASS or FAILED
+    # 3. Resets is_exacompute to false on test config
+    #
+    @pytest.fixture(autouse = True, scope="function")
+    def update_exacompute_config(self):
+        mPatchLogPrint("Updating is_exacompute flag to True")
+        mUpdateInfraPatchingTestConfigParam("is_exacompute", "True")
+        try:
+            yield
+        except StopIteration:
+            return
+        mPatchLogPrint("Updating is_exacompute flag to False")
+        mUpdateInfraPatchingTestConfigParam("is_exacompute", "False")
+
+    @classmethod
+    def setUpClass(cls):
+        cls.__dom0s = mGetInfraPatchingTestConfigParam('dom0s')
+
+    def __init__(self, *initial_data, **kwargs):
+        super(Test_exacompute_class, self).__init__(*initial_data, **kwargs)
+        self.__operation = ""
+        self.__operation_style = ""
+        self.__infra_patch_operation_status_result = False
+        self.__infra_patch_operation_status_output = ""
+        self.__operation_style = OP_STYLE_NON_ROLLING
+        self.__ssh_equivalance_configured = False
+        self.__ssh_equivalance_cleanup_required = False
+
+    # This method is to run something similar before every test execution.
+    def setUp(self):
+        mUpdateAdditionalOptionsInPayload("exasplice", "no")
+        mDeletePendingFailedECRARequest()
+
+        mUpdateParamInPayload("LaunchNodes", Test_exacompute_class.__dom0s[0])
+        mUpdateParamInPayload("NodeList", Test_exacompute_class.__dom0s[1:])
+        self.__ssh_equivalence_configured, self.__ssh_equivalence_cleanup_required = ConfigureSSHKeys(Test_exacompute_class.__dom0s[0], Test_exacompute_class.__dom0s[1:])
+        mExecuteRemoteExasshCmd("/bin/sed  \\'s/ClientAliveInterval.*/ClientAliveInterval 600/\\' -i /etc/ssh/sshd_config",Test_exacompute_class.__dom0s)
+
+    # This method is to remove ssh equivalance between the nodes
+    def tearDown(self):
+        if self.__ssh_equivalence_cleanup_required:
+            _status = RemoveKeyFromHosts(Test_exacompute_class.__dom0s[1:], Test_exacompute_class.__dom0s[0])
+
+    @pytest.mark.exacompute_patch_with_vms_running
+    def test_exacompute_patch_with_vms_running(self):
+        """
+        As part of this test precheck and patch flows are tested, when the targetnode has vms running.
+        status call output should return 500 because precheck/patch would be failed in these scenarios.        
+        """
+        def _mExecuteExacomputePatchOperation():
+            _patch_failed = False
+            if self.__ssh_equivalence_configured:
+                self.__infra_patch_operation_status_result, self.__infra_patch_operation_status_output =  \
+                    mExecuteInfraPatchCommand(self.__operation, Test_exacompute_class.__target_name, self.__operation_style)
+    
+                # Validate status output.
+                _status_json = json.loads(self.__infra_patch_operation_status_output)
+    
+                if _status_json and "status" in _status_json:
+                    _status = _status_json["status"]
+                    if _status == 500:
+                        _patch_failed = True
+            return  _patch_failed               
+
+        self.__operation = TASK_PREREQ_CHECK
+        _precheck_failed = _mExecuteExacomputePatchOperation()
+        self.__operation = TASK_PATCH
+        _patch_failed = _mExecuteExacomputePatchOperation()
+
+        self.assertTrue(_precheck_failed,
+                        "Status call output for exacompute precheck does not have 500 status. Please check the logs and retry the test.")
+        self.assertTrue(_patch_failed,
+                        "Status call output for exacompute patch does not have 500 status. Please check the logs and retry the test." )
+
+    @pytest.mark.exacompute_precheck
+    def test_exacompute_precheck(self):
+        _target_node = Test_exacompute_class.__dom0s[1:]
+        _ret = mShutdownVMsOnDom0(_target_node)
+        if not _ret:
+            self.assertTrue(_ret, "Could not modify sshd_conf file.")
+        else:
+            self.__operation = TASK_PREREQ_CHECK
+            if self.__ssh_equivalence_configured:
+                self.__infra_patch_operation_status_result, self.__infra_patch_operation_status_output =  \
+                    mExecuteInfraPatchCommandWithRetry(self.__operation, Test_exacompute_class.__target_name, self.__operation_style)
+                self.assertTrue(self.__infra_patch_operation_status_result, "Exacompute %s operation failed." % self.__operation)
+
+    @pytest.mark.exacompute_precheck_patch_mgr_failure
+    def test_exacompute_precheck_patch_mgr_failure(self):
+        """
+        This test is to simulate patch_mgr error and validate error code in json
+
+        The following things are done in this test
+        1. Prepare the environment to simulate patch_mgr error
+        2. Execute exacompute precheck
+        3. Validate exacompute precheck operation for patch_mgr failure
+        """
+
+        # Change the ClientAliveInterval interval setting in /etc/ssh/sshd_config file to 590 so that it triggers patch_mgr failure.
+        # The error code that gets returned is EXAUPG-00002
+        mExecuteRemoteExasshCmd("/bin/sed  \\'s/ClientAliveInterval.*/ClientAliveInterval 590/\\' -i /etc/ssh/sshd_config",Test_exacompute_class.__dom0s)
+
+        '''
+        Example output for status call:
+
+        {
+          "progress_percent": 0,
+          "end_time": "2024-01-24T11:44:01+0000",
+          "exacompute_patching_details": {
+            "node_patching_progress_data": [
+              {
+                "from_version": "22.1.7.0.0.230113",
+                "last_updated_time": "2024-01-24 03:42:50-0800",
+                "node_name": "scaqae03adm02.us.oracle.com",
+                "patch_sub_operation": "PATCHMGR_PRECHECK",
+                "patchmgr_start_time": "2024-01-24 03:40:06-0800",
+                "patchmgr_status": "Failed",
+                "status": "Completed",
+                "to_version": "22.1.18.0.0.231208"
+              }
+            ],
+            "service": "ExaCompute Patch",
+            "status": "0x03010045",
+            "TargetVersion": "22.1.18.0.0.231208",
+            "OperationStyle": "non-rolling",
+            "Operation": "patch_prereq_check",
+            "status_message": "Patchmgr command failed on Target : dom0 for Patch Operation : patch_prereq_check. Patchmgr logs are available on the node : scaqae03adm01.us.oracle.com at location : /EXAVMIMAGES/dbserver.patch.zip_exadata_ovs_22.1.18.0.0.231208_Linux-x86-64.zip/dbserver_patch_231214/patchmgr_log_5161e9b3-1516-4273-937f-3a8bef25f515_patch_prereq_check.",
+            "launch_node": "scaqae03adm01",
+            "master_request_uuid": "365e52d4-baad-11ee-8e64-020017155f86",
+            "exacloud_thread_log": "/scratch/apotluri/ecra_installs/infrapatchauto/mw_home/user_projects/domains/exacloud//log/threads/0000-0000-0000-0000/00000000-0000-0000-0000-000000000000/365e52d4-baad-11ee-8e64-020017155f86_cluctrl.exacompute_patch_nodes.log"
+          },
+          "ecra_server": "EcraServer1",
+          "wf_uuid": "0edca112-1289-4a56-9a3a-399568c2ed3e",
+          "extrainfo": {
+            "header": "EXACLOUD ENCOUNTERED THE FOLLOWING PROBLEM.",
+            "errorCode": "0x03010045",
+            "errorAction": "RETRY_WITH_SAME_TOKEN",
+            "description": "Patchmgr command failed with non-zero status.",
+            "details": {
+              "comments": "{\"error_str\":\"patchmgr command failed with non-zero status.\",\"cmd\":\"cluctrl.exacompute_patch_nodes\",\"na1\":\"scaqae03adm0102clu3\",\"na2\":\"0\",\"exacloudinfo\":{\"output\":{\"Operation\":\"patch_prereq_check\",\"OperationStyle\":\"non-rolling\",\"TargetVersion\":\"22.1.18.0.0.231208\",\"exacloud_thread_log\":\"\\/scratch\\/apotluri\\/ecra_installs\\/infrapatchauto\\/mw_home\\/user_projects\\/domains\\/exacloud\\/\\/log\\/threads\\/0000-0000-0000-0000\\/00000000-0000-0000-0000-000000000000\\/365e52d4-baad-11ee-8e64-020017155f86_cluctrl.exacompute_patch_nodes.log\",\"launch_node\":\"scaqae03adm01\",\"master_request_uuid\":\"365e52d4-baad-11ee-8e64-020017155f86\",\"node_patching_status\":{\"launch_node\":\"scaqae03adm01\",\"node_patching_progress_data\":[{\"from_version\":\"22.1.7.0.0.230113\",\"last_updated_time\":\"2024-01-24 03:42:50-0800\",\"node_name\":\"scaqae03adm02.us.oracle.com\",\"patch_sub_operation\":\"PATCHMGR_PRECHECK\",\"patchmgr_start_time\":\"2024-01-24 03:40:06-0800\",\"patchmgr_status\":\"Failed\",\"status\":\"Completed\",\"to_version\":\"22.1.18.0.0.231208\"}]},\"service\":\"ExaCompute Patch\",\"status\":\"0x03010045\",\"status_message\":\"Patchmgr command failed on Target : dom0 for Patch Operation : patch_prereq_check. Patchmgr logs are available on the node : scaqae03adm01.us.oracle.com at location : \\/EXAVMIMAGES\\/dbserver.patch.zip_exadata_ovs_22.1.18.0.0.231208_Linux-x86-64.zip\\/dbserver_patch_231214\\/patchmgr_log_5161e9b3-1516-4273-937f-3a8bef25f515_patch_prereq_check.\"}}}"
+            }
+          },
+          "start_time": "2024-01-24T11:39:19+0000",
+          "target_uri": "http://phoenix336212.dev3sub3phx.databasede3phx.oraclevcn.com:9001/ecra/endpoint/exacompute/patching",
+          "last_heartbeat_update": "2024-01-24T11:39:19+0000",
+          "status": 500,
+          "message": "patchmgr command failed with non-zero status.",
+          "ecra_error": "patchmgr command failed with non-zero status.",
+          "op": "EXACOMPUTEPATCHING",
+          "completion_percentage": 0,
+          "errorCode": "0x03010045",
+          "errorAction": "PAGE_ONCALL",
+          "retryCount": 0,
+          "wf_task": "ExaComputePatchNodes",
+          "comments": {
+            "wf_task": "ExaComputePatchNodes"
+          }
+        }
+        '''
+
+        _target_node = Test_exacompute_class.__dom0s[1:]
+        _ret = mShutdownVMsOnDom0(_target_node)
+        if not _ret:
+            self.assertTrue(_ret, "Could not modify sshd_conf file.")
+        else:
+            self.__operation = TASK_PREREQ_CHECK
+            if self.__ssh_equivalence_configured:
+                self.__infra_patch_operation_status_result, self.__infra_patch_operation_status_output =  \
+                    mExecuteInfraPatchCommand(self.__operation, Test_exacompute_class.__target_name, self.__operation_style)
+                _ret = mStartVMsOnDom0(_target_node)
+                if not _ret:
+                    self.assertTrue(_ret, "Unable to bring up domus.")
+
+            # Validate for patch_mgr_error code from status output. This error code is from infrapatching tool
+            _status_json = json.loads(self.__infra_patch_operation_status_output)
+            _patch_mgr_error_occured = False
+
+            if _status_json and "status" in _status_json and "errorCode" in _status_json and "patchmgr_status" in \
+                    _status_json['exacompute_patching_details']['node_patching_progress_data'][0]:
+                _status = _status_json['status']
+                _error_code = _status_json['errorCode']
+                _patchmgr_status = _status_json['exacompute_patching_details']['node_patching_progress_data'][0][
+                    'patchmgr_status']
+                if _status == 500 and _error_code == '0x03010045' and _patchmgr_status == 'Failed':
+                    _patch_mgr_error_occured = True
+            self.assertTrue(_patch_mgr_error_occured, "Patch_mgr failure is not found in status output.")
+
+
+    @pytest.mark.exacompute_patch_failure
+    def test_exacompute_patch_failure(self):
+        """
+        This test is to simulate patch error and validate error code in json
+
+        The following things are done in this test
+        1. Prepare the environment to patch error
+        2. Execute exacompute patch
+        3. Validate exacompute patch operation for patch failure
+        """
+
+        self.__operation = TASK_PATCH
+        if self.__ssh_equivalence_configured:
+            self.__infra_patch_operation_status_result, self.__infra_patch_operation_status_output =  \
+                mExecuteInfraPatchCommand(self.__operation, Test_exacompute_class.__target_name, self.__operation_style)
+
+        # Validate for patch_mgr_error code from status output. This error code is from infra patching tool
+        _status_json = json.loads(self.__infra_patch_operation_status_output)
+        _patch_failed = False
+
+        if _status_json and "status" in _status_json and "errorCode" in _status_json:
+            _status = _status_json['status']
+            _error_code = _status_json['errorCode']
+            if _status == 500 and _error_code == '0x0301005E':
+                _patch_failed = True
+        self.assertTrue(_patch_failed, "Patch failure is not found in status output.")
+
+
+    @pytest.mark.exacompute_patch
+    def test_exacompute_patch(self):
+        _target_node = Test_exacompute_class.__dom0s[1:]
+        # precheck test would have shutdown the vms so not considering the return code
+        _ret = mShutdownVMsOnDom0(_target_node)
+        self.__operation = TASK_PATCH
+        if self.__ssh_equivalence_configured:
+            self.__infra_patch_operation_status_result, self.__infra_patch_operation_status_output =  \
+                mExecuteInfraPatchCommandWithRetry(self.__operation, Test_exacompute_class.__target_name, self.__operation_style)
+            self.assertTrue(self.__infra_patch_operation_status_result, "Exacompute %s operation failed." % self.__operation)
+
+    @pytest.mark.exacompute_postcheck
+    def test_exacompute_postcheck(self):
+        self.__operation = TASK_POSTCHECK
+        if self.__ssh_equivalence_configured:
+            self.__infra_patch_operation_status_result, self.__infra_patch_operation_status_output =  \
+                mExecuteInfraPatchCommandWithRetry(self.__operation, Test_exacompute_class.__target_name, self.__operation_style)
+            self.assertTrue(self.__infra_patch_operation_status_result, "Exacompute %s operation failed." % self.__operation)
+
+    @pytest.mark.exacompute_rollback
+    def test_exacompute_rollback(self):
+        self.__operation = TASK_ROLLBACK
+        if self.__ssh_equivalence_configured:
+            self.__infra_patch_operation_status_result, self.__infra_patch_operation_status_output =  \
+                mExecuteInfraPatchCommandWithRetry(self.__operation, Test_exacompute_class.__target_name, self.__operation_style)
+            self.assertTrue(self.__infra_patch_operation_status_result, "Exacompute %s operation failed." % self.__operation)
+
+    @pytest.mark.exacompute_backup_image
+    def test_exacompute_backup_image(self):
+        self.__operation = TASK_BACKUP_IMAGE
+        if self.__ssh_equivalence_configured:
+            self.__infra_patch_operation_status_result, self.__infra_patch_operation_status_output =  \
+                mExecuteInfraPatchCommandWithRetry(self.__operation, Test_exacompute_class.__target_name, self.__operation_style)
+            self.assertTrue(self.__infra_patch_operation_status_result, "Exacompute %s operation failed." % self.__operation)
+
+    @pytest.mark.exacompute_elu_precheck
+    def test_exacompute_elu_precheck(self):
+        self.__operation = TASK_PREREQ_CHECK
+        if self.__ssh_equivalence_configured:
+            mUpdateAdditionalOptionsInPayload("exasplice", "yes")
+            self.__infra_patch_operation_status_result, self.__infra_patch_operation_status_output =  \
+                mExecuteInfraPatchCommandWithRetry(self.__operation, Test_exacompute_class.__target_name, self.__operation_style)
+            self.assertTrue(self.__infra_patch_operation_status_result, "Exacompute ELU %s operation failed." % self.__operation)
+
+    @pytest.mark.exacompute_elu_patch
+    def test_exacompute_elu_patch(self):
+        self.__operation = TASK_PATCH
+        if self.__ssh_equivalence_configured:
+            mUpdateAdditionalOptionsInPayload("exasplice", "yes")
+            self.__infra_patch_operation_status_result, self.__infra_patch_operation_status_output =  \
+                mExecuteInfraPatchCommandWithRetry(self.__operation, Test_exacompute_class.__target_name, self.__operation_style)
+            self.assertTrue(self.__infra_patch_operation_status_result, "Exacompute ELU %s operation failed." % self.__operation)
+
+    @pytest.mark.exacompute_elu_rollback
+    def test_exacompute_elu_rollback(self):
+        self.__operation = TASK_ROLLBACK
+        if self.__ssh_equivalence_configured:
+            mUpdateAdditionalOptionsInPayload("exasplice", "yes")
+            self.__infra_patch_operation_status_result, self.__infra_patch_operation_status_output =  \
+                mExecuteInfraPatchCommandWithRetry(self.__operation, Test_exacompute_class.__target_name, self.__operation_style)
+            self.assertTrue(self.__infra_patch_operation_status_result, "Exacompute ELU %s operation failed." % self.__operation)
+
+    @pytest.mark.exacompute_precheck_failure_then_patch
+    def test_exacompute_precheck_failure_then_patch(self):
+        """
+        This test is to fail precheck on few nodes and make patch successful on last node and proceed with patching on
+        node where patching is successful and then verify is node patching progess data is displaying the precheck
+        failed node correctly.
+
+        The following things are done in this test
+        1. Shuthdown the vms on last node
+        2. Run exacompute patch
+        3. Verify if precheck failed data is present in node patching progess data for the respective nodes
+        4. Validate exacompute patch operation for patch failure
+
+        Sample status json:
+        {
+          "progress_percent": 0,
+          "start_time_ts": "2024-11-28 17:17:52.0",
+          "end_time": "2024-11-28T17:50:03+0000",
+          "exacompute_patching_details": {
+            "node_patching_progress_data": [
+              {
+                "from_version": "24.1.2.0.0.240727",
+                "last_updated_time": "2024-11-28 17:47:44+0000",
+                "node_name": "sea201323exdd011.sea2xx2xx0061qf.adminsea2.oraclevcn.com",
+                "patch_sub_operation": "PATCHMGR_PATCH",
+                "patchmgr_start_time": "2024-11-28 17:22:35+0000",
+                "patchmgr_status": "Succeeded",
+                "status": "Completed",
+                "to_version": "24.1.6.0.0.241115"
+              },
+              {
+                "last_updated_time": "2024-11-28 17:18:34",
+                "node_name": "sea201323exdd007.sea2xx2xx0061qf.adminsea2.oraclevcn.com",
+                "patch_sub_operation": "PATCHMGR_PRECHECK",
+                "patchmgr_start_time": "2024-11-28 17:18:34",
+                "patchmgr_status": "Failed",
+                "status": "Completed"
+              },
+              {
+                "last_updated_time": "2024-11-28 17:18:34",
+                "node_name": "sea201323exdd008.sea2xx2xx0061qf.adminsea2.oraclevcn.com",
+                "patch_sub_operation": "PATCHMGR_PRECHECK",
+                "patchmgr_start_time": "2024-11-28 17:18:34",
+                "patchmgr_status": "Failed",
+                "status": "Completed"
+              }
+            ],
+            "service": "ExaCompute Patch",
+            "status": "0x03010045",
+            "TargetVersion": "24.1.6.0.0.241115",
+            "OperationStyle": "non-rolling",
+            "Operation": "patch",
+            "status_message": "Although upgrade operation was successful on the nodes : ['sea201323exdd011.sea2xx2xx0061qf.adminsea2.oraclevcn.com'], prechecks failed on ['sea201323exdd007.sea2xx2xx0061qf.adminsea2.oraclevcn.com', 'sea201323exdd008.sea2xx2xx0061qf.adminsea2.oraclevcn.com'] and hence were not upgraded.",
+            "launch_node": "sea201323exdd006",
+            "master_request_uuid": "b39efa62-adac-11ef-ab95-00001701ee8d",
+            "exacloud_thread_log": "/u02/ecra_preprov/oracle/ecra_installs/infrapatch0917/mw_home/user_projects/domains/exacloud//log/threads/0000-0000-0000-0000/00000000-0000-0000-0000-000000000000/b39efa62-adac-11ef-ab95-00001701ee8d_cluctrl.exacompute_patch_nodes.log"
+          },
+          "ecra_server": "EcraServer1",
+          "wf_uuid": "5c45f875-7e5c-4eec-a4d8-983c02ea1b41",
+          "extrainfo": {
+            "header": "EXACLOUD ENCOUNTERED THE FOLLOWING PROBLEM.",
+            "errorCode": "0x03010045",
+            "errorAction": "RETRY_WITH_SAME_TOKEN",
+            "description": "Patchmgr command failed with non-zero status.",
+            "details": {
+              "comments": "{\"error_str\":\"patchmgr command failed with non-zero status.\",\"cmd\":\"cluctrl.exacompute_patch_nodes\",\"na1\":\"sea201309exd\",\"na2\":\"0\",\"exacloudinfo\":{\"output\":{\"Operation\":\"patch\",\"OperationStyle\":\"non-rolling\",\"TargetVersion\":\"24.1.6.0.0.241115\",\"exacloud_thread_log\":\"\\/u02\\/ecra_preprov\\/oracle\\/ecra_installs\\/infrapatch0917\\/mw_home\\/user_projects\\/domains\\/exacloud\\/\\/log\\/threads\\/0000-0000-0000-0000\\/00000000-0000-0000-0000-000000000000\\/b39efa62-adac-11ef-ab95-00001701ee8d_cluctrl.exacompute_patch_nodes.log\",\"launch_node\":\"sea201323exdd006\",\"master_request_uuid\":\"b39efa62-adac-11ef-ab95-00001701ee8d\",\"node_patching_status\":{\"launch_node\":\"sea201323exdd006\",\"node_patching_progress_data\":[{\"from_version\":\"24.1.2.0.0.240727\",\"last_updated_time\":\"2024-11-28 17:47:44+0000\",\"node_name\":\"sea201323exdd011.sea2xx2xx0061qf.adminsea2.oraclevcn.com\",\"patch_sub_operation\":\"PATCHMGR_PATCH\",\"patchmgr_start_time\":\"2024-11-28 17:22:35+0000\",\"patchmgr_status\":\"Succeeded\",\"status\":\"Completed\",\"to_version\":\"24.1.6.0.0.241115\"},{\"last_updated_time\":\"2024-11-28 17:18:34\",\"node_name\":\"sea201323exdd007.sea2xx2xx0061qf.adminsea2.oraclevcn.com\",\"patch_sub_operation\":\"PATCHMGR_PRECHECK\",\"patchmgr_start_time\":\"2024-11-28 17:18:34\",\"patchmgr_status\":\"Failed\",\"status\":\"Completed\"},{\"last_updated_time\":\"2024-11-28 17:18:34\",\"node_name\":\"sea201323exdd008.sea2xx2xx0061qf.adminsea2.oraclevcn.com\",\"patch_sub_operation\":\"PATCHMGR_PRECHECK\",\"patchmgr_start_time\":\"2024-11-28 17:18:34\",\"patchmgr_status\":\"Failed\",\"status\":\"Completed\"}]},\"service\":\"ExaCompute Patch\",\"status\":\"0x03010045\",\"status_message\":\"Although upgrade operation was successful on the nodes : ['sea201323exdd011.sea2xx2xx0061qf.adminsea2.oraclevcn.com'], prechecks failed on ['sea201323exdd007.sea2xx2xx0061qf.adminsea2.oraclevcn.com', 'sea201323exdd008.sea2xx2xx0061qf.adminsea2.oraclevcn.com'] and hence were not upgraded.\"}}}"
+            }
+          },
+          "start_time": "2024-11-28T17:17:52+0000",
+          "target_uri": "http://ecra-exacsdev7.emmgmt.adminsea2.oraclevcn.com:9046/ecra/endpoint/exacompute/patching",
+          "last_heartbeat_update": "2024-11-28T17:17:52+0000",
+          "status": 500,
+          "message": "patchmgr command failed with non-zero status.",
+          "ecra_error": "patchmgr command failed with non-zero status.",
+          "op": "EXACOMPUTEPATCHING",
+          "completion_percentage": 0,
+          "errorCode": "0x03010045",
+          "errorAction": "PAGE_ONCALL",
+          "retryCount": 0,
+          "wf_task": "ExaComputePatchNodes",
+          "comments": {
+            "wf_task": "ExaComputePatchNodes"
+          }
+        }
+
+        """
+
+        mPatchLogInfo(str(Test_exacompute_class.__dom0s))
+        # Get the list of nodes to get the precheck pass and proceed with patch
+        _target_node = Test_exacompute_class.__dom0s[-2:]
+        # Get the list of node for the prechecks to fail
+        _nodes_to_verify = Test_exacompute_class.__dom0s[:-1]
+        # shutdown vms only on target node, we dont shutdown vms on other nodes as we need precheck to fail
+        _ret = mShutdownVMsOnDom0(_target_node)
+        self.assertTrue(_ret, "Problem while shutting down domus on %s" % _target_node)
+
+        # Change the ClientAliveInterval interval setting in /etc/ssh/sshd_config file to 590 so that it triggers patch_mgr failure.
+        mExecuteRemoteExasshCmd("/bin/sed  \\'s/ClientAliveInterval.*/ClientAliveInterval 590/\\' -i /etc/ssh/sshd_config",[Test_exacompute_class.__dom0s[-2]])
+
+        self.__operation = TASK_PATCH
+
+        if self.__ssh_equivalence_configured:
+            self.__infra_patch_operation_status_result, self.__infra_patch_operation_status_output = \
+                mExecuteInfraPatchCommand(self.__operation, Test_exacompute_class.__target_name, self.__operation_style)
+
+            # Validate for patch_mgr_error code from status output. This error code is from infra patching tool
+            _status_json = json.loads(self.__infra_patch_operation_status_output)
+            _patch_failed = False
+
+            _ret = mStartVMsOnDom0([Test_exacompute_class.__dom0s[-2]])
+            if not _ret:
+                self.assertTrue(_ret, "Unable to bring up domus on %s" % Test_exacompute_class.__dom0s[-2])
+
+            if _status_json and "status" in _status_json and "errorCode" in _status_json:
+                # get the node patching progess data
+                _node_patching_progress_data = _status_json["exacompute_patching_details"]["node_patching_progress_data"]
+                # for each node where precheck should fail verify if node patching progess data has it
+                for _node_to_verify in _nodes_to_verify[1:]:
+                    _node_found = False
+                    for _node in _node_patching_progress_data:
+                        if _node["node_name"] == _node_to_verify:
+                            _node_found = True
+                            # verify is patch_sub_operation is PATCHMGR_PRECHECK and patchmgr_status is Failed for the node
+                            if _node["patch_sub_operation"] == "PATCHMGR_PRECHECK" and _node["patchmgr_status"] == "Failed":
+                                mPatchLogInfo("%s found in node_patching_progress_data with patch_sub_operation as PATCHMGR_PRECHECK and patchmgr_status as Failed" % _node_to_verify)
+                            else:
+                                _patch_failed = True
+                                mPatchLogError("%s is found but either patch_sub_operation or patchmgr_status is not in the expected state" % _node_to_verify)
+                            break
+
+                    # node is missing from node_patching_progress_data
+                    if not _node_found:
+                        _patch_failed = True
+                        mPatchLogError("%s not found in status output" % _node_to_verify)
+
+                # check for status and errorcode in status json
+                _status = _status_json['status']
+                _error_code = _status_json['errorCode']
+                if _status != 500 and _error_code != '0x03010045':
+                    _patch_failed = True
+            else:
+               self.assertTrue(_patch_failed, "status json missing either status or errorCode key")
+
+            self.assertFalse(_patch_failed, "Patch didn't fail with expected status output.")

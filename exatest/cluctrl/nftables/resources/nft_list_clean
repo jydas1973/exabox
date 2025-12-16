@@ -1,0 +1,16 @@
+table ip INPUT { # handle 2
+}
+table ip OUTPUT { # handle 3
+}
+table ip FORWARD { # handle 4
+}
+table ip filter { # handle 5
+    chain FORWARD { # handle 1
+    }
+
+    chain INPUT { # handle 2
+    }
+
+    chain OUTPUT { # handle 3
+    }
+}
