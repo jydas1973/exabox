@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    jyotdas     02/06/26 - Enh - Unit tests for LATEST targetVersion DOM0
+#                           exasplice bypass
 #    avimonda    09/16/24 - Enhancement Request 36775120 - EXACLOUD TIMEOUT
 #                           MUST BE CALCULATED BASED ON THE PATCH OPERATION
 #                           AND TARGET TYPE
@@ -33,7 +35,7 @@ from unittest.mock import patch
 from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
 from exabox.log.LogMgr import ebLogInfo
 from exabox.agent.ebJobRequest import ebJobRequest
-from exabox.infrapatching.utils.utility import mGetInfraPatchingConfigParam
+from exabox.infrapatching.utils.utility import mGetInfraPatchingConfigParam, mIsLatestTargetVersionAllowed
 from exabox.infrapatching.core.cludispatcher import ebCluPatchDispatcher
 from exabox.core.MockCommand import exaMockCommand
 
@@ -146,6 +148,38 @@ class ebTestCluPatchDispatcher(ebTestClucontrol):
         _rc=_patch_dispatcher.mCalculatePatchOperationTimeout(_options)
         self.assertEqual(_rc, 169200)
         ebLogInfo("Unit test on ebCluPatchDispatcher.mCalculatePatchOperationTimeout_Rolling_Rollback executed successfully")
+
+    def test_mIsLatestTargetVersionAllowed_dom0_exasplice_yes(self):
+        """Test LATEST is allowed as literal for dom0 + exasplice=yes"""
+        ebLogInfo("")
+        ebLogInfo("Running unit test: mIsLatestTargetVersionAllowed with dom0 + exasplice=yes")
+        result = mIsLatestTargetVersionAllowed('LATEST', 'dom0', 'yes')
+        self.assertTrue(result)
+        ebLogInfo("Unit test on mIsLatestTargetVersionAllowed dom0 + exasplice=yes executed successfully")
+
+    def test_mIsLatestTargetVersionAllowed_non_dom0_returns_false(self):
+        """Test LATEST is NOT allowed for non-dom0 targets"""
+        ebLogInfo("")
+        ebLogInfo("Running unit test: mIsLatestTargetVersionAllowed with cell + exasplice=yes")
+        result = mIsLatestTargetVersionAllowed('LATEST', 'cell', 'yes')
+        self.assertFalse(result)
+        ebLogInfo("Unit test on mIsLatestTargetVersionAllowed cell + exasplice=yes executed successfully")
+
+    def test_mIsLatestTargetVersionAllowed_exasplice_no_returns_false(self):
+        """Test LATEST is NOT allowed when exasplice is not yes"""
+        ebLogInfo("")
+        ebLogInfo("Running unit test: mIsLatestTargetVersionAllowed with dom0 + exasplice=no")
+        result = mIsLatestTargetVersionAllowed('LATEST', 'dom0', 'no')
+        self.assertFalse(result)
+        ebLogInfo("Unit test on mIsLatestTargetVersionAllowed dom0 + exasplice=no executed successfully")
+
+    def test_mIsLatestTargetVersionAllowed_non_latest_version_returns_false(self):
+        """Test non-LATEST version returns False even with dom0 + exasplice=yes"""
+        ebLogInfo("")
+        ebLogInfo("Running unit test: mIsLatestTargetVersionAllowed with actual version + dom0 + exasplice=yes")
+        result = mIsLatestTargetVersionAllowed('25.1.0.0.0.250101', 'dom0', 'yes')
+        self.assertFalse(result)
+        ebLogInfo("Unit test on mIsLatestTargetVersionAllowed with actual version executed successfully")
 
 if __name__ == "__main__":
     unittest.main()

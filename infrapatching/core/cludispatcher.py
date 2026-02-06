@@ -15,6 +15,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    jyotdas     02/06/26 - Enh - Allow LATEST targetVersion for DOM0
+#                           exasplice patching
 #    ajayasin    08/05/25 - moving command handler functions from clucontrol.py
 #                           to clucommandhandler.py
 #    apotluri    07/31/25 - Bug 38096654 - PRECHECK OF SMR FAILED WITH
@@ -878,8 +880,16 @@ class ebCluPatchDispatcher(LogHandler):
                 if 'TargetVersion' in _entry:
                     # Bug-26830429 - Evaluate the available latest version
                     if _entry['TargetVersion'].upper() == 'LATEST':
-                        self.mPatchLogInfo("Finding the LATEST target version.")
-                        _version = self.mGetLatestPatchVersion()
+                        # Check if LATEST is allowed as literal for dom0 + exasplice=yes
+                        _target_types = _entry.get('TargetType', [])
+                        _is_dom0_only = len(_target_types) == 1 and _target_types[0].lower() == PATCH_DOM0
+                        if _is_dom0_only and _is_exasplice:
+                            # Allow LATEST as literal string for dom0 exasplice patching
+                            self.mPatchLogInfo(f"Allowing LATEST as literal targetVersion for DOM0 exasplice patching")
+                            _version = _entry['TargetVersion']
+                        else:
+                            self.mPatchLogInfo("Finding the LATEST target version.")
+                            _version = self.mGetLatestPatchVersion()
                     else:
                         _version = _entry['TargetVersion']
                         self.mPatchLogInfo(f"The TargetVersion selected: {_version} ")

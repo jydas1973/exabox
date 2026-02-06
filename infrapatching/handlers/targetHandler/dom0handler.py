@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    jyotdas     02/06/26 - Enh - Allow LATEST targetVersion for DOM0
+#                           exasplice patching
 #    jyotdas     10/31/25 - Bug 38575316 - Parallelise the dom0 shutdown across
 #                           all nodes while non-rolling qmr patching.
 #    bhpati      10/23/25 - Display an Exadata Live Update (ELU) specific error
@@ -727,7 +729,10 @@ class Dom0Handler(TargetHandler):
                 return _ret, _no_action_taken
 
             # Validate for exasplice patch to be applied on list of dom0s.
-            if mExaspliceVersionPatternMatch(self.mGetTargetVersion()):
+            if mExaspliceVersionPatternMatch(self.mGetTargetVersion()) \
+                    or (self.mGetTargetVersion().upper() == 'LATEST' and self.mIsExaSplice()):
+                if self.mGetTargetVersion().upper() == 'LATEST':
+                    self.mPatchLogInfo(f"Processing LATEST targetVersion for DOM0 exasplice precheck")
                 _list_of_nodes = self.mGetListOfDom0sWhereExasplicePatchCanBeApplied(_launch_nodes, _list_of_nodes)
 
             # Set initial Patch Status Json.
@@ -1082,7 +1087,10 @@ class Dom0Handler(TargetHandler):
                     return _ret, _no_action_taken
 
                 # Validate for exasplice patch to be applied on list of dom0s.
-                if mExaspliceVersionPatternMatch(self.mGetTargetVersion()):
+                if mExaspliceVersionPatternMatch(self.mGetTargetVersion()) \
+                        or (self.mGetTargetVersion().upper() == 'LATEST' and self.mIsExaSplice()):
+                    if self.mGetTargetVersion().upper() == 'LATEST':
+                        self.mPatchLogInfo(f"Processing LATEST targetVersion for DOM0 ELU exasplice precheck")
                     _list_of_nodes = self.mGetListOfDom0sWhereExasplicePatchCanBeApplied(_launch_nodes, _list_of_nodes)
 
                 '''
@@ -1606,7 +1614,10 @@ class Dom0Handler(TargetHandler):
                 return _ret, _no_action_taken
 
             # Validate for exasplice patch to be applied on list of dom0s.
-            if mExaspliceVersionPatternMatch(self.mGetTargetVersion()):
+            if mExaspliceVersionPatternMatch(self.mGetTargetVersion()) \
+                    or (self.mGetTargetVersion().upper() == 'LATEST' and self.mIsExaSplice()):
+                if self.mGetTargetVersion().upper() == 'LATEST':
+                    self.mPatchLogInfo(f"Processing LATEST targetVersion for DOM0 exasplice patching")
                 _list_of_nodes = self.mGetListOfDom0sWhereExasplicePatchCanBeApplied(_launch_nodes, _list_of_nodes)
 
             # Set initial Patch Status Json.
@@ -2062,7 +2073,8 @@ class Dom0Handler(TargetHandler):
                         _dom0_node = exaBoxNode(get_gcontext())
                         _dom0_node.mConnect(aHost=_node)
 
-                        if mExaspliceVersionPatternMatch(self.mGetTargetVersion()):
+                        if mExaspliceVersionPatternMatch(self.mGetTargetVersion()) \
+                                or (self.mGetTargetVersion().upper() == 'LATEST' and self.mIsExaSplice()):
                             _i, _o, _e = _dom0_node.mExecuteCmd("date '+%s' -d \"`imageinfo -activatedexasplice`\"")
                         else:
                             _i, _o, _e = _dom0_node.mExecuteCmd("date '+%s' -d \"`imageinfo -activated`\"")

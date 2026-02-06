@@ -1,7 +1,1 @@
-My aim is to generate code based on this codebase . So I want you to generate a AGENTS.md file based on this project which will be referenced for code generation . Some important points
-
-1. Please anylyse the codebase thoroughly and lay down the good coding practices
-2. Please ensure that unittest are generated in the exatest folder for new functionality added if possible.
-3. Have a section for the unittest which lays down the rules for validating the unit test with exact commands based on this codebase 
-4. Please take a look at the examples folder for some files from other projects
-5. Keep it simple and do not overengineer . The document should be within 200 lines
+JQL_QUERY=(text ~ metricsV2.EXADATA.dbaas.patchCloudExaInfra.APPLY.WORKER.Failure OR text ~ metricsV2.EXADATA.dbaas.patchExacs.APPLY.WORKER.Failure) AND labels in (oneview_triagex_started,oneview_triagex_success,oneview_triagex_failed) AND created >= -3d ORDER BY created DESC

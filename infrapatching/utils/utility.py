@@ -15,6 +15,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    jyotdas     02/06/26 - Enh - Allow LATEST targetVersion for DOM0
+#                           exasplice patching
 #    sdevasek    10/10/25 - ENH 38437135 - IMPLEMENT ADDITION OF SCRIPTNAME
 #                           SCRIPTBUNLDENAME AND SCRIPTBUNDLEHASH ATTRIBUTES
 #                           TO ECRA REGISTERED PLUGINS METADATA REGISTRATION
@@ -129,7 +131,8 @@ from exabox.infrapatching.utils.constants import ANSI_ESCAPE, WAIT_LINES_ESCAPE,
     TASK_HANDLER_MAP, TARGET_HANDLER_MAP, INFRA_PATCHING_KNOWN_ALERTS_EXACOMPUTE,                         \
     INFRA_PATCHING_KNOWN_ALERTS_EXACC, INFRA_PATCHING_KNOWN_ALERTS_EXACS, INFRA_PATCHING_CONF_FILE,       \
     EXACOMPUTE_PATCH_CONF_FILE, EXACS_SRV, EXACC_SRV, KEY_API, TASK_MOCK_HANDLER_MAP, TARGET_MOCK_HANDLER_MAP, \
-    SHELL_CMD_TIMEOUT_EXIT_CODE, SHELL_CMD_DEFAULT_TIMEOUT_IN_SECONDS, PATCH_CELL_CLUSTERLESS, PATCH_DOM0_CLUSTERLESS
+    SHELL_CMD_TIMEOUT_EXIT_CODE, SHELL_CMD_DEFAULT_TIMEOUT_IN_SECONDS, PATCH_CELL_CLUSTERLESS, PATCH_DOM0_CLUSTERLESS, \
+    PATCH_DOM0
 from exabox.log.LogMgr import ebLogInfo, ebLogDebug, ebLogWarn, ebLogError, ebLogTrace
 from exabox.infrapatching.core.infrapatcherror import *
 from exabox.ovm.cluencryption import getMountPointInfo
@@ -1066,3 +1069,23 @@ def mExaspliceVersionPatternMatch(version):
     regex = r'^\d{6}(\.\d+)?$'
     pattern = re.compile(regex)
     return bool(pattern.fullmatch(version))
+
+def mIsLatestTargetVersionAllowed(target_version, target_type, exasplice):
+    """
+    Check if LATEST targetVersion is allowed as a literal string.
+    LATEST is allowed only for DOM0 with exasplice='yes'.
+
+    Args:
+        target_version: The target version string
+        target_type: The target type (dom0, domu, cell, etc.)
+        exasplice: The exasplice value from AdditionalOptions
+
+    Returns:
+        True if LATEST is allowed (dom0 + exasplice=yes)
+        False otherwise
+    """
+    if target_version and target_version.upper() == 'LATEST':
+        if target_type and target_type.lower() == PATCH_DOM0:
+            if exasplice and exasplice.lower() == 'yes':
+                return True
+    return False
