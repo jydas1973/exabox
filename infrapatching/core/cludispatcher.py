@@ -15,6 +15,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    jyotdas     02/08/26 - Refactor to use mIsLatestTargetVersionAllowed
+#                           utility function
 #    jyotdas     02/06/26 - Enh - Allow LATEST targetVersion for DOM0
 #                           exasplice patching
 #    ajayasin    08/05/25 - moving command handler functions from clucontrol.py
@@ -188,7 +190,7 @@ from exabox.infrapatching.core.ibclusterpatch import IBClusterPatch
 from exabox.infrapatching.core.ibfabricpatch import IBFabricPatch
 from exabox.ovm.clumisc import OracleVersion
 from defusedxml import ElementTree as ET
-from exabox.infrapatching.utils.utility import mGetInfraPatchingConfigParam, mTruncateErrorMessageDescription, isInfrapatchErrorCode, runInfraPatchCommandsLocally, mQuarterlyVersionPatternMatch
+from exabox.infrapatching.utils.utility import mGetInfraPatchingConfigParam, mTruncateErrorMessageDescription, isInfrapatchErrorCode, runInfraPatchCommandsLocally, mQuarterlyVersionPatternMatch, mIsLatestTargetVersionAllowed
 from exabox.infrapatching.utils.infrapatchexecutionvalidator import InfrapatchExecutionValidator
 
 class ebCluPatchDispatcher(LogHandler):
@@ -882,8 +884,10 @@ class ebCluPatchDispatcher(LogHandler):
                     if _entry['TargetVersion'].upper() == 'LATEST':
                         # Check if LATEST is allowed as literal for dom0 + exasplice=yes
                         _target_types = _entry.get('TargetType', [])
-                        _is_dom0_only = len(_target_types) == 1 and _target_types[0].lower() == PATCH_DOM0
-                        if _is_dom0_only and _is_exasplice:
+                        _target_type = _target_types[0] if len(_target_types) == 1 else None
+                        _exasplice_value = 'yes' if _is_exasplice else 'no'
+
+                        if mIsLatestTargetVersionAllowed(_entry['TargetVersion'], _target_type, _exasplice_value):
                             # Allow LATEST as literal string for dom0 exasplice patching
                             self.mPatchLogInfo(f"Allowing LATEST as literal targetVersion for DOM0 exasplice patching")
                             _version = _entry['TargetVersion']
