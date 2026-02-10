@@ -1084,8 +1084,6 @@ def mIsLatestTargetVersionAllowed(target_version, target_type, exasplice):
         True if LATEST is allowed (dom0 + exasplice=yes)
         False otherwise
     """
-    if target_version and target_version.upper() == 'LATEST':
-        if target_type and target_type.lower() == PATCH_DOM0:
-            if exasplice and exasplice.lower() == 'yes':
-                return True
-    return False
+    return (target_version and target_version.upper() == 'LATEST' and
+            target_type and target_type.lower() == PATCH_DOM0 and
+            exasplice and exasplice.lower() == 'yes')
