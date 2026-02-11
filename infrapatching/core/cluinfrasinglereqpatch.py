@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    jyotdas     02/11/26 - Enh - Allow LATEST targetVersion for DOM0
+#                           exasplice patching
 #    apotluri    07/25/25 - Bug 38096654 - PRECHECK OF SMR FAILED WITH
 #                           'DIRECTORY FOR EXADATA_RELEASE HAS MORE THAN ONE
 #                           PATCH'
@@ -55,7 +57,7 @@ KEY_NAME_Dom0_YumRepository, KEY_NAME_Domu_YumRepository, KEY_NAME_PatchFile, PA
 PAYLOAD_NON_RELEASE, PATCH_ALL, PATCH_DOM0 ,PATCH_DOMU, TASK_BACKUP_IMAGE, PATCH_SWITCH, EXADATA_BUNDLES_METADATA_FILE
 from exabox.infrapatching.utils.constants import *
 from exabox.infrapatching.core.infrapatcherror import *
-from exabox.infrapatching.utils.utility import mGetInfraPatchingConfigParam, mTruncateErrorMessageDescription, runInfraPatchCommandsLocally, mQuarterlyVersionPatternMatch
+from exabox.infrapatching.utils.utility import mGetInfraPatchingConfigParam, mTruncateErrorMessageDescription, runInfraPatchCommandsLocally, mQuarterlyVersionPatternMatch, mIsLatestTargetVersionAllowed
 
 
 class ebCluInfraSingeRequestPatch(ebCluInfraPatch):
@@ -419,7 +421,7 @@ class ebCluInfraSingeRequestPatch(ebCluInfraPatch):
         self.mPatchLogInfo("Latest version from file system: %s" % _latest_ver_from_fs)
         return _latest_ver_from_fs
 
-    def mParseLatestVersion(self, aPatchFile, aVersion, aOperation):
+    def mParseLatestVersion(self, aPatchFile, aVersion, aOperation, aTargetType=None, aIsExasplice=False):
         """
         This function replaces the 'LATEST' with actual latest
         value in patch path and also construct correct path for the
@@ -444,6 +446,13 @@ class ebCluInfraSingeRequestPatch(ebCluInfraPatch):
         # case of oneoff, oneoffv2 patching.
         if aOperation in [ TASK_ONEOFF, TASK_ONEOFFV2 ]:
             self.mPatchLogInfo(f"Patch file version validations are skipped during oneoff and oneoffv2 operations.")
+            return PATCH_SUCCESS_EXIT_CODE, aPatchFile, _msg
+
+        # Skip path validation for DOM0 exasplice with LATEST - handlers will resolve it later
+        if (aVersion and aVersion.upper() == 'LATEST' and
+            aTargetType and aTargetType.lower() == PATCH_DOM0 and
+            aIsExasplice):
+            self.mPatchLogInfo("Skipping path validation for DOM0 exasplice LATEST - will be resolved by handlers")
             return PATCH_SUCCESS_EXIT_CODE, aPatchFile, _msg
 
         # If directory path is not having 'LATEST' string and it's not exacc, then
@@ -675,8 +684,18 @@ class ebCluInfraSingeRequestPatch(ebCluInfraPatch):
                 if 'TargetVersion' in _entry:
                     # Bug-26830429 - Evaluate the available latest version
                     if _entry['TargetVersion'].upper() == 'LATEST':
-                        self.mPatchLogInfo("Finding the LATEST target version.")
-                        _version = self.mGetLatestPatchVersion()
+                        # Check if LATEST is allowed as literal for dom0 + exasplice=yes
+                        _target_types = _entry.get('TargetType', [])
+                        _target_type = _target_types[0] if len(_target_types) == 1 else None
+                        _exasplice_value = 'yes' if _is_exasplice else 'no'
+
+                        if mIsLatestTargetVersionAllowed(_entry['TargetVersion'], _target_type, _exasplice_value):
+                            # Allow LATEST as literal string for dom0 exasplice patching
+                            self.mPatchLogInfo(f"Allowing LATEST as literal targetVersion for DOM0 exasplice patching")
+                            _version = _entry['TargetVersion']
+                        else:
+                            self.mPatchLogInfo("Finding the LATEST target version.")
+                            _version = self.mGetLatestPatchVersion()
                     else:
                         _version = _entry['TargetVersion']
                         self.mPatchLogInfo("The TargetVersion selected: %s " % _version)
@@ -857,7 +876,7 @@ class ebCluInfraSingeRequestPatch(ebCluInfraPatch):
                         elif _ttype == PATCH_DOM0:
                             self.__sanitizedPayload['DBPatchFile'] = _entry['DBPatchFile']
                             # Construct path with latest version for patch file
-                            _ret, _patch_file, _msg  = self.mParseLatestVersion(self.__sanitizedPayload['DBPatchFile'], _version, self.__sanitizedPayload['Operation'])
+                            _ret, _patch_file, _msg  = self.mParseLatestVersion(self.__sanitizedPayload['DBPatchFile'], _version, self.__sanitizedPayload['Operation'], _ttype, _is_exasplice)
                             if _ret == PATCH_SUCCESS_EXIT_CODE:
                                 self.__sanitizedPayload['DBPatchFile'] = _patch_file
                             if _ret != PATCH_SUCCESS_EXIT_CODE:
@@ -865,7 +884,7 @@ class ebCluInfraSingeRequestPatch(ebCluInfraPatch):
 
                             self.__sanitizedPayload['Dom0YumRepository'] = _entry['Dom0YumRepository']
                             # Construct path with latest version for patch file
-                            _ret, _patch_file, _msg  = self.mParseLatestVersion(self.__sanitizedPayload['Dom0YumRepository'], _version, self.__sanitizedPayload['Operation'])
+                            _ret, _patch_file, _msg  = self.mParseLatestVersion(self.__sanitizedPayload['Dom0YumRepository'], _version, self.__sanitizedPayload['Operation'], _ttype, _is_exasplice)
                             if _ret == PATCH_SUCCESS_EXIT_CODE:
                                 self.__sanitizedPayload['Dom0YumRepository'] = _patch_file
                             if _ret != PATCH_SUCCESS_EXIT_CODE:
@@ -925,7 +944,25 @@ class ebCluInfraSingeRequestPatch(ebCluInfraPatch):
             _rc = INSUFFICIENT_SPACE_AT_EXACLOUD_THREAD_LOCATION
             return _rc, _suggestion_msg
 
-        if self.__latest_verion_source_loc == self.LATEST_VER_FROM_FILESYSTEM:
+        # Check if we should skip filesystem validation for DOM0 exasplice LATEST
+        _skip_filesystem_validation = False
+        if self.__sanitizedPayload:
+            _target_version = self.__sanitizedPayload.get('TargetVersion', '')
+            _target_types = self.__sanitizedPayload.get('TargetType', [])
+            _additional_options = self.__sanitizedPayload.get('AdditionalOptions', [])
+
+            _is_exasplice = False
+            if _additional_options and len(_additional_options) > 0:
+                _is_exasplice = _additional_options[0].get('exasplice', '').lower() == 'yes'
+
+            # Skip validation if: LATEST + single dom0 target + exasplice=yes
+            if (_target_version and _target_version.upper() == 'LATEST' and
+                len(_target_types) == 1 and _target_types[0].lower() == PATCH_DOM0 and
+                _is_exasplice):
+                _skip_filesystem_validation = True
+                self.mPatchLogInfo("Skipping filesystem validation for DOM0 exasplice LATEST - will be resolved by handlers")
+
+        if not _skip_filesystem_validation and self.__latest_verion_source_loc == self.LATEST_VER_FROM_FILESYSTEM:
             self.mPatchLogInfo("Using file system to read patch files.")
             _rc, _suggestion_msg = self.mCheckPatchFileExistInFileSystem()
             if _rc != PATCH_SUCCESS_EXIT_CODE:
@@ -1065,6 +1102,11 @@ class ebCluInfraSingeRequestPatch(ebCluInfraPatch):
         _rc = PATCH_SUCCESS_EXIT_CODE
         _version_common_directory = None
         for _version in self.__object_store.keys():
+            # Skip validation for LATEST - it's for DOM0 exasplice and will be resolved by handlers
+            if _version and _version.upper() == 'LATEST':
+                self.mPatchLogInfo(f"Skipping filesystem validation for version '{_version}' - will be resolved by handlers")
+                continue
+
             for _file in set(self.__object_store[_version]['files']):
                 _version_directory = os.path.join(self.PATCH_PAYLOADS_DIRECTORY, _version, _file)
 

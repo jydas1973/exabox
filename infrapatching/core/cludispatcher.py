@@ -15,6 +15,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    jyotdas     02/11/26 - Enh - Skip path validation for DOM0 exasplice
+#                           LATEST - handlers will resolve it
 #    jyotdas     02/08/26 - Refactor to use mIsLatestTargetVersionAllowed
 #                           utility function
 #    jyotdas     02/06/26 - Enh - Allow LATEST targetVersion for DOM0
@@ -487,6 +489,11 @@ class ebCluPatchDispatcher(LogHandler):
         _rc = PATCH_SUCCESS_EXIT_CODE
         _version_common_directory = None
         for _version in self.__object_store.keys():
+            # Skip validation for LATEST - it's for DOM0 exasplice and will be resolved by handlers
+            if _version and _version.upper() == 'LATEST':
+                self.mPatchLogInfo(f"Skipping filesystem validation for version '{_version}' - will be resolved by handlers")
+                continue
+
             for _file in set(self.__object_store[_version]['files']):
                 _version_directory = os.path.join(self.PATCH_PAYLOADS_DIRECTORY, _version, _file)
 
@@ -637,7 +644,7 @@ class ebCluPatchDispatcher(LogHandler):
             if self.mAreClustersRepeated(_jconf):
                 return INCORRECT_INPUT_JSON, _invalid_json_sug_msg
 
-            def mParseLatestVersion(aPatchFile, aVersion, aOperation):
+            def mParseLatestVersion(aPatchFile, aVersion, aOperation, aTargetType=None, aIsExasplice=False):
                 """
                 This function replaces the 'LATEST' with actual latest
                 value in patch path and also construct correct path for the
@@ -672,7 +679,14 @@ class ebCluPatchDispatcher(LogHandler):
                     self.mPatchLogInfo(f"Patch file version validations are skipped during oneoff and oneoffv2 operations.")
                     return PATCH_SUCCESS_EXIT_CODE, aPatchFile, _msg
 
-                # If directory path is not having 'LATEST' string and it's not exacc, then 
+                # Skip path validation for DOM0 exasplice with LATEST - handlers will resolve it later
+                if (aVersion and aVersion.upper() == 'LATEST' and
+                    aTargetType and aTargetType.lower() == PATCH_DOM0 and
+                    aIsExasplice):
+                    self.mPatchLogInfo("Skipping path validation for DOM0 exasplice LATEST - will be resolved by handlers")
+                    return PATCH_SUCCESS_EXIT_CODE, aPatchFile, _msg
+
+                # If directory path is not having 'LATEST' string and it's not exacc, then
                 # no job here; simply return (aPatchFile) as it is.
                 if not _DBPatchFileDir and ((not aPatchFile or aPatchFile.find('LATEST') == -1) and self.OCIEXACC != 'True'):
                     self.mPatchLogInfo(f"mParseLatestVersion: PatchFile = '{aPatchFile}' ")
@@ -1069,7 +1083,7 @@ class ebCluPatchDispatcher(LogHandler):
                         elif _ttype == PATCH_DOM0:
                             _call['DBPatchFile'] = _entry['DBPatchFile']
                             # Construct path with latest version for patch file
-                            _ret, _patch_file, _msg  = mParseLatestVersion(_call['DBPatchFile'], _version, _call['Operation'])
+                            _ret, _patch_file, _msg  = mParseLatestVersion(_call['DBPatchFile'], _version, _call['Operation'], _ttype, _is_exasplice)
                             if _ret == PATCH_SUCCESS_EXIT_CODE:
                                 _call['DBPatchFile'] = _patch_file
                             if _ret != PATCH_SUCCESS_EXIT_CODE:
@@ -1077,7 +1091,7 @@ class ebCluPatchDispatcher(LogHandler):
 
                             _call['Dom0YumRepository'] = _entry['Dom0YumRepository']
                             # Construct path with latest version for patch file
-                            _ret, _patch_file, _msg  = mParseLatestVersion(_call['Dom0YumRepository'], _version, _call['Operation'])
+                            _ret, _patch_file, _msg  = mParseLatestVersion(_call['Dom0YumRepository'], _version, _call['Operation'], _ttype, _is_exasplice)
                             if _ret == PATCH_SUCCESS_EXIT_CODE:
                                 _call['Dom0YumRepository'] = _patch_file
                             if _ret != PATCH_SUCCESS_EXIT_CODE:

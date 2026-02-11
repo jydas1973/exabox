@@ -2653,6 +2653,12 @@ class Dom0Handler(TargetHandler):
         # domains/exacloud/PatchPayloads/19.3.6.0.0.200317/Dom0YumRepository/exadata_ol7_19.3.6.0.0.200317_Linux-x86-64.zip,
         # domains/exacloud/PatchPayloads/19.3.6.0.0.200317/Dom0YumRepository/exadata_ovs_19.3.6.0.0.200317_Linux-x86-64.zip
         # if _target in [PATCH_ALL, PATCH_DOM0] and self.__dom0_local_patch_zip and self.__dom0_local_patch_zip2:
+
+        #"DBPatchFile": "/scratch/jyotdas/ecra_installs/octecra/mw_home/user_projects/domains/exacloud/PatchPayloads/LATEST/DBPatchFile",
+        # "Dom0YumRepository": "/scratch/jyotdas/ecra_installs/octecra/mw_home/user_projects/domains/exacloud/PatchPayloads/LATEST/ExaspliceRepository",
+
+        #DBPatchFile": "/u02/svmmvmmigr/admin/exacloud/PatchPayloads/22.1.13.0.0.230712/DBPatchFile/dbserver.patch.zip",
+        # "Dom0YumRepository": "/u02/svmmvmmigr/admin/exacloud/PatchPayloads/22.1.13.0.0.230712/Dom0YumRepository/exadata_ol7_22.1.13.0.0.230712_Linux-x86-64.zip,/u02/svmmvmmigr/admin/exacloud/PatchPayloads/22.1.13.0.0.230712/Dom0YumRepository/exadata_ovs_22.1.13.0.0.230712_Linux-x86-64.zip",
         if self.__dom0_local_patch_zip and self.__dom0_local_patch_zip2:
             # Select the appropriate zip file based on KVM (e.g exadata_ol7_19.3.6.0.0.200317_Linux-x86-64.zip ) or  OVM (e.g exadata_ovs_19.3.6.0.0.200317_Linux-x86-64.zip)
             dom0zip2File = self.__dom0_local_patch_zip2
