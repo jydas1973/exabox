@@ -2090,7 +2090,15 @@ class ebCluPatchDispatcher(LogHandler):
             else:
                 self.mPatchLogInfo("Sufficient free disk space found for exacloud threads and request logs.")
 
-            if self.__latest_verion_source_loc == self.LATEST_VER_FROM_FILESYSTEM:
+            # Check if we should skip filesystem validation for DOM0 exasplice LATEST
+            _skip_filesystem_validation = False
+            if self.__dispatcher_target_version and self.__dispatcher_target_version.upper() == 'LATEST' and \
+               len(self.__dispatcher_target) == 1 and self.__dispatcher_target[0].lower() == PATCH_DOM0 and \
+               self.__dispatcher_exasplice and self.__dispatcher_exasplice == 'yes':
+                _skip_filesystem_validation = True
+                self.mPatchLogInfo("Skipping filesystem validation for DOM0 exasplice LATEST - will be resolved by handlers")
+
+            if not _skip_filesystem_validation and self.__latest_verion_source_loc == self.LATEST_VER_FROM_FILESYSTEM:
                 self.mPatchLogInfo("Using file system to read patch files.")
                 _rc = self.mCheckPatchFileExistInFileSystem()
                 if _rc != PATCH_SUCCESS_EXIT_CODE:
