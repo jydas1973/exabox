@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2020, Oracle and/or its affiliates. All rights reserved.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     DiagEndpoint - Basic functionality
@@ -11,6 +11,8 @@ NOTE:
     None    
 
 History:
+    shapatna    02/09/2026 - Bug: 38900266 - Fix for issues pointed by Codev
+                             in exabox/management directory
     jesandov    06/04/2020 - Change function name affected by AsyncTrackEndpoint
     jesandov    26/03/2019 - File Creation
 """
@@ -62,9 +64,10 @@ class DiagEndpoint(AsyncTrackEndpoint):
         else:
 
             _fileC = ""
-            with open(_zip, "r") as _f:
-                _fileC = _f.read()
-                _fileC = base64.b64encode(_fileC.encode('utf8')).decode('utf8')
+            _file_bytes = ""
+            with open(_zip, "rb") as _f:
+                _file_bytes = _f.read()
+                _fileC = base64.b64encode(_file_bytes).decode('utf-8')
 
             self.mGetResponse()['ctype'] = "application/octet-stream"
             self.mGetResponse()['text']  = _fileC

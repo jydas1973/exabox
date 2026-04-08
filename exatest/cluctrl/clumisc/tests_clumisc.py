@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 #
-# $Header: ecs/exacloud/exabox/exatest/cluctrl/clumisc/tests_clumisc.py /main/25 2025/11/07 20:59:33 jfsaldan Exp $
+# $Header: ecs/exacloud/exabox/exatest/cluctrl/clumisc/tests_clumisc.py /main/27 2026/02/10 22:08:12 jfsaldan Exp $
 #
 # tests_clumisc.py
 #
-# Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_clumisc.py - <one-line expansion of the name>
@@ -16,6 +16,14 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    kanmanic    03/24/26 - 39082361 Update tests for dbmcli
+#    jfsaldan    01/14/26 - Bug 38844619 - EXADBXS CREATE SERVICE | IF A STALE
+#                           ADMIN INTERFACE EXISTS FOR THE SAME ADMIN IP, NEW
+#                           PROVISIONINGS FAIL | REQUESTED IP FOR NAT-ED
+#                           INTERFACE IS ALREADY CONFIGURED FOR THE DUMMY
+#                           BRIDGE
+#    avimonda    12/05/25 - Bug 38610132 - OCI: DBAAS.CREATEEXACCVMCLUSTER
+#                           HANGS /DOES NOT PROGRESS
 #    remamid     10/14/25 - Add unittest for libvirtd enable bug 38481712
 #    remamid     05/08/25 - Add unittest for mRunComputePhysicalDiskTest
 #    ririgoye    11/05/24 - Bug 36994764 - EXACS-PREPROD: VM CLUSTER PROVISION
@@ -225,12 +233,39 @@ ELASTIC_SHAPES_RESULT_FLUSH = {
 
 class ebTestClumisc(ebTestClucontrol):
 
+    _DBMCLI_CMD_REGEX = "/usr/bin/dbmcli -e list dbserver detail"
+    _DBMCLI_OK_STDOUT = (
+        "msStatus:               running\n"
+        "rsStatus:               running\n"
+    )
+
     @classmethod
     def setUpClass(self):
         #super().setUpClass()
         super(ebTestClumisc, self).setUpClass(aGenerateDatabase=True,aUseOeda=True)
         warnings.filterwarnings("ignore")
- 
+
+    def _append_dbmcli_mock(self, aMockCmds):
+        for _regex in (self.mGetRegexDom0(), self.mGetRegexCell()):
+            if _regex in aMockCmds:
+                for _cmd_sequence in aMockCmds[_regex]:
+                    if not any(
+                        hasattr(_cmd, "mGetCmdRegex") and _cmd.mGetCmdRegex() == self._DBMCLI_CMD_REGEX
+                        for _cmd in _cmd_sequence
+                    ):
+                        _cmd_sequence.append(
+                            exaMockCommand(
+                                self._DBMCLI_CMD_REGEX,
+                                aRc=0,
+                                aStdout=self._DBMCLI_OK_STDOUT,
+                                aPersist=True,
+                            )
+                        )
+
+    def mPrepareMockCommands(self, aMock):
+        self._append_dbmcli_mock(aMock)
+        super().mPrepareMockCommands(aMock)
+
     def test_ebCluPreChecks_001_preservate_matching(self):
 
         _imgList = """/EXAVMIMAGES/System.first.boot.20.1.1.0.0.200808.img
@@ -338,7 +373,7 @@ class ebTestClumisc(ebTestClucontrol):
 
             _pchecks = ebCluPreChecks(self.mGetClubox())
             _pchecks.cleanup_old_system_boot_files(_dom0, {_imgrev})
-    
+
     def test_ebCluPreChecks__004_connectivity_checks(self):
 
         _cmds = {
@@ -359,6 +394,30 @@ class ebTestClumisc(ebTestClucontrol):
 
         _pchecks = ebCluPreChecks(self.mGetClubox())
         _pchecks.mConnectivityChecks(aCheckDomU=False)
+
+    def test_ebCluPreChecks_005_skip_cleanup_for_current_dom0_version(self):
+
+        for _dom0, _ in self.mGetClubox().mReturnDom0DomUPair():
+
+            _imgrev = self.mGetClubox().mGetImageVersion(_dom0)
+            _cmds = {
+                self.mGetRegexDom0(): [
+                    [
+                        exaMockCommand('/usr/local/bin/imageinfo -version', aStdout=_imgrev),
+                        exaMockCommand('/bin/test.*find'),
+                        exaMockCommand('/sbin/find /EXAVMIMAGES/ -maxdepth 1 -iname "System.first.boot.*.img" -mtime \+7'),
+                    ],
+                    [
+                        exaMockCommand('rm -rf /EXAVMIMAGES/System.first.boot.19.1.0.0.0.190101.*img'),
+                        exaMockCommand('rm -rf /EXAVMIMAGES/System.first.boot.19.1.0.0.0.190101.*bz2'),
+                    ],
+                ],
+            }
+
+            self.mPrepareMockCommands(_cmds)
+
+            _pchecks = ebCluPreChecks(self.mGetClubox())
+            _pchecks.cleanup_old_system_boot_files(_dom0, {_imgrev})
 
     def test_ebCluDom0SanityTests_001_mRunIlomConsistencyTest(self):
 
@@ -1405,6 +1464,35 @@ class ebTestClumisc(ebTestClucontrol):
         _procManager.mJoinProcess()
         del(_procManager)
         ebLogInfo(f"Result table: {_hw_health_table}")
+
+    def test_mRunComputeAdminIPConflictTest_nodup(self):
+
+        _cmds = {
+            self.mGetRegexDom0(): [
+                [
+                    exaMockCommand(f"test.*grep", aRc=0),
+                    exaMockCommand(f"/sbin/grep -RiI 10.31.112.34 /etc/sysconfig/network-scripts/ifcfg-vm.*", aRc=1),
+                    exaMockCommand(f"/sbin/grep -RiI 10.31.112.42 /etc/sysconfig/network-scripts/ifcfg-vm.*", aRc=1),
+                ],
+            ]
+        }
+
+        #Init new Args
+        self.mPrepareMockCommands(_cmds)
+
+        _configpath = os.getcwd() + "/config/hardware_prechecks.conf"
+        _step = "ESTP_PREVM_CHECKS"
+        _precheck_config = {}
+        with open(_configpath) as fd:
+            _precheck_config = json.load(fd)
+        #Execute the check function
+        for _dom0, _ in self.mGetClubox().mReturnDom0DomUPair():
+            _imgrev = self.mGetClubox().mGetImageVersion(_dom0)
+
+            _pchecks = ebCluPreChecks(self.mGetClubox())
+            _precheck_config['dom0_prechecks'] = {"compute_admin_ip_test": "True"}
+            _test_handler = ebCluDom0SanityTests(_pchecks, _dom0, aStep=_step, aPrecheckConfig=_precheck_config['dom0_prechecks'])
+            self.assertFalse(_test_handler.mRunComputeAdminIPConflictTest())
 
 if __name__ == '__main__':
     unittest.main(warnings='ignore', buffer=True)

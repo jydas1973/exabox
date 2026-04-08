@@ -4,7 +4,7 @@
 #
 # AsyncTrackEndpointCps.py
 #
-# Copyright (c) 2022, Oracle and/or its affiliates.
+# Copyright (c) 2022, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      AsyncTrackEndpointCps.py - <one-line expansion of the name>
@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    shapatna    02/09/26 - Bug: 38900266 - Fix for issues pointed by Codev 
+#                           in exabox/management directory
 #    hgaldame    09/30/22 - 34627398 - exacc:bb:22.3.1:cps-sw upgrade: provide
 #                           proper error code for precheck failure instead of
 #                           returning generic error
@@ -139,7 +141,7 @@ class AsyncTrackEndpointCps(AsyncTrackEndpoint):
             if _processDict['alive']:
                 _current_time = datetime.strftime(datetime.now(), '%Y-%m-%d %H:%M:%S+%f')
                 _processDict['alive'] = False
-                _processDict["rc"] = _tmpjson if _tmpjson else 1
+                _processDict["rc"] = _tmpjson if _tmpjson is not None else 1
                 _processDict["time_end"] = _current_time
                 _db.mUpsertAsyncProcess(_processDict)
         return _processDict

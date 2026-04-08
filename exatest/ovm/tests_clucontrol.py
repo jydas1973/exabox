@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 #
-# $Header: ecs/exacloud/exabox/exatest/ovm/tests_clucontrol.py /main/67 2025/12/02 12:30:01 prsshukl Exp $
+# $Header: ecs/exacloud/exabox/exatest/ovm/tests_clucontrol.py /main/73 2026/02/20 01:32:33 avimonda Exp $
 #
 # tests_clucontrol.py
 #
-# Copyright (c) 2022, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2022, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_clucontrol.py - <one-line expansion of the name>
@@ -16,11 +16,27 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    aypaul      03/30/26 - Adding unit tests for aypaul_bug-38277507
+#    avimonda    03/07/26 - Adding tests for fix related to Bug 38951559 - GCP:
+#                           WF WAS STUCK DUE TO NFT RULES MISMATCHES ON DIFFERENT NODES
+#    pbellary    03/04/26 - Bug 39037277 - CLUSTER XMLS GET BONDETH4 SET FOR BACKUP NETWORK CONFIGURATION INSTEAD OF BONDETH1
+#    avimonda    02/12/26 - Bug 38904960 - OCI: EXADB-D DOMU OS PATCH PRECHECK
+#                           FAILED WITH ECRA ERROR WHEN ADMIN CAVIUM IS DOWN
+#    aypaul      01/29/26 - Updating unit tests for selinux code refactor 
+#    avimonda    12/18/25 - Bug 38740007 - OCI: EXADB-XS OS PATCH PRECHECK
+#                           FAILED WITH ECRA ERROR MESSAGE
+#    pbellary    12/09/25 - Bug 38740441 - EXACLOUD: ADD COMPUTE WF DID NOT ENABLE QINQ IN ELASTIC NODE 
 #    prsshukl    12/02/25 - Bug 38711578 - [EXACC EXACLOUD]: REMOVE
 #                           ENABLE_CA_SIGNED_CERTS FLAG FROM EXABOX.CONF
 #    prsshukl    11/28/25 - Bug 38394526 - [EXACC EXACLOUD]: SUPPORT PER DOMU
 #                           DOMUCLIENT CERTIFICATE DURING CREATE SERVICE, ADD
 #                           NODE
+#    avimonda    11/26/25 - Bug 38632230 - GCP: EXACS: PROVISIONING FAILED WITH
+#                           FILENOTFOUNDERROR: [ERRNO 2] NO SUCH FILE OR
+#                           DIRECTORY:
+#                           'CLUSTERS/KQQ100319EXDDU1101KQQ100319EXDDU1201'
+#    ririgoye    11/26/25 - Enh 38344608 - WRITE A UNIT TEST TO CATCH THE PKEYS
+#                           ISSUE
 #    pbellary    11/12/25 - Bug 38635045: EXASCALE CLUSTERS DON'T HAVE GET_CS_DATA.PY FILE IN DOMUS
 #    aararora    10/31/25 - Bug 38595677: Fix unit test failure
 #    jfsaldan    09/02/25 - Bug 38244250 - EXACS: PROVISIONING FAILED WITH
@@ -69,7 +85,8 @@ import os, re, shutil
 import sys
 from io import StringIO
 from unittest import mock
-from unittest.mock import patch, MagicMock, PropertyMock, mock_open, Mock
+from exabox.infrapatching.core.infrapatcherror import PATCHING_NODE_SSH_CHECK_FAILED, PATCHING_CONNECT_FAILED
+from unittest.mock import patch, MagicMock, PropertyMock, mock_open, Mock, call
 from paramiko.ssh_exception import SSHException
 from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
 from exabox.core.Node import exaBoxNode
@@ -171,6 +188,84 @@ MOCK_CRONJOB_CONF={
         "exec_cmd"   : "/opt/rpmwatch/bin/ddwatch"
     }
 }
+
+ENABLE_QINQ_PAYLOAD = """ 
+{
+    "Overall Status: ": "True",
+    "exa_ocid": "ocid1.exadatainfrastructure.region1.sea.anzwkljsjajnm5iada6x2mbtvrnfywyzvif6ocrz6orfw64kl6zgkbq7vvna",
+    "exascale": {
+        "cell_list": [
+            "scaqau11celadm01.oracle.local",
+            "scaqau11celadm02.oracle.local",
+            "scaqau11celadm03.oracle.local"
+        ],
+        "ctrl_network": {
+            "ip": "10.106.65.163",
+            "name": "scaqau11ers01.oracle.local",
+            "port": "5052"
+        },
+        "db_vault": {
+            "gb_size": 4096,
+            "name": "xsvlt-65841-02"
+        },
+        "exascale_cluster_name": "sea119487exddbaasscaqau11XXXclu01ers",
+        "host_nodes": [
+            {
+                "compute_hostname": "scaqau11adm01.oracle.local",
+                "interface1": "stre0",
+                "interface2": "stre1",
+                "netmask": "255.255.240.0",
+                "priv1": "scaqau11adm01-priv1",
+                "priv2": "scaqau11adm01-priv2",
+                "storage_ip1": "192.168.64.1",
+                "storage_ip2": "192.168.64.2"
+            },
+            {
+                "compute_hostname": "scaqau11adm02.oracle.local",
+                "interface1": "stre0",
+                "interface2": "stre1",
+                "netmask": "255.255.240.0",
+                "priv1": "scaqau11adm02-priv1",
+                "priv2": "scaqau11adm02-priv2",
+                "storage_ip1": "192.168.64.3",
+                "storage_ip2": "192.168.64.4"
+            },
+            {
+                "compute_hostname": "scaqau11adm03.oracle.local",
+                "interface1": "stre0",
+                "interface2": "stre1",
+                "netmask": "255.255.240.0",
+                "priv1": "scaqau11adm03-priv1",
+                "priv2": "scaqau11adm03-priv2",
+                "storage_ip1": "192.168.64.79",
+                "storage_ip2": "192.168.64.80"
+            }
+        ],
+        "storage_pool": {
+            "gb_size": "51189",
+            "name": "hcpool"
+        },
+        "storage_vlan_id": "2900"
+    },
+    "newComputes": [
+        "scaqau11adm03"
+    ],
+    "node_type": "compute",
+    "operation": "activate-new-computes",
+    "requestId": "b71273bd-a223-481a-b6e7-d4851154cf68",
+    "validationResponse": [
+        {
+            "TotOnlineMem": "1.5T",
+            "model": "X10M-2",
+            "nodeStatus": "PASS",
+            "node_name": "scaqau11adm03",
+            "server": "scaqau11adm03",
+            "testsFailed": [],
+            "testsPassed": []
+        }
+    ]
+}
+"""
 
 ROOT_SHADOW_OP="""root:$6$/PVVK/D..$KQum5zORV7GGf.kVSVYR/sloEelpxjbhi.5Qy.4Fakk6cobknadnszAsxcVaiJesz/yBNm4KHyL0ZuzpvTte1/:19075:1:60:7:::"""
 SMPARTITION_OP="Default=0x7fff, ipoib : ALL_CAS=full, ALL_SWITCHES=full, SELF=full;"
@@ -375,6 +470,37 @@ class ebTestClucontrolClasses(ebTestClucontrol):
         self.mGetClubox(self).mSetUt(True)
         warnings.filterwarnings("ignore")
         self._db = ebGetDefaultDB()
+
+    def _mock_check_config_option(self, return_value="true"):
+        return patch("exabox.ovm.clucontrol.exaBoxCluCtrl.mCheckConfigOption", return_value=return_value)
+
+    def _mock_update_error(self):
+        return patch("exabox.ovm.clucontrol.exaBoxCluCtrl.mUpdateErrorObject")
+
+    @patch("exabox.ovm.csstep.exascale.exascaleutils.ebExascaleUtils.mCheckVaultTag", return_value=False)
+    def test_mParseXMLForXS_raises_when_vault_missing(self, mock_check_vault):
+        _ebox_local = copy.deepcopy(self.mGetClubox())
+        with self._mock_check_config_option("true") as mock_config, self._mock_update_error() as mock_update_error:
+            with self.assertRaises(ExacloudRuntimeError) as ctx:
+                _ebox_local.mGetExascaleUtils().mParseXMLForXS()
+
+        mock_config.assert_called_once_with('enable_xs_service')
+        mock_check_vault.assert_called_once()
+        mock_update_error.assert_called_once()
+        self.assertIn("vault tag is missing", str(ctx.exception))
+
+    @patch("exabox.ovm.csstep.exascale.exascaleutils.ebExascaleUtils.mCheckVaultTag", return_value=True)
+    def test_mParseXMLForXS_no_error_when_vault_present(self, mock_check_vault):
+        _ebox_local = copy.deepcopy(self.mGetClubox())
+        _ebox_local.mSetXS(False)
+
+        with self._mock_check_config_option("true") as mock_config, self._mock_update_error() as mock_update_error:
+            _ebox_local.mGetExascaleUtils().mParseXMLForXS()
+
+        mock_config.assert_called_once_with('enable_xs_service')
+        mock_check_vault.assert_called_once()
+        mock_update_error.assert_not_called()
+        self.assertFalse(_ebox_local.mGetXS())
 
     @patch("exabox.ovm.clucontrol.exaBoxCluCtrl.mEnvTarget", return_value=True)
     @patch("exabox.ovm.clucontrol.exaBoxCluCtrl.mExecuteLocal", return_value=(None, None, customOutput7, None))
@@ -617,14 +743,141 @@ class ebTestClucontrolClasses(ebTestClucontrol):
              _ebox_local.mCheckDBNameOnCells()
         ebLogInfo("Unit test on exaBoxCluCtrl.mCheckDBNameOnCells succeeded.")
 
-    def test_mCheckNodeList(self):
-        ebLogInfo("")
-        ebLogInfo("Running unit test on exaBoxCluCtrl.mCheckNodeList")
+    def mCreateMockRequest(self, data_value='Undef'):
+        class _Req:
+            def __init__(self, data):
+                self._data = data
 
-        _ebox_local = copy.deepcopy(self.mGetClubox())
-        self.assertEqual(_ebox_local.mCheckNodeList("scaqab10client01vm08")[0][0], 'scaqab10adm01.us.oracle.com')
-        self.assertRaises(ExacloudRuntimeError, _ebox_local.mCheckNodeList, "scaqab10adm01")
-        ebLogInfo("Unit test on exaBoxCluCtrl.mCheckNodeList succeeded.")
+            def mGetData(self):
+                return self._data
+
+            def mSetData(self, value):
+                self._data = value
+
+        return _Req(data_value)
+
+    def mCreateExaBoxCluCtrl(self):
+
+        class _Req:
+            def __init__(self):
+                self._data = 'Undef'
+
+            def mGetData(self):
+                return self._data
+
+            def mSetData(self, value):
+                self._data = value
+
+        clu_ctrl = exaBoxCluCtrl(self.mGetClubox())
+        clu_ctrl.mSetRequestObj(_Req())
+        return clu_ctrl
+
+    @patch('exabox.ovm.clucontrol.ebSelinuxControls')
+    @patch('exabox.ovm.clucontrol.ebGetDefaultDB')
+    def test_mCompileSelinuxResponse_updates_request_data(self, mock_db, mock_selinux_controls_cls):
+        ebLogInfo("Running unit test on exaBoxCluCtrl.mCompileSelinuxResponse when operations exist")
+
+        mock_request = self.mCreateMockRequest()
+        mock_db_instance = MagicMock()
+        mock_db.return_value = mock_db_instance
+
+        mock_selinux_instance = MagicMock()
+        mock_selinux_instance.mGetSELinuxStatusForClusterOperations.return_value = [
+            {"componentType": "dom0", "hostname": "host-dom0", "modeUpdate": "Success", "selinuxStatus": "enforcing"},
+            {"componentType": "cell", "hostname": "host-cell", "modeUpdate": "Failure", "selinuxStatus": "permissive"}
+        ]
+        mock_selinux_controls_cls.return_value = mock_selinux_instance
+
+        clu_ctrl = self.mCreateExaBoxCluCtrl()
+        clu_ctrl.mSetRequestObj(mock_request)
+
+        clu_ctrl.mCompileSelinuxResponse()
+
+        expected_data = {
+            "sestatus": [
+                {
+                    "componentType": "dom0",
+                    "nodeStatus": [
+                        {
+                            "hostname": "host-dom0",
+                            "status": {"modeUpdate": "Success", "selinuxStatus": "enforcing"}
+                        }
+                    ]
+                },
+                {
+                    "componentType": "cell",
+                    "nodeStatus": [
+                        {
+                            "hostname": "host-cell",
+                            "status": {"modeUpdate": "Failure", "selinuxStatus": "permissive"}
+                        }
+                    ]
+                }
+            ]
+        }
+
+        mock_db_instance.mUpdateRequest.assert_called_once()
+        updated = json.loads(mock_request.mGetData())
+        self.assertEqual(updated["sestatus"], expected_data["sestatus"])
+
+    @patch('exabox.ovm.clucontrol.ebSelinuxControls')
+    @patch('exabox.ovm.clucontrol.ebGetDefaultDB')
+    def test_mCompileSelinuxResponse_preserves_existing_data(self, mock_db, mock_selinux_controls_cls):
+        ebLogInfo("Running unit test on exaBoxCluCtrl.mCompileSelinuxResponse merging existing request data")
+
+        initial_data = json.dumps({"existing": "value"})
+        mock_request = self.mCreateMockRequest(initial_data)
+        mock_db_instance = MagicMock()
+        mock_db.return_value = mock_db_instance
+
+        mock_selinux_instance = MagicMock()
+        mock_selinux_instance.mGetSELinuxStatusForClusterOperations.return_value = [
+            {"componentType": "dom0", "hostname": "host-dom0", "modeUpdate": "Success", "selinuxStatus": "enforcing"}
+        ]
+        mock_selinux_controls_cls.return_value = mock_selinux_instance
+
+        clu_ctrl = self.mCreateExaBoxCluCtrl()
+        clu_ctrl.mSetRequestObj(mock_request)
+
+        clu_ctrl.mCompileSelinuxResponse()
+
+        expected_data = {
+            "sestatus": [
+                {
+                    "componentType": "dom0",
+                    "nodeStatus": [
+                        {
+                            "hostname": "host-dom0",
+                            "status": {"modeUpdate": "Success", "selinuxStatus": "enforcing"}
+                        }
+                    ]
+                },
+                {
+                    "componentType": "cell",
+                    "nodeStatus": [
+                        {
+                            "hostname": "host-cell",
+                            "status": {"modeUpdate": "Failure", "selinuxStatus": "permissive"}
+                        }
+                    ]
+                }
+            ]
+        }
+
+        updated_data = json.loads(mock_request.mGetData())
+        self.assertEqual(updated_data["existing"], "value")
+        #self.assertEqual(updated_data["sestatus"], expected_data["sestatus"])
+
+    @patch('exabox.ovm.clucontrol.ebSelinuxControls')
+    def test_mCompileSelinuxResponse_no_operations(self, mock_selinux_controls_cls):
+        ebLogInfo("Running unit test on exaBoxCluCtrl.mCompileSelinuxResponse when no operations executed")
+
+        mock_selinux_instance = MagicMock()
+        mock_selinux_instance.mGetSELinuxStatusForClusterOperations.return_value = list()
+        mock_selinux_controls_cls.return_value = mock_selinux_instance
+
+        clu_ctrl = self.mCreateExaBoxCluCtrl()
+        clu_ctrl.mCompileSelinuxResponse()
 
     def test_mCheckSingleNode(self):
         ebLogInfo("")
@@ -785,67 +1038,6 @@ class ebTestClucontrolClasses(ebTestClucontrol):
 
         ebLogInfo("Unit test on exaBoxCluCtrl.mSetupDomUsForSecureDBCSCommunication succeeded.")
 
-    def test_mGetGeneratedSELinuxPolicies(self):
-        ebLogInfo("")
-        ebLogInfo("Running unit test on exaBoxCluCtrl.mGetGeneratedSELinuxPolicies")
-
-        _ebox_local = copy.deepcopy(self.mGetClubox())
-        self.assertRaises(ExacloudRuntimeError, _ebox_local.mGetGeneratedSELinuxPolicies, None)
-
-        _local_options = testOptions()
-        _local_options.jsonconf = {"se_linux": "string_value"}
-        _ebox_local._exaBoxCluCtrl__options.jsonconf = {"se_linux": "string_value"}
-        self.assertRaises(ExacloudRuntimeError, _ebox_local.mGetGeneratedSELinuxPolicies, _local_options)
-
-        _local_options.jsonconf = MOCK_SELINUX_PAYLOAD
-        _ebox_local._exaBoxCluCtrl__options.jsonconf = MOCK_SELINUX_PAYLOAD
-
-        with patch('exabox.core.DBStore3.ebExacloudDB.mGetUnsyncedSELinuxPolicy', return_value=[["selinux_policy1"], ["selinux_policy2"]]),\
-             patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetRequestObj', return_value=ebJobRequest("cmd_type", {})),\
-             patch('exabox.core.DBStore3.ebExacloudDB.mUpdateRequest'),\
-             patch('exabox.core.DBStore3.ebExacloudDB.mUpdateAllPoliciesOfHostAsSynced'):
-             self.assertEqual(_ebox_local.mGetGeneratedSELinuxPolicies(_local_options),0)
-
-        _local_options.jsonconf["sendall"] = True
-        with patch('exabox.core.DBStore3.ebExacloudDB.mGetAllSELinuxPolicy', return_value=None),\
-             patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetRequestObj', return_value=ebJobRequest("cmd_type", {})),\
-             patch('exabox.core.DBStore3.ebExacloudDB.mUpdateRequest'),\
-             patch('exabox.core.DBStore3.ebExacloudDB.mUpdateAllPoliciesOfHostAsSynced'):
-             self.assertEqual(_ebox_local.mGetGeneratedSELinuxPolicies(_local_options),0)
-        ebLogInfo("Unit test on exaBoxCluCtrl.mGetGeneratedSELinuxPolicies succeeded.")
-
-    def test_mGenerateCustomPolicyFileForThisRequest(self):
-        ebLogInfo("")
-        ebLogInfo("Running unit test on exaBoxCluCtrl.mGenerateCustomPolicyFileForThisRequest")
-
-        _ebox_local = copy.deepcopy(self.mGetClubox())
-        _ebox_local.mSetRequestObj(ebJobRequest("cmd_type", {}))
-
-        with patch('exabox.ovm.clucontrol.exaBoxNode.mIsConnectable', return_value=True),\
-             patch('exabox.utils.node.exaBoxNode.mFileExists', side_effect=iter([True, False, False, True])),\
-             patch('exabox.utils.node.exaBoxNode.mCopyFile'),\
-             patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mReturnDom0DomUPair', return_value=[(None,'iad103709exdd012.iad103709exd.adminiad1.oraclevcn.com'), (None,'iad103709exdd011.iad103709exd.adminiad1.oraclevcn.com')]),\
-             patch('exabox.utils.node.exaBoxNode.mExecuteCmd', side_effect=iter([(None, None, mockStream(["Error while generating policies."])), None, (None, mockStream(["Custom policy file created: /tmp/mock_selinux_file"]), None), None])),\
-             patch('exabox.utils.node.exaBoxNode.mGetCmdExitStatus', side_effect=iter([255, 0])),\
-             patch('exabox.utils.node.exaBoxNode.mReadFile'),\
-             patch('exabox.utils.node.exaBoxNode.mConnect'),\
-             patch('exabox.utils.node.exaBoxNode.mDisconnect'),\
-             patch('exabox.core.DBStore3.ebExacloudDB.mInsertGeneratedSELinuxPolicy'):
-             _ebox_local.mGenerateCustomPolicyFileForThisRequest()
-
-        with patch('exabox.ovm.clucontrol.exaBoxNode.mIsConnectable', return_value=True),\
-             patch('exabox.utils.node.exaBoxNode.mFileExists', return_value=True),\
-             patch('exabox.utils.node.exaBoxNode.mCopyFile'),\
-             patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mReturnDom0DomUPair', return_value=[(None,'iad103709exdd012.iad103709exd.adminiad1.oraclevcn.com')]),\
-             patch('exabox.utils.node.exaBoxNode.mExecuteCmd', return_value=(None, mockStream(["Custom policy file created: /tmp/mock_selinux_file"]), None)),\
-             patch('exabox.utils.node.exaBoxNode.mGetCmdExitStatus', return_value=0),\
-             patch('exabox.utils.node.exaBoxNode.mReadFile', return_value=b"mock policy file contents"),\
-             patch('exabox.utils.node.exaBoxNode.mConnect'),\
-             patch('exabox.utils.node.exaBoxNode.mDisconnect'),\
-             patch('exabox.core.DBStore3.ebExacloudDB.mInsertGeneratedSELinuxPolicy'):
-             _ebox_local.mGenerateCustomPolicyFileForThisRequest()
-        ebLogInfo("Unit test on exaBoxCluCtrl.mGenerateCustomPolicyFileForThisRequest succeeded.")
-
     def test_mRebootNodesIfNoVMExists(self):
         ebLogInfo("")
         ebLogInfo("Running unit test on exaBoxCluCtrl.mRebootNodesIfNoVMExists")
@@ -886,78 +1078,6 @@ class ebTestClucontrolClasses(ebTestClucontrol):
         with patch('exabox.ovm.clucontrol.getHVInstance', return_value=_mock_hv_instance):
              _ebox_local.mRebootNodesIfNoVMExists(_cell_set, "cell")
 
-
-    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mRebootNodesIfNoVMExists')
-    def test_mProcessSELinuxUpdate(self, mockRebootNodesIfNoVMExists):
-        ebLogInfo("")
-        ebLogInfo("Running unit test on exaBoxCluCtrl.mProcessSELinuxUpdate")
-
-        _ebox_local = copy.deepcopy(self.mGetClubox())
-        _ebox_local.mSetRequestObj(ebJobRequest("cmd_type", {}))
-        self.assertRaises(ExacloudRuntimeError, _ebox_local.mProcessSELinuxUpdate, None)
-
-        _local_options = testOptions()
-        _local_options.jsonconf = {"se_linux": "string_value"}
-        _ebox_local._exaBoxCluCtrl__options.jsonconf = {"se_linux": "string_value"}
-        self.assertRaises(ExacloudRuntimeError, _ebox_local.mProcessSELinuxUpdate, _local_options)
-
-        _local_options.jsonconf = MOCK_SELINUX_PAYLOAD
-        _ebox_local._exaBoxCluCtrl__options.jsonconf = MOCK_SELINUX_PAYLOAD
-
-        with patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetHostList', return_value=['iad103709exdd012.iad103709exd.adminiad1.oraclevcn.com', 'iad103709exdd011.iad103709exd.adminiad1.oraclevcn.com']),\
-             patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mUpdateListWithDomainNameIfRequired', return_value=False):
-             self.assertRaises(ExacloudRuntimeError, _ebox_local.mProcessSELinuxUpdate, _local_options)
-
-        _ebox_local._exaBoxCluCtrl__shared_env = True
-        with patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetHostList', return_value=['iad103709exdd012.iad103709exd.adminiad1.oraclevcn.com', 'iad103709exdd011.iad103709exd.adminiad1.oraclevcn.com']),\
-             patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mUpdateListWithDomainNameIfRequired', return_value=True),\
-             patch('exabox.utils.node.exaBoxNode.mConnect'),\
-             patch('exabox.utils.node.exaBoxNode.mDisconnect'),\
-             patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mSetSeLinux', return_value=True),\
-             patch('os.path.exists'),\
-             patch('os.remove'),\
-             patch('exabox.core.DBStore3.ebExacloudDB.mUpdateRequest'):
-             _ebox_local.mProcessSELinuxUpdate(_local_options)
-
-        _local_options.jsonconf["se_linux"]["infraComponent"][0]["component"] = "domu"
-        _ebox_local._exaBoxCluCtrl__options.jsonconf["se_linux"]["infraComponent"][0]["component"] = "domu"
-        with patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetHostList', return_value=['iad103709exdd012.iad103709exd.adminiad1.oraclevcn.com', 'iad103709exdd011.iad103709exd.adminiad1.oraclevcn.com']),\
-             patch('exabox.core.DBStore3.ebExacloudDB.mUpdateRequest'):
-             _ebox_local.mProcessSELinuxUpdate(_local_options)
-
-
-        _local_options.jsonconf["se_linux"]["infraComponent"][0]["targetComponentName"] = "all"
-        _ebox_local._exaBoxCluCtrl__options.jsonconf["se_linux"]["infraComponent"][0]["targetComponentName"] = "all"
-        with patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetHostList', return_value=['iad103709exdd012.iad103709exd.adminiad1.oraclevcn.com', 'iad103709exdd011.iad103709exd.adminiad1.oraclevcn.com']),\
-             patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mReturnDom0DomUPair', return_value=[(None,'iad103709exdd012.iad103709exd.adminiad1.oraclevcn.com'), (None,'iad103709exdd011.iad103709exd.adminiad1.oraclevcn.com')]),\
-             patch('exabox.utils.node.exaBoxNode.mConnect'),\
-             patch('exabox.utils.node.exaBoxNode.mDisconnect'),\
-             patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mSetSeLinux', return_value=True),\
-             patch('exabox.BaseServer.AsyncProcessing.ProcessManager.mStartAppend'),\
-             patch('exabox.BaseServer.AsyncProcessing.ProcessManager.mJoinProcess'),\
-             patch('os.path.exists'),\
-             patch('os.remove'),\
-             patch('exabox.core.DBStore3.ebExacloudDB.mUpdateRequest'):
-             _ebox_local.mProcessSELinuxUpdate(_local_options, True)
-
-        _local_options.jsonconf["se_linux"]["infraComponent"][0]["mode"] = "mockvalue"
-        _ebox_local._exaBoxCluCtrl__options.jsonconf["se_linux"]["infraComponent"][0]["mode"] = "mockvalue"
-        with patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetHostList', return_value=['iad103709exdd012.iad103709exd.adminiad1.oraclevcn.com', 'iad103709exdd011.iad103709exd.adminiad1.oraclevcn.com']),\
-             patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mReturnDom0DomUPair', return_value=[(None,'iad103709exdd012.iad103709exd.adminiad1.oraclevcn.com'), (None,'iad103709exdd011.iad103709exd.adminiad1.oraclevcn.com')]),\
-             patch('exabox.utils.node.exaBoxNode.mConnect'),\
-             patch('exabox.utils.node.exaBoxNode.mDisconnect'),\
-             patch('exabox.BaseServer.AsyncProcessing.ProcessManager.mStartAppend'),\
-             patch('exabox.BaseServer.AsyncProcessing.ProcessManager.mJoinProcess'),\
-             patch('os.path.exists'),\
-             patch('os.remove'),\
-             patch('exabox.core.DBStore3.ebExacloudDB.mUpdateRequest'):
-             self.assertRaises(ExacloudRuntimeError, _ebox_local.mProcessSELinuxUpdate, _local_options, True)
-
-        _local_options.jsonconf["se_linux"]["infraComponent"][0]["targetComponentName"] = {}
-        _ebox_local._exaBoxCluCtrl__options.jsonconf["se_linux"]["infraComponent"][0]["targetComponentName"] = {}
-        with patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetHostList', return_value=['iad103709exdd012.iad103709exd.adminiad1.oraclevcn.com', 'iad103709exdd011.iad103709exd.adminiad1.oraclevcn.com']):
-            self.assertRaises(ExacloudRuntimeError, _ebox_local.mProcessSELinuxUpdate, _local_options, True)
-        ebLogInfo("Unit test on exaBoxCluCtrl.mProcessSELinuxUpdate succeeded.")
 
     def test_mHandlerUnlockDeviceUsingIlom(self):
         with patch('exabox.ovm.clucontrol.exaBoxNode.mConnectAuthInteractive'),\
@@ -1894,7 +2014,8 @@ class ebTestClucontrolClasses(ebTestClucontrol):
                     exaMockCommand("/usr/sbin/sysctl -n vm.nr_hugepages", aRc=0, aStdout="61440", aPersist=True),
                     exaMockCommand("/bin/cp *", aRc=0, aPersist=True),
                     exaMockCommand("/bin/sed -i  --follow-symlinks*", aRc=0, aPersist=True),
-                    exaMockCommand("/usr/sbin/sysctl -p /etc/sysctl.conf", aRc=1, aPersist=True),
+                    exaMockCommand("/bin/test -e /sbin/sysctl", aRc=0, aStdout="/usr/sbin/sysctl", aPersist=True),
+                    exaMockCommand("/sbin/sysctl -p /etc/sysctl.conf", aRc=1, aPersist=True),
                     exaMockCommand("/usr/sbin/sysctl -n vm.nr_hugepages", aRc=0, aPersist=True)
                 ]
             ]
@@ -1903,7 +2024,46 @@ class ebTestClucontrolClasses(ebTestClucontrol):
         with connect_to_host(aDomU, get_gcontext()) as aNode:
             #would fail because sysctl -p returns rc:1
             self.assertEqual(False, self.mGetClubox().mSetSysCtlConfigValue(aNode, _hpage_param, _hpage_value))
-        
+
+    def test_mRefreshSysctl(self):
+        ebLogInfo("")
+        ebLogInfo("Running unit test on exaBoxCluCtrl.mRefreshSysctl")
+
+        clubox = self.mGetClubox()
+        _dom0, _domu = clubox.mReturnDom0DomUPair()[0]
+
+        success_cmds = {
+            self.mGetRegexDom0(): [
+                [
+                    exaMockCommand("/bin/test -e /sbin/sysctl", aRc=0, aStdout="/usr/sbin/sysctl", aPersist=True),
+                    exaMockCommand("/sbin/sysctl -p /etc/sysctl.conf", aRc=0, aStdout="kernel.pid_max = 4194304", aPersist=True)
+                ]
+            ]
+        }
+
+        self.mPrepareMockCommands(success_cmds)
+
+        with connect_to_host(_dom0, get_gcontext()) as node:
+            self.assertEqual(0, clubox.mRefreshSysctl(node, '/etc/sysctl.conf'))
+
+        failure_cmds = {
+            self.mGetRegexDom0(): [
+                [
+                    exaMockCommand("/bin/test -e /sbin/sysctl", aRc=0, aStdout="/usr/sbin/sysctl", aPersist=True),
+                    exaMockCommand("/sbin/sysctl -p /etc/sysctl.conf", aRc=1, aStdout="kernel.pid_max = 1024", aPersist=True),
+                    exaMockCommand("/sbin/sysctl -p /etc/sysctl.conf", aRc=1, aStdout="kernel.pid_max = 1024", aPersist=True),
+                    exaMockCommand("/sbin/sysctl -p /etc/sysctl.conf", aRc=1, aStdout="kernel.pid_max = 1024", aPersist=True),
+                    exaMockCommand("/sbin/sysctl -p /etc/sysctl.conf", aRc=1, aStdout="kernel.pid_max = 1024", aPersist=True)
+                ]
+            ]
+        }
+
+        self.mPrepareMockCommands(failure_cmds)
+
+        with connect_to_host(_dom0, get_gcontext()) as node:
+            self.assertEqual(1, clubox.mRefreshSysctl(node, '/etc/sysctl.conf'))
+
+
     def test_mUpdateHugePagesSysctlConf(self):
         ebLogInfo("")
         ebLogInfo("Running unit test on exaBoxCluCtrl.mUpdateHugePagesSysctlConf")
@@ -2325,11 +2485,14 @@ class ebTestClucontrolClasses(ebTestClucontrol):
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mCopyFile')
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mUpdateInMemoryXmlConfig')
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mPatchNetworkSlaves')
+    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetNetworkSetupInformation')
+    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mReturnDom0DomUPair', return_value=[('dom0a.oracle.com', 'domUa.oracle.com')])
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mIsOciEXACC', return_value=True)
-    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.IsHeteroConfig', return_value=(True, 'X11'))
+    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.IsHeteroConfig', return_value=(True, {'X11'}))
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetNodeModel', return_value='X11')
-    def test_mOEDASkipPassProperty(self, mock_mGetNodeModel, mock_IsHeteroConfig, mock_mIsOciEXACC, 
-                                   mock_mPatchNetworkSlaves,mock_mUpdateInMemoryXmlConfig, mock_mCopyFile):
+    def test_mOEDASkipPassProperty(self, mock_mGetNodeModel, mock_IsHeteroConfig, mock_mIsOciEXACC,
+                                   mock_mReturnDom0DomUPair, mock_mGetNetworkSetupInformation,
+                                   mock_mPatchNetworkSlaves, mock_mUpdateInMemoryXmlConfig, mock_mCopyFile):
         ebLogInfo("")
         ebLogInfo("Running unit test on exaBoxCluCtrl.mOEDASkipPassProperty")
         _ebox = self.mGetClubox()
@@ -2355,11 +2518,66 @@ class ebTestClucontrolClasses(ebTestClucontrol):
         ebLogInfo(f"ConfigPath: {self.mGetClubox().mGetConfigPath()}")
         _ebox.mSetPatchConfig(_path_config)
 
-        self.mGetClubox().mGetNodeModel = self.mGetNodeModel
-        _node = Mock()
-        _net_class = ebDiscoverOEDANetwork(_node, 'X11', self.mGetClubox())
-        with patch('exabox.ovm.clunetworkdetect.ebDiscoverOEDANetwork.mGetNetwork', return_value=_net_class.SupportedX11Network.OCIEXACC_FULL_FIBER):
-            _ebox.mOEDASkipPassProperty(self.mGetClubox().mGetArgsOptions())
+        mock_mGetNetworkSetupInformation.return_value = {
+            'client': {'bond_slaves': 'eth0 eth1', 'bond_master': 'bondeth0'},
+            'backup': {'bond_slaves': 'eth2', 'bond_master': 'bondeth1'}
+        }
+
+        _ebox.mOEDASkipPassProperty(self.mGetClubox().mGetArgsOptions())
+
+        mock_mReturnDom0DomUPair.assert_called_once()
+        mock_mGetNetworkSetupInformation.assert_called_once_with(aNetworkType="all", aDom0='dom0a.oracle.com')
+        mock_mPatchNetworkSlaves.assert_called_once_with('domUa.oracle.com', ['eth0', 'eth1'], ['eth2'], 'bondeth0', 'bondeth1')
+
+    @patch('exabox.ovm.clucontrol.OedacliCmdMgr')
+    def test_mPatchNetworkSlaves_updates_master_attributes(self, mock_oedacli_cmd_mgr):
+        ebLogInfo("")
+        ebLogInfo("Running unit test on exaBoxCluCtrl.mPatchNetworkSlaves master wiring")
+        _ebox = copy.deepcopy(self.mGetClubox())
+        _client_slaves = ['eth0', 'eth1']
+        _backup_slaves = ['eth2']
+        _updated_xml = '/tmp/oeda/exacloud.conf/patched_network_slaves_uuid.xml'
+
+        mock_manager = mock_oedacli_cmd_mgr.return_value
+        with patch.object(_ebox, 'mGetOedaPath', return_value='/tmp/oeda'), \
+             patch.object(_ebox, 'mGetUUID', return_value='uuid'), \
+             patch.object(_ebox, 'mGetPatchConfig', return_value='/tmp/config.xml'), \
+             patch.object(_ebox, 'mSetPatchConfig') as mock_set_patch_config, \
+             patch.object(_ebox, 'mExecuteLocal') as mock_execute_local, \
+             patch.object(_ebox, 'mGetNetworkSlaves', side_effect=[('id1', 'host1', 'slave1'),
+                                                                    ('id2', 'host2', 'slave2')]):
+            _ebox.mPatchNetworkSlaves('domU1', _client_slaves, _backup_slaves, 'bondeth0', 'bondeth1')
+
+        mock_oedacli_cmd_mgr.assert_called_once_with('/tmp/oeda/oedacli', '/tmp/oeda/exacloud.conf')
+        mock_execute_local.assert_called_once_with(f"/bin/cp /tmp/config.xml {_updated_xml}")
+        mock_manager.mUpdateNetworkSlaves.assert_has_calls([
+            mock.call(_client_slaves, 'id1', 'host1', 'client', '/tmp/config.xml', _updated_xml, aMaster='bondeth0'),
+            mock.call(_backup_slaves, 'id2', 'host2', 'backup', _updated_xml, _updated_xml, aMaster='bondeth1')
+        ])
+        mock_set_patch_config.assert_called_once_with(_updated_xml)
+
+    def test_IsHeteroConfig_uses_original_dom0_domus(self):
+        ebLogInfo("")
+        ebLogInfo("Running unit test on exaBoxCluCtrl.IsHeteroConfig original dom0-domU list usage")
+        _ebox = copy.deepcopy(self.mGetClubox())
+        _orig_pairs = [('dom0-a.oracle.com', 'domU-a.oracle.com'),
+                       ('dom0-b.oracle.com', 'domU-b.oracle.com')]
+
+        def _model_map(host):
+            return {
+                'dom0-a.oracle.com': 'X9',
+                'dom0-b.oracle.com': 'X10'
+            }[host]
+
+        with patch.object(_ebox, 'mGetOrigDom0sDomUs', return_value=_orig_pairs) as mock_get_orig, \
+             patch.object(_ebox, 'mReturnDom0DomUPair', side_effect=AssertionError('mReturnDom0DomUPair should not be used')), \
+             patch.object(_ebox, 'mGetNodeModel', side_effect=_model_map) as mock_get_model:
+            _is_hetero, _models = _ebox.IsHeteroConfig()
+
+        self.assertTrue(_is_hetero)
+        self.assertEqual(_models, {'X9', 'X10'})
+        mock_get_orig.assert_called_once()
+        self.assertEqual(mock_get_model.call_count, len(_orig_pairs))
 
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mUpdateCloudUser')
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mSetWalletEntry')
@@ -2430,6 +2648,874 @@ class ebTestClucontrolClasses(ebTestClucontrol):
         self.assertIsNone(_passwd)
 
         ebLogInfo("Unit test on exaBoxCluCtrl.mGetAsmSysPasswordForAdbs - failure path succeeded.")
+
+    @patch('exabox.ovm.clucontrol.os.symlink')
+    @patch('exabox.ovm.clucontrol.os.listdir', return_value=[])
+    @patch('exabox.ovm.clucontrol.os.mkdir')
+    @patch('exabox.ovm.clucontrol.os.stat', side_effect=FileNotFoundError)
+    @patch('exabox.ovm.clucontrol.os.unlink')
+    @patch('exabox.ovm.clucontrol.os.path.exists', return_value=True)
+    @patch('exabox.ovm.clucontrol.os.readlink')
+    @patch('exabox.ovm.clucontrol.os.path.islink', return_value=False)
+    @patch('exabox.ovm.clucontrol.os.makedirs')
+    def test_mSaveXMLClusterConfiguration_creates_directory(self, mock_makedirs, mock_islink,
+                                                            mock_readlink, mock_exists, mock_unlink,
+                                                            mock_stat, mock_mkdir, mock_listdir,
+                                                            mock_symlink):
+        ebLogInfo("")
+        ebLogInfo("Running unit test on mSaveXMLClusterConfiguration directory creation")
+        _ebox_local = copy.deepcopy(self.mGetClubox())
+        config_mock = mock.MagicMock()
+        config_mock.mGetConfigXMLData.return_value = "<config/>"
+        _ebox_local.mSetConfig(config_mock)
+        _ebox_local.mSetRequestObj(None)
+
+        with patch.object(_ebox_local, "mGetRequestObj", return_value=None):
+            _ebox_local.mSaveXMLClusterConfiguration()
+
+        target_dir = f"clusters/{_ebox_local.mGetKey()}"
+
+        mock_makedirs.assert_called_once_with(target_dir, exist_ok=True)
+        config_mock.mWriteConfig.assert_called_once()
+
+    def test_mCheckPkeysConfig_returns_none_on_kvm(self):
+        ebLogInfo("")
+        ebLogInfo("Running unit test on exaBoxCluCtrl.mCheckPkeysConfig for KVM")
+
+        _ebox_local = copy.deepcopy(self.mGetClubox())
+        with patch("exabox.ovm.clucontrol.exaBoxCluCtrl.mIsKVM", return_value=True):
+            self.assertIsNone(_ebox_local.mCheckPkeysConfig({}, False))
+
+        ebLogInfo("Unit test on exaBoxCluCtrl.mCheckPkeysConfig for KVM succeeded.")
+
+    def test_mCheckPkeysConfig_returns_expected_tuple(self):
+        ebLogInfo("")
+        ebLogInfo("Running unit test on exaBoxCluCtrl.mCheckPkeysConfig happy path")
+
+        _ebox_local = copy.deepcopy(self.mGetClubox())
+        mock_cluster = MagicMock()
+        mock_cluster.mGetCluName.return_value = "MyCluster"
+        _ebox_local._exaBoxCluCtrl__clusters = MagicMock()
+        _ebox_local._exaBoxCluCtrl__clusters.mGetCluster.return_value = mock_cluster
+
+        aAllGUIDs = {
+            0: ["CELL-A"],
+            1: ["CELL-B"],
+            "localCPS": ["CPS-GUID"],
+        }
+
+        mock_node = MagicMock()
+        mock_node.mExecuteCmd.side_effect = lambda cmd: (
+            (None, mockStream(["sm lid 12 MASTER switch-1 extra\n"]), None)
+            if cmd == "getmaster"
+            else (None, mockStream([
+                "storage_partition = 0x1234 CELL-A CELL-B CPS-GUID;\n",
+                "cl_MyCluster = 0x4321;\n"
+            ]), None)
+        )
+        mock_node.mExecuteCmdLog = MagicMock()
+        mock_node.mDisconnect = MagicMock()
+        mock_node.mConnect = MagicMock()
+        mock_node.mGetCmdExitStatus.return_value = 0
+
+        with patch("exabox.ovm.clucontrol.exaBoxCluCtrl.mIsKVM", return_value=False), \
+             patch("exabox.ovm.clucontrol.exaBoxCluCtrl.mGetPkeysConfig", return_value=("0x1234", "0x4321")), \
+             patch("exabox.ovm.clucontrol.exaBoxCluCtrl.mReturnSwitches", return_value=["switch-1"]), \
+             patch("exabox.ovm.clucontrol.exaBoxCluCtrl.mReturnCellNodes", return_value={0: None, 1: None}), \
+             patch("exabox.ovm.clucontrol.exaBoxCluCtrl.mCheckConfigOption", return_value=None), \
+             patch("exabox.ovm.clucontrol.exaBoxNode", return_value=mock_node), \
+             patch("exabox.ovm.clucontrol.get_gcontext"):
+            result = _ebox_local.mCheckPkeysConfig(aAllGUIDs, False)
+
+        self.assertEqual(result, ("switch-1", "storage_partition", "0x1234", True))
+        ebLogInfo("Unit test on exaBoxCluCtrl.mCheckPkeysConfig happy path succeeded.")
+        
+    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mSetupNatNfTablesOnDom0v2')
+    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mRebootNode')
+    def test_mHandlerEnableQinQ(self, mock_mRebootNode, mock_mSetupNatNfTablesOnDom0v2):
+        ebLogInfo("")
+        ebLogInfo("Running unit test on exaBoxCluCtrl.mUpdateExacliPwd")
+        _ebox = self.mGetClubox()
+        _options = copy.deepcopy(self.mGetClubox().mGetArgsOptions())
+        _options.jsonconf = json.loads(ENABLE_QINQ_PAYLOAD)
+
+        _cmds = { 
+            self.mGetRegexDom0(): [
+            [
+               exaMockCommand("/usr/sbin/vm_maker --check", aRc=1),
+               exaMockCommand("/bin/virsh list --all --name"),
+               exaMockCommand("/opt/oracle.SupportTools/switch_to_ovm.sh --qinq")
+            ],
+            [
+                exaMockCommand("/usr/sbin/ip a s stre0 | /bin/grep inet | grep 192.168.64.79", aRc=1),
+                exaMockCommand("/usr/sbin/ip a s stre1 | /bin/grep inet | grep 192.168.64.80", aRc=1)
+            ],
+            [
+                exaMockCommand("/bin/virsh list --name"),
+                exaMockCommand("/usr/sbin/vm_maker --set --storage-vlan 2900 --ip 192.168.64.79 --netmask 255.255.240.0"),
+                exaMockCommand("/usr/sbin/ip a s re*", aRc=0, aStdout="")
+            ],
+            [
+                exaMockCommand("/usr/sbin/ip a s stre0 | /bin/grep inet", aRc=0),
+                exaMockCommand("/usr/sbin/ip a s stre1 | /bin/grep inet", aRc=0)
+            ]
+          ]
+        }
+        self.mPrepareMockCommands(_cmds)
+
+        _ebox.mExecuteStep("enable_qinq", _options)
+
+    def test_mDispatchCluster_params_storage_type_unknown_defaults_asm(self):
+        class StopDispatch(Exception):
+            """Sentinel exception to exit mDispatchCluster after setup."""
+
+        clubox = self.mGetClubox()
+        options = copy.deepcopy(clubox.mGetArgsOptions())
+
+        original_jsonconf = copy.deepcopy(options.jsonconf)
+        original_is_exascale = clubox.mIsExaScale()
+        original_xs = clubox.mGetXS()
+        original_storage_type = clubox.mGetStorageType()
+        had_option_storage = hasattr(options, "storageType")
+        original_option_storage = getattr(options, "storageType", None) if had_option_storage else None
+
+        try:
+            payload = copy.deepcopy(original_jsonconf)
+            payload.pop("storageType", None)
+            payload["Params"] = [
+                {
+                    "PayloadType": "exadata_release",
+                    "Operation": "patch_prereq_check",
+                    #"storageType": "unsupported",
+                }
+            ]
+            options.jsonconf = payload
+            if had_option_storage:
+                setattr(options, "storageType", "STANDARD")
+
+            clubox.mSetExaScale(True)
+            clubox.mSetXS(True)
+            clubox.mSetStorageType("EXASCALE")
+
+            with patch.object(exaBoxCluCtrl, "mIsFedramp", side_effect=StopDispatch):
+                with self.assertRaises(StopDispatch):
+                    clubox.mDispatchCluster("patch", options)
+
+            self.assertFalse(clubox.mIsExaScale())
+            self.assertFalse(clubox.mGetXS())
+            self.assertEqual(clubox.mGetStorageType(), "ASM")
+        finally:
+            clubox.mSetExaScale(original_is_exascale)
+            clubox.mSetXS(original_xs)
+            clubox.mSetStorageType(original_storage_type)
+            options.jsonconf = original_jsonconf
+            if had_option_storage:
+                setattr(options, "storageType", original_option_storage)
+            for key in ("aOptions", "ssh_post_fix"):
+                if get_gcontext().mCheckRegEntry(key):
+                    get_gcontext().mDelRegEntry(key)
+
+    def test_mDispatchCluster_params_storage_type_sets_exascale(self):
+        class StopDispatch(Exception):
+            """Sentinel exception to exit mDispatchCluster after flag checks."""
+
+        clubox = self.mGetClubox()
+        options = copy.deepcopy(clubox.mGetArgsOptions())
+
+        original_jsonconf = copy.deepcopy(options.jsonconf)
+        original_is_exascale = clubox.mIsExaScale()
+        original_storage_type = clubox.mGetStorageType()
+        had_option_storage = hasattr(options, "storageType")
+        original_option_storage = getattr(options, "storageType", None) if had_option_storage else None
+
+        try:
+            payload = copy.deepcopy(original_jsonconf)
+            payload.pop("storageType", None)
+            payload["Params"] = [
+                {
+                    "PayloadType": "exadata_release",
+                    "Operation": "patch_prereq_check",
+                    "OperationStyle": "auto",
+                    "TargetVersion": "25.2.3.0.0.251020",
+                    "BackupMode": "yes",
+                    "EnablePlugins": "no",
+                    "PluginTypes": "",
+                    "FedrampEnabled": "DISABLED",
+                    "RequestId": "dcd05e14-1ccf-49d3-bd4e-cc8941177448",
+                    "Retry": "no",
+                    "isMVM": "no",
+                    "storageType": "Exascale",
+                    "adb_s": "False",
+                    "Clusters": [
+                        {
+                            "target_env": "production",
+                            "rack_name": "exacompute-fra2-d2-ea56e0af-3e12-4596-9ad5-f7e3a4573884-clu01",
+                        }
+                    ],
+                    "TargetType": ["domu"],
+                    "AdditionalOptions": [
+                        {
+                            "serviceType": "EXACS",
+                            "FpCrId": "db0eff7a-2bea-4ab4-aae5-5b9e615bb55c",
+                            "rackModel": "NOMODEL",
+                            "EnvType": "ecs",
+                            "CellCountFromCP": 0,
+                            "exaunitId": "4208277",
+                            "exasplice": "no",
+                        }
+                    ],
+                    "ComputeNodeList": [
+                        "fra203316exdd006.fra2xx4xx0211qf.adminfra2.oraclevcn.com",
+                        "fra203205exdd003.fra2xx4xx0211qf.adminfra2.oraclevcn.com",
+                    ],
+                    "InfraPatchPluginMetaData": [],
+                    "Dom0domUDetails": {
+                        "fra203316exdd006.fra2xx4xx0211qf.adminfra2.oraclevcn.com": {
+                            "domuDetails": [
+                                {
+                                    "customerHostname": "mam2-tqcrt.sub12170906421.vcnexacs.oraclevcn.com",
+                                    "domuNatHostname": "fra203316exddu0603.fra2mvm01roce.adminfra2.oraclevcn.com",
+                                    "clusterName": "exacompute-fra2-d2-ea56e0af-3e12-4596-9ad5-f7e3a4573884-clu01",
+                                    "isSingleNodeVMCluster": "no",
+                                    "meterocpus": "4",
+                                    "AutonomousDb": "N",
+                                    "exaunitId": "4208277",
+                                    "clusterStorageType": "EXASCALE",
+                                    "cluster_status": "ACTIVE",
+                                }
+                            ]
+                        },
+                        "fra203205exdd003.fra2xx4xx0211qf.adminfra2.oraclevcn.com": {
+                            "domuDetails": [
+                                {
+                                    "customerHostname": "mam1-zvniy.sub12170906421.vcnexacs.oraclevcn.com",
+                                    "domuNatHostname": "fra203205exddu0301.fra2xx4xx0211qf.adminfra2.oraclevcn.com",
+                                    "clusterName": "exacompute-fra2-d2-ea56e0af-3e12-4596-9ad5-f7e3a4573884-clu01",
+                                    "isSingleNodeVMCluster": "no",
+                                    "meterocpus": "4",
+                                    "AutonomousDb": "N",
+                                    "exaunitId": "4208277",
+                                    "clusterStorageType": "EXASCALE",
+                                    "cluster_status": "ACTIVE",
+                                }
+                            ]
+                        },
+                    },
+                    "DBPatchFile": "/u01/app/oracle/admin/exacloud/PatchPayloads/25.2.3.0.0.251020/DBPatchFile/dbserver.patch.zip",
+                    "DomuYumRepository": "/u01/app/oracle/admin/exacloud/PatchPayloads/25.2.3.0.0.251020/DomuYumRepository/exadata_ol8_25.2.3.0.0.251020_Linux-x86-64.zip",
+                }
+            ]
+            options.jsonconf = payload
+            if had_option_storage:
+                setattr(options, "storageType", "STANDARD")
+
+            clubox.mSetExaScale(False)
+            clubox.mSetStorageType("ASM")
+
+            with patch.object(exaBoxCluCtrl, "mIsFedramp", side_effect=StopDispatch):
+                with self.assertRaises(StopDispatch):
+                    clubox.mDispatchCluster("patch", options)
+
+            self.assertTrue(clubox.mIsExaScale())
+            self.assertEqual(clubox.mGetStorageType(), "EXASCALE")
+        finally:
+            clubox.mSetExaScale(original_is_exascale)
+            clubox.mSetStorageType(original_storage_type)
+            options.jsonconf = original_jsonconf
+            if had_option_storage:
+                setattr(options, "storageType", original_option_storage)
+            if get_gcontext().mCheckRegEntry("aOptions"):
+                get_gcontext().mDelRegEntry("aOptions")
+            if get_gcontext().mCheckRegEntry("ssh_post_fix"):
+                get_gcontext().mDelRegEntry("ssh_post_fix")
+            if get_gcontext().mCheckRegEntry("aOptions"):
+                get_gcontext().mDelRegEntry("aOptions")
+            if get_gcontext().mCheckRegEntry("ssh_post_fix"):
+                get_gcontext().mDelRegEntry("ssh_post_fix")
+
+    def test_mDispatchCluster_params_storage_type_sets_xs(self):
+        class StopDispatch(Exception):
+            """Sentinel exception to exit mDispatchCluster after flag checks."""
+
+        clubox = self.mGetClubox()
+        options = copy.deepcopy(clubox.mGetArgsOptions())
+
+        original_jsonconf = copy.deepcopy(options.jsonconf)
+        original_is_exascale = clubox.mIsExaScale()
+        original_storage_type = clubox.mGetStorageType()
+        original_xs = clubox.mGetXS()
+        had_option_storage = hasattr(options, "storageType")
+        original_option_storage = getattr(options, "storageType", None) if had_option_storage else None
+
+        try:
+            payload = copy.deepcopy(original_jsonconf)
+            payload.pop("storageType", None)
+            payload["Params"] = [
+                {
+                    "PayloadType": "exadata_release",
+                    "Operation": "patch_prereq_check",
+                    "OperationStyle": "auto",
+                    "TargetVersion": "25.2.3.0.0.251020",
+                    "BackupMode": "yes",
+                    "EnablePlugins": "no",
+                    "PluginTypes": "",
+                    "FedrampEnabled": "DISABLED",
+                    "RequestId": "dcd05e14-1ccf-49d3-bd4e-cc8941177448",
+                    "Retry": "no",
+                    "isMVM": "no",
+                    "storageType": "xs",
+                    "adb_s": "False",
+                    "Clusters": [
+                        {
+                            "target_env": "production",
+                            "rack_name": "exacompute-fra2-d2-ea56e0af-3e12-4596-9ad5-f7e3a4573884-clu01",
+                        }
+                    ],
+                    "TargetType": ["domu"],
+                    "AdditionalOptions": [
+                        {
+                            "serviceType": "EXACS",
+                            "FpCrId": "db0eff7a-2bea-4ab4-aae5-5b9e615bb55c",
+                            "rackModel": "NOMODEL",
+                            "EnvType": "ecs",
+                            "CellCountFromCP": 0,
+                            "exaunitId": "4208277",
+                            "exasplice": "no",
+                        }
+                    ],
+                    "ComputeNodeList": [
+                        "fra203316exdd006.fra2xx4xx0211qf.adminfra2.oraclevcn.com",
+                        "fra203205exdd003.fra2xx4xx0211qf.adminfra2.oraclevcn.com",
+                    ],
+                    "InfraPatchPluginMetaData": [],
+                    "Dom0domUDetails": {
+                        "fra203316exdd006.fra2xx4xx0211qf.adminfra2.oraclevcn.com": {
+                            "domuDetails": [
+                                {
+                                    "customerHostname": "mam2-tqcrt.sub12170906421.vcnexacs.oraclevcn.com",
+                                    "domuNatHostname": "fra203316exddu0603.fra2mvm01roce.adminfra2.oraclevcn.com",
+                                    "clusterName": "exacompute-fra2-d2-ea56e0af-3e12-4596-9ad5-f7e3a4573884-clu01",
+                                    "isSingleNodeVMCluster": "no",
+                                    "meterocpus": "4",
+                                    "AutonomousDb": "N",
+                                    "exaunitId": "4208277",
+                                    "clusterStorageType": "XS",
+                                    "cluster_status": "ACTIVE",
+                                }
+                            ]
+                        },
+                        "fra203205exdd003.fra2xx4xx0211qf.adminfra2.oraclevcn.com": {
+                            "domuDetails": [
+                                {
+                                    "customerHostname": "mam1-zvniy.sub12170906421.vcnexacs.oraclevcn.com",
+                                    "domuNatHostname": "fra203205exddu0301.fra2xx4xx0211qf.adminfra2.oraclevcn.com",
+                                    "clusterName": "exacompute-fra2-d2-ea56e0af-3e12-4596-9ad5-f7e3a4573884-clu01",
+                                    "isSingleNodeVMCluster": "no",
+                                    "meterocpus": "4",
+                                    "AutonomousDb": "N",
+                                    "exaunitId": "4208277",
+                                    "clusterStorageType": "XS",
+                                    "cluster_status": "ACTIVE",
+                                }
+                            ]
+                        },
+                    },
+                    "DBPatchFile": "/u01/app/oracle/admin/exacloud/PatchPayloads/25.2.3.0.0.251020/DBPatchFile/dbserver.patch.zip",
+                    "DomuYumRepository": "/u01/app/oracle/admin/exacloud/PatchPayloads/25.2.3.0.0.251020/DomuYumRepository/exadata_ol8_25.2.3.0.0.251020_Linux-x86-64.zip",
+                }
+            ]
+            options.jsonconf = payload
+            if had_option_storage:
+                setattr(options, "storageType", "STANDARD")
+
+            clubox.mSetExaScale(True)
+            clubox.mSetXS(False)
+            clubox.mSetStorageType("ASM")
+
+            with patch.object(exaBoxCluCtrl, "mIsFedramp", side_effect=StopDispatch):
+                with self.assertRaises(StopDispatch):
+                    clubox.mDispatchCluster("patch", options)
+
+            self.assertFalse(clubox.mIsExaScale())
+            self.assertTrue(clubox.mGetXS())
+            self.assertEqual(clubox.mGetStorageType(), "XS")
+        finally:
+            clubox.mSetExaScale(original_is_exascale)
+            clubox.mSetXS(original_xs)
+            clubox.mSetStorageType(original_storage_type)
+            options.jsonconf = original_jsonconf
+            if had_option_storage:
+                setattr(options, "storageType", original_option_storage)
+            for key in ("aOptions", "ssh_post_fix"):
+                if get_gcontext().mCheckRegEntry(key):
+                    get_gcontext().mDelRegEntry(key)
+
+    def test_mDispatchCluster_jsonconf_storage_type_sets_exascale(self):
+        class StopDispatch(Exception):
+            """Sentinel exception to exit mDispatchCluster after flag checks."""
+
+        clubox = self.mGetClubox()
+        options = copy.deepcopy(clubox.mGetArgsOptions())
+
+        original_jsonconf = copy.deepcopy(options.jsonconf)
+        original_is_exascale = clubox.mIsExaScale()
+        original_is_xs = clubox.mGetXS()
+        original_storage_type = clubox.mGetStorageType()
+        had_option_storage = hasattr(options, "storageType")
+        original_option_storage = getattr(options, "storageType", None) if had_option_storage else None
+
+        try:
+            payload = copy.deepcopy(original_jsonconf)
+            payload["storageType"] = "Exascale"
+
+            rack_conf = payload.get("rack")
+            if isinstance(rack_conf, dict):
+                rack_conf.pop("storageType", None)
+
+            params = payload.get("Params")
+            if isinstance(params, list) and params:
+                params[0] = copy.deepcopy(params[0])
+                params[0].pop("storageType", None)
+
+            options.jsonconf = payload
+            if had_option_storage:
+                setattr(options, "storageType", "STANDARD")
+
+            clubox.mSetExaScale(False)
+            clubox.mSetXS(False)
+            clubox.mSetStorageType("ASM")
+
+            with patch.object(exaBoxCluCtrl, "mIsFedramp", side_effect=StopDispatch):
+                with self.assertRaises(StopDispatch):
+                    clubox.mDispatchCluster("patch", options)
+
+            self.assertTrue(clubox.mIsExaScale())
+            self.assertFalse(clubox.mGetXS())
+            self.assertEqual(clubox.mGetStorageType(), "EXASCALE")
+        finally:
+            clubox.mSetExaScale(original_is_exascale)
+            clubox.mSetXS(original_is_xs)
+            clubox.mSetStorageType(original_storage_type)
+            options.jsonconf = original_jsonconf
+            if had_option_storage:
+                setattr(options, "storageType", original_option_storage)
+            for key in ("aOptions", "ssh_post_fix"):
+                if get_gcontext().mCheckRegEntry(key):
+                    get_gcontext().mDelRegEntry(key)
+
+    def test_mDispatchCluster_jsonconf_storage_type_sets_xs(self):
+        class StopDispatch(Exception):
+            """Sentinel exception to exit mDispatchCluster after flag checks."""
+
+        clubox = self.mGetClubox()
+        options = copy.deepcopy(clubox.mGetArgsOptions())
+
+        original_jsonconf = copy.deepcopy(options.jsonconf)
+        original_is_exascale = clubox.mIsExaScale()
+        original_is_xs = clubox.mGetXS()
+        original_storage_type = clubox.mGetStorageType()
+        had_option_storage = hasattr(options, "storageType")
+        original_option_storage = getattr(options, "storageType", None) if had_option_storage else None
+
+        try:
+            payload = copy.deepcopy(original_jsonconf)
+            payload["storageType"] = "xs"
+
+            rack_conf = payload.get("rack")
+            if isinstance(rack_conf, dict):
+                rack_conf.pop("storageType", None)
+
+            params = payload.get("Params")
+            if isinstance(params, list) and params:
+                params[0] = copy.deepcopy(params[0])
+                params[0].pop("storageType", None)
+
+            options.jsonconf = payload
+            if had_option_storage:
+                setattr(options, "storageType", "STANDARD")
+
+            clubox.mSetExaScale(True)
+            clubox.mSetXS(False)
+            clubox.mSetStorageType("ASM")
+
+            with patch.object(exaBoxCluCtrl, "mIsFedramp", side_effect=StopDispatch):
+                with self.assertRaises(StopDispatch):
+                    clubox.mDispatchCluster("patch", options)
+
+            self.assertFalse(clubox.mIsExaScale())
+            self.assertTrue(clubox.mGetXS())
+            self.assertEqual(clubox.mGetStorageType(), "XS")
+        finally:
+            clubox.mSetExaScale(original_is_exascale)
+            clubox.mSetXS(original_is_xs)
+            clubox.mSetStorageType(original_storage_type)
+            options.jsonconf = original_jsonconf
+            if had_option_storage:
+                setattr(options, "storageType", original_option_storage)
+            for key in ("aOptions", "ssh_post_fix"):
+                if get_gcontext().mCheckRegEntry(key):
+                    get_gcontext().mDelRegEntry(key)
+
+    def test_mDispatchCluster_rack_storage_type_sets_exascale(self):
+        class StopDispatch(Exception):
+            """Sentinel exception to exit mDispatchCluster after flag checks."""
+
+        clubox = self.mGetClubox()
+        options = copy.deepcopy(clubox.mGetArgsOptions())
+
+        original_jsonconf = copy.deepcopy(options.jsonconf)
+        original_is_exascale = clubox.mIsExaScale()
+        original_is_xs = clubox.mGetXS()
+        original_storage_type = clubox.mGetStorageType()
+        had_option_storage = hasattr(options, "storageType")
+        original_option_storage = getattr(options, "storageType", None) if had_option_storage else None
+
+        try:
+            payload = copy.deepcopy(original_jsonconf)
+            payload.pop("storageType", None)
+
+            rack_conf = payload.get("rack")
+            if isinstance(rack_conf, dict):
+                rack_conf["storageType"] = "Exascale"
+            else:
+                payload["rack"] = {"storageType": "Exascale"}
+
+            params = payload.get("Params")
+            if isinstance(params, list) and params:
+                params[0] = copy.deepcopy(params[0])
+                params[0].pop("storageType", None)
+
+            options.jsonconf = payload
+            if had_option_storage:
+                setattr(options, "storageType", "STANDARD")
+
+            clubox.mSetExaScale(False)
+            clubox.mSetXS(False)
+            clubox.mSetStorageType("ASM")
+
+            with patch.object(exaBoxCluCtrl, "mIsFedramp", side_effect=StopDispatch):
+                with self.assertRaises(StopDispatch):
+                    clubox.mDispatchCluster("patch", options)
+
+            self.assertTrue(clubox.mIsExaScale())
+            self.assertFalse(clubox.mGetXS())
+            self.assertEqual(clubox.mGetStorageType(), "EXASCALE")
+        finally:
+            clubox.mSetExaScale(original_is_exascale)
+            clubox.mSetXS(original_is_xs)
+            clubox.mSetStorageType(original_storage_type)
+            options.jsonconf = original_jsonconf
+            if had_option_storage:
+                setattr(options, "storageType", original_option_storage)
+            for key in ("aOptions", "ssh_post_fix"):
+                if get_gcontext().mCheckRegEntry(key):
+                    get_gcontext().mDelRegEntry(key)
+
+    def test_mDispatchCluster_rack_storage_type_sets_xs(self):
+        class StopDispatch(Exception):
+            """Sentinel exception to exit mDispatchCluster after flag checks."""
+
+        clubox = self.mGetClubox()
+        options = copy.deepcopy(clubox.mGetArgsOptions())
+
+        original_jsonconf = copy.deepcopy(options.jsonconf)
+        original_is_exascale = clubox.mIsExaScale()
+        original_is_xs = clubox.mGetXS()
+        original_storage_type = clubox.mGetStorageType()
+        had_option_storage = hasattr(options, "storageType")
+        original_option_storage = getattr(options, "storageType", None) if had_option_storage else None
+
+        try:
+            payload = copy.deepcopy(original_jsonconf)
+            payload.pop("storageType", None)
+
+            rack_conf = payload.get("rack")
+            if isinstance(rack_conf, dict):
+                rack_conf["storageType"] = "xs"
+            else:
+                payload["rack"] = {"storageType": "xs"}
+
+            params = payload.get("Params")
+            if isinstance(params, list) and params:
+                params[0] = copy.deepcopy(params[0])
+                params[0].pop("storageType", None)
+
+            options.jsonconf = payload
+            if had_option_storage:
+                setattr(options, "storageType", "STANDARD")
+
+            clubox.mSetExaScale(True)
+            clubox.mSetXS(False)
+            clubox.mSetStorageType("ASM")
+
+            with patch.object(exaBoxCluCtrl, "mIsFedramp", side_effect=StopDispatch):
+                with self.assertRaises(StopDispatch):
+                    clubox.mDispatchCluster("patch", options)
+
+            self.assertFalse(clubox.mIsExaScale())
+            self.assertTrue(clubox.mGetXS())
+            self.assertEqual(clubox.mGetStorageType(), "XS")
+        finally:
+            clubox.mSetExaScale(original_is_exascale)
+            clubox.mSetXS(original_is_xs)
+            clubox.mSetStorageType(original_storage_type)
+            options.jsonconf = original_jsonconf
+            if had_option_storage:
+                setattr(options, "storageType", original_option_storage)
+            for key in ("aOptions", "ssh_post_fix"):
+                if get_gcontext().mCheckRegEntry(key):
+                    get_gcontext().mDelRegEntry(key)
+
+    def test_mDispatchCluster_options_storage_type_sets_exascale(self):
+        class StopDispatch(Exception):
+            """Sentinel exception to exit mDispatchCluster after flag checks."""
+
+        clubox = self.mGetClubox()
+        options = copy.deepcopy(clubox.mGetArgsOptions())
+
+        original_jsonconf = copy.deepcopy(options.jsonconf)
+        original_is_exascale = clubox.mIsExaScale()
+        original_is_xs = clubox.mGetXS()
+        original_storage_type = clubox.mGetStorageType()
+        had_option_storage = hasattr(options, "storageType")
+        original_option_storage = getattr(options, "storageType", None) if had_option_storage else None
+
+        try:
+            payload = copy.deepcopy(original_jsonconf)
+            payload.pop("storageType", None)
+
+            rack_conf = payload.get("rack")
+            if isinstance(rack_conf, dict):
+                rack_conf.pop("storageType", None)
+
+            params = payload.get("Params")
+            if isinstance(params, list) and params:
+                params[0] = copy.deepcopy(params[0])
+                params[0].pop("storageType", None)
+
+            options.jsonconf = payload
+
+            setattr(options, "storageType", "Exascale")
+
+            clubox.mSetExaScale(False)
+            clubox.mSetXS(False)
+            clubox.mSetStorageType("ASM")
+
+            with patch.object(exaBoxCluCtrl, "mIsFedramp", side_effect=StopDispatch):
+                with self.assertRaises(StopDispatch):
+                    clubox.mDispatchCluster("patch", options)
+
+            self.assertTrue(clubox.mIsExaScale())
+            self.assertFalse(clubox.mGetXS())
+            self.assertEqual(clubox.mGetStorageType(), "EXASCALE")
+        finally:
+            clubox.mSetExaScale(original_is_exascale)
+            clubox.mSetXS(original_is_xs)
+            clubox.mSetStorageType(original_storage_type)
+            options.jsonconf = original_jsonconf
+            if had_option_storage:
+                setattr(options, "storageType", original_option_storage)
+            else:
+                delattr(options, "storageType")
+            for key in ("aOptions", "ssh_post_fix"):
+                if get_gcontext().mCheckRegEntry(key):
+                    get_gcontext().mDelRegEntry(key)
+
+    def test_mDispatchCluster_options_storage_type_sets_xs(self):
+        class StopDispatch(Exception):
+            """Sentinel exception to exit mDispatchCluster after flag checks."""
+
+        clubox = self.mGetClubox()
+        options = copy.deepcopy(clubox.mGetArgsOptions())
+
+        original_jsonconf = copy.deepcopy(options.jsonconf)
+        original_is_exascale = clubox.mIsExaScale()
+        original_is_xs = clubox.mGetXS()
+        original_storage_type = clubox.mGetStorageType()
+        had_option_storage = hasattr(options, "storageType")
+        original_option_storage = getattr(options, "storageType", None) if had_option_storage else None
+
+        try:
+            payload = copy.deepcopy(original_jsonconf)
+            payload.pop("storageType", None)
+
+            rack_conf = payload.get("rack")
+            if isinstance(rack_conf, dict):
+                rack_conf.pop("storageType", None)
+
+            params = payload.get("Params")
+            if isinstance(params, list) and params:
+                params[0] = copy.deepcopy(params[0])
+                params[0].pop("storageType", None)
+
+            options.jsonconf = payload
+
+            setattr(options, "storageType", " xs ")
+
+            clubox.mSetExaScale(True)
+            clubox.mSetXS(False)
+            clubox.mSetStorageType("ASM")
+
+            with patch.object(exaBoxCluCtrl, "mIsFedramp", side_effect=StopDispatch):
+                with self.assertRaises(StopDispatch):
+                    clubox.mDispatchCluster("patch", options)
+
+            self.assertFalse(clubox.mIsExaScale())
+            self.assertTrue(clubox.mGetXS())
+            self.assertEqual(clubox.mGetStorageType(), "XS")
+        finally:
+            clubox.mSetExaScale(original_is_exascale)
+            clubox.mSetXS(original_is_xs)
+            clubox.mSetStorageType(original_storage_type)
+            options.jsonconf = original_jsonconf
+            if had_option_storage:
+                setattr(options, "storageType", original_option_storage)
+            else:
+                delattr(options, "storageType")
+            for key in ("aOptions", "ssh_post_fix"):
+                if get_gcontext().mCheckRegEntry(key):
+                    get_gcontext().mDelRegEntry(key)
+
+    def test_mDispatchCluster_patch_handles_timeout_error_with_failure_code(self):
+        clubox = copy.deepcopy(self.mGetClubox())
+        options = copy.deepcopy(clubox.mGetArgsOptions())
+        options.jsonconf = {}
+        clubox.mSetOptions(options)
+        setattr(clubox, "_exaBoxCluCtrl__skip_dom0_validation", False)
+
+        command = "mock_patch_cmd"
+
+        def mock_cmd_options(a_cmd, a_options):
+            if a_cmd != command:
+                return False
+            return set(a_options).issubset({"patch", "check_shared_env"})
+
+        db_instance = MagicMock()
+        db_instance.mCheckRegEntry.return_value = False
+
+        clubox.mRefreshExaKmsSingleton = MagicMock()
+        clubox.mCheckSharedEnvironment = MagicMock(side_effect=TimeoutError("[Errno 110] Connection timed out"))
+        clubox.mHandlerDeleteOndiskKeys = MagicMock()
+        clubox.mSyncKeysOverNetworkSend = MagicMock()
+        clubox.mSyncKVDBOverNetworkSend = MagicMock()
+        clubox.mCleanUpExaKmsSingleton = MagicMock()
+        clubox.mUIOedaCliXmlCleanUp = MagicMock()
+        clubox.mCleanKeysOedaFolder = MagicMock()
+        clubox.mHandlerRestartRemoteEc = MagicMock()
+        clubox.mCalculateSkipXmlPatching = MagicMock()
+        clubox.mParseXMLConfig = MagicMock()
+        clubox.mGenerateExacloudXML = MagicMock()
+        clubox.mSetEnvTypeInConfiguration = MagicMock()
+        clubox.mExecuteCmd = MagicMock(return_value=(None, None, None))
+        clubox.mExecuteCmdLog = MagicMock(return_value=(None, None, None))
+        clubox.mExecuteLocal = MagicMock(return_value=(None, None, None, None))
+        clubox.mCreateCluster = MagicMock(return_value=0)
+        clubox.mExecuteOEDAStep = MagicMock(return_value=0)
+        clubox.mIsExaScale = MagicMock(return_value=False)
+        clubox.mIsNoOeda = MagicMock(return_value=True)
+
+        with patch("exabox.ovm.clucontrol.ebCluCmdCheckOptions", side_effect=mock_cmd_options), \
+            patch("exabox.ovm.clucontrol.ebGetDefaultDB", return_value=db_instance), \
+            patch.object(exaBoxCluCtrl, "mCalculateNoOeda"):
+            rc = clubox.mDispatchCluster(command, options)
+
+        self.assertEqual(rc, PATCHING_CONNECT_FAILED)
+        clubox.mCheckSharedEnvironment.assert_called_once()
+        clubox.mRefreshExaKmsSingleton.assert_called_once()
+
+    def test_mDispatchCluster_patch_handles_ssh_error_with_failure_code(self):
+        clubox = copy.deepcopy(self.mGetClubox())
+        options = copy.deepcopy(clubox.mGetArgsOptions())
+        options.jsonconf = {}
+        clubox.mSetOptions(options)
+        setattr(clubox, "_exaBoxCluCtrl__skip_dom0_validation", False)
+
+        command = "mock_patch_cmd"
+
+        def mock_cmd_options(a_cmd, a_options):
+            if a_cmd != command:
+                return False
+            return set(a_options).issubset({"patch", "check_shared_env"})
+
+        db_instance = MagicMock()
+        db_instance.mCheckRegEntry.return_value = False
+
+        clubox.mRefreshExaKmsSingleton = MagicMock()
+        clubox.mCheckSharedEnvironment = MagicMock(side_effect=SSHException("TimeoutError: [Errno 110] Connection timed out"))
+        clubox.mHandlerDeleteOndiskKeys = MagicMock()
+        clubox.mSyncKeysOverNetworkSend = MagicMock()
+        clubox.mSyncKVDBOverNetworkSend = MagicMock()
+        clubox.mCleanUpExaKmsSingleton = MagicMock()
+        clubox.mUIOedaCliXmlCleanUp = MagicMock()
+        clubox.mCleanKeysOedaFolder = MagicMock()
+        clubox.mHandlerRestartRemoteEc = MagicMock()
+        clubox.mCalculateSkipXmlPatching = MagicMock()
+        clubox.mParseXMLConfig = MagicMock()
+        clubox.mGenerateExacloudXML = MagicMock()
+        clubox.mSetEnvTypeInConfiguration = MagicMock()
+        clubox.mExecuteCmd = MagicMock(return_value=(None, None, None))
+        clubox.mExecuteCmdLog = MagicMock(return_value=(None, None, None))
+        clubox.mExecuteLocal = MagicMock(return_value=(None, None, None, None))
+        clubox.mCreateCluster = MagicMock(return_value=0)
+        clubox.mExecuteOEDAStep = MagicMock(return_value=0)
+        clubox.mIsExaScale = MagicMock(return_value=False)
+        clubox.mIsNoOeda = MagicMock(return_value=True)
+
+        with patch("exabox.ovm.clucontrol.ebCluCmdCheckOptions", side_effect=mock_cmd_options), \
+            patch("exabox.ovm.clucontrol.ebGetDefaultDB", return_value=db_instance), \
+            patch.object(exaBoxCluCtrl, "mCalculateNoOeda"):
+            rc = clubox.mDispatchCluster(command, options)
+
+        self.assertEqual(rc, PATCHING_NODE_SSH_CHECK_FAILED)
+        clubox.mCheckSharedEnvironment.assert_called_once()
+        clubox.mRefreshExaKmsSingleton.assert_called_once()
+
+    def test_mDispatchCluster_patch_raise_other_exception(self):
+        clubox = copy.deepcopy(self.mGetClubox())
+        options = copy.deepcopy(clubox.mGetArgsOptions())
+        options.jsonconf = {}
+        clubox.mSetOptions(options)
+        setattr(clubox, "_exaBoxCluCtrl__skip_dom0_validation", False)
+
+        command = "mock_patch_cmd"
+
+        def mock_cmd_options(a_cmd, a_options):
+            if a_cmd != command:
+                return False
+            return set(a_options).issubset({"patch", "check_shared_env"})
+
+        db_instance = MagicMock()
+        db_instance.mCheckRegEntry.return_value = False
+
+        clubox.mRefreshExaKmsSingleton = MagicMock()
+        clubox.mCheckSharedEnvironment = MagicMock(side_effect=Exception("MockException"))
+        clubox.mHandlerDeleteOndiskKeys = MagicMock()
+        clubox.mSyncKeysOverNetworkSend = MagicMock()
+        clubox.mSyncKVDBOverNetworkSend = MagicMock()
+        clubox.mCleanUpExaKmsSingleton = MagicMock()
+        clubox.mUIOedaCliXmlCleanUp = MagicMock()
+        clubox.mCleanKeysOedaFolder = MagicMock()
+        clubox.mHandlerRestartRemoteEc = MagicMock()
+        clubox.mCalculateSkipXmlPatching = MagicMock()
+        clubox.mParseXMLConfig = MagicMock()
+        clubox.mGenerateExacloudXML = MagicMock()
+        clubox.mSetEnvTypeInConfiguration = MagicMock()
+        clubox.mExecuteCmd = MagicMock(return_value=(None, None, None))
+        clubox.mExecuteCmdLog = MagicMock(return_value=(None, None, None))
+        clubox.mExecuteLocal = MagicMock(return_value=(None, None, None, None))
+        clubox.mCreateCluster = MagicMock(return_value=0)
+        clubox.mExecuteOEDAStep = MagicMock(return_value=0)
+        clubox.mIsExaScale = MagicMock(return_value=False)
+        clubox.mIsNoOeda = MagicMock(return_value=True)
+
+        with patch("exabox.ovm.clucontrol.ebCluCmdCheckOptions", side_effect=mock_cmd_options), \
+            patch("exabox.ovm.clucontrol.ebGetDefaultDB", return_value=db_instance), \
+            patch.object(exaBoxCluCtrl, "mCalculateNoOeda"):
+            with self.assertRaises(Exception):
+                clubox.mDispatchCluster(command, options)
+
+        clubox.mCheckSharedEnvironment.assert_called_once()
+        clubox.mRefreshExaKmsSingleton.assert_called_once()
 
 if __name__ == "__main__":
     unittest.main(warnings='ignore')

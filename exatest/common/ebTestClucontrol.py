@@ -2,7 +2,7 @@
 
  $Header: 
 
- Copyright (c) 2018, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2018, 2026, Oracle and/or its affiliates.
 
  NAME:
       ebTestClucontrol.py - Base class for unittesting
@@ -16,6 +16,7 @@
  History:
 
        MODIFIED (MM/DD/YY)
+       gsundara 03/23/26 - Fix cell regex for unit test mocks
        gparada  02/10/25 - 37569998 New param in mGetRegexCell for better test
        gparada  06/22/23 - 35213979 Override workers, adding typing
        gparada  05/23/23 - 35098923 New param to mGetRegexDom0 for better handling
@@ -123,7 +124,7 @@ class ebTestClucontrol(unittest.TestCase):
             return ".*exdcl.*"
         if aSeqNo:
             return ".*[0-9]{1}celadm" + aSeqNo +"{1}.*"
-        return ".*cel*"
+        return ".*cel.*"
 
     def mGetRegexDom0(self, aSeqNo:str=None) -> str:
         if self.__is_elastic:

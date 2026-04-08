@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     cluexachk.py - Refactored from cluhealth to provide exachk functionality
@@ -12,6 +12,8 @@ NOTE:
 
 History:
     ririgoye  25/11/25 - Bug 38667586 - EXACS: MAIN: PYTHON3.11: SUPRASS ALL PYTHON WARNINGS
+    shapatna  11/19/25 - Bug 38669143: Fix Parsing issue related
+                         to the creation of results zip file
     jesandov  22/07/25 - Bug 38222270: Avoid locking on AHF DomU Install in ExaCS
     akkar     01/25/24 - Bug:37151441 - Remove Ahf_setup file from domU after installation 
     jesandov  04/05/25 - 36482990: Avoid locking on AHF DomU Install in ExaScale
@@ -324,6 +326,13 @@ class ebCluExachk(object):
         #
         # Check if host is pingable
         #
+        if not _hostList:
+            ebLogInfo('WARNING: host list is empty for Exachk execution')
+            ebLogHealth('WRN', 'No hosts provided for Exachk execution')
+            ebLogRemoveHCLogDestination(_tmp_log_destination)
+            ebLogSetHCLogDestination(_hc.mGetDefaultLogHandler())
+            return
+
         if _hostList[0]:
             _host = _hostList[0]
             _clunode = _cluster_host_d[_host]
@@ -513,7 +522,9 @@ class ebCluExachk(object):
 
                                 try:
                                     if clustername:
+                                        ebLogInfo(f"***** _exachk_zip_path = {_exachk_zip_path}")
                                         zip_file_name = _exachk_zip_path.split('/')[-1]
+                                        ebLogInfo(f"***** zip file name = {zip_file_name}")
                                         # remove .zip to get the directory name
                                         src_exachk_folder_name = _exachk_zip_path[:-4]
                                         _args = '_'
@@ -522,9 +533,11 @@ class ebCluExachk(object):
                                             if _jconf["other"].lstrip().rstrip().startswith('-profile'):
                                                 _args += _jconf["other"].lstrip().rstrip().split("-profile")[1].strip() + '_'
                                         zip_file_name = zip_file_name.split("_")
-                                        if len(zip_file_name) < 4:
-                                            raise Exception("The file name does not have the required fields. List Index Out of Range error.")
-                                        date = zip_file_name[2] + zip_file_name[3]
+                                        
+                                        if len(zip_file_name) < 2:
+                                           raise Exception("The file name does not have the required fields. List Index Out of Range error.")
+                                        
+                                        date = zip_file_name[1]
                                         zip_file_name = zip_file_name[0] + "_" + zip_file_name[1] + "_" + clustername + _args + date.split('.')[0]
                                         ebLogInfo('*** *** zip name %s: ' % (zip_file_name))
                                         exachk_zip_dir = exachk_zip_dir + '/' + zip_file_name

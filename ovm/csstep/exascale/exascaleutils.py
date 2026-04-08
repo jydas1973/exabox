@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 #
-# $Header: ecs/exacloud/exabox/ovm/csstep/exascale/exascaleutils.py /main/86 2025/11/27 16:55:04 pbellary Exp $
+# $Header: ecs/exacloud/exabox/ovm/csstep/exascale/exascaleutils.py pbellary_bug-38972840/6 2026/02/24 07:09:16 pbellary Exp $
 #
 # exascaleutils.py
 #
-# Copyright (c) 2021, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      exaScaleUtils - Exascale Utility file for Create Service & CRED operations
@@ -16,6 +16,20 @@
 #      NONE
 #
 #    MODIFIED   (MM/DD/YY)
+#    siyarlag    04/02/26 - Update domU validation logic
+#    oespinos    03/09/26 - 39001455: Deconfigure exascale on kvm host
+#    pbellary    02/24/26 - Bug 38972840 - DELETE-SERVICE WF FAILED TO VERIFY ACL USER ID
+#    pbellary    02/24/26 - Bug 38858318 - IF CHACL COMMAND FAILS CREATE SERVICE FLOW SHOULD FAIL
+#    pbellary    02/24/26 - Bug 38883255 - VM BACKUP OPERATION IS NOT TAKING BACKUP OF 3RD NODE
+#    jesandov    01/15/26 - 38853575: Add check for empty node in mExecuteEscliCmd
+#    siyarlag    01/13/26 - 38834983: delete oracle wallet user acl
+#    pbellary    01/09/26 - Bug 38830473 - EXASCALE CLUSTER FAILED TO CREATE EDV VOLUME ATTACHMENT 
+#    siyarlag    01/08/26 - update mCreateOracleEsWallet
+#    siyarlag    01/07/26 - 38824676: use absolute path for cert file
+#    pbellary    01/06/26 - Enh 38650337 - EXACLOUD API FOR ADDITIONAL ACFS EXTRACTION
+#    siyarlag    12/15/25 - 38654530: update mCreateOracleEsWallet
+#    pbellary    12/09/25 - Bug 38740441 - EXACLOUD: ADD COMPUTE WF DID NOT ENABLE QINQ IN ELASTIC NODE
+#    pbellary    11/30/25 - Enh 38708130 - EXASCALE: DELETE SERVICE SHOULD DELETE ADDITIONAL ACFS FILESYSTEMS
 #    pbellary    11/24/25 - Enh 38685113 - EXASCALE: POST CONFIGURE EXASCALE EXACLOUD SHOULD FETCH STRE0/STE1 FROM DOM0
 #    rajsag      11/20/25 - bug 38673238 - exacloud: vm backup xs migration
 #                           failed valueerror: could not convert string to
@@ -195,7 +209,7 @@ from tempfile import NamedTemporaryFile, TemporaryDirectory
 from exabox.ovm.csstep.exascale.escli_util import ebEscliUtils
 from exabox.core.Error import ebError, ExacloudRuntimeError, gReshapeError, gExascaleError
 from exabox.log.LogMgr import ebLogError, ebLogInfo, ebLogWarn, ebLogDebug, ebLogVerbose, ebLogTrace, ebLogCritical
-from exabox.utils.node import connect_to_host, node_cmd_abs_path_check, node_exec_cmd, node_exec_cmd_check, node_read_text_file, node_write_text_file
+from exabox.utils.node import connect_to_host, node_cmd_abs_path_check, node_connect_to_host, node_exec_cmd, node_exec_cmd_check, node_read_text_file, node_write_text_file
 from exabox.ovm.cludomufilesystems import shutdown_domu, start_domu
 from exabox.utils.common import version_compare
 
@@ -205,6 +219,7 @@ DEVICE_NAME = "xacfsvol"
 CTRL_PORT   = "5052"
 REDUNDANCY_FACTOR = 3.0
 ATTR_AUTO_FILE_ENCRYPTION = "autoFileEncryption"
+MAX_CLU_NAME_LEN = 11
 
 class ebExascaleUtils(object):
 
@@ -273,8 +288,8 @@ class ebExascaleUtils(object):
                 if _inet_match and _iface:
                    _ipaddr = _inet_match.group(1)
                    _cidr = _inet_match.group(2)
-                _netmask = self.mConvertFromCIDRToNetmask(_cidr)
-                ebLogInfo(f"Interface: {_iface} Ip Address: {_ipaddr} Netmask: {_netmask}")
+                   _netmask = self.mConvertFromCIDRToNetmask(_cidr)
+                   ebLogInfo(f"Interface: {_iface} Ip Address: {_ipaddr} Netmask: {_netmask}")
         return _ipaddr, _netmask
 
     def mFetchStorageInterconnectIps(self, aDom0=None):
@@ -321,6 +336,9 @@ class ebExascaleUtils(object):
                 _priv = _ebox.mGetNetworks().mGetNetworkConfig(_net)
                 if _priv.mGetNetType() == 'private':
                     _priv_host.append(_priv.mGetNetHostName())
+            if len(_priv_host) < 2:
+                _err_str = f"Dom0:{_dom0} not containing two private ipaddress"
+                raise ExacloudRuntimeError(aErrorMsg=_err_str)
             _priv1 = _priv_host[0]
             _priv2 = _priv_host[1]
             _storage_ip1, _storage_ip2, _netmask = _utils.mFetchStorageInterconnectIps(aDom0=_dom0)
@@ -360,13 +378,13 @@ class ebExascaleUtils(object):
     def mEnableXSService(self, aOptions):
         ebLogInfo("*** mEnableXSService() >>>")
         _ebox = self.__cluctrl
-        _escli = ebEscliUtils(self)
+        _escli = ebEscliUtils(_ebox)
         _storage_intf_list, _cell_list, _ntp_list, _dns_list = [], [], [], []
         _exascale_name, _sre_hostname, _sre_ip, _hc_pool, _pool_size, _vault_name, _vault_size, _vlan_id = "", "", "", "", "", "", "", ""
 
         _redundancy_factor = 3 #setting redundancy factor to 3 
-        _enable_xs_service = _ebox.mCheckConfigOption('enable_xs_service')
-        if _enable_xs_service.lower() == "false":
+        _enable_xs_service = str(_ebox.mCheckConfigOption('enable_xs_service'))
+        if _enable_xs_service and _enable_xs_service.lower() == "false":
             ebLogInfo('*** enable_xs_service flag is False. XS(Exascale) Service is disabled.')
             _ebox.mSetXS(False)
             return
@@ -390,6 +408,9 @@ class ebExascaleUtils(object):
                 _pool_size = str(int(_exascale_attr['storage_pool']['gb_size'])*_redundancy_factor)+ 'GB'
             if "cell_list" in list(_exascale_attr.keys()):
                 _cell_list = _exascale_attr['cell_list']
+                if not _cell_list:
+                    _err_str = "cell_list is not populated in input payload"
+                    raise ExacloudRuntimeError(aErrorMsg=_err_str)
             if "db_vault" in list(_exascale_attr.keys()):
                 _vault_name = _exascale_attr['db_vault']['name']
                 _vault_size = str(int(_exascale_attr['db_vault']['gb_size'])*_redundancy_factor) + 'GB'
@@ -519,6 +540,9 @@ class ebExascaleUtils(object):
                     if _priv.mGetNetType() == 'private':
                         _priv_host.append(_priv.mGetNetHostName())
                 _storage_ip1, _storage_ip2, _netmask = self.mFetchStorageInterconnectIps(aDom0=_dom0)
+                if len(_priv_host) < 2:
+                    _err_str = f"Dom0:{_dom0} not containing two private ipaddress"
+                    raise ExacloudRuntimeError(aErrorMsg=_err_str)
                 _priv1 = _priv_host[0]
                 _priv2 = _priv_host[1]
                 if _vlan_id and _storage_ip1 and _priv1 and _storage_ip2 and _priv2 and _netmask:
@@ -577,7 +601,8 @@ class ebExascaleUtils(object):
         _host_list = aHostList
         _compute_host = aComputeHost
         for _host in _host_list:
-            if _host['compute_hostname'] == _compute_host:
+            if _host and 'compute_hostname' in list(_host.keys())  and _host['compute_hostname'] and \
+                (_host['compute_hostname'].split('.')[0] == _compute_host.split('.')[0]):
                 return _host
         return None
 
@@ -600,7 +625,7 @@ class ebExascaleUtils(object):
             and aOptions is not None and aOptions.jsonconf is not None:
             _inputjson = aOptions.jsonconf
             if _inputjson and 'rack' in _inputjson.keys() and 'xsVmImage' in _inputjson['rack'].keys():
-                _edv_image_support = _inputjson['rack']['xsVmImage']
+                _edv_image_support = str(_inputjson['rack']['xsVmImage'])
 
         _status = True if _edv_image_support.lower() == "true" else False
         ebLogInfo(f"EDV Image Supported:{_status}")
@@ -615,7 +640,7 @@ class ebExascaleUtils(object):
         _inputjson = aOptions.jsonconf
 
         if _inputjson and 'rack' in _inputjson.keys() and 'xsVmImage' in _inputjson['rack'].keys():
-            _edv_image_support = _inputjson['rack']['xsVmImage']
+            _edv_image_support = str(_inputjson['rack']['xsVmImage'])
             if "system_vault" in _inputjson['rack'].keys():
                 _system_vault_list = aOptions.jsonconf["rack"]['system_vault']
                 for _vault_list in _system_vault_list:
@@ -699,9 +724,9 @@ class ebExascaleUtils(object):
             and aOptions is not None and aOptions.jsonconf is not None:
             _inputjson = aOptions.jsonconf
             if _inputjson and 'rack' in _inputjson.keys() and 'xsVmBackup' in _inputjson['rack'].keys():
-                _edv_backup_support = _inputjson['rack']['xsVmBackup']
+                _edv_backup_support = str(_inputjson['rack']['xsVmBackup'])
 
-        _status = True if _edv_backup_support.lower() == "true" else False
+        _status = True if _edv_backup_support and _edv_backup_support.lower() == "true" else False
         ebLogInfo(f"EDV Backup Supported:{_status}")
         return _status
 
@@ -784,6 +809,14 @@ class ebExascaleUtils(object):
                 _data["exascale_backup_vault"] = _backup_vault
                 _data["exascale_ers_ip_port"] = f"{_ctrl_ip}:{_ctrl_port}"
                 self.mWriteVMBackupJson(_data, _remoteFileName, aDom0=_dom0)
+
+                #Update ACL for backup vault
+                if "exascale" in list(aOptions.jsonconf.keys()):
+                    _exascale_attr = aOptions.jsonconf['exascale']
+                    if 'cell_list' in list(_exascale_attr.keys()) and _exascale_attr['cell_list']:
+                        _cell = _exascale_attr['cell_list'][0]
+                        if _backup_vault:
+                            _escli.mChangeACL(_cell, None, "M", aOptions, _dom0, aVaultName=_backup_vault)
 
     def mGenerateVMbackupJson(self, aOptions):
         _escli = self.__escli
@@ -1036,9 +1069,10 @@ class ebExascaleUtils(object):
                     continue
                 if _out:
                     _output = _out.readlines()
-                    _egs_clusterName = _output[0].split('=')[1].strip()
-                    ebLogInfo(f"EGS Cluster name on cell:{_cell_name}: {_egs_clusterName}")
-                    break
+                    if _output:
+                        _egs_clusterName = _output[0].split('=')[1].strip()
+                        ebLogInfo(f"EGS Cluster name on cell:{_cell_name}: {_egs_clusterName}")
+                        break
         return _egs_clusterName
 
     def mCheckVaultTag(self):
@@ -1060,16 +1094,17 @@ class ebExascaleUtils(object):
         return _xs_cluster
 
     def mGetCtrlIP(self):
-        _ipaddress = ""
+        _ipaddress, _ers = "", ""
         _ebox = self.__cluctrl
         _config = ebCluExascaleConfig(_ebox.mGetConfig())
         _config_list = _config.mGetExascaleClusterConfigList()
-        _exascale = _config.mGetExascaleClusterConfig(_config_list[0])
-        _net_list = _exascale.mGetMacNetworks()
-        for _net_id in _net_list:
-            _net_conf = _ebox.mGetNetworks().mGetNetworkConfig(_net_id)
-            _ipaddress = _net_conf.mGetNetIpAddr()
-            _ers = _net_conf.mGetNetHostName() + "." +  _net_conf.mGetNetDomainName()
+        if _config_list:
+            _exascale = _config.mGetExascaleClusterConfig(_config_list[0])
+            _net_list = _exascale.mGetMacNetworks()
+            for _net_id in _net_list:
+                _net_conf = _ebox.mGetNetworks().mGetNetworkConfig(_net_id)
+                _ipaddress = _net_conf.mGetNetIpAddr()
+                _ers = _net_conf.mGetNetHostName() + "." +  _net_conf.mGetNetDomainName()
         return _ipaddress, _ers
 
     def mParseXMLForXS(self):
@@ -1145,7 +1180,6 @@ class ebExascaleUtils(object):
                 _ebox.mUpdateErrorObject(gExascaleError["INVALID_EXASCALE_OPERATION"], _err_msg)
                 return _rc
 
-
     # function to create DB vault
     def mCreateDbVault(self, aOptions):
         """
@@ -1191,7 +1225,7 @@ class ebExascaleUtils(object):
         else:
             _vault = {}
             _json = ''.join( _out.splitlines())
-            if _json[0] == '{':
+            if _json and _json[0] == '{':
                 _jsonOut = json.loads(_json)
                 _vault["vault_ocid"]= _inputjson['db_vault']['vault_ocid']
                 _vault["name"]= _vaultName
@@ -1282,7 +1316,7 @@ class ebExascaleUtils(object):
             raise ExacloudRuntimeError(0x0811, 0xA, _msg)
         else:
             _json = ''.join( _out.splitlines())
-            if _json[0] == '{':
+            if _json and _json[0] == '{':
                 _jsonOut = json.loads(_json)
                 _vault = {}
                 _usedSpace = int(_jsonOut["data"]["attributes"][f"spaceUsed{_suffix}"])
@@ -1304,7 +1338,7 @@ class ebExascaleUtils(object):
             raise ExacloudRuntimeError(0x0811, 0xA, _msg)
         else:
             _json = ''.join( _out.splitlines())
-            if _json[0] == '{':
+            if _json and _json[0] == '{':
                 _jsonOut = json.loads(_json)
                 _vault = {}
                 _vault["vault_ocid"]= _inputjson['db_vault']['vault_ocid']
@@ -1350,7 +1384,7 @@ class ebExascaleUtils(object):
                 ebLogWarn(_msg)
             else:
                 _json = ''.join( _out.splitlines())
-                if _json[0] == '{':
+                if _json and _json[0] == '{':
                     _jsonOut = json.loads(_json)
                     _vault = {}
                     _vault["vault_ocid"]= _inputjson['db_vault']['vault_ocid']
@@ -1399,7 +1433,7 @@ class ebExascaleUtils(object):
             raise ExacloudRuntimeError(0x0811, 0xA, _msg)
         else:
             _json = ''.join( _out.splitlines())
-            if _json[0] == '{':
+            if _json and _json[0] == '{':
                 _jsonOut = json.loads(_json)
                 _usedSpaceGb = float(_jsonOut['data']['attributes']['spaceUsed'])
                 if _usedSpaceGb > 0:
@@ -1421,7 +1455,7 @@ class ebExascaleUtils(object):
                 raise ExacloudRuntimeError(0x0811, 0xA, _msg)
             else:
                 _json = ''.join( _out.splitlines())
-                if _json[0] == '{':
+                if _json and _json[0] == '{':
                     _vaultList = []
                     _provisionedVaultSpace = 0
                     _jsonOut = json.loads(_json)
@@ -1482,12 +1516,12 @@ class ebExascaleUtils(object):
             self._mUpdateRequestData(-1,_data_d,_msg)
             raise ExacloudRuntimeError(0x0811, 0xA, _msg)
         else:
+            #Update ACL Permissions on all the compute nodes
             for _dom0 in _domOList:
-                _host = _dom0.split('.')[0]
-                _escli.mChangeACL(_cell, None, "M", aOptions, _host, aVaultName=_vaultName)
+                _escli.mChangeACL(_cell, None, "M", aOptions, _dom0, aVaultName=_vaultName)
             _json = ''.join( _out.splitlines())
             _vault = {}
-            if _json[0] == '{':
+            if _json and _json[0] == '{':
                 _jsonOut = json.loads(_json)
                 _vault["name"]= _vaultName
                 _vault["vault_ocid"]= _inputjson['system_vault']['vault_ocid']
@@ -1578,6 +1612,7 @@ class ebExascaleUtils(object):
         _cell_list = _inputjson['cell_list']
         _cell = _cell_list[0]
         _vaultName = _inputjson['system_vault']['name']
+        _domOList = _inputjson["compute_list"]
         _poolName = None
         _usedSpace = 0
         if "storage_pool" in list(_inputjson.keys()):
@@ -1593,8 +1628,11 @@ class ebExascaleUtils(object):
             self._mUpdateRequestData(_ret,_data_d,_msg)
             raise ExacloudRuntimeError(0x0811, 0xA, _msg)
         else:
+            #Update ACL Permissions on all the compute nodes
+            for _dom0 in _domOList:
+                _escli.mChangeACL(_cell, None, "M", aOptions, _dom0, aVaultName=_vaultName)
             _json = ''.join( _out.splitlines())
-            if _json[0] == '{':
+            if _json and _json[0] == '{':
                 _jsonOut = json.loads(_json)
                 _vault = {}
                 _usedSpace = int(_jsonOut["data"]["attributes"][f"spaceUsed{_suffix}"])
@@ -1615,7 +1653,7 @@ class ebExascaleUtils(object):
             raise ExacloudRuntimeError(0x0811, 0xA, _msg)
         else:
             _json = ''.join( _out.splitlines())
-            if _json[0] == '{':
+            if _json and _json[0] == '{':
                 _jsonOut = json.loads(_json)
                 _vault = {}
                 _vault["name"]= _vaultName 
@@ -1667,7 +1705,7 @@ class ebExascaleUtils(object):
                 ebLogWarn(_msg)
             else:
                 _json = ''.join( _out.splitlines())
-                if _json[0] == '{':
+                if _json and _json[0] == '{':
                     _jsonOut = json.loads(_json)
                     _vault = {}
                     _vault["vault_ocid"]= _inputjson['db_vault']['vault_ocid']
@@ -1686,13 +1724,13 @@ class ebExascaleUtils(object):
             _vaultName = _inputjson['name']
             _sysvault_cell = _sysvault_cell_list[0]
             _suffix = "EF" if _escli.mIsEFRack(_sysvault_cell) else "HC"
-            _ret, _out, _err = _escli.mListVault(_cell, _vaultName, aOptions, aDetail=True)
+            _ret, _out, _err = _escli.mListVault(_sysvault_cell, _vaultName, aOptions, aDetail=True)
             if _ret != 0:
                 _msg = f'Unable to Get System Vault {_vaultName} details due to {_err}. Output is {_out}'
                 ebLogWarn(_msg)
             else:
                 _json = ''.join( _out.splitlines())
-                if _json[0] == '{':
+                if _json and _json[0] == '{':
                     _jsonOut = json.loads(_json)
                     _vault = {}
                     _vault["name"]= _vaultName
@@ -1851,15 +1889,20 @@ class ebExascaleUtils(object):
                 _ret, _out, _err = node_exec_cmd(_node, _cmd)
                 if "Shut down all guests" in _out + _err:
                     ebLogWarn("mSetupRoCEIPs: VM maker demanding us to shut off all VMs first!")
-                    # Shut off all DomUs
-                    _cmd = '/usr/sbin/vm_maker --stop-domain --all'
-                    _node.mExecuteCmdLog(_cmd)
-                    _ret = _node.mGetCmdExitStatus()
-                    if _ret != 0:
-                        _msg = f'mSetupRoCEIPs: Unable to shutdown all DomUs before RoCE setup'
-                        ebLogError(_msg)
-                        _ebox.mUpdateErrorObject(gExascaleError["CONFIG_STRE_FAILED"], _msg)
-                        raise ExacloudRuntimeError(0x0811, 0xA, _msg)
+
+                    _is_reboot_exascale_config = _ebox.mCheckConfigOption('reboot_exascale_config')
+                    if _is_reboot_exascale_config and _is_reboot_exascale_config.lower() == "false":
+                        ebLogInfo(f'mSetupRoCEIPs: Disabled dom0 or domU reboot; skip domU reboot')
+                    else:
+                        # Shut off all DomUs
+                        _cmd = '/usr/sbin/vm_maker --stop-domain --all'
+                        _node.mExecuteCmdLog(_cmd)
+                        _ret = _node.mGetCmdExitStatus()
+                        if _ret != 0:
+                            _msg = f'mSetupRoCEIPs: Unable to shutdown all DomUs before RoCE setup'
+                            ebLogError(_msg)
+                            _ebox.mUpdateErrorObject(gExascaleError["CONFIG_STRE_FAILED"], _msg)
+                            raise ExacloudRuntimeError(0x0811, 0xA, _msg)
 
                     # Try again
                     _cmd = f'/usr/sbin/vm_maker --set --storage-vlan {_vlan_id} --ip {_ip} --netmask {_netmask}'
@@ -1884,6 +1927,12 @@ class ebExascaleUtils(object):
                         ebLogWarn(f"mSetupRoCEIPs: {_if} still has an IPv4 configured!")
                         _reboot_dom0 = True
                         break
+
+            # check if domu or dom0 reboot is required for exascale config
+            _is_reboot_exascale_config = _ebox.mCheckConfigOption('reboot_exascale_config')
+            if _is_reboot_exascale_config and _is_reboot_exascale_config.lower() == "false":
+                ebLogInfo(f'mSetupRoCEIPs: Disabled dom0 or domU reboot. Move to next Host')
+                continue
 
             if _reboot_dom0:
                 self.__cluctrl.mRebootNode(_dom0)
@@ -1915,6 +1964,7 @@ class ebExascaleUtils(object):
                     ebLogError(_msg)
                     _ebox.mUpdateErrorObject(gExascaleError["CONFIG_STRE_FAILED"], _msg)
                     raise ExacloudRuntimeError(0x0811, 0xA, _msg)
+
             ebLogInfo(f'mSetupRoCEIPs: Move to next Host')
 
         # Setup NFTables rules for stre0 & stre1 interfaces in Dom0s
@@ -1924,6 +1974,53 @@ class ebExascaleUtils(object):
             _ebox.mSetupNatNfTablesOnDom0v2(aDom0s=_dom0s)
 
         return _ret
+
+    def mExecuteXSDeconfigCompute(self, aOptions):
+        """
+        function to deconfigure exascale on a deleted compute
+        """
+        ebLogInfo("*** mExecuteXSDeconfigCompute")
+
+        _computelist = aOptions.jsonconf.get('removed_computes')
+        if not _computelist:
+            _msg = 'mExecuteXSDeconfigCompute: removed_computes payload is empty'
+            ebLogError(_msg)
+            return -1
+
+        self.mCheckEgsService(_computelist)
+
+        _save_dir = self.__cluctrl.mGetOedaPath() + '/exacloud.conf'
+        self.__cluctrl.mExecuteLocal("/bin/mkdir -p {0}".format(_save_dir))
+
+        _configxml = _save_dir + '/xsdeconfig_kvmhost_' + self.__cluctrl.mGetUUID() + '.xml'
+        _outputxml = _save_dir + '/xsdeconfig_kvmhost_' + self.__cluctrl.mGetUUID() + '_output.xml'
+        self.__cluctrl.mExecuteLocal("/bin/cp {} {}".format(self.__cluctrl.mGetPatchConfig(), _configxml))
+
+        _oedacli_bin = self.__cluctrl.mGetOedaPath() + '/oedacli'
+        _oedacli_mgr = OedacliCmdMgr(_oedacli_bin, _save_dir)
+        _oedacli_mgr.mUndoConfigureKVMHosts(_configxml, _outputxml, _computelist)
+        return 0
+
+
+    def mCheckEgsService(self, aRemovedComputes):
+        for _removed_compute in aRemovedComputes:
+            if self.mIsEgsRunning(_removed_compute):
+                _msg = "Requested compute is still running EGS, please migrate EGS to a different node before retrying the operations"
+                ebLogError(_msg)
+                raise ExacloudRuntimeError(0x0811, 0xA, _msg)
+
+    def mIsEgsRunning(self, aHost):
+        _cmd = "/usr/sbin/dbmcli -e list dbserver attributes egsStatus"
+
+        try:
+            _node = exaBoxNode(get_gcontext())
+            _node.mConnect(aHost=aHost)
+            _i, _o, _e = _node.mExecuteCmd(_cmd)
+            if "running" in _o.read().strip():
+                return True
+        finally:
+            _node.mDisconnect()
+        return False
 
     def mExecuteXSConfigOp(self, aOptions):
         """
@@ -1949,6 +2046,8 @@ class ebExascaleUtils(object):
             return self.mExecuteXSConfigOedaStep(_options)
         elif _inputjson["config_op"] == "updatestoragepool":
             return self.mExecuteXSConfigReshapePool(_options)
+        elif _inputjson["config_op"] == "deconfigcompute":
+            return self.mExecuteXSDeconfigCompute(_options)
         _msg = "Invalid DBVault operation %s "%(_inputjson["config_op"])
         ebLogError(_msg)
         _ebox.mUpdateErrorObject(gExascaleError["INVALID_EXASCALE_OPERATION"], _msg)
@@ -2168,9 +2267,52 @@ class ebExascaleUtils(object):
                     _clusterDict[_clusterName] = list(_clusterDict.get(_clusterName,""))
                     _clusterDict[_clusterName].append(_domUdetail["domuNatHostname"])
                 _domUList.append(_domUdetail["domuNatHostname"])
-                    #check if crs and dbs are up and all db instances are running
+        _domu_reach_check = _ebox.mCheckConfigOption('disable_domu_reachablity_check')
+        if not _domUList:
+            ebLogInfo("*** No DomUs found for connectivity validation")
+            return 0
+        elif _domu_reach_check and _domu_reach_check.lower() == "true":
+            ebLogInfo("*** Disabled DomUs reachablity check")
+        else:
+            _domUList = list(dict.fromkeys(_domUList))
+            _conn_timeout = 30
+            _unreachable_domus = []
+            _reachable_domus = []
+            for _domU in _domUList:
+                ebLogInfo(f"*** Validating DomU connectivity for {_domU}")
+                _hostname_success = False
+                try:
+                    with node_connect_to_host(exaBoxNode(get_gcontext()), _domU, timeout=_conn_timeout) as _node:
+                        _, _stdout, _stderr = _node.mExecuteCmd("hostname")
+                        if _node.mGetCmdExitStatus() == 0:
+                            ebLogInfo(f"*** DomU {_domU} responded to hostname command")
+                            _hostname_success = True
+                        else:
+                            ebLogWarn(f"*** Hostname command failed on {_domU} with exit code {_node.mGetCmdExitStatus()}")
+                except Exception as _ex:
+                    ebLogTrace(f"*** Attempt to validate DomU {_domU} failed: {_ex}")
+                if not _hostname_success:
+                    _unreachable_domus.append(_domU)
+                else:
+                    _reachable_domus.append(_domU)
+            if _unreachable_domus:
+                _detail_error = "DomUs not connectable after reboot: {}".format(", ".join(_unreachable_domus))
+                ebLogWarn('***  DomU connectivity validation Warning: ' + _detail_error)
+            if not _reachable_domus:
+                ebLogWarn("*** No DomUs responded to connectivity validation; skipping further checks")
+                return 0
+            _domUList = _reachable_domus
+            _domUAsmList = [domu for domu in _domUAsmList if domu in _reachable_domus]
+            for _cluster in list(_clusterDict.keys()):
+                _cluster_domus = [domu for domu in _clusterDict[_cluster] if domu in _reachable_domus]
+                if _cluster_domus:
+                    _clusterDict[_cluster] = _cluster_domus
+                else:
+                    ebLogWarn(f"*** No reachable DomUs for cluster {_cluster}; skipping ASM validation")
+                    del _clusterDict[_cluster]
+        #check if crs and dbs are up and all db instances are running
         _tvl = _ebox.mCheckConfigOption('crs_timeout')
-        if _tvl is not None:
+        if _tvl:
             _timeout_crs = int(_tvl) * 60
         else:
             _timeout_crs = 60*60
@@ -2388,7 +2530,7 @@ class ebExascaleUtils(object):
             raise ExacloudRuntimeError(0x0811, 0xA, _msg)
         else:
             _json = ''.join( _out.splitlines())
-            if _json[0] == '{':
+            if _json and _json[0] == '{':
                 _jsonOut = json.loads(_json)
                 _usedSpaceGb = float(_jsonOut['data']['attributes']['spaceUsed'])
                 if _usedSpaceGb > 0:
@@ -2450,7 +2592,7 @@ class ebExascaleUtils(object):
 
                 #Create ACFS FileSystem
                 _escli.mCreateACFSFileSystem(_cell, _vol_id, "/var/opt/oracle/dbaas_acfs", _acfs_name, _gi_clustername, aOptions)
-                _acfs_id, _, _ = _escli.mGetACFSFileSystem(_cell, _vol_id, aOptions)
+                _acfs_id, _, _, _ = _escli.mGetACFSFileSystem(_cell, _vol_id, aOptions)
         return _acfs_id
 
     def mCreateACFS(self, aOptions):
@@ -2494,7 +2636,7 @@ class ebExascaleUtils(object):
 
                     #Create ACFS FileSystem
                     _escli.mCreateACFSFileSystem(_cell, _vol_id, _mount_path, _acfs_name, _gi_clustername, aOptions)
-                    _acfs_id, _, _ = _escli.mGetACFSFileSystem(_cell, _vol_id, aOptions)
+                    _acfs_id, _, _, _ = _escli.mGetACFSFileSystem(_cell, _vol_id, aOptions)
 
     def mResizeACFS(self, aOptions):
         _cell = ""
@@ -2516,14 +2658,8 @@ class ebExascaleUtils(object):
         if aOptions is not None and aOptions.jsonconf is not None and \
                "acfs" in list(aOptions.jsonconf.keys()):
             _acfs_list = aOptions.jsonconf["acfs"]
-
-        if not _ebox.mIsOciEXACC() and 'rack' in list(aOptions.jsonconf.keys()) \
-            and 'name' in list(aOptions.jsonconf['rack'].keys()):
-            _clusterName = "grid" + aOptions.jsonconf['rack']['name']
-            ebLogInfo(f"Fetching the Cluster name:{_clusterName} from input payload")
-        else:
-            _clusterName = "grid" + _ebox.mGetClusters().mGetCluster().mGetCluName()
-            ebLogInfo(f"Fetching the Cluster name:{_clusterName} from XML")
+        
+        _clusterName = "grid" + self.mGetClusterName(aOptions)
 
         for _acfs in _acfs_list:
             _acfs_name = _acfs['name']
@@ -2591,7 +2727,7 @@ class ebExascaleUtils(object):
 
             _vol_id, _ = _escli.mGetVolumeID(_cell, _acfs_vol, aOptions)
             if _vol_id:
-                _acfs_id, _, _ = _escli.mGetACFSFileSystem(_cell, _vol_id, aOptions)
+                _acfs_id, _, _, _ = _escli.mGetACFSFileSystem(_cell, _vol_id, aOptions)
                 if _acfs_id:
                     _escli.mUnMountACFSFileSystem(_cell, _acfs_id, aOptions)
 
@@ -2613,18 +2749,30 @@ class ebExascaleUtils(object):
                "acfs" in list(aOptions.jsonconf.keys()):
             _acfs_list = aOptions.jsonconf["acfs"]
 
-        for _acfs in _acfs_list:
-            _mount_path = ""
-            _acfs_name = _acfs['name']
-            _acfs_vol = "vol_" + _acfs_name
-
-            _vol_id, _ = _escli.mGetVolumeID(_cell, _acfs_vol, aOptions)
-            if _vol_id:
-                _, _mount_path, _size_str = _escli.mGetACFSFileSystem(_cell, _vol_id, aOptions)
-                if _size_str:
-                    _size_list = re.findall(r'\d+(?:\.\d+)?|\w+', _size_str)
-                    _size_gb = math.ceil(float(_size_list[0]))
-                _res_list.append({"name": _acfs_name, "gb_size": _size_gb, "mount_path": _mount_path})
+        _ret, _out, _err = _escli.mGetACFSFileSystemByJsonFormat(_cell, aOptions)
+        if _ret != 0:
+            _msg = f'Unable to get ACFS Filesystem'
+            ebLogError(_msg)
+            _ebox.mUpdateErrorObject(gExascaleError["GET_ACFS_FAILED"], _msg)
+            self._mUpdateRequestData(_ret, _data_d, _msg)
+            raise ExacloudRuntimeError(aErrorMsg=_msg)
+        else:
+            _json = ''.join( _out.splitlines())
+            if _json and _json[0] == '{':
+                _jsonOut = json.loads(_json)
+                for _acfs in _acfs_list:
+                    _mount_path = ""
+                    _acfs_name = _acfs['name']
+                    _acfs_vol = "vol_" + _acfs_name
+                    _vol_id, _ = _escli.mGetVolumeID(_cell, _acfs_vol, aOptions)
+                    _fs_dict = next((_fs for _fs in _jsonOut["data"] if _fs["attributes"].get("volume") == _vol_id), None)
+                    if _fs_dict:
+                        _mount_path = _fs_dict["attributes"]["mountPath"]
+                        _size_gb = float(float(_fs_dict["attributes"]["size"])/(1024*1024*1024))
+                        _total_free_gb = float(float(_fs_dict["attributes"]["totalFree"])/(1024*1024*1024))
+                        _used_gb = math.ceil(float(_size_gb - _total_free_gb))
+                        _size_gb = math.floor(_size_gb)
+                        _res_list.append({"name": _acfs_name, "size_gb": _size_gb, "used_gb": _used_gb, "mount_path": _mount_path})
         _data_d["acfs"] = _res_list
         ebLogInfo(f"ACFS Size: {_data_d}")
         self._mUpdateRequestData(_ret, _data_d, "")
@@ -2639,7 +2787,7 @@ class ebExascaleUtils(object):
         _vol_id, _ = _escli.mGetVolumeID(_cell, _acfs_volname, aOptions)
         if _vol_id:
             _vol_attach, _, _ = _escli.mGetVolumeAttachments(_cell, _vol_id, aOptions)
-            _acfs_id, _, _ = _escli.mGetACFSFileSystem(_cell, _vol_id, aOptions)
+            _acfs_id, _, _, _ = _escli.mGetACFSFileSystem(_cell, _vol_id, aOptions)
 
             if _acfs_id:
                 _escli.mUnMountACFSFileSystem(_cell, _acfs_id, aOptions)
@@ -2744,34 +2892,42 @@ class ebExascaleUtils(object):
         self.mDetachAcfsVolume(aOptions)
         self.mRemoveAcfsDir()
 
+    def mGetClusterName(self, aOptions):
+        _ebox = self.__cluctrl
+        _clusterName = ""
+
+        if not _ebox.mIsOciEXACC() and 'rack' in list(aOptions.jsonconf.keys()) \
+            and 'name' in list(aOptions.jsonconf['rack'].keys()):
+            _clusterName = aOptions.jsonconf['rack']['name']
+            if _clusterName and len(_clusterName) > MAX_CLU_NAME_LEN:
+                _clusterName = _ebox.mGetClusters().mGetCluster().mGetCluName()
+                ebLogInfo(f"Fetching the Cluster name:{_clusterName} from XML")
+            else:
+                ebLogInfo(f"Fetching the Cluster name:{_clusterName} from input payload")
+        else:
+            _clusterName = _ebox.mGetClusters().mGetCluster().mGetCluName()
+            ebLogInfo(f"Fetching the Cluster name:{_clusterName} from XML")
+
+        return _clusterName
+
     def mUnRegisterACFS(self, aOptions):
         _ebox = self.__cluctrl
         _escli = self.__escli
         _cell_list = _ebox.mReturnCellNodes()
         _cell = list(_cell_list.keys())[0]
 
-        if not _ebox.mIsOciEXACC() and 'rack' in list(aOptions.jsonconf.keys()) \
-            and 'name' in list(aOptions.jsonconf['rack'].keys()):
-            _clusterName = aOptions.jsonconf['rack']['name']
-            ebLogInfo(f"Fetching the Cluster name:{_clusterName} from input payload")
-        else:
-            _clusterName = _ebox.mGetClusters().mGetCluster().mGetCluName()
-            ebLogInfo(f"Fetching the Cluster name:{_clusterName} from XML")
-
         try:
-            _gi_clustername, _ = _escli.mGetClusterID(_cell, aOptions)
-            if _gi_clustername:
-                _acfs_volname = "vol" + "_" + _gi_clustername
-                _volume_id, _ = _escli.mGetVolumeID(_cell, _acfs_volname, aOptions)
-            else:
-                _gi_clustername = _escli.mGetUser(_cell, _clusterName, aOptions)
-                _acfs_volname = "vol" + "_" + _gi_clustername
-                _volume_id, _ = _escli.mGetVolumeID(_cell, _acfs_volname, aOptions)
+            _clusterName = self.mGetClusterName(aOptions)
+            _gi_clustername = "grid" + _clusterName
+            _acfs_volname = "vol" + "_" + _gi_clustername
+            _volume_id, _ = _escli.mGetVolumeID(_cell, _acfs_volname, aOptions)
             if _volume_id:
-                _acfs_id, _, _ = _escli.mGetACFSFileSystem(_cell, _volume_id, aOptions)
+                _acfs_id, _, _, _ = _escli.mGetACFSFileSystem(_cell, _volume_id, aOptions)
                 if _acfs_id:
-                    _escli.mUnMountACFSFileSystem(_cell, _acfs_id, aOptions)
+                    _escli.mUnMountACFSFileSystem(_cell, _acfs_id, aOptions, aRaiseError=False)
                     _escli.mRemoveACFSFileSystem(_cell, _acfs_id, aOptions)
+            else:
+                ebLogError(f"Volume ID not exisiting for ACFS:{_acfs_volname}")
         except Exception as e:
             ebLogWarn(f"*** mUnRegisterACFS failed with Exception: {str(e)}")
 
@@ -2782,23 +2938,10 @@ class ebExascaleUtils(object):
         _cell_list = _ebox.mReturnCellNodes()
         _cell = list(_cell_list.keys())[0]
 
-        if not _ebox.mIsOciEXACC() and 'rack' in list(aOptions.jsonconf.keys()) \
-            and 'name' in list(aOptions.jsonconf['rack'].keys()):
-            _clusterName = aOptions.jsonconf['rack']['name']
-            ebLogInfo(f"Fetching the Cluster name:{_clusterName} from input payload")
-        else:
-            _clusterName = _ebox.mGetClusters().mGetCluster().mGetCluName()
-            ebLogInfo(f"Fetching the Cluster name:{_clusterName} from XML")
-
-        _gi_clustername, _ = _escli.mGetClusterID(_cell, aOptions)
-        if _gi_clustername:
-            _acfs_volname = "vol" + "_" + _gi_clustername
-            _volume_id, _ = _escli.mGetVolumeID(_cell, _acfs_volname, aOptions)
-        else:
-            _gi_clustername = _escli.mGetUser(_cell, _clusterName, aOptions)
-            _acfs_volname = "vol" + "_" + _gi_clustername
-            _volume_id, _ = _escli.mGetVolumeID(_cell, _acfs_volname, aOptions)
-
+        _clusterName = self.mGetClusterName(aOptions)
+        _gi_clustername = "grid" + _clusterName
+        _acfs_volname = "vol" + "_" + _gi_clustername
+        _volume_id, _ = _escli.mGetVolumeID(_cell, _acfs_volname, aOptions)
         _vol_attach, _, _ = _escli.mGetVolumeAttachments(_cell, _volume_id, aOptions)
 
         #Remove EDV volume attachment
@@ -2806,7 +2949,7 @@ class ebExascaleUtils(object):
             _escli.mRemoveEDVAttachment(_cell, aOptions, _vol_attach, aForce=_force)
 
             _timeout = _ebox.mCheckConfigOption('volume_detach_timeout')
-            if _timeout is not None:
+            if _timeout:
                 _timeout_rmvolume = int(_timeout)
             else:
                 _timeout_rmvolume = 600
@@ -2819,6 +2962,9 @@ class ebExascaleUtils(object):
     def mDeleteFilesInDbVault(self, aOptions):
         _ebox = self.__cluctrl
         _escli = self.__escli
+        _retries = 0
+        _max_retries = 15
+        _timeout = 60
         try:
             if aOptions is not None and aOptions.jsonconf is not None and \
                "exascale" in list(aOptions.jsonconf.keys()):
@@ -2835,18 +2981,54 @@ class ebExascaleUtils(object):
         _cell_list = _ebox.mReturnCellNodes()
         _cell = list(_cell_list.keys())[0]
 
-        if not _ebox.mIsOciEXACC() and 'rack' in list(aOptions.jsonconf.keys()) \
-            and 'name' in list(aOptions.jsonconf['rack'].keys()):
-            _clusterName = aOptions.jsonconf['rack']['name']
-            ebLogInfo(f"Fetching the Cluster name:{_clusterName} from input payload")
-        else:
-            _clusterName = _ebox.mGetClusters().mGetCluster().mGetCluName()
-            ebLogInfo(f"Fetching the Cluster name:{_clusterName} from XML")
-
+        _clusterName = self.mGetClusterName(aOptions)
         _vault = "@" + _vault_name
-        _cluster = _clusterName.upper()
-        _files = f"{_vault}/{_cluster}*"
-        _escli.mRemoveFile(_cell, _files, aOptions, aForce=True)
+        _cluster_up, _cluster_lr, _cluster = _clusterName.upper(), _clusterName.lower(), _clusterName
+        _files_up, _files_lr, _files_exact  = f"{_vault}/{_cluster_up}*", f"{_vault}/{_cluster_lr}*", f"{_vault}/{_cluster}*"
+
+        _output_up = _escli.mListFiles(_cell, _files_up, aOptions)
+        _output_lr = _escli.mListFiles(_cell, _files_lr, aOptions)
+        _output_exact = _escli.mListFiles(_cell, _files_exact, aOptions)
+        _output = set(_output_up + _output_lr + _output_exact)
+
+        while _output and _retries < _max_retries:
+            try:
+                for _files in [_files_up, _files_lr, _files_exact]:
+                    _escli.mRemoveFile(_cell, _files, aOptions)
+
+                # Wait for the specified timeout of 5 seconds before retrying
+                time.sleep(_timeout)
+
+                _output_up = _escli.mListFiles(_cell, _files_up, aOptions)
+                _output_lr = _escli.mListFiles(_cell, _files_lr, aOptions)
+                _output_exact = _escli.mListFiles(_cell, _files_exact, aOptions)
+                _output = set(_output_up + _output_lr + _output_exact)
+
+                # Increment the retry counter
+                _retries += 1
+            except Exception as e:
+                ebLogError(f"Exception occurred: {e}")
+                break
+
+        if _output:
+            _err_str = f"Failed to remove files after {_max_retries} retries."
+            ebLogError(_err_str)
+            raise ExacloudRuntimeError(aErrorMsg=_err_str)
+        else:
+            ebLogInfo(f"Files removed successfully from DB Vault:{_vault_name}.")
+
+    def mRemoveUser(self, aOptions):
+        _ebox = self.__cluctrl
+        _escli = self.__escli
+        _cell_list = _ebox.mReturnCellNodes()
+        _cell = list(_cell_list.keys())[0]
+
+        _clusterName = self.mGetClusterName(aOptions)
+        _gi_clustername = "grid" + _clusterName
+        _escli.mRemoveUser(_cell, _gi_clustername, aOptions)
+
+        _oracle_clustername = "oracle" + _clusterName
+        _escli.mRemoveUser(_cell, _oracle_clustername, aOptions)
 
     def mCreateU02Volume(self, aHost, aVolName, aSize, aOptions):
         _host = aHost
@@ -3042,19 +3224,26 @@ class ebExascaleUtils(object):
         _escli = self.__escli
         _cell_list = _ebox.mReturnCellNodes()
         _cell = list(_cell_list.keys())[0]
+        _clusterName = ""
 
         if not _ebox.mIsOciEXACC() and 'rack' in list(aOptions.jsonconf.keys()) \
             and 'name' in list(aOptions.jsonconf['rack'].keys()):
-            _clusterName = "grid" + aOptions.jsonconf['rack']['name']
+            _clusterName = aOptions.jsonconf['rack']['name']
             ebLogInfo(f"Fetching the Cluster name:{_clusterName} from input payload")
         else:
-            _clusterName = "grid" + _ebox.mGetClusters().mGetCluster().mGetCluName()
+            _clusterName = _ebox.mGetClusters().mGetCluster().mGetCluName()
             ebLogInfo(f"Fetching the Cluster name:{_clusterName} from XML")
-        
+
         if _host and _vault:
             _escli.mChangeACL(_cell, None, _acl_priv, aOptions, _host, aVaultName=_vault)
         else:
-           _escli.mChangeACL(_cell, _clusterName, _acl_priv, aOptions)
+            # update grid user acl
+            _giUser = "grid" + _clusterName
+            _escli.mChangeACL(_cell, _giUser, _acl_priv, aOptions)
+
+            # update oracle user acl as well
+            _oracleUser = "oracle" + _clusterName
+            _escli.mChangeACL(_cell, _oracleUser, _acl_priv, aOptions)
 
     def mDetachU02(self, aDom0, aDomU, aU02Name, aDevicePath, aOptions):
         _dom0 = aDom0
@@ -3141,8 +3330,7 @@ class ebExascaleUtils(object):
             _err_msg = f'Invalid XS Put operation {(_inputjson["operation"])}'
             _ebox.mUpdateErrorObject(gExascaleError["INVALID_EXASCALE_OPERATION"], _err_msg)
             return _rc
-        
-            
+
     def mGetComputeDetails(self, aOptions):
         """
         function to get details of the new compute
@@ -3231,9 +3419,9 @@ class ebExascaleUtils(object):
                 if _ebox.mGetCmd() == "vmgi_reshape":
                     _image_vault, _backup_vault = self.mGetImageBackupVault(aOptions)
                     if _image_vault:
-                        self.mUpdateACL(aOptions, aHost=_host, aVaultName=_image_vault, aAclPriv="M")
+                        self.mUpdateACL(aOptions, aHost=_dom0, aVaultName=_image_vault, aAclPriv="M")
                     if _backup_vault:
-                        self.mUpdateACL(aOptions, aHost=_host, aVaultName=_backup_vault, aAclPriv="M")
+                        self.mUpdateACL(aOptions, aHost=_dom0, aVaultName=_backup_vault, aAclPriv="M")
 
                 #Update volume access for the computes
                 _domU_mac = _ebox.mGetMachines().mGetMachineConfig(_domU)
@@ -3381,95 +3569,210 @@ class ebExascaleUtils(object):
                 _rack_type = "normal"
         return _rack_type
 
-    def mCreateOracleWallet(self, aOptions):
+    def mCreateOracleEsWallet(self, aOptions):
         _ebox = self.__cluctrl
+        _escli = self.__escli
 
-        # Create eswallet for oracle or DB user
-        _srcDomu = None
-        _exaRootUrl = None
-        _cluster_name = None
+        _cmd_type = _ebox.mGetCmd()
 
-        # fetch Grid cluster name
-        if not _ebox.mIsOciEXACC() and 'rack' in list(aOptions.jsonconf.keys()) \
-            and 'name' in list(aOptions.jsonconf['rack'].keys()):
-            _cluster_name = aOptions.jsonconf['rack']['name']
-            ebLogInfo(f"Fetching the Cluster name:{_cluster_name} from input payload")
-        else:
-            _cluster_name = _ebox.mGetClusters().mGetCluster().mGetCluName()
-            ebLogInfo(f"Fetching the Cluster name:{_cluster_name} from XML")
+        # Create eswallet for oracle or DB user during createservice
+        if _cmd_type == "createservice":
+            # Create eswallet for oracle or DB user
+            _srcDomu = None
+            _exaRootUrl = None
+            _cluster_name = None
 
-        ESCLI = "/usr/bin/escli"
-        _gridWallet = "/etc/oracle/cell/network-config/eswallet"
-        _oracleWallet = "/u02/app/oracle/admin/eswallet"
-        _mkwalletScr = f"/tmp/oracle{_cluster_name}.mkwallet.scr"
-        _chwalletScr = f"/tmp/oracle{_cluster_name}.chwallet.scr"
-        _privkeyfile = f"/tmp/ExascaleCluster-{_cluster_name}-oracle.priv.key"
-        _pubkeyfile = f"/tmp/ExascaleCluster-{_cluster_name}-oracle.pub.key"
-        _orawalletuser = f"oracle{_cluster_name}"
-        _node = exaBoxNode(get_gcontext())
-        for _, _domu in _ebox.mReturnDom0DomUPair():
-            if _srcDomu is None:
-                # setup wallet on the 1st domU
-                # fetch exaRootUrl from grid eswallet that was already setup
-                _srcDomu = _domu
-                _node.mConnect(aHost=_domu)
+            # DB vault
+            if aOptions is not None and aOptions.jsonconf is not None and "exascale" in list(aOptions.jsonconf.keys()):
+                _exascale_attr = aOptions.jsonconf['exascale']
+                _vaultName = _exascale_attr['db_vault']['name'].strip()
+            else:
+                ebLogInfo(f"Not an Exascale system to create eswallet")
+                return
+
+            # fetch Grid cluster name
+            if not _ebox.mIsOciEXACC() and 'rack' in list(aOptions.jsonconf.keys()) \
+                and 'name' in list(aOptions.jsonconf['rack'].keys()):
+                _cluster_name = aOptions.jsonconf['rack']['name']
+                ebLogInfo(f"Fetching the Cluster name:{_cluster_name} from input payload")
+            else:
+                _cluster_name = _ebox.mGetClusters().mGetCluster().mGetCluName()
+                ebLogInfo(f"Fetching the Cluster name:{_cluster_name} from XML")
+
+            ESCLI = "/usr/bin/escli"
+            _gridWallet = "/etc/oracle/cell/network-config/eswallet"
+            _oracleWallet = "/u02/app/oracle/admin/eswallet"
+            _mkwalletScr = f"/tmp/oracle{_cluster_name}.mkwallet.scr"
+            _chwalletScr = f"/tmp/oracle{_cluster_name}.chwallet.scr"
+            _privkeyfile = f"/tmp/ExascaleCluster-{_cluster_name}-oracle.priv.key"
+            _pubkeyfile = f"/tmp/ExascaleCluster-{_cluster_name}-oracle.pub.key"
+            _orawalletuser = f"oracle{_cluster_name}"
+            _dom0_domU_pairs = list(_ebox.mReturnDom0DomUPair())
+            if not _dom0_domU_pairs:
+                ebLogWarn("No Dom0/DomU pairs found to configure oracle wallet")
+                return -1
+
+            _srcDomu = _dom0_domU_pairs[0][1]
+            # connect to source DomU and run wallet setup steps
+            with node_connect_to_host(exaBoxNode(get_gcontext()), _srcDomu) as _node:
+                _sudo_cmd = node_cmd_abs_path_check(_node, "sudo", sbin=True)
+                _grep_cmd = node_cmd_abs_path_check(_node, "grep")
+                _mkdir_cmd = node_cmd_abs_path_check(_node, "mkdir")
+                _chown_cmd = node_cmd_abs_path_check(_node, "chown")
+                _echo_cmd = node_cmd_abs_path_check(_node, "echo")
+                _rm_cmd = node_cmd_abs_path_check(_node, "rm")
+                _ls_cmd = node_cmd_abs_path_check(_node, "ls")
+                _scp_cmd = node_cmd_abs_path_check(_node, "scp")
                 if _node.mFileExists('/etc/oracle/cell/network-config/eswallet'):
-                    _cmd = f"sudo -u grid {ESCLI} --wallet {_gridWallet} lswallet --attributes exaRootUrl | grep -v exaRootUrl"
+                    _cmd = (f"{_sudo_cmd} -u grid {ESCLI} --wallet {_gridWallet} "
+                        f"lswallet --attributes exaRootUrl | {_grep_cmd} -v exaRootUrl")
                     _, _o, _ = _node.mExecuteCmd(_cmd)
                     _out = _o.readlines()
                     if _out and len(_out):
                         _exaRootUrl = _out[0].strip()
 
                 # create eswallet directory
-                _cmd = f"/bin/mkdir -p {_oracleWallet}"
+                _cmd = f"{_mkdir_cmd} -p {_oracleWallet}"
                 _, _o, _ = _node.mExecuteCmd(_cmd)
 
                 # change ownership to oracle:oinstall in oracle eswallet files
-                _node.mExecuteCmd(f"/bin/chown -fR oracle:oinstall {_oracleWallet}")
+                _node.mExecuteCmd(f"{_chown_cmd} -fR oracle:oinstall /u02/app")
 
                 #  mkwallet --wallet /u02/app/oracle/admin/eswallet
                 _cmd = f" mkwallet --wallet {_oracleWallet}"
-                _node.mExecuteCmd(f"/bin/echo '{_cmd}' > {_mkwalletScr}")
-                _node.mExecuteCmd(f"/bin/echo '{_cmd}' > {_chwalletScr}")
+                _node.mExecuteCmd(f"{_echo_cmd} '{_cmd}' > {_mkwalletScr}")
+                _node.mExecuteCmd(f"{_echo_cmd} '{_cmd}' > {_chwalletScr}")
 
-                # mkkey --private-key-file /u02/app/oracle/admin/eswallet/ExascaleCluster1-Cluster-c1-oracle.priv.key --public-key-file /u02/app/oracle/admin/eswallet/ExascaleCluster1-Cluster-c1-oracle.pub.key
+                # mkkey --private-key-file ... --public-key-file ...
                 _cmd = f" mkkey --private-key-file {_privkeyfile} --public-key-file {_pubkeyfile}"
-                _node.mExecuteCmd(f"/bin/echo '{_cmd}' >> {_mkwalletScr}")
+                _node.mExecuteCmd(f"{_echo_cmd} '{_cmd}' >> {_mkwalletScr}")
 
-                # chwallet --wallet /u02/app/oracle/admin/eswallet --private-key-file /u02/app/oracle/admin/eswallet/ExascaleCluster1-Cluster-c1-oracle.priv.key
-                #    --attributes user=oracleCluster-c1 --attributes exaRootUrl="egs=..."
+                # chwallet --wallet ... --attributes user=... --attributes exaRootUrl=...
                 _cmd = f"chwallet --wallet {_oracleWallet} --private-key-file {_privkeyfile} --attributes user={_orawalletuser} --attributes exaRootUrl=\"{_exaRootUrl}\""
-                _node.mExecuteCmd(f"/bin/echo '{_cmd}' >> {_mkwalletScr}")
-                _node.mExecuteCmd(f"/bin/echo '{_cmd}' >> {_chwalletScr}")
+                _node.mExecuteCmd(f"{_echo_cmd} '{_cmd}' >> {_mkwalletScr}")
+                _node.mExecuteCmd(f"{_echo_cmd} '{_cmd}' >> {_chwalletScr}")
+
+                # chwallet --wallet --clear-old-trusted-certs
+                _cmd = f"chwallet --wallet {_oracleWallet} --clear-old-trusted-certs"
+                _node.mExecuteCmd(f"{_echo_cmd} '{_cmd}' >> {_mkwalletScr}")
+                _node.mExecuteCmd(f"{_echo_cmd} '{_cmd}' >> {_chwalletScr}")
+
+                # Fetch Trust cert file
+                _trustCertFile = "/tmp/*TrustedCerts.cert"
+                _, _o, _ = _node.mExecuteCmd(f"{_ls_cmd} /tmp/*TrustedCerts.cert")
+                _out = _o.readlines()
+                if _out and len(_out):
+                    _trustCertFile = str(_out[0].strip())
+
+                # chwallet --wallet --trusted-cert-file ...
+                _cmd = f"chwallet --wallet {_oracleWallet} --trusted-cert-file {_trustCertFile}"
+                _node.mExecuteCmd(f"{_echo_cmd} '{_cmd}' >> {_mkwalletScr}")
+                _node.mExecuteCmd(f"{_echo_cmd} '{_cmd}' >> {_chwalletScr}")
 
                 # Execute escli mkwallet script on src domu
-                _cmd = f"/usr/bin/sudo -u oracle {ESCLI} < {_mkwalletScr}"
+                _cmd = f"{_sudo_cmd} -u oracle {ESCLI} < {_mkwalletScr}"
+                ebLogInfo(f"Execute oracle eswallet mkwallet script on {_srcDomu}")
                 _, _o, _ = _node.mExecuteCmd(_cmd)
 
-            else:
-                # copy the key and escli script files to other domus
-                ebLogInfo(f"Copying oracle eswallet setup files from {_srcDomu} to {_domu}.")
-                _node.mExecuteCmd(f"/usr/bin/sudo -u oracle /bin/scp {_privkeyfile} oracle@{_domu}:/tmp/")
-                _node.mExecuteCmd(f"/usr/bin/sudo -u oracle /bin/scp {_chwalletScr} oracle@{_domu}:/tmp/")
+                for _, _domu in _dom0_domU_pairs[1:]:
+                    # copy the key and escli chwallet script files to other domus
+                    ebLogInfo(f"Copying oracle eswallet setup files from {_srcDomu} to {_domu}.")
+                    _node.mExecuteCmd(
+                        f"{_sudo_cmd} -u oracle {_scp_cmd} {_privkeyfile} oracle@{_domu}:/tmp/")
+                    _node.mExecuteCmd(
+                        f"{_sudo_cmd} -u oracle {_scp_cmd} {_chwalletScr} oracle@{_domu}:/tmp/")
 
-        # cleanup and disconnect from source domu
-        _node.mExecuteCmd(f"/usr/bin/rm -f {_privkeyfile} {_pubkeyfile} {_mkwalletScr}")
-        _node.mDisconnect()
+                # copy pubkey to local
+                _node.mCopy2Local(_pubkeyfile, _pubkeyfile)
 
-        # Execute escli chwallet script on remote domus
-        _node = exaBoxNode(get_gcontext())
-        for _, _domu in _ebox.mReturnDom0DomUPair():
-            if not _domu == _srcDomu:
-                _node.mConnect(aHost=_domu)
-                _cmd = f"/bin/mkdir -p {_oracleWallet}"
-                _, _o, _ = _node.mExecuteCmd(_cmd)
+                # cleanup and disconnect from source domu
+                _node.mExecuteCmd(f"{_rm_cmd} -f {_privkeyfile} {_pubkeyfile} {_mkwalletScr}")
 
-                # change ownership to oracle:oinstall in oracle eswallet files
-                _node.mExecuteCmd(f"/bin/chown -fR oracle:oinstall {_oracleWallet}")
+            # Create oracle wallet user in cell server
+            _cell_list = _ebox.mReturnCellNodes()
+            _cell = list(_cell_list.keys())[0]
+            with connect_to_host(_cell, get_gcontext()) as _cell_node:
+                _cell_node.mCopyFile(_pubkeyfile, _pubkeyfile)
+            _escli.mCreateEsWalletUser(aOptions, _cell, _orawalletuser, _pubkeyfile, _vaultName)
 
-                # Execute mkwallet script
-                _cmd = f"/usr/bin/sudo -u oracle {ESCLI} < {_chwalletScr}"
-                _, _o, _ = _node.mExecuteCmd(_cmd)
-                # cleanup
-                _node.mExecuteCmd(f"/usr/bin/rm -f {_privkeyfile} {_chwalletScr}")
-                _node.mDisconnect()
+            # connect to remaining DomUs and execute wallet provisioning
+            for _, _domu in _dom0_domU_pairs[1:]:
+                with node_connect_to_host(exaBoxNode(get_gcontext()), _domu) as _node:
+                    _mkdir_cmd = node_cmd_abs_path_check(_node, "mkdir")
+                    _chown_cmd = node_cmd_abs_path_check(_node, "chown")
+                    _rm_cmd = node_cmd_abs_path_check(_node, "rm")
+                    _sudo_cmd = node_cmd_abs_path_check(_node, "sudo", sbin=True)
+                    # create eswallet directory
+                    _cmd = f"{_mkdir_cmd} -p {_oracleWallet}"
+                    _, _o, _ = _node.mExecuteCmd(_cmd)
+
+                    # change ownership to oracle:oinstall in oracle eswallet files
+                    _node.mExecuteCmd(f"{_chown_cmd} -fR oracle:oinstall /u02/app")
+
+                    # Execute mkwallet script
+                    _cmd = f"{_sudo_cmd} -u oracle {ESCLI} < {_chwalletScr}"
+                    _, _o, _ = _node.mExecuteCmd(_cmd)
+                    # cleanup
+                    _node.mExecuteCmd(f"{_rm_cmd} -f {_privkeyfile} {_chwalletScr}")
+
+        elif _cmd_type == "vmgi_reshape":
+            # Reshape: distribute existing oracle wallet to new DomU nodes
+            _oracleWallet = "/u02/app/oracle/admin/eswallet"
+
+            _existing_pairs = _ebox.mGetElasticOldDom0DomUPair()
+            if not _existing_pairs:
+                ebLogError("No existing Dom0/DomU pairs found to distribute oracle wallet")
+                return -1
+
+            _new_pairs = []
+            _input_json = aOptions.jsonconf
+            _reshape_subset = _input_json.get('reshaped_node_subset', {})
+            _added_computes = _reshape_subset.get('added_computes', [])
+
+            if _added_computes:
+                for _compute in _added_computes:
+                    _dom0 = _compute.get('compute_node_hostname')
+                    _domu = _compute['virtual_compute_info']['compute_node_hostname']
+                    if _dom0 and _domu:
+                        _new_pairs.append((_dom0, _domu))
+
+            if not _new_pairs:
+                ebLogError("No Dom0/DomU pairs detected for reshape wallet distribution")
+                return -1
+
+            _existing_domus = {domu for _, domu in _existing_pairs}
+            _new_domus = {domu for _, domu in _new_pairs}
+            _srcDomu = None
+            for _domu in _existing_domus:
+                if _domu not in _new_domus:
+                    with node_connect_to_host(exaBoxNode(get_gcontext()), _domu) as _node:
+                        if _node.mFileExists(_oracleWallet):
+                            _srcDomu = _domu
+                            break
+
+            if not _srcDomu:
+                ebLogError("Failed to get srcDomu with oracle wallet")
+                return -1
+
+            ebLogInfo(f"Using source domU {_srcDomu} for oracle eswallet copy")
+
+            # create eswallet directory on new domUs
+            for _, _domu in _new_pairs:
+                with node_connect_to_host(exaBoxNode(get_gcontext()), _domu) as _node:
+                    _mkdir_cmd = node_cmd_abs_path_check(_node, "mkdir")
+                    _sudo_cmd = node_cmd_abs_path_check(_node, "sudo", sbin=True)
+                    _cmd = f"{_mkdir_cmd} -p {_oracleWallet}"
+                    _, _o, _ = _node.mExecuteCmd(_cmd)
+                    _node.mExecuteCmd(f"{_sudo_cmd} chown -fR oracle:oinstall /u02/app")
+
+            with node_connect_to_host(exaBoxNode(get_gcontext()), _srcDomu) as _node:
+                _sudo_cmd = node_cmd_abs_path_check(_node, "sudo", sbin=True)
+                _ssh_cmd = node_cmd_abs_path_check(_node, "ssh")
+                _scp_cmd = node_cmd_abs_path_check(_node, "scp")
+                # Ensure permissions before transfer
+                _node.mExecuteCmd(f"{_sudo_cmd} chown -fR oracle:oinstall {_oracleWallet}")
+
+                for _, _domu in _new_pairs:
+                    ebLogInfo(f"Copying oracle eswallet from {_srcDomu} to {_domu}.")
+                    _cmd = f"{_sudo_cmd} -u oracle {_scp_cmd} -r {_oracleWallet} oracle@{_domu}:/u02/app/oracle/admin"
+                    _, _o, _ = _node.mExecuteCmd(_cmd)

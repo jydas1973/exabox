@@ -1,5 +1,5 @@
 """
- Copyright (c) 2019, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2019, 2026, Oracle and/or its affiliates.
 
 NAME:
     cs_util.py - step wise Create Service UTILities
@@ -17,6 +17,8 @@ INTERNAL CLASSES:
 
 History:
     MODIFIED (MM/DD/YY)
+    jfsaldan  03/13/26   - Enh 37054517 - EXADB-XS:EXACLOUD:IMAGE BASE
+                           PROVISIONING: SUPPORT BOM FILE IN EXACLOUD
     pbellary  11/03/25   - Bug 38605016: INSTALL CLUSTER STEP FAILING TIMEOUT WHILE EXECUTING OEDA STEP: 9 
     pbellary  10/30/25   - Enh 38596691 - ASM/EXASCALE TO SUPPORT ADD NODE WITH EDV IMAGE
     akkar     08/30/25   - Bug 38025087: dbaastool rpm for multi cloud
@@ -84,7 +86,7 @@ History:
     srtata    04/01/2019 - Creation
 
 """
-from exabox.core.Error import ebError, ExacloudRuntimeError, gProvError
+from exabox.core.Error import ebError, ExacloudRuntimeError, gProvError, retryOnException
 from exabox.log.LogMgr import ebLogError, ebLogInfo, ebLogWarn, ebLogDebug, ebLogVerbose, ebLogTrace
 from exabox.ovm.csstep.cs_constants import csConstants, csXSConstants, csXSEighthConstants, csBaseDBXSConstants, csAsmEDVConstants, csEighthConstants, csX11ZConstants
 from exabox.core.Node import exaBoxNode
@@ -103,6 +105,7 @@ import time, json
 import re
 import os
 import subprocess
+import time
 from exabox.BaseServer.AsyncProcessing import ProcessManager, ProcessStructure, TimeoutBehavior, ExitCodeBehavior
 
 # This class contains utility functions used by create service 
@@ -1154,3 +1157,54 @@ class csUtil(object):
             _override_str = " -override"
 
         return _override_str
+
+    def mSetupDBCSAgentAuth(self, aDom0DomUPairs):
+        """
+        Driver method to set up the DomU Agent Auth
+        """
+
+        def _setup_dbcs_agent_auth_per_node(aDomU):
+            """
+            Helper method to use as callback as part of out
+            multiprocessing
+            """
+            ebLogInfo(f"Setting up Auth DCS in {aDomU}")
+            with connect_to_host(aDomU, get_gcontext()) as _node:
+                _node.mExecuteCmdLog("/opt/oracle/dcs/bin/setupAuthDcs.py")
+
+                self.mStartServiceInNode(_node, "dbcsagent")
+                self.mStartServiceInNode(_node, "dbcsadmin")
+
+        ebLogInfo(f"Spawning subprocess to set domU Agent Auth")
+        _plist = ProcessManager()
+
+        for _dom0, _domU in aDom0DomUPairs:
+            _p = ProcessStructure(_setup_dbcs_agent_auth_per_node, [_domU], _domU)
+            _p.mSetMaxExecutionTime(60*10) # 10 minutes
+            _p.mSetJoinTimeout(5)
+            _p.mSetLogTimeoutFx(ebLogWarn)
+            _plist.mStartAppend(_p)
+
+        _plist.mJoinProcess()
+
+    @retryOnException(max_times=5, sleep_interval=1)
+    def mStartServiceInNode(self, aNode, aService):
+        """
+        Helper method to use systemctl commands to restart a service and ensure it is active.
+        """
+
+        _hostname = aNode.mGetHostname()
+        _systemctl = node_cmd_abs_path_check(aNode, "systemctl", sbin=True)
+
+        ebLogInfo(f"Restarting service {aService} on {_hostname}")
+
+        node_exec_cmd_check(aNode, f"{_systemctl} stop {aService}",
+            log_stdout_on_error=True)
+        time.sleep(1)
+        node_exec_cmd_check(aNode, f"{_systemctl} start {aService}",
+            log_stdout_on_error=True)
+        time.sleep(1)
+        node_exec_cmd_check(aNode, f"{_systemctl} is-active {aService}",
+            log_stdout_on_error=True)
+
+        ebLogInfo(f"Service {aService} is active on {_hostname}")

@@ -1,0 +1,35 @@
+{
+    "properties": {
+        "dom0domUPairs": {
+            "items": {
+                "properties": {
+                    "dom0": {
+                        "type": "string"
+                    },
+                    "domus": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    }
+                },
+                "required": [
+                    "dom0",
+                    "domus"
+                ],
+                "type": "object"
+            },
+            "type": "array"
+        },
+        "clientIPs": {
+            "items": {
+                "type": "string"
+            },
+            "type": "array"
+        }
+    },
+    "required": [
+        "dom0domUPairs"
+    ],
+    "type": "object"
+}

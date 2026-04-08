@@ -1,5 +1,5 @@
 """
- Copyright (c) 2019, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2019, 2026, Oracle and/or its affiliates.
 
 NAME:
     cs_base.py - Abstract file for create service steps
@@ -17,6 +17,9 @@ EXTERNAL INTERFACES:
 INTERNAL CLASSES:
 
 History: 
+    jesandov    03/16/2026 - Bug 39036804 - Add GIP error raise
+    scoral      12/16/2025 - Bug 38770136 - Make sure monitor_adming.json is
+                             updated for BaseDB environments.
     pbellary    08/15/2025 - Enh 38318848 - CREATE ASM CLUSTERS TO SUPPORT VM STORAGE ON EDV OF IMAGE VAULT
     aararora    08/07/2025 - ER 37858683: Add tcps config if present in the payload
     dekuckre    07/02/2025 - Add support for clone VM for basedb
@@ -1156,6 +1159,7 @@ class CSBase(metaclass=abc.ABCMeta):
 
             ebLogInfo(f"Grab Dom0 Lock?: {_grabLock}")
             _isclone = aOptions.jsonconf.get("isClone", None)
+
             # set REUSEEDVVOLUMEIFEXIST=true in es.properties for clone VM (basedb) request
             if _ebox.isBaseDB() and _isclone and str(_isclone).lower() == "true":
                 _oeda_path  = _ebox.mGetOedaPath()
@@ -1166,7 +1170,15 @@ class CSBase(metaclass=abc.ABCMeta):
             elif _ebox.isBaseDB() or _ebox.isExacomputeVM():
                 _ebox.mGetBaseDB().mUpdateOedaPropertiesInterface()
             _csConstants = _csu.mGetConstants(_ebox, aOptions)
-            _csu.mExecuteOEDAStep(_ebox, self.step, steplist, aOedaStep=_csConstants.OSTP_CREATE_VM, dom0Lock=_grabLock)
+
+            try:
+                _csu.mExecuteOEDAStep(_ebox, self.step, steplist, aOedaStep=_csConstants.OSTP_CREATE_VM, dom0Lock=_grabLock)
+            except Exception as e:
+                if imageBom.mIsGoldImageProvisioning():
+                    _error_str = "Failed on Gold Image Provisioning"
+                    raise ExacloudRuntimeError(0x0829, 0xA, _error_str, aStackTrace=True)
+                else:
+                    raise
 
         #Install Serial Console bits on dom0 if not present (non ExaCC only)
         if not imageBom.mIsSubStepExecuted(self.step, "CONFIGURE_DOCKER_CONSOLE"):
@@ -1217,7 +1229,7 @@ class CSBase(metaclass=abc.ABCMeta):
 
         #
         # Configure bridge only if static monitoring bridge is not supported.
-        if not imageBom.mIsSubStepExecuted(self.step, "RECONFIGURE_BONDING_AND_NETWORK") and not _ebox.isBaseDB() and not _ebox.isExacomputeVM():
+        if not imageBom.mIsSubStepExecuted(self.step, "CONFIGURE_BONDING") and not _ebox.isExacomputeVM():
             conf_bridge = \
                 not clubonding.is_static_monitoring_bridge_supported(
                     _ebox, payload=aOptions.jsonconf)
@@ -1225,6 +1237,10 @@ class CSBase(metaclass=abc.ABCMeta):
                 _ebox, payload=aOptions.jsonconf, configure_bridge=conf_bridge,
                 configure_monitor=True)
 
+        #
+        # Extra network configuration
+        #
+        if not imageBom.mIsSubStepExecuted(self.step, "RECONFIGURE_NETWORK") and not _ebox.isBaseDB() and not _ebox.isExacomputeVM():
             _isHetero, _ = _ebox.IsHeteroConfig()
             _ociexacc = _ebox.mIsOciEXACC()
             if _isHetero and _ociexacc:

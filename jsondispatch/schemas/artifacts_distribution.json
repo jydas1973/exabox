@@ -1,0 +1,48 @@
+{
+    "properties": {
+        "artifact": {
+            "type": "string"
+        },
+        "dom0": {
+            "items": {
+                "properties": {
+                    "hostname": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "hostname"
+                ],
+                "type": "object"
+            },
+            "type": "array"
+        },
+        "file": {
+            "properties": {
+                "mime": {
+                    "type": "string"
+                },
+                "data": {
+                    "type": "string"
+                },
+                "local_path": {
+                    "type": "string"
+                },
+                "sha256checksum": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "local_path",
+                "mime",
+                "sha256checksum"
+            ],
+            "type": "object"
+        }
+    },
+    "required": [
+        "dom0",
+        "file"
+    ],
+    "type": "object"
+}

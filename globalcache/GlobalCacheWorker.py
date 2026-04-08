@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# $Header: ecs/exacloud/exabox/globalcache/GlobalCacheWorker.py /main/15 2025/11/13 07:05:36 joysjose Exp $
+# $Header: ecs/exacloud/exabox/globalcache/GlobalCacheWorker.py /main/16 2025/12/19 06:53:10 joysjose Exp $
 #
 # GlobalCacheWorker.py
 #
@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    joysjose    12/05/25 - Bug 38728514 To copy reflink even if original
+#                           file is present
 #    joysjose    11/04/25 - Bug 38599605 modify GI bits naming for n-3
 #                           according to new OEDA changes
 #    akkar       11/04/24 - Bug 37177099: Delete img and sha256 files for
@@ -142,17 +144,15 @@ class GlobalCacheWorker:
 
                     _missingDom0s = self.mCalculateMissingDom0s()
 
-                    # All images complete
+                    # All images present in Dom0 GlobalCache
                     if not _missingDom0s:
-                        #Adding this fix to make sure 23.26 images 
+                        #Adding this fix to make sure GI images 
                         # are copied to /EXAVMIMAGES wihtout fail when 
-                        # original file is present in the dom0. 
-                        # This will be removed once general fix is merged
-                        if _26AIMAJORMINORREF in self.__imageName:
-                            _dom0List = self.mGetDom0List()
-                            for _dom0 in _dom0List:
-                                self.mCreateSymbolicLink(_dom0)
-                        ##End of fix for bug 38599605
+                        # original file is present in the dom0 GlobalCache. 
+                        _dom0List = self.mGetDom0List()
+                        for _dom0 in _dom0List:
+                            self.mCreateSymbolicLink(_dom0)
+                        ##End of fix for bug 38599605 and 38728514
                         ebLogInfo(f'image {self.__imageName} is consistent across all dom0s !')
                         return True
 

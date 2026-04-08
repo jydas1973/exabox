@@ -4,7 +4,7 @@ $Header: ecs/exacloud/exabox/managment/src/CronJobEndPoint.py /main/1 2022/12/13
 
 CronJobEndPoint.py
 
- Copyright (c) 2022, Oracle and/or its affiliates.
+ Copyright (c) 2022, 2026, Oracle and/or its affiliates.
 
    NAME
      CronJobEndPoint.py - <one-line expansion of the name>
@@ -16,6 +16,8 @@ CronJobEndPoint.py
      <other useful comments, qualifications, etc.>
 
    MODIFIED   (MM/DD/YY)
+   shapatna    02/09/26 - Bug: 38900266 - Fix for issues pointed by Codev 
+                          in exabox/management directory
    anhiguer    11/24/22 - 34728392 - Creation
 
 """
@@ -44,7 +46,7 @@ class CronJobEndPoint(BaseEndpoint):
         if _json:
             _cmd_to_exec.append(_json)
         print(_cmd_to_exec)
-        _p = subprocess.Popen(_cmd_to_exec, shell=False, stdin=subprocess.PIPE, stdout=subprocess.PIPE, encoding="utf-8")
+        _p = subprocess.Popen(_cmd_to_exec, shell=False, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8")
         _stdout, _stderr = _p.communicate()
         # Failure
         if _p.returncode != 0:

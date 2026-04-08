@@ -1,10 +1,10 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/exatest/infrapatching/tests_targethandler.py /main/16 2025/10/09 17:03:44 avimonda Exp $
+# $Header: ecs/exacloud/exabox/exatest/infrapatching/tests_targethandler.py remamid_bug-38894017/2 2026/02/17 16:51:02 remamid Exp $
 #
 # tests_targethandler.py
 #
-# Copyright (c) 2024, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2024, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_targethandler.py - <one-line expansion of the name>
@@ -16,6 +16,17 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    remamid     02/19/26 - Add mgmt launch async test
+#    araghave    01/19/26 - Bug 38861325 - ECS_MAIN ->
+#                           TESTS_ROCESWITCHHANDLER_PY.DIF AND
+#                           TESTS_TARGETHANDLER_PY.DIF IS FAILING IN
+#                           ECS_MAIN_LINUX.X64_260116.0518
+#    bhpati      01/15/26 - Bug 38671311 - FAILED TO COMPLETE GUEST VM OS
+#                           UPDATE APPLY. VM PATCH EXCEPTION DETECTED
+#    remamid     12/17/25 - Add unittest for bug 38671388
+#    araghave    12/16/25 - Enh 38766076 - CONFIGURE UPDATE-CRYPTO-POLICIES
+#                           BEFORE AND AFTER SWITCH PATCHING
+#    rbhandar    12/11/25 - Bug 37865971 - AIM4ECS:0X03010067 - COMMAND TIMED OUT BEFORE IT COMPLETED.
 #    avimonda    10/07/25 - Bug 38475354 - AIM4ECS:0X03050015 - PATCHMGR
 #                           SESSION ON VM ALREADY EXISTS. REFER MOS NOTE
 #                           2829056.1 FOR MORE DETAILS
@@ -53,6 +64,67 @@
 #    avimonda    02/14/24 - Creation
 #
 import unittest
+import sys
+from pathlib import Path
+from types import MethodType, ModuleType
+import sys
+
+try:
+    import paramiko
+except ModuleNotFoundError:
+    paramiko = ModuleType('paramiko')
+    class AuthenticationException(Exception):
+        pass
+    class SSHException(Exception):
+        pass
+    ssh_exception = ModuleType('paramiko.ssh_exception')
+    ssh_exception.AuthenticationException = AuthenticationException
+    ssh_exception.SSHException = SSHException
+    paramiko.AuthenticationException = AuthenticationException
+    paramiko.SSHException = SSHException
+    paramiko.ssh_exception = ssh_exception
+    sys.modules.setdefault('paramiko', paramiko)
+    sys.modules.setdefault('paramiko.ssh_exception', ssh_exception)
+from paramiko.ssh_exception import SSHException, AuthenticationException
+
+def _ensure_exacloud_on_path():
+    current = Path(__file__).resolve()
+    for parent in current.parents:
+        package_root = parent / "exacloud"
+        if (package_root / "__init__.py").exists():
+            parent_path = str(parent)
+            if parent_path not in sys.path:
+                sys.path.insert(0, parent_path)
+            package_root_path = str(package_root)
+            if package_root_path not in sys.path:
+                sys.path.insert(0, package_root_path)
+            return
+    raise ModuleNotFoundError("Unable to locate exacloud package root for tests_targethandler")
+
+_ensure_exacloud_on_path()
+
+CRYPTO_POLICY_DEFAULT_EXADATA = "DEFAULT:EXADATA"
+CRYPTO_POLICY_DEFAULT = "DEFAULT"
+CRYPTO_POLICY_SHOW_CMD = "/usr/bin/update-crypto-policies --show"
+CRYPTO_POLICY_SET_CMD = "/usr/bin/update-crypto-policies --set {}"
+
+_LOCAL_HOST_STATE = {}
+
+
+def _set_local_host(self, value):
+    _LOCAL_HOST_STATE[id(self)] = value
+
+
+def _get_local_host(self):
+    return _LOCAL_HOST_STATE.get(id(self))
+
+
+def _ensure_local_host_helpers(ctx):
+    if not hasattr(ctx, "mSetLocalHost"):
+        ctx.mSetLocalHost = MethodType(_set_local_host, ctx)
+    if not hasattr(ctx, "mGetLocalHost"):
+        ctx.mGetLocalHost = MethodType(_get_local_host, ctx)
+
 import io
 from unittest.mock import patch, mock_open, MagicMock 
 from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
@@ -60,8 +132,14 @@ from exabox.log.LogMgr import ebLogInfo
 from exabox.proxy.ebProxyJobRequest import ebProxyJobRequest
 from exabox.utils.node import exaBoxNode
 from exabox.infrapatching.handlers.targetHandler.targethandler import TargetHandler
+from exabox.infrapatching.core.infrapatcherror import (
+    PATCH_COPY_ASYNC_TIMEOUT,
+    UNABLE_TO_SSH_PATCHNODE_POSTPATCH,
+    PASSWDLESS_SSH_CLEANUP_FAILED
+)
 from exabox.core.MockCommand import exaMockCommand
-from paramiko.ssh_exception import SSHException
+from exabox.core.Error import ExacloudRuntimeError
+from paramiko.ssh_exception import SSHException, AuthenticationException
 from exabox.infrapatching.handlers.targetHandler.infrapatchmgrhandler import InfraPatchManager
 
 PATCH_DIR_1 = io.StringIO("/EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.17.0.0.231109.1_Linux-x86-64.zip/dbserver_patch_231023\n/EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_22.1.17.0.0.231109.1_Linux-x86-64.zip/dbserver_patch_231115")
@@ -79,10 +157,20 @@ class mockFileHandler():
         self.terminal_op = fileoutput
 
     def read(self):
-        return self.terminal_op
+        if self.terminal_op is None:
+            return ""
+        if hasattr(self.terminal_op, "read"):
+            return self.terminal_op.read()
+        return str(self.terminal_op)
 
     def readlines(self):
-        return self.terminal_op.readlines()
+        if self.terminal_op is None:
+            return []
+        if hasattr(self.terminal_op, "readlines"):
+            return self.terminal_op.readlines()
+        return []
+
+
 
 class ebTestTargetHandler(ebTestClucontrol):
     SUCCESS_ERROR_CODE = "0x00000000"
@@ -90,10 +178,13 @@ class ebTestTargetHandler(ebTestClucontrol):
     @classmethod
     def setUpClass(self):
         ebLogInfo("Starting classSetUp TargetHandler")
-        super(ebTestTargetHandler, self).setUpClass(aGenerateDatabase=True)
+        super(ebTestTargetHandler, self).setUpClass(aGenerateDatabase=False)
         self.mGetClubox(self).mGetCtx().mSetConfigOption("repository_root", self.mGetPath(self))
         _cluCtrl = self.mGetClubox(self)
         _cluCtrl._exaBoxCluCtrl__kvm_enabled = True
+        _cluCtrl.mIsOciEXACC = MagicMock(return_value=True)
+        _cluCtrl.mGetCtx().mSetConfigOption('exacc', 'True')
+        _cluCtrl.mGetCtx().mSetConfigOption('service_type', 'EXACC')
         self.__patch_args_dict = {'CluControl': _cluCtrl,
                                 'LocalLogFile': 'exabox/exatest/infrapatching/resources/patchmgr_logs',
                                 'TargetType': ['dom0'], 'Operation': 'patch_prereq_check', 'OperationStyle': 'rolling',
@@ -196,6 +287,202 @@ class ebTestTargetHandler(ebTestClucontrol):
         for _ret, _errmsg in _ret_stats.items():
             self.assertEqual(_ret, "0x03010055") 
         ebLogInfo("Unit test on TargetHandler.mCleanupExadataPatches executed successfully")
+
+    @patch('exabox.infrapatching.handlers.generichandler.GenericHandler.mIsCryptoPolicyResetEnabled', return_value=True)
+    @patch('exabox.infrapatching.handlers.generichandler.GenericHandler.mIsExaCC', return_value=True)
+    @patch('exabox.core.Node.exaBoxNode.mDisconnect')
+    @patch('exabox.core.Node.exaBoxNode.mIsConnected', return_value=False)
+    @patch('exabox.core.Node.exaBoxNode.mGetCmdExitStatus', return_value=0)
+    @patch('exabox.core.Node.exaBoxNode.mFileExists', return_value=True)
+    @patch('exabox.core.Node.exaBoxNode.mExecuteCmd')
+    @patch('exabox.core.Node.exaBoxNode.mConnect')
+    @patch('exabox.infrapatching.handlers.targetHandler.targethandler.TargetHandler.mSetConnectionUser')
+    @patch('exabox.core.Node.exaBoxNode.__init__', return_value=None)
+    def test_mUpdateCryptoPolicyIfRequired_sets_default(self, _mock_init, _mock_set_connection_user, _mock_connect, _mock_execute_cmd, _mock_file_exists, _mock_get_cmd_exit_status, _mock_is_connected, _mock_disconnect, _mock_is_exacc, _mock_is_enabled):
+        ebLogInfo("")
+        ebLogInfo("Running unit test on TargetHandler.mUpdateCryptoPolicyIfRequired when DEFAULT:EXADATA")
+
+        _cmds = {
+            self.mGetRegexDom0(): [
+                [
+                    exaMockCommand("virsh", aStdout="scaqan03dv0208.us.oracle.com"),
+                ],
+            ]
+        }
+        self.mPrepareMockCommands(_cmds)
+
+        _targetHandler = TargetHandler(self.__patch_args_dict)
+        _context = _targetHandler.mGetCluControl().mGetCtx()
+        _ensure_local_host_helpers(_context)
+        _context.mSetLocalHost("slcs27adm03.us.oracle.com")
+
+        _mock_connect.reset_mock()
+        _mock_disconnect.reset_mock()
+        _mock_execute_cmd.reset_mock()
+
+        _mock_execute_cmd.side_effect = [
+            (None, mockFileHandler(io.StringIO(f"{CRYPTO_POLICY_DEFAULT_EXADATA}\n")), None),
+            (None, mockFileHandler(), None)
+        ]
+
+        self.assertTrue(_targetHandler.mUpdateCryptoPolicyIfRequired("slcs27adm03.us.oracle.com"))
+        self.assertEqual(_targetHandler._TargetHandler__crypto_policy_state, CRYPTO_POLICY_DEFAULT_EXADATA)
+        self.assertEqual(_mock_execute_cmd.call_count, 2)
+        _mock_set_connection_user.assert_called()
+
+        ebLogInfo("Unit test on TargetHandler.mUpdateCryptoPolicyIfRequired when DEFAULT:EXADATA executed successfully")
+
+    @patch('exabox.infrapatching.handlers.generichandler.GenericHandler.mIsCryptoPolicyResetEnabled', return_value=True)
+    @patch('exabox.infrapatching.handlers.generichandler.GenericHandler.mIsExaCC', return_value=True)
+    @patch('exabox.core.Node.exaBoxNode.mDisconnect')
+    @patch('exabox.core.Node.exaBoxNode.mIsConnected', return_value=False)
+    @patch('exabox.core.Node.exaBoxNode.mGetCmdExitStatus', return_value=0)
+    @patch('exabox.core.Node.exaBoxNode.mFileExists', return_value=True)
+    @patch('exabox.core.Node.exaBoxNode.mExecuteCmd')
+    @patch('exabox.core.Node.exaBoxNode.mConnect')
+    @patch('exabox.infrapatching.handlers.targetHandler.targethandler.TargetHandler.mSetConnectionUser')
+    @patch('exabox.core.Node.exaBoxNode.__init__', return_value=None)
+    def test_mUpdateCryptoPolicyIfRequired_no_change(self, _mock_init, _mock_set_connection_user, _mock_connect, _mock_execute_cmd, _mock_file_exists, _mock_get_exit_status, _mock_is_connected, _mock_disconnect, _mock_is_exacc, _mock_is_enabled):
+        ebLogInfo("")
+        ebLogInfo("Running unit test on TargetHandler.mUpdateCryptoPolicyIfRequired with non DEFAULT:EXADATA")
+
+        _cmds = {
+            self.mGetRegexDom0(): [
+                [
+                    exaMockCommand("virsh", aStdout="scaqan03dv0208.us.oracle.com"),
+                ],
+            ]
+        }
+        self.mPrepareMockCommands(_cmds)
+
+        _targetHandler = TargetHandler(self.__patch_args_dict)
+        _context = _targetHandler.mGetCluControl().mGetCtx()
+        _ensure_local_host_helpers(_context)
+        _context.mSetLocalHost("slcs27adm03.us.oracle.com")
+
+        _mock_connect.reset_mock()
+        _mock_disconnect.reset_mock()
+        _mock_execute_cmd.reset_mock()
+
+        _mock_execute_cmd.side_effect = [
+            (None, mockFileHandler(io.StringIO(f"{CRYPTO_POLICY_DEFAULT}\n")), None)
+        ]
+
+        self.assertTrue(_targetHandler.mUpdateCryptoPolicyIfRequired("slcs27adm03.us.oracle.com"))
+        self.assertEqual(_targetHandler._TargetHandler__crypto_policy_state, CRYPTO_POLICY_DEFAULT)
+        _mock_execute_cmd.assert_called_once_with(CRYPTO_POLICY_SHOW_CMD)
+
+        ebLogInfo("Unit test on TargetHandler.mUpdateCryptoPolicyIfRequired with non DEFAULT:EXADATA executed successfully")
+
+    @patch('exabox.infrapatching.handlers.generichandler.GenericHandler.mIsCryptoPolicyResetEnabled', return_value=True)
+    @patch('exabox.infrapatching.handlers.generichandler.GenericHandler.mIsExaCC', return_value=True)
+    @patch('exabox.core.Node.exaBoxNode.mDisconnect')
+    @patch('exabox.core.Node.exaBoxNode.mIsConnected', return_value=False)
+    @patch('exabox.core.Node.exaBoxNode.mFileExists', return_value=True)
+    @patch('exabox.core.Node.exaBoxNode.mExecuteCmd')
+    @patch('exabox.core.Node.exaBoxNode.mConnect')
+    @patch('exabox.infrapatching.handlers.targetHandler.targethandler.TargetHandler.mSetConnectionUser')
+    @patch('exabox.core.Node.exaBoxNode.__init__', return_value=None)
+    def test_mUpdateCryptoPolicyIfRequired_no_local_host(self, _mock_init, _mock_set_connection_user, _mock_connect, _mock_execute_cmd, _mock_file_exists, _mock_is_connected, _mock_disconnect, _mock_is_exacc, _mock_is_enabled):
+        ebLogInfo("")
+        ebLogInfo("Running unit test on TargetHandler.mUpdateCryptoPolicyIfRequired when local host missing")
+
+        _cmds = {
+            self.mGetRegexDom0(): [
+                [
+                    exaMockCommand("virsh", aStdout="scaqan03dv0208.us.oracle.com"),
+                ],
+            ]
+        }
+        self.mPrepareMockCommands(_cmds)
+
+        _targetHandler = TargetHandler(self.__patch_args_dict)
+        _context = _targetHandler.mGetCluControl().mGetCtx()
+        _ensure_local_host_helpers(_context)
+        _context.mSetLocalHost(None)
+
+        _mock_connect.reset_mock()
+        _mock_disconnect.reset_mock()
+        _mock_execute_cmd.reset_mock()
+
+        self.assertFalse(_targetHandler.mUpdateCryptoPolicyIfRequired(""))
+        _mock_connect.assert_not_called()
+        _mock_execute_cmd.assert_not_called()
+
+        ebLogInfo("Unit test on TargetHandler.mUpdateCryptoPolicyIfRequired when local host missing executed successfully")
+
+    @patch('exabox.infrapatching.handlers.generichandler.GenericHandler.mIsCryptoPolicyResetEnabled', return_value=True)
+    @patch('exabox.core.Node.exaBoxNode.mDisconnect')
+    @patch('exabox.core.Node.exaBoxNode.mIsConnected', return_value=False)
+    @patch('exabox.core.Node.exaBoxNode.mGetCmdExitStatus', return_value=0)
+    @patch('exabox.core.Node.exaBoxNode.mFileExists', return_value=True)
+    @patch('exabox.core.Node.exaBoxNode.mExecuteCmd')
+    @patch('exabox.core.Node.exaBoxNode.mConnect')
+    @patch('exabox.infrapatching.handlers.targetHandler.targethandler.TargetHandler.mSetConnectionUser')
+    @patch('exabox.core.Node.exaBoxNode.__init__', return_value=None)
+    def test_mRestoreCryptoPolicyIfRequired_restores(self, _mock_init, _mock_set_connection_user, _mock_connect, _mock_execute_cmd, _mock_file_exists, _mock_get_exit_status, _mock_is_connected, _mock_disconnect, _mock_is_enabled):
+        ebLogInfo("")
+        ebLogInfo("Running unit test on TargetHandler.mRestoreCryptoPolicyIfRequired")
+
+        _cmds = {
+            self.mGetRegexDom0(): [
+                [
+                    exaMockCommand("virsh", aStdout="scaqan03dv0208.us.oracle.com"),
+                ],
+            ]
+        }
+        self.mPrepareMockCommands(_cmds)
+
+        _targetHandler = TargetHandler(self.__patch_args_dict)
+        _context = _targetHandler.mGetCluControl().mGetCtx()
+        _ensure_local_host_helpers(_context)
+        _context.mSetLocalHost("slcs27adm03.us.oracle.com")
+        _targetHandler._TargetHandler__crypto_policy_state = CRYPTO_POLICY_DEFAULT_EXADATA
+
+        _mock_connect.reset_mock()
+        _mock_disconnect.reset_mock()
+        _mock_execute_cmd.reset_mock()
+
+        _mock_execute_cmd.return_value = (None, mockFileHandler(), None)
+
+        self.assertTrue(_targetHandler.mRestoreCryptoPolicyIfRequired("slcs27adm03.us.oracle.com"))
+
+        _mock_execute_cmd.assert_called_once_with(CRYPTO_POLICY_SET_CMD.format(CRYPTO_POLICY_DEFAULT_EXADATA))
+
+        ebLogInfo("Unit test on TargetHandler.mRestoreCryptoPolicyIfRequired executed successfully")
+
+    @patch('exabox.infrapatching.handlers.generichandler.GenericHandler.mIsCryptoPolicyResetEnabled', return_value=True)
+    @patch('exabox.core.Node.exaBoxNode.mDisconnect')
+    @patch('exabox.core.Node.exaBoxNode.mIsConnected', return_value=False)
+    @patch('exabox.core.Node.exaBoxNode.mConnect')
+    @patch('exabox.infrapatching.handlers.targetHandler.targethandler.TargetHandler.mSetConnectionUser')
+    @patch('exabox.core.Node.exaBoxNode.__init__', return_value=None)
+    def test_mRestoreCryptoPolicyIfRequired_no_state(self, _mock_init, _mock_set_connection_user, _mock_connect, _mock_is_connected, _mock_disconnect, _mock_is_enabled):
+        ebLogInfo("")
+        ebLogInfo("Running unit test on TargetHandler.mRestoreCryptoPolicyIfRequired no state")
+
+        _cmds = {
+            self.mGetRegexDom0(): [
+                [
+                    exaMockCommand("virsh", aStdout="scaqan03dv0208.us.oracle.com"),
+                ],
+            ]
+        }
+        self.mPrepareMockCommands(_cmds)
+
+        _targetHandler = TargetHandler(self.__patch_args_dict)
+        _context = _targetHandler.mGetCluControl().mGetCtx()
+        _ensure_local_host_helpers(_context)
+        _context.mSetLocalHost("slcs27adm03.us.oracle.com")
+
+        _mock_connect.reset_mock()
+        _mock_disconnect.reset_mock()
+
+        self.assertTrue(_targetHandler.mRestoreCryptoPolicyIfRequired("slcs27adm03.us.oracle.com"))
+
+        _mock_connect.assert_not_called()
+
+        ebLogInfo("Unit test on TargetHandler.mRestoreCryptoPolicyIfRequired no state executed successfully")
 
     def test_mCheckAndUpdateNodeList(self):
 
@@ -507,6 +794,30 @@ class ebTestTargetHandler(ebTestClucontrol):
         _rc, _errmsg = _targetHandler.mValidateImageCheckSum(_PatchFile, _local_patch_path, aRemotePatchBase, aNodeList, aRemoteNecessarySpaceMb, aSingleVmHandler)
         self.assertEqual(_rc, _SUCCESS_ERROR_CODE)
 
+    @patch("exabox.infrapatching.utils.infrapatchexecutionvalidator.InfrapatchExecutionValidator.mCheckCondition", return_value=False)
+    @patch("exabox.infrapatching.handlers.targetHandler.targethandler.TargetHandler.mValidateImageCheckSum", side_effect=Exception("Timeout while async execute (id: node-1, start_time: 2025-06-09 18:22:34+0000, end_time: 2025-06-09 19:22:34+0000, max_time: 3600, callback: <function TargetHandler.mValidateImageCheckSum.<locals>._mExecute_FileCopy at 0x145729b66d90>, args: ['node-1'], pid: 2804658, is_running: True). Error while multiprocessing(Process timeout)"))
+    def test_mValidateImageCheckSumWithRetry_timeout(self, mock_validate_checksum, mock_check_condition):
+        ebLogInfo("Running unit test on TargetHandler.mValidateImageCheckSumWithRetry for async timeout")
+
+        _target_handler = TargetHandler(self.__patch_args_dict)
+
+        with self.assertLogs('dfltlog', level='ERROR') as _log_output:
+            _rc, _errmsg = _target_handler.mValidateImageCheckSumWithRetry(
+                'dbserver.patch.zip',
+                '/local/repo',
+                '/remote/base',
+                ['node-1'],
+                1024,
+                None)
+
+        ebLogInfo(f"test_mValidateImageCheckSumWithRetry_timeout: rc={_rc}, errmsg={_errmsg}")
+        ebLogInfo(f"test_mValidateImageCheckSumWithRetry_timeout: captured logs={_log_output.output}")
+        self.assertEqual(_rc, PATCH_COPY_ASYNC_TIMEOUT)
+        _expected_suffix = 'Patch file copy timed out while multiprocessing on node node-1 (PID 2804658) after exceeding 3600 seconds'
+        self.assertEqual(_errmsg, _expected_suffix)
+        self.assertTrue(any(PATCH_COPY_ASYNC_TIMEOUT in _entry for _entry in _log_output.output))
+        self.assertTrue(any(_expected_suffix in _entry for _entry in _log_output.output))
+
 
     def test_mCheckKnownAlertHistory(self):
         ebLogInfo("")
@@ -637,8 +948,7 @@ class ebTestTargetHandler(ebTestClucontrol):
             for _ret, _errmsg in _ret_stats.items():
                 self.assertEqual(_ret, "0x00000000")
         ebLogInfo("Unit test for test_mCleanupExadataPatches_with_exasplice_versions executed successfully")
-
-
+    
     @patch('exabox.core.Node.exaBoxNode.mConnect')
     @patch('exabox.infrapatching.handlers.generichandler.GenericHandler.mGetTargetVersion')
     @patch('exabox.utils.node.exaBoxNode.mExecuteCmdLog')
@@ -689,6 +999,74 @@ class ebTestTargetHandler(ebTestClucontrol):
             for _ret, _errmsg in _ret_stats.items():
                 self.assertEqual(_ret, "0x00000000")
         ebLogInfo("Unit test for test_mCleanupExadataPatches_with_exasplice_same_active_target_versions executed successfully")
+
+    @patch('exabox.core.Node.exaBoxNode.mConnect')
+    @patch('exabox.infrapatching.handlers.generichandler.GenericHandler.mGetTargetVersion')
+    @patch('exabox.utils.node.exaBoxNode.mExecuteCmdLog')
+    @patch('exabox.utils.node.exaBoxNode.mIsConnected', return_value=True)
+    @patch('exabox.infrapatching.handlers.targetHandler.targethandler.ProcessStructure')
+    @patch('exabox.infrapatching.handlers.targetHandler.targethandler.ProcessManager')
+    def test_mCleanupExadataPatches_timeout_cleanup_failed(self, mock_mIsConnected, mock_mExecuteCmdLog, mock_mGetTargetVersion, mock_mConnect, mock_processmanager, mock_processstructure):
+        ebLogInfo(" ")
+        ebLogInfo("Running unit test on TargetHandler.mCleanupExadataPatches timeout path")
+
+        _cmds = {
+            self.mGetRegexDom0(): [
+                [
+                    exaMockCommand("virsh", aStdout="scaqan03dv0208.us.oracle.com"),
+                ],
+            ]
+        }
+        self.mPrepareMockCommands(_cmds)
+
+        # Stub ProcessManager so .mJoinProcess raises the timeout error.
+        _fake_manager = MagicMock()
+        _fake_manager.list.return_value = []
+        mock_pm_instance = mock_processmanager.return_value
+        mock_pm_instance.mGetManager.return_value = _fake_manager
+        mock_pm_instance.mJoinProcess.side_effect = ExacloudRuntimeError(0x0756, 0xA, "Process timeout")
+        mock_pm_instance.mGetStatus.return_value = "killed"
+
+        mock_processstructure.return_value = MagicMock()
+
+        mock_mGetTargetVersion.return_value = '25.1.16.0.0.240509'
+        with patch('exabox.core.Node.exaBoxNode.mExecuteCmd') as mock_executeCmd:
+            mock_executeCmd.side_effect=[(None, mockFileHandler(io.StringIO("25.1.14.0.0.240509.exasplice.suffix")), mockFileHandler()) , (None, mockFileHandler(io.StringIO("25.1.13.0.0.240509.exasplice.suffix")), mockFileHandler())]
+            target_handler = TargetHandler(self.__patch_args_dict)
+            _ret_stats = target_handler.mCleanupExadataPatches(['scaqan10adm03.us.oracle.com', 'scaqan10adm04.us.oracle.com'])
+            for _ret, _errmsg in _ret_stats.items():
+                self.assertEqual(_ret, "0x00000000")
+        ebLogInfo("Unit test for mCleanupExadataPatches_timeout_cleanup_failed executed successfully")
+
+    def test_mHandleSshCleanupException(self):
+        """Verify helper maps authentication and generic SSH cleanup errors to expected codes."""
+        #UNABLE_TO_SSH_PATCHNODE_POSTPATCH = "0x03010075"
+        #PASSWDLESS_SSH_CLEANUP_FAILED = "0x03010040"
+        target_handler = TargetHandler(self.__patch_args_dict)
+        target_handler.mPatchLogError = MagicMock()
+        target_handler.mAddError = MagicMock()
+
+        auth_exc = AuthenticationException('auth failed')
+        with self.assertRaises(AuthenticationException):
+            target_handler.mHandleSshCleanupException(auth_exc, 'dom0', ['cell1'], 'CELL')
+        target_handler.mAddError.assert_called_with(
+            UNABLE_TO_SSH_PATCHNODE_POSTPATCH,
+            "Unable to establish SSH connectivity during CELL cleanup between dom0 and ['cell1']: auth failed",
+        )
+        target_handler.mPatchLogError.assert_called()
+
+        target_handler.mAddError.reset_mock()
+        target_handler.mPatchLogError.reset_mock()
+
+        generic_exc = Exception('ssh failure')
+        with self.assertRaises(Exception) as context:
+            target_handler.mHandleSshCleanupException(generic_exc, 'dom0', ['cell1'], 'CELL')
+        self.assertIs(context.exception, generic_exc)
+        target_handler.mAddError.assert_called_with(
+            PASSWDLESS_SSH_CLEANUP_FAILED,
+            "Passwordless SSH cleanup failed during CELL between dom0 and ['cell1']: ssh failure",
+        )
+        target_handler.mPatchLogError.assert_called()
 
     @patch("exabox.ovm.clumisc.ebCluSshSetup.mRestoreSSHKey", return_value=True)
     @patch("exabox.ovm.clumisc.ebCluSshSetup.mCleanSSHPasswordless", return_value=True)
@@ -741,9 +1119,7 @@ class ebTestTargetHandler(ebTestClucontrol):
     def test_mExecutePatchMgrCmd(self, mock_mFileExists, mock_mGetCmdExitStatus, mock_mExecuteCmdLog, mock_mExecuteCmd, mock_mGetNodeListFromNodesToBePatchedFile):
         ebLogInfo("")
         ebLogInfo("Running unit test on InfraPatchManager.mExecutePatchMgrCmd")
-
         mock_mExecuteCmd.side_effect=[(None, mockFileHandler(io.StringIO("mock_output")), None), (None, mockFileHandler(io.StringIO("123")), mockFileHandler())]
-
         _patch_mgr = InfraPatchManager(aTarget="domu", aOperation="patch", aPatchBaseAfterUnzip="/patch/base", aLogPathOnLaunchNode="/log/path", aHandler=TargetHandler(self.__patch_args_dict))
         result = _patch_mgr.mExecutePatchMgrCmd("mocked_patchmgr_cmd")
         self.assertEqual(result, '0x00000000')
@@ -757,6 +1133,23 @@ class ebTestTargetHandler(ebTestClucontrol):
         _patch_mgr = InfraPatchManager(aTarget="cell", aOperation="patch", aPatchBaseAfterUnzip="/patch/base", aLogPathOnLaunchNode="/log/path", aHandler=TargetHandler(self.__patch_args_dict))
         result = _patch_mgr.mExecutePatchMgrCmd("mocked_patchmgr_cmd")
         self.assertEqual(result, '0x03030025')
+
+    @patch("exabox.infrapatching.handlers.targetHandler.infrapatchmgrhandler.InfraPatchManager.mGetNodeListFromNodesToBePatchedFile", return_value=['slcs27adm04.us.oracle.com'])
+    @patch("exabox.core.Node.exaBoxNode.mExecuteCmd")
+    @patch("exabox.core.Node.exaBoxNode.mGetCmdExitStatus", return_value=2)
+    @patch("exabox.core.Node.exaBoxNode.mFileExists", return_value=True)
+    def test_mExecutePatchMgrCmd_Domu_failure(self, mock_mFileExists, mock_mGetCmdExitStatus, mock_mExecuteCmd, mock_mGetNodeListFromNodesToBePatchedFile):
+        ebLogInfo("")
+        ebLogInfo("Running unit test on InfraPatchManager.mExecutePatchMgrCmd")
+        _patchmgr_err = f"ksh: syntax error at line 1: `&' unmatched"
+        mock_mExecuteCmd.side_effect=[(None, mockFileHandler(io.StringIO("mock_output")), None), (None, mockFileHandler(io.StringIO("mock_output")), io.StringIO(_patchmgr_err)), (None, mockFileHandler(io.StringIO("123")), mockFileHandler())]
+        #mock_mGetCmdExitStatus.side_effect=[0,1,0]
+
+        _patch_mgr = InfraPatchManager(aTarget="domu", aOperation="patch", aPatchBaseAfterUnzip="/patch/base", aLogPathOnLaunchNode="/log/path", aHandler=TargetHandler(self.__patch_args_dict))
+        with patch("exabox.core.Node.exaBoxNode.mFileExists", return_value=False):
+            with patch("exabox.infrapatching.handlers.targetHandler.infrapatchmgrhandler.InfraPatchManager.mCheckForPatchMgrSessionExistence", return_value=(1, None)):
+                result = _patch_mgr.mExecutePatchMgrCmd("mocked_patchmgr_cmd")
+                self.assertEqual(result, '0x03030026')
 
 if __name__ == "__main__":
     unittest.main()

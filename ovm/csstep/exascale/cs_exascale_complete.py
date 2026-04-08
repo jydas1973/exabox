@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 #
-# $Header: ecs/exacloud/exabox/ovm/csstep/exascale/cs_exascale_complete.py /main/25 2025/12/01 14:45:28 remamid Exp $
+# $Header: ecs/exacloud/exabox/ovm/csstep/exascale/cs_exascale_complete.py /main/27 2025/12/23 19:02:13 siyarlag Exp $
 #
 # cs_exascale_complete.py
 #
-# Copyright (c) 2021, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      cs_exascale_complete.py - Complete step on XS Provisioning
@@ -21,6 +21,10 @@
 #    INTERNAL CLASSES:
 #
 #    MODIFIED   (MM/DD/YY)
+#.   aararora    03/20/26 - 39106054: Install Falcon agent during postginid
+#    prsshukl    03/04/25 - Bug 38828221: Copy customer Root CA for SSL Inspection enabled infra
+#.   siyarlag    12/15/25 - 38654530: enable mCreateOracleEsWallet
+#.   siyarlag    12/11/25 - 38732398: disable call to mCreateOracleEsWallet
 #.   remamid     11/10/25 - exacc natfilesystem ip different for vms in the
 #.                          cluster bug 38581933
 #.   siyarlag    10/30/25 - 38500170: create eswallet for oracle/db user
@@ -72,6 +76,7 @@ from exabox.ovm.atp import (AtpAddRoutes2DomU, ebCluATPConfig,
         AtpAddScanname2EtcHosts, AtpSetupNamespace, AtpSetupASMListener)
 from exabox.log.LogMgr import ebLogError, ebLogInfo, ebLogTrace, ebLogWarn, ebLogDebug, ebLogVerbose
 from exabox.ovm.cluencryption import exacc_fsencryption_requested, mSetLuksPassphraseOnDom0Exacc
+from exabox.ovm.utils.clu_utils import ebCluUtils
 
 # This class implements doExecute and undoExecute functions
 # for the ESTP_EXASCALE_COMPLETE step of create service
@@ -87,6 +92,7 @@ class csExaScaleComplete(CSBase):
         _csu = csUtil()
         _csConstants = _csu.mGetConstants(_ebox, False)
         # Obtain DOM0-DOMU pairs, and all the DOMMU list
+        _clu_utils = ebCluUtils(_ebox)
         _dpairs = _ebox.mReturnDom0DomUPair()
         _domu_list = [ _domu for _ , _domu in _dpairs]
 
@@ -103,9 +109,11 @@ class csExaScaleComplete(CSBase):
         # 38500170: create eswallet for oracle/db user
         try:
             _utils = ebExascaleUtils(_ebox)
-            _utils.mCreateOracleWallet(aOptions)
+            _utils.mCreateOracleEsWallet(aOptions)
         except Exception as ex:
-            ebLogError(f"*** Could not create oracle eswallet. Error: {ex}")
+            _err_str = f"*** Could not create oracle eswallet. Error: {ex}"
+            ebLogError(_err_str)
+            raise ExacloudRuntimeError(aErrorMsg=_err_str)        
 
         # Resize Domu filesystems
         _step_time = time.time()
@@ -312,6 +320,8 @@ class csExaScaleComplete(CSBase):
             # ER 32161016: Copy DBCS/CPS agent wallets
             _ebox.mAddAgentWallet()
 
+            _clu_utils.mSetupCustomerRootCACertificates(aOptions)
+
         #
         # ER 27371691: Install DBCS agent rpm
         #
@@ -423,6 +433,10 @@ class csExaScaleComplete(CSBase):
                 _ebox.mInstallSuricataRPM()
             except Exception as e: 
                 ebLogWarn(f"*** mInstallSuricataRPM failed with Exception: {str(e)}")
+
+        _clu_utils = ebCluUtils(_ebox)
+        _falcon_domus = [domu for _, domu in _ebox.mReturnDom0DomUPair()]
+        _clu_utils.mInstallFalconAgentOnDomus(_falcon_domus, "Create Service")
 
         # Reset SSH Cluster Keys
         _step_time = time.time()

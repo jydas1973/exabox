@@ -1014,10 +1014,11 @@ def execute_from_commandline(aArgv, aExaboxState):
             sys.exit(-1)
         ebLogInfo('::ClusterCtrl Command: '+options.clusterctrl)
         cluhandle = exaBoxCluCtrl(aCtx=ebContext, aNode=node, aOptions=options)
-        if options.clusterctrl in ["validate_elastic_shapes", "xsvault", "infra_vm_states", "xsput", "xsget"]: # pragma: no cover
+        if options.clusterctrl in ["validate_elastic_shapes", "xsvault", "infra_vm_states", "xsput", "xsget", "enable_qinq"]: # pragma: no cover
              _rc = cluhandle.mDispatchNonXMLCluster(options.clusterctrl, options)
         else:
             _rc = cluhandle.mDispatchCluster(options.clusterctrl, options)
+            cluhandle.mCompileSelinuxResponse()
         node.mDisconnect()
         return _rc
 

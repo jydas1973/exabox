@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2023, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     ExacloudCmdHandler - Basic functionality
@@ -189,7 +189,8 @@ class ExacloudCmdEndpoint(AsyncTrackEndpoint):
                 _cmd.append("{0}/xpatch.py".format(aUpgradePath))
                 _cmd.append("upgrade")
                 _cmd.append("-ni")
-                _cmd.append("-e {0}".format(aParentPath))
+                _cmd.append("-e")
+                _cmd.append(aParentPath)
                 _cmdList.append(_cmd)
 
                 #Clean up command

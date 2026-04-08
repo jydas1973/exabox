@@ -1,10 +1,10 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/infrapatching/exacompute/handlers/exacomputeprecheckhandler.py /main/6 2025/05/07 04:51:45 araghave Exp $
+# $Header: ecs/exacloud/exabox/infrapatching/exacompute/handlers/exacomputeprecheckhandler.py sdevasek_bug-38891722/1 2026/02/09 16:53:59 sdevasek Exp $
 #
 # exacomputepatchhandler.py
 #
-# Copyright (c) 2022, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2022, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      exacomputepatchhandler.py
@@ -16,6 +16,10 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    sdevasek    02/09/26 - Enh 38891722 - REMOVAL OF SSH EQUIVALENCE BETWEEN
+#                           LAUNCH-NODE AND TARGET-NODES
+#    sdevasek    01/22/26 - Enh 38854794 - EXACOMPUTE FREE POOL NODE  PATCHING:
+#                           UPDATE NODE_PROGRESS_DATA CORRECTLY
 #    araghave    03/17/25 - Enh 37713042 - CONSUME ERROR HANDLING DETAILS FROM
 #                           INFRAPATCHERROR.PY DURING EXACOMPUTE PATCHING
 #    araghave    01/27/25 - Enh 37132175 - EXACOMPUTE MUST REUSE INFRA PATCHING
@@ -76,14 +80,22 @@ class ExaPrecheckHandler(ExaGenericHandler):
         self.mSetSubOperation("PATCHMGR_PRECHECK")
 
         try:
+
             # 1. Set up environment
-            self.mSetEnvironment()
+            # When No LaunchNode is the payload, it returns 2 launchnodes in _eligible_launch_nodes otherwise returns 1 in the _eligible_launch_nodes list
+            _ret, _eligible_launch_nodes, _compute_node_list_to_be_patched, _consolidated_precheck_failure_nodes = self.mSetEnvironment()
+
+            if _ret != PATCH_SUCCESS_EXIT_CODE:
+                return _ret
 
             self.mPatchLogInfo(
                 f"\n\n---------------> Starting {TASK_PREREQ_CHECK} on {self.mGetCurrentTargetType()}s <---------------\n")
 
             # Get customized list of nodes
-            _, _, _list_of_nodes, _already_upgraded_node_list = self.mFilterNodesToPatch(self.mGetCustomizedDom0List(), PATCH_DOM0,  TASK_PREREQ_CHECK)
+            _ret, _sug_msg, _list_of_nodes, _already_upgraded_node_list = self.mFilterNodesToPatch(self.mGetCustomizedDom0List(), PATCH_DOM0,  TASK_PREREQ_CHECK)
+            if _ret != PATCH_SUCCESS_EXIT_CODE:
+                _ret = self.mAddError(_ret, _sug_msg)
+                return _ret
 
             # Set initial Patch Status Json.
             self.mUpdatePatchProgressStatus(aNodeList=_list_of_nodes, aAlreadyUpgradedNodeList=_already_upgraded_node_list)
@@ -134,30 +146,11 @@ class ExaPrecheckHandler(ExaGenericHandler):
                 else:
                     return _ret
 
-            for _node in self.mGetLaunchNodes():
-                if self.mGetCluPatchCheck().mPingNode(_node):
-                    _launch_ping_node = _node
-                    self.mSetEligibleLaunchNode(_node)
-                    break
-                else:
-                    self.mPatchmgrLogInfo(f"Launch Node : {_node} is not pingable.")
-                    continue
-
-            if _launch_ping_node is None:
-                _suggestion_msg = f"None of the launch nodes provided are reachable, unable to proceed with patch operations. Launch node list provided : {str(self.mGetLaunchNodes())}"
-                _ret = self.mAddError(DOM0_NOT_PINGABLE, _suggestion_msg)
-                if aPrecheckpatchOperation:
-                    _no_action_required_further = True
-                    return _ret, _no_action_required_further, _consolidated_precheck_failure_nodes
-                else:
-                    return _ret
-
-            def _patch_precheck_node(aNode):
+            def _patch_precheck_node(aNode, aNodeListToPatch):
                 _nodes_count = len(self.mGetCustomizedDom0List())
                 _domOUs_count_on_same_target_version = 0
                 _exit_code = PATCH_SUCCESS_EXIT_CODE
                 _patchmgr_precheck_failure_nodes = []
-                aNodeListToPatch = self.mGetCustomizedDom0List()
                 _patchMgrObj = None
 
                 if aNode is None:
@@ -293,13 +286,20 @@ class ExaPrecheckHandler(ExaGenericHandler):
                 return _exit_code, _patchmgr_precheck_failure_nodes
                 # end of _patch_precheck_node
 
-            # Run the pre_check in all the dom[0U]s except one
-            _ret, _consolidated_precheck_failure_nodes = _patch_precheck_node(_launch_ping_node)
+            for _eligible_launch_node in _eligible_launch_nodes:
+                if len(_eligible_launch_nodes) > 1:
+                    if _eligible_launch_node == _eligible_launch_nodes[0]:
+                        _list_of_nodes = list(set(_list_of_nodes) - set([_eligible_launch_node]))
+                    else:
+                        _list_of_nodes = [_eligible_launch_nodes[0]]
 
-            # There are nodes on which precheck failed so return failed error code
-            if len(_consolidated_precheck_failure_nodes) > 0 and _ret == PATCH_SUCCESS_EXIT_CODE:
-                _suggestion_msg = f"Precheck operation failed on {str(_consolidated_precheck_failure_nodes)} ."
-                _ret = self.mAddError(PRECHECK_OPERATION_FAILED_ON_COMPUTE_NODES, _suggestion_msg)
+                self.mSetEligibleLaunchNode(_eligible_launch_node)
+                _ret, _precheck_failure_nodes = _patch_precheck_node(_eligible_launch_node, _list_of_nodes)
+                _consolidated_precheck_failure_nodes = _consolidated_precheck_failure_nodes + _precheck_failure_nodes
+
+                if len(_consolidated_precheck_failure_nodes) > 0 and _ret == PATCH_SUCCESS_EXIT_CODE:
+                    _suggestion_msg = f"Precheck operation failed on {str(_consolidated_precheck_failure_nodes)} ."
+                    _ret = self.mAddError(PRECHECK_OPERATION_FAILED_ON_COMPUTE_NODES, _suggestion_msg)
 
             if _ret == PATCH_SUCCESS_EXIT_CODE:
                 self.mAddSuccess()
@@ -317,4 +317,6 @@ class ExaPrecheckHandler(ExaGenericHandler):
                         f"Precheck returned with error : {str(_ret)}, Precheck failure nodes : {str(_consolidated_precheck_failure_nodes)}")
                 return _ret, _no_action_required_further, _consolidated_precheck_failure_nodes
             else:
+                self.mPatchLogInfo("Cleanup Environment")
+                self.mCleanUpExaComputeSSHEnv()
                 return _ret

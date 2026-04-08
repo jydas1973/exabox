@@ -1,6 +1,6 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/exatest/ovm/csstep/exabasedb/tests_cs_exascale_complete.py /main/1 2025/11/25 05:03:58 prsshukl Exp $
+# $Header: ecs/exacloud/exabox/exatest/ovm/csstep/exabasedb/tests_cs_exascale_complete.py /main/3 2026/01/02 04:46:45 naps Exp $
 #
 # tests_cs_exascale_complete.py
 #
@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    naps        12/23/25 - Bug 38746264 - UT Updation
+#    naps        12/19/25 - Bug 38769320 - UT updation.
 #    prsshukl    11/24/25 - Creation
 #
 
@@ -25,6 +27,8 @@ from unittest import mock
 from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
 from exabox.ovm.csstep.exabasedb.cs_exascale_complete import csExaScaleComplete
 from exabox.ovm.bom_manager import ImageBOM
+from unittest.mock import patch, MagicMock, PropertyMock, mock_open
+from exabox.core.MockCommand import exaMockCommand
 
 class ebTestExaScaleComplete(ebTestClucontrol):
 
@@ -40,6 +44,16 @@ class ebTestExaScaleComplete(ebTestClucontrol):
         _ebox = self.mGetClubox()
         _options = _ebox.mGetArgsOptions()
         _step_list = ["ESTP_EXASCALE_COMPLETE"]
+        _cmds = {
+            self.mGetRegexVm(): [
+                [
+                    exaMockCommand("cat /etc/passw.*", aStdout=None),
+                    exaMockCommand("/opt/oracle.cellos/host_access_control.*", aStdout=None)
+                ]
+            ]
+        }
+
+        self.mPrepareMockCommands(_cmds)
 
         # Mock ImageBOM - substeps already executed
         mock_imagebom_instance = mock.Mock()
@@ -51,7 +65,9 @@ class ebTestExaScaleComplete(ebTestClucontrol):
         mock_ebCluExaScale.return_value = mock_exascale_instance
 
         _handler = csExaScaleComplete()
-        _handler.doExecute(_ebox, _options, _step_list)
+        _options.jsonconf['delete_domu_keys'] = 'True'
+        with patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetCmd', return_value="createservice"):
+            _handler.doExecute(_ebox, _options, _step_list)
 
         # Verify that skipped steps are not called
         mock_expand_domu_filesystem.assert_not_called()

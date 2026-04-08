@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     OVM - Basic functionality
@@ -12,10 +12,32 @@ NOTE:
 
 History:    
     MODIFIED   (MM/DD/YY)
+    kanmanic   03/24/26 - 39082361 Add dbmcli precheck
+    ajayasin   02/27/26 - 39018800:n-3,26ai:default gi support from UI
+    naps       02/26/26 - Bug 38984665 - fix the exception in log message.
+    jfsaldan   02/17/26 - Bug 38972776 - EXACLOUD - HARDWARE_ALERTS ENDPOINT
+                          FAILING FOR MVM DELETE CELL PRECHECK
+    nelango     02/11/26 - Bug 38930043 : ssh key removal in cells incase of
+                           ecra switchover
+    joysjose   02/07/26 - Bug 38934069 Remove lock for EXADBXS and Exascale
+    kanmanic   01/27/26 - Bug 38875642 validate_elastic_reshape returns 0 on 
+                           failure
+    jfsaldan    01/13/26 - Bug 38844619 - EXADBXS CREATE SERVICE | IF A STALE
+                           ADMIN INTERFACE EXISTS FOR THE SAME ADMIN IP, NEW
+                           PROVISIONINGS FAIL | REQUESTED IP FOR NAT-ED
+                           INTERFACE IS ALREADY CONFIGURED FOR THE DUMMY BRIDGE
+    aararora    01/08/26 - Bug 38785417: Set the supported flag correctly if
+                           100 Gbps speed is unsupported
+    avimonda    12/04/25 - Bug 38683898: If payload from ECRA does NOT have a
+                           domU Exadata version, Dom0 X10 models or ExaDB-XS
+                           services reuse the Dom0 version, so retain matching
+                           System.first.boot images.
     scoral      11/20/25 - Bug 38673589 - Enhanced mIsEth0Removed to connect to
                            the actual node and check the interface.
     joysjose    11/15/25 - joysjose 10/22/25 - Bug 38417178 Refactoring cell
                            connections before Create VM
+    bhpati      11/13/25 - Bug 38467261 - Remove vm operation failed - ssh test
+                           to the vm failed during pre-check
     jfsaldan    10/27/25 - Bug 38559314 - EXADBXS Y25W42 | CREATEVM FAILED | 2
                            DOM0S HAVE DIFFERENT IMAGE VERSION | PARALLEL CREATE
                            SERVICE 'B' WITH DIFFERENT FIRST.BOOT IMAGE SELECTED
@@ -380,7 +402,7 @@ from exabox.core.Error import ebError, gSubError, ExacloudRuntimeError, gReshape
 from exabox.core.Node import exaBoxNode
 from exabox.utils.node import (connect_to_host, node_exec_cmd,
         node_cmd_abs_path_check, node_list_process)
-from exabox.log.LogMgr import ebLogError, ebLogInfo, ebLogWarn, ebLogVerbose, ebLogDebug, ebLogJson, ebLogTrace
+from exabox.log.LogMgr import ebLogError, ebLogInfo, ebLogWarn, ebLogVerbose, ebLogDebug, ebLogJson, ebLogTrace, ebLogCritical
 from exabox.ovm.vmconfig import exaBoxClusterConfig
 from exabox.utils.common import check_string_base64, version_compare
 from exabox.utils.node import connect_to_host, node_exec_cmd_check, node_cmd_abs_path_check, node_exec_cmd
@@ -1191,19 +1213,31 @@ class ebCluPreChecks(object):
 
     def mUpdateRequestData(self, aOptions, rc, aData, err):
         """
-        Updates request object with the response payload
+        Updates request object with the response payload and sets top-level request error code.
         """
         _reqobj = self.__cluctrl.mGetRequestObj()
         _response = {}
         _response["success"] = "True" if (rc == 0) else "False"
         _response["error"] = err
         _response["output"] = aData
+
         if _reqobj is not None:
             _db = ebGetDefaultDB()
-            _reqobj.mSetData(json.dumps(_response, sort_keys = True))
+            # Ensure /Status success derives from existing error_code logic by setting requests.error
+            try:
+                _reqobj.mSetError('0' if rc == 0 else '1')
+                # Prefer provided error string if present; otherwise set a generic message on failure
+                if rc == 0:
+                    _reqobj.mSetErrorStr('Undef')
+                else:
+                    _reqobj.mSetErrorStr(err if (err and isinstance(err, str) and err.strip()) else 'Unknown Error')
+            except Exception:
+                pass
+            # Persist response payload under requests.data
+            _reqobj.mSetData(json.dumps(_response, sort_keys=True))
             _db.mUpdateRequest(_reqobj)
 
-        ebLogJson(json.dumps(_response, indent=4, sort_keys = True))
+        ebLogJson(json.dumps(_response, indent=4, sort_keys=True))
 
     def mVMPreChecks(self, aHost=None):
 
@@ -2077,6 +2111,22 @@ class ebCluPreChecks(object):
         _hw_health_table = self.mRunHWSanityTest(_step, _nodeInfo, _precheck_config)
         _output = self.validate_hw_results(_step, _hw_health_table)
 
+        # Derive return code from faulty server lists
+        try:
+            if isinstance(_output, dict):
+                _qr_faulty = _output.get("quarter-rack-faulty-servers") or []
+                _el_faulty = _output.get("elastic-faulty-servers") or []
+                _qr_count = len(_qr_faulty) if isinstance(_qr_faulty, list) else 0
+                _el_count = len(_el_faulty) if isinstance(_el_faulty, list) else 0
+                _rc = 1 if (_qr_count > 0 or _el_count > 0) else 0
+                ebLogTrace(f"Elastic shape validation: qr_faulty={_qr_count}, el_faulty={_el_count}, rc={_rc}")
+                if _rc == 1:
+                    _err = 'Elastic shape validation is failed.'
+            else:
+                ebLogWarn("mValidateElasticShapes: Unexpected output structure; keeping default rc")
+        except Exception as e:
+            ebLogWarn(f"Unexpected output structure in mValidateElasticShapes: {e}")
+
         self.mUpdateRequestData(_options, _rc, _output, _err)
 
         return _rc
@@ -2242,6 +2292,7 @@ class ebCluPreChecks(object):
 
         _dom0 = aDom0
         _imgvers = aImgVers
+        _dom0_image_version = self.__cluctrl.mGetImageVersion(_dom0)
         _customImgVer = self.__cluctrl.mCheckConfigOption('exadata_custom_domu_version')
 
         _node = exaBoxNode(get_gcontext())
@@ -2254,6 +2305,8 @@ class ebCluPreChecks(object):
             _imgver_list = set(map(lambda x: re.search("boot\.([0-9\.]{1,})", x).group(1), _output))
             _imgver_list = set(map(lambda x: x.strip("."), _imgver_list))
             _imgver_list = _imgver_list - _imgvers
+            if _dom0_image_version:
+                _imgver_list.discard(_dom0_image_version.strip('.'))
             if _customImgVer:
                 ebLogTrace("The flag exadata_custom_domu_version is set, skipping cleanup of image {}".format(_imgver_list))
                 _imgver_list = set(filter(_customImgVer.__ne__, _imgver_list))
@@ -2506,6 +2559,18 @@ class ebCluSshSetup(object):
 
         self.__priv_hostkey_files = []
         self.__pub_hostkey_files = []
+
+    def mSetHostKeyComment(self, aKeyComment):
+        """
+        Store the host key comment so cleanup commands can reuse it.
+        """
+        self.__hostkey = aKeyComment
+
+    def mGetHostKeyComment(self):
+        """
+        Return the cached host key comment
+        """
+        return self.__hostkey
 
 
     def get_priv_hostkey_files(self):
@@ -5004,7 +5069,7 @@ class ebCluCellValidate(object):
             else:
                 # Condition to avoid patching cells SSHD if command has no_check_sw_cell
                 if ebCluCmdCheckOptions(self.__cluctrl.mGetCmd(), ['no_check_sw_cell']):
-                    ebLogInfo(f'*** Skip patching cells SSHD for {self.__cluctrl.__cmd} command')
+                    ebLogInfo(f'*** Skip patching cells SSHD for {self.__cluctrl.mGetCmd()} command')
                 else:
                     self.__cluctrl.mPatchCellsSSHDConfig()
                 
@@ -5015,17 +5080,26 @@ class ebCluCellValidate(object):
             def _perform_checks():
                 try:
                     _cell_info['zdlra_enabled'] = self.mZDLRAChecks()
-                    _cell_info['exadata_model'] = self.__cluctrl.mGetExadataCellModel()
+                    #We need cell detection only in provisioning flow. this is not used in vm operation workflows.
+                    #Lets stop calling this for vm commands, because cells can be down during concurrent operations like infrapatching.
+                    if not ebCluCmdCheckOptions(self.__cluctrl.mGetCmd(), ['skip_cell_model_detection']):
+                        _cell_info['exadata_model'] = self.__cluctrl.mGetExadataCellModel()
+                    else:
+                        _cell_info['exadata_model'] = None
                     self.mMaxStartupChecks(aOptions)
                     self.__cluctrl.mSetCellInfo(_cell_info)
                 except Exception as e:
                     ebLogError(f"mCellTasks failed with Exception: {str(e)}")
-            
-            if 'steplist' in aOptions and aOptions.steplist is not None and aOptions.steplist in _steplist:
-                with self.__cluctrl.remote_lock():
-                    _perform_checks()
+                    
+            if self.__cluctrl.mIsExaScale():
+                #the naming ExaDB-XS is created in ENH 33685362
+                ebLogInfo(f"Skipping the cell checks for ExaDB-XS service")
             else:
-                _perform_checks()
+                if 'steplist' in aOptions and aOptions.steplist is not None and aOptions.steplist in _steplist:
+                    with self.__cluctrl.remote_lock():
+                        _perform_checks()
+                else:
+                    _perform_checks()
             _cell_info = self.__cluctrl.mGetCellInfo()
             ebLogTrace(f"ZDLRA Enabled : {_cell_info.get('zdlra_enabled','None')} ")
             ebLogTrace(f"Exadata Model : {_cell_info.get('exadata_model','None')} ")
@@ -5143,6 +5217,7 @@ gPreCheckFunctionMap = {
     "power_test"               :   "mRunPowerTest",
     "temperature_test"         :   "mRunTemperatureTest",
     "hypervisor_test"          :   "mRunHypervisorTest",
+    "dbmcli_status_test"       :   "mRunDbmcliStatusTest",
     "root_storage_test"        :   "mRunRootStorageTest",
     "exavmimages_storage_test" :   "mRunExavmImagesStorageTest",
     "memory_test"              :   "mRunMemoryTest",
@@ -5155,6 +5230,7 @@ gPreCheckFunctionMap = {
     "flashcache_test"          :   "mRunFlashCacheTest",
     "pmemcache_test"           :   "mRunPmemCacheTest",
     "ip_match_test"            :   "mRunIPConflictTest",
+    "compute_admin_ip_test"    :   "mRunComputeAdminIPConflictTest",
     "env_test"                 :   "mRunHWTest",
     "hw_alerts"                :   "mRunListAlertHistory",
     "computephysicaldisk_test" :   "mRunComputePhysicalDiskTest"
@@ -5183,6 +5259,10 @@ class ebCluDom0SanityTests:
             if _value == "True":
                 if _key not in ["bridge_test", "stale_domU_test", "image_info_test"]:
                     self.__precheck_list.append(_key)
+
+        if (self.__precheckConfig.get("dbmcli_status_test", "True") == "True" and
+                "dbmcli_status_test" not in self.__precheck_list):
+            self.__precheck_list.append("dbmcli_status_test")
 
         if self.__step == "ESTP_PREVM_CHECKS":
             self.__hostname, self.__domain = aNodeInfo.split('.', 1)
@@ -5344,6 +5424,26 @@ class ebCluDom0SanityTests:
             self.__res.update( {'hypervisor' : 'stopped'} )
             ebLogError("*** {0}: HYPERVISOR {1} on dom0:{2}".format(self.__alert_log, _status, self.__host))
             self.__error_list.append(get_hw_validate_error(90003, "hypervisor", self.__host))
+
+    def mRunDbmcliStatusTest(self):
+        _result_key = 'dbmcli_status'
+        _migrate_util = ebMigrateUsersUtil(self.__cluctrl)
+        try:
+            if _migrate_util._is_dbmcli_running(self.__node):
+                self.__res.update({_result_key: 'normal'})
+                ebLogInfo(f"*** {self.__alert_log}: DBMCLI service on dom0:{self.__host} is normal")
+            else:
+                self.__res.update({_result_key: 'abnormal'})
+                ebLogError(f"*** {self.__alert_log}: DBMCLI service on dom0:{self.__host} is not running")
+                self.__error_list.append(get_hw_validate_error(90035, _result_key, self.__host))
+        except ExacloudRuntimeError as exc:
+            self.__res.update({_result_key: 'abnormal'})
+            ebLogError(f"*** {self.__alert_log}: Failed to verify DBMCLI service on dom0:{self.__host}: {exc}")
+            self.__error_list.append(get_hw_validate_error(90035, _result_key, self.__host))
+        except Exception as exc:
+            self.__res.update({_result_key: 'abnormal'})
+            ebLogError(f"*** {self.__alert_log}: Unexpected error while verifying DBMCLI service on dom0:{self.__host}: {exc}")
+            self.__error_list.append(get_hw_validate_error(90035, _result_key, self.__host))
     
     def mRunFanTest(self):
         _cmd_str = "ipmitool sdr type fan  |  awk '{ print $5 }'"
@@ -5401,6 +5501,88 @@ class ebCluDom0SanityTests:
             else:
                 self.__res.update( {'temperature' : _value} )
                 self.__error_list.append(get_hw_validate_error(90006, "temperature", self.__host))
+
+    def mRunComputeAdminIPConflictTest(self):
+        """
+        Method to handle a test to see if a Compute Node already has
+        an interface with the same Admin IP address
+        """
+
+
+        _cmd = self.__cluctrl.mGetCmd()
+
+        if not ebCluCmdCheckOptions(_cmd, ['check_dup_admin_ip']):
+            ebLogWarn("mRunComputeAdminIPConflictTest is disabled through program arguments")
+            return
+
+        _files_to_search = "/etc/sysconfig/network-scripts/ifcfg-vm*eth*"
+        _nat_ip = None
+
+        for _dom0, _domU in self.__cluctrl.mReturnDom0DomUPair():
+
+            if _dom0 == self.__host:
+                _domu_conf = self.__cluctrl.mGetMachines().mGetMachineConfig(_domU)
+                _domu_conf_net = _domu_conf.mGetMacNetworks()
+
+                _net_config = self.__cluctrl.mGetVMNetConfigs(_domU)
+                _nat_ip = _net_config.get("client").mGetNetNatAddr()
+                break
+
+        # Failed to detect IP from XML file with current nodes
+        # We will treat this as SUCCESS
+        if not _nat_ip:
+            ebLogInfo(f"Admin IP is NOT detected in XML file for {_domU}")
+            self.__res.update( {'compute_admin_ip_test' : 'normal'} )
+            return
+
+        # Check if Dom0 is kvm and OL8
+        _check_nft = False
+        if self.__cluctrl.mIsKVM() and self.__cluctrl.mIsHostOL8(_dom0):
+            ebLogInfo(f"Dom0 {_dom0} is OL8")
+            _check_nft = True
+
+        ebLogTrace(f"Admin IP {_nat_ip} found for {_domU}")
+        _rc = 0
+        with connect_to_host(self.__host, get_gcontext()) as _node:
+
+            # Search IP in the known list of potential files with stale bridges
+            _bin_grep = node_cmd_abs_path_check(_node, "grep", sbin=True)
+            _out_grep_config_files = node_exec_cmd(
+                _node, f"{_bin_grep} -RiI {_nat_ip} {_files_to_search}")
+            ebLogTrace(_out_grep_config_files)
+            if _out_grep_config_files.exit_code == 0:
+                ebLogCritical(
+                    f"Dom0 {self.__host} is already using the domU NAT ip "
+                    f"{_nat_ip} in an interface. This IP is expected to "
+                    f"be used for {_domU}",
+                    f"Check the interfaces in the Dom0 {self.__host} that "
+                    f"are using {_nat_ip} and see if you need to clean "
+                    "them")
+                _rc = 1
+
+            # If Dom0 has NFT, check if the IP is already used. It shouldn't
+            if _check_nft:
+                _bin_nft = node_cmd_abs_path_check(_node, "nft", sbin=True)
+                _out_grep_nft = node_exec_cmd(
+                    _node, f"{_bin_nft} list table nat | {_bin_grep} -i '{_nat_ip}'")
+                ebLogTrace(_out_grep_nft)
+                if _out_grep_nft.exit_code == 0:
+                    ebLogCritical(
+                        f"Dom0 {self.__host} is already using the domU NAT ip "
+                        f"{_nat_ip} in an NFT Rule. This IP is expected to "
+                        f"be used for {_domU}",
+                        f"Check the NFT rules in the Dom0 {self.__host} that "
+                        f"are using {_nat_ip} and see if you need to clean "
+                        "them")
+                    _rc = 1
+        if _rc != 0:
+            ebLogWarn('*** {0}: Host {1} is already using an Admin IP address'.format(self.__alert_log, self.__host))
+            self.__res.update( {'compute_admin_ip_test' : 'abnormal'} )
+            self.__error_list.append(get_hw_validate_error(90000, "adminip_in_use", self.__host))
+        else:
+            self.__res.update( {'compute_admin_ip_test' : 'normal'} )
+            ebLogInfo("*** {0}: COMPUTE_ADMIN_IP_TEST on dom0:{1} is normal".format(self.__alert_log, self.__host))
+
 
     def mRunRootStorageTest(self):
         _partition = '/'
@@ -6528,6 +6710,41 @@ class ebCluServerSshConnectionCheck(object):
         
         ebLogInfo('*** mServerSshConnectionCheck <<< ***')
         return _rc
+    
+    def mNodeSubsetSshConnectionCheck(self, aOptions, aDomUs=[]):
+        ebLogInfo('*** mNodeSubsetSshConnectionCheck >>> ***')
+        _domUs = aDomUs
+        _rc = 1
+        
+        if self.__ebox.mIsOciEXACC():
+            _key_only = False
+        else:
+            _key_only = True
+
+        for _domu in _domUs:
+            ebLogInfo('*** Running ssh test for server: %s ***' % (_domu))
+            if self.__node.mIsConnectable(aHost=_domu, aKeyOnly=_key_only):
+                ebLogInfo('*** Success: VM %s is connectable ***' % (_domu))
+                _rc = 0
+                # No need to check further once one VM SSH test is successful
+                break
+
+        _data = []
+        _error = ""
+
+        if _rc == 0:
+            self.mUpdateRequestData(_rc, _data, _error, aOptions)
+            ebLogInfo('*** Success: The SSH connection test was successful for at least one VM in the cluster ***')
+        else:
+            _error = ", ".join(map(str, _domUs))
+            _detail_error = "All VMs in the cluster failed the SSH connection test, Ensure that at least one VM is running: " + _error
+            self.mUpdateRequestData(_rc, _data, _detail_error, aOptions)
+            self.__ebox.mUpdateErrorObject(gReshapeError['ERROR_SSH_FAILURE'], _detail_error)
+            raise ExacloudRuntimeError(0x0807, 0xA, _detail_error)
+        
+        ebLogInfo('*** mNodeSubsetSshConnectionCheck <<< ***')
+        return _rc
+
 
 
 class ebCluIbSwitchSanityTests:
@@ -6975,6 +7192,7 @@ class ebCluEthernetConfig:
         else:
             _msg = f"Interface {_ethx} is down in {_dom0} and it was not possible to bring it up"
             ebLogWarn(_msg)
+            return False
 
     def mUpdateCustomEthernetSpeed(self, aNode, aDom0, aEthx, aCurrSpeed, aExadataModel=None):
         _node = aNode
@@ -7846,7 +8064,7 @@ class ebADBSUtil:
         return _exit_status
 
 
-def mGetGridListSupportedByOeda(aExaBoxCluCtrlObj, aGridVersion):
+def mGetGridListSupportedByOeda(aExaBoxCluCtrlObj, aGridVersion, aGrid26aiSupport=False):
     """
     Check if given grid image is supported by OEDA
     """
@@ -7859,7 +8077,10 @@ def mGetGridListSupportedByOeda(aExaBoxCluCtrlObj, aGridVersion):
         # Get the output from oedacli  
         _, _, _o, _ = _ebox.mExecuteLocal(_get_grid_list_cmd)
         _output = _o.strip()
-        
+        _grid_26ai_support = aGrid26aiSupport
+
+        version_split_position = 2
+
         _supported_major_minor_versions = set()  
         
         for line in _output.split(os.linesep):
@@ -7868,7 +8089,7 @@ def mGetGridListSupportedByOeda(aExaBoxCluCtrlObj, aGridVersion):
                 continue
 
             potential_versions = line.split(',')
-            
+        
             first_part = potential_versions[0].strip()
             if not first_part or not all(c.isdigit() or c == '.' for c in first_part):
                 # Skip lines that don't start with something looking like a version
@@ -7877,23 +8098,32 @@ def mGetGridListSupportedByOeda(aExaBoxCluCtrlObj, aGridVersion):
             for part in potential_versions:
                 version = part.strip()
                 if version:
-                    major_minor = '.'.join(version.split('.')[:2])
-                    # Ensure it looks like major.minor (e.g. "19.25", not "GI") before adding
+                    if _grid_26ai_support:
+                        major_minor = version
+                    else:
+                        major_minor = '.'.join(version.split('.')[:version_split_position])
+                        # Ensure it looks like major.minor (e.g. "19.25", not "GI") before adding
                     if '.' in major_minor and all(p.isdigit() for p in major_minor.split('.')):
                         _supported_major_minor_versions.add(major_minor)
 
-        # Extract major.minor from the input grid version
-        input_major_minor = '.'.join(aGridVersion.split('.')[:2])
-        
+        if _grid_26ai_support:
+            input_major_minor = aGridVersion
+        else:
+            # Extract major.minor from the input grid version
+            input_major_minor = '.'.join(aGridVersion.split('.')[:version_split_position])
+          
+        ebLogTrace(f" _supported_major_minor_versions : {_supported_major_minor_versions}")
+
         if input_major_minor in _supported_major_minor_versions:
             ebLogInfo(f'Grid version {aGridVersion} supported by OEDA')
-            return True
+            return True, _supported_major_minor_versions
+
         
         ebLogWarn(f'Grid version {aGridVersion} NOT supported by OEDA !')
-        return False
+        return False, _supported_major_minor_versions
     
     except Exception as e:
         ebLogError(f'Exception during checking Grid list support in OEDA : {str(e)}')
-        return False
+        return False, set()
         
 # end of file

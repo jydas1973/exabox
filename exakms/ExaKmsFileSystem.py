@@ -4,7 +4,7 @@
 #
 # ExaKmsFileSystem.py
 #
-# Copyright (c) 2021, 2023, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      ExaKmsFileSystem.py - <one-line expansion of the name>
@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    gsundara    03/21/26 - Bug 38900137 - EXACLOUD: ISSUES FOUND BY VOXIO
+#                           CODEV AGENT IN DIR EXABOX/EXAKMS (Fix restore backup entry selection)
 #    jesandov    10/20/23 - 35933990: Include label in ExaKmsEntry
 #    jesandov    06/12/23 - 35484161: Add validation to nathostname in the search pattern dict
 #    jesandov    04/27/23 - 35141575: Add support of ECDSA key type
@@ -275,7 +277,8 @@ class ExaKmsFileSystem(ExaKms):
 
                 _entryDict = {"FQDN": _entry.mGetFQDN(),
                               "user": _entry.mGetUser()}
-                _mainEntry = self.mSearchExaKmsEntries(_entryDict, aRefreshKey=True)
+                _mainEntries = self.mSearchExaKmsEntries(_entryDict, aRefreshKey=True)
+                _mainEntry = _mainEntries[0] if _mainEntries else None
 
                 # If the entry already exists, we keep the latest one
                 if not _mainEntry or _mainEntry.mGetCreationTime() < _entry.mGetCreationTime():

@@ -4,7 +4,7 @@
 #
 # ExaKmsHistoryKVDB.py
 #
-# Copyright (c) 2024, Oracle and/or its affiliates.
+# Copyright (c) 2024, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      ExaKmsHistoryKVDB.py - <one-line expansion of the name>
@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    gsundara    03/21/26 - Bug 38900137 - EXACLOUD: ISSUES FOUND BY VOXIO
+#                           CODEV AGENT IN DIR EXABOX/EXAKMS (Fix history KVDB write)
 #    ririgoye    10/08/24 - Bug 37076081 - Created ExaKmsHistoryKVDB file
 #    ririgoye    10/08/24 - Creation
 #
@@ -63,7 +65,7 @@ class ExaKmsHistoryKVDB(ExaKmsHistory):
 
         # Insert to JSON history object
         _entry = aKmsEntry.mToJson()
-        _key = _entry.mGetKey()
+        _key = aKmsEntry.mGetKey()
         _json_obj[_key] = _entry
 
         # Get path to exakv.db
@@ -76,7 +78,7 @@ class ExaKmsHistoryKVDB(ExaKmsHistory):
         _file_path = os.path.join(_db_path, 'exakv.db')
 
         # Update exakv.db file
-        with open(_file_path) as _file:
+        with open(_file_path, 'w') as _file:
             json.dump(_json_obj, _file, indent=4)
 
 

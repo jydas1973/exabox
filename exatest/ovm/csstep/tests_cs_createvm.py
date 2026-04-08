@@ -1,10 +1,10 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/exatest/ovm/csstep/tests_cs_createvm.py /main/11 2025/12/01 22:37:00 avimonda Exp $
+# $Header: ecs/exacloud/exabox/exatest/ovm/csstep/tests_cs_createvm.py /main/13 2026/01/28 17:38:21 avimonda Exp $
 #
 # tests_cs_createvm.py
 #
-# Copyright (c) 2023, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2023, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_cs_createvm.py - <one-line expansion of the name>
@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    avimonda    12/06/25 - Bug 38610132 - OCI: DBAAS.CREATEEXACCVMCLUSTER
+#                           HANGS /DOES NOT PROGRESS
 #    avimonda    11/06/25 - Bug 38427813 - OCI: EXACS: PROVISIONING FAILED WITH
 #                           EXACLOUD ERROR CODE: 1877 EXACLOUD : ERROR IN
 #                           MULTIPROCESSING(NON-ZERO EXITCODE(-9) RETURNED
@@ -53,7 +55,7 @@ class ebTestCSCreateVm(ebTestClucontrol):
     def test_mCreateVM(self):
         ebLogInfo("Running unit test on csCreateVM.py:mCreateVM")
 
-        with patch('exabox.ovm.csstep.cs_base.ImageBOM.mIsSubStepExecuted', side_effect=iter([True,True,True,True,True,True,True,True,True,False,True,True])),\
+        with patch('exabox.ovm.csstep.cs_base.ImageBOM.mIsSubStepExecuted', side_effect=iter([True,True,True,True,True,True,True,True,True,False,True,True,True])),\
              patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mIsOciEXACC', return_value=True),\
              patch('exabox.ovm.csstep.cs_base.serialConsole.mRunContainer'),\
              patch('exabox.ovm.csstep.cs_base.serialConsole.mRestartContainer'):
@@ -106,7 +108,9 @@ class ebTestCSCreateVm(ebTestClucontrol):
 
         self.mPrepareMockCommands(mockCommands)
         with patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetVersionGi', return_value="191") ,\
-            patch('exabox.ovm.sysimghandler.mGetLocalFileHash', return_value={'System.first.boot.22.1.10.0.0.230422.img':'d2fd86...'}):
+            patch('exabox.ovm.sysimghandler.mGetLocalFileHash', return_value={'System.first.boot.22.1.10.0.0.230422.img':'d2fd86...'}), \
+            patch.object(self.mGetClubox(), 'mGetExadataDom0Model', return_value='X8-2'), \
+            patch.object(self.mGetClubox(), 'mIsXS', return_value=False):
             self.mGetClubox().mCheckSystemImage()
 
     def test_mCheckDomUImageFor23ai_invalid_image(self):

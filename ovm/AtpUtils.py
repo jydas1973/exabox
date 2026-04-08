@@ -70,6 +70,7 @@ class ebAtpUtils(object):
         _domainName = _out.read().strip()
         if _domainName in _scanName:
             ebLogInfo(f"*** Scan name on the DOMU is already in fqdn format: {_scanName}. ***")
+            _nodeDomU.mDisconnect()
             return
         _scanFqdn = _scanName + '.' + _domainName
         _cmd_modifyScanName = f"{_srvctl_bin} modify scan -scanname {_scanFqdn}"

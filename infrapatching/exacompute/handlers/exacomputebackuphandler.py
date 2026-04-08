@@ -1,10 +1,10 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/infrapatching/exacompute/handlers/exacomputebackuphandler.py /main/5 2025/05/07 04:51:45 araghave Exp $
+# $Header: ecs/exacloud/exabox/infrapatching/exacompute/handlers/exacomputebackuphandler.py sdevasek_bug-38891722/1 2026/02/09 16:53:55 sdevasek Exp $
 #
 # exacomputebackuphandler.py
 #
-# Copyright (c) 2022, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2022, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      exacomputebackuphandler.py
@@ -16,6 +16,10 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    sdevasek    02/09/26 - Enh 38891722 - REMOVAL OF SSH EQUIVALENCE BETWEEN
+#                           LAUNCH-NODE AND TARGET-NODES
+#    sdevasek    01/22/26 - Enh 38854794 - EXACOMPUTE FREE POOL NODE  PATCHING:
+#                           UPDATE NODE_PROGRESS_DATA CORRECTLY
 #    araghave    03/17/25 - Enh 37713042 - CONSUME ERROR HANDLING DETAILS FROM
 #                           INFRAPATCHERROR.PY DURING EXACOMPUTE PATCHING
 #    araghave    01/27/25 - Enh 37132175 - EXACOMPUTE MUST REUSE INFRA PATCHING
@@ -72,7 +76,8 @@ class ExaBackupHandler(ExaGenericHandler):
 
         try:
             # 1. Set up environment
-            self.mSetEnvironment()
+            # When No LaunchNode is the payload, it returns 2 launchnodes in _eligible_launch_nodes otherwise returns 1 in the _eligible_launch_nodes list
+            _ret, _eligible_launch_nodes, _compute_node_list_to_be_patched, _consolidated_precheck_failure_nodes = self.mSetEnvironment()
 
             self.mPatchLogInfo(
                 f"\n\n---------------> Starting {TASK_BACKUP_IMAGE} on {self.mGetCurrentTargetType()}s <---------------\n")
@@ -111,22 +116,19 @@ class ExaBackupHandler(ExaGenericHandler):
                 _ret = self.mAddError(DOM0_SYSTEM_CONSISTENCY_CHECK_FAILED, _suggestion_msg)
                 return _ret
 
-            for _node in self.mGetLaunchNodes():
-                if self.mGetCluPatchCheck().mPingNode(_node):
-                    _node_patcher = _node
-                    self.mSetEligibleLaunchNode(_node)
-                    break
-                else:
-                    self.mPatchmgrLogInfo(f"Launch Node : {_node} is not pingable.")
-                    continue
+            for _eligible_launch_node in _eligible_launch_nodes:
+                if len(_eligible_launch_nodes) > 1:
+                    if _eligible_launch_node == _eligible_launch_nodes[0]:
+                        _list_of_nodes = list(set(_list_of_nodes) - set([_eligible_launch_node]))
+                    else:
+                        _list_of_nodes = [_eligible_launch_nodes[0]]
+                self.mSetEligibleLaunchNode(_eligible_launch_node)
 
-            if _node_patcher is None:
-                _suggestion_msg = f"None of the launch nodes provided are reachable, unable to proceed with patch operations Launch node list provided : {str(self.mGetLaunchNodes())}"
-                _ret = self.mAddError(DOM0_NOT_PINGABLE, _suggestion_msg)
-                return _ret
+                # Run the image backup in all the dom[0U]s except one
+                _rc = self.mPatchImageBackupComputeNode(_eligible_launch_node)
 
-            # Run the image backup in all the dom[0U]s except one
-            _ret = self.mPatchImageBackupComputeNode(_node_patcher)
+                if _rc != PATCH_SUCCESS_EXIT_CODE:
+                    _ret = _rc
 
             if _ret == PATCH_SUCCESS_EXIT_CODE:
                 self.mAddSuccess()
@@ -137,6 +139,8 @@ class ExaBackupHandler(ExaGenericHandler):
             _ret = self.mAddError(PATCH_DOM0_IMAGE_BACKUP_ERROR_EXCEPTION, _suggestion_msg)
 
         finally:
+            self.mPatchLogInfo("Cleanup Environment")
+            self.mCleanUpExaComputeSSHEnv()
             self.mPatchLogInfo(f"Final return code from task : {self.mGetTask()} is {_ret} ")
             return _ret
 

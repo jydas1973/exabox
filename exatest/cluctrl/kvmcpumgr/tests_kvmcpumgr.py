@@ -52,23 +52,22 @@ class TestKVMCpuManager(ebTestClucontrol):
                     exaMockCommand("/bin/rm -f /tmp/serial-exatest-scaqab10client01vm08.us.oracle.com.log.1",aPersist=True),
                 ],
                 [
-                    exaMockCommand(".*virsh nodeinfo.*", aStdout='100'),
-                    exaMockCommand("/usr/sbin/vm_maker --list --vcpu | /bin/grep 'Host reserved'.*", aStdout='4'),
+                    exaMockCommand("/usr/bin/virsh nodeinfo", aStdout='CPU(s): 100\n'),
+                    exaMockCommand("/usr/sbin/vm_maker --list --vcpu", aStdout=_vm_maker_list_vcpu, aPersist=True),
                     #exaMockCommand("/usr/sbin/vm_maker --list | /bin/grep running | /bin/grep scaqab10client01vm08.us.oracle.com", aStdout="scaqab10client01vm08.us.oracle.com(24)       : running"),# 24 is the VMID
                     #exaMockCommand("/usr/sbin/vm_maker --list --vcpu$", aStdout=_vm_maker_list_vcpu, aPersist=True),
-                    exaMockCommand("/usr/sbin/vm_maker --list --vcpu --domain.*", aStdout='16',aPersist=True), #16 is current VCPUS
-                    exaMockCommand("/usr/sbin/vm_maker   --list   --vcpu   --domain.*", aStdout='16 16',aPersist=True),
-                    exaMockCommand("/usr/sbin/vm_maker --list-domains | /bin/awk '{print $1}'", aStdout='scaqab10client01vm08.us.oracle.com'),
-                    exaMockCommand("/usr/sbin/vm_maker --list --vcpu", aStdout=_vm_maker_list_vcpu, aPersist=True),
-                    exaMockCommand("/usr/bin/virsh vcpucount scaqab10client01vm08.us.oracle.com | /bin/grep maximum | /bin/grep config | /bin/awk '{print $3}'", aStdout='100'),
-                    exaMockCommand("/usr/bin/virsh vcpucount.*", aStdout='100'),
+                    exaMockCommand("/usr/sbin/vm_maker --list --vcpu --domain.*", aStdout='scaqab10client01vm08.us.oracle.com: Current: 16 Restart: 16',aPersist=True), #16 is current VCPUS
+                    exaMockCommand("/usr/sbin/vm_maker   --list   --vcpu   --domain.*", aStdout='scaqab10client01vm08.us.oracle.com: Current: 16 Restart: 16',aPersist=True),
+                    exaMockCommand("/usr/sbin/vm_maker --list-domains", aStdout='scaqab10client01vm08.us.oracle.com'),
+                    exaMockCommand("/usr/bin/virsh vcpucount scaqab10client01vm08.us.oracle.com", aStdout='maximum config 100'),
+                    exaMockCommand("/usr/bin/virsh vcpucount.*", aStdout='maximum config 100'),
                     exaMockCommand("/usr/sbin/vm_maker --set --vcpu .*"),
-                    exaMockCommand("/usr/sbin/vm_maker --list --vcpu --domain scaqab10client01vm08.us.oracle.com | /bin/awk -F: '{print $4}'", aStdout='10'),
+                    exaMockCommand("/usr/sbin/vm_maker --list --vcpu --domain scaqab10client01vm08.us.oracle.com", aStdout='scaqab10client01vm08.us.oracle.com: Current: 10 Restart: 10'),
                     exaMockCommand("/usr/bin/virsh list --all | /bin/tail -n+3 | /bin/awk '{print $2}'", aStdout='scaqab10client01vm08.us.oracle.com')
 
                 ],
                 [
-                    exaMockCommand("/usr/bin/virsh vcpucount .* | /bin/grep maximum | /bin/grep config | /bin/awk '{print $3}", aStdout='100'),
+                    exaMockCommand("/usr/bin/virsh vcpucount .*", aStdout='maximum config 100'),
                     exaMockCommand("/usr/sbin/vm_maker --set --vcpu .*"),
                     exaMockCommand("/usr/bin/virsh list --all | /bin/tail -n+3 | /bin/awk '{print $2}'", aStdout='scaqab10client01vm08.us.oracle.com')
                 ],
@@ -141,22 +140,21 @@ class TestKVMCpuManager(ebTestClucontrol):
                     exaMockCommand("/bin/rm -f /tmp/serial-exatest-scaqab10client01vm08.us.oracle.com.log.1",aPersist=True),
                 ],
                 [
-                    exaMockCommand(".*virsh nodeinfo.*", aStdout='100'),
-                    exaMockCommand("/usr/sbin/vm_maker --list --vcpu | /bin/grep 'Host reserved'.*", aStdout='4'),
+                    exaMockCommand("/usr/bin/virsh nodeinfo", aStdout='CPU(s): 100\n'),
+                    exaMockCommand("/usr/sbin/vm_maker --list --vcpu", aStdout=_vm_maker_list_vcpu, aPersist=True),
                     #exaMockCommand("/usr/sbin/vm_maker --list --vcpu$", aStdout=_vm_maker_list_vcpu, aPersist=True),
                     #exaMockCommand("/usr/sbin/vm_maker --list | /bin/grep running | /bin/grep scaqab10client01vm08.us.oracle.com", aStdout="scaqab10client01vm08.us.oracle.com(24)       : running"),
-                    exaMockCommand("/usr/sbin/vm_maker --list --vcpu --domain scaqab10client01vm08.us.oracle.com | /bin/awk -F: '{print $4}'", aStdout='10'),
-                    exaMockCommand("/usr/sbin/vm_maker   --list   --vcpu   --domain.*", aStdout='Current: 16 Restart: 16',aPersist=True),
-                    exaMockCommand("/usr/sbin/vm_maker --list-domains | /bin/awk '{print $1}'", aStdout='scaqab10client01vm08.us.oracle.com'),
-                    exaMockCommand("/usr/sbin/vm_maker --list --vcpu", aStdout=_vm_maker_list_vcpu, aPersist=True),
-                    exaMockCommand("/usr/bin/virsh vcpucount scaqab10client01vm08.us.oracle.com | /bin/grep maximum | /bin/grep config | /bin/awk '{print $3}'", aStdout='100'),
-                    exaMockCommand("/usr/bin/virsh vcpucount.*", aStdout='100'),
+                    exaMockCommand("/usr/sbin/vm_maker --list --vcpu --domain scaqab10client01vm08.us.oracle.com", aStdout='scaqab10client01vm08.us.oracle.com: Current: 10 Restart: 10'),
+                    exaMockCommand("/usr/sbin/vm_maker   --list   --vcpu   --domain.*", aStdout='scaqab10client01vm08.us.oracle.com: Current: 16 Restart: 16',aPersist=True),
+                    exaMockCommand("/usr/sbin/vm_maker --list-domains", aStdout='scaqab10client01vm08.us.oracle.com'),
+                    exaMockCommand("/usr/bin/virsh vcpucount scaqab10client01vm08.us.oracle.com", aStdout='maximum config 100'),
+                    exaMockCommand("/usr/bin/virsh vcpucount.*", aStdout='maximum config 100'),
                     exaMockCommand("/usr/sbin/vm_maker --set --vcpu .*"),
                     exaMockCommand("/usr/sbin/vm_maker --list --vcpu --domain.*", aStdout='16',aPersist=True),
                     exaMockCommand("/usr/bin/virsh list --all | /bin/tail -n+3 | /bin/awk '{print $2}'", aStdout='scaqab10client01vm08.us.oracle.com')
                 ],
                 [
-                    exaMockCommand("/usr/bin/virsh vcpucount .* | /bin/grep maximum | /bin/grep config | /bin/awk '{print $3}", aStdout='100'),
+                    exaMockCommand("/usr/bin/virsh vcpucount .*", aStdout='maximum config 100'),
                     #exaMockCommand("/usr/sbin/vm_maker   --list   --vcpu   --domain.*", aStdout='16 16',aPersist=True),
                     exaMockCommand("/usr/sbin/vm_maker --set --vcpu .*",aPersist=True),
                     exaMockCommand("/usr/sbin/vm_maker   --list   --vcpu   --domain.*", aStdout='Current: 16 Restart: 16',aPersist=True),
@@ -241,7 +239,6 @@ class TestKVMCpuManager(ebTestClucontrol):
         return _exacpueobj.mPatchVMCfgVcpuCountKvm("scaqab10adm01.us.oracle.com", "scaqab10client01vm08.us.oracle.com", aOptions=_options)
 
     def test_cpu_burst(self):
-
         _cmds = {
             self.mGetRegexDom0(): [[
                     exaMockCommand(".*virsh nodeinfo.*", aStdout="CPU(s):100"),
@@ -344,4 +341,3 @@ class TestKVMCpuManager(ebTestClucontrol):
 
 if __name__ == '__main__':
     unittest.main()
-

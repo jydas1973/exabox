@@ -4,7 +4,7 @@
 #
 # vmboci.py
 #
-# Copyright (c) 2023, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2023, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      vmboci.py - <one-line expansion of the name>
@@ -16,6 +16,9 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    jfsaldan    03/11/26 - Bug 39070236 - EXADB-D VMBACKUP | EXACLOUD SHOULD
+#                           USE HOME REGION WHEN MAKING OCI REQUEST TO CREATE A
+#                           NEW VMBACKUP COMPARTMENT
 #    jfsaldan    04/25/25 - Bug 37877334 - EXACLOUD VMBACKUP TO OSS PREVENT
 #                           EXACSDBOPS-10887 | TERMINATION FAILS IF VMBACKUP TO
 #                           OSS COMPARTMENT DOES NOT EXIST
@@ -99,7 +102,7 @@ from exabox.core.Context import get_gcontext
 from exabox.core.Error import ExacloudRuntimeError
 from exabox.log.LogMgr import ebLogInfo, ebLogError, ebLogTrace, ebLogWarn
 from exabox.utils.ExaRegion import (get_r1_certificate_path,
-    get_instance_root_compartment, get_instance_compartment)
+    get_instance_root_compartment, get_instance_compartment, is_r1_region)
 from exabox.utils.node import connect_to_host, node_exec_cmd_check
 from tempfile import NamedTemporaryFile
 from typing import Optional, NamedTuple, Tuple
@@ -196,6 +199,7 @@ class ebVMBackupOCI(object):
         # We rely on this identity client to get some OCIDs, so this client
         # needs to be created first
         self._identity_client = self._oci_factory.get_identity_client()
+
 
         # Try to get the OCI Resources names and get the OCIDs that we'll need
         self._ADMIN_TENANCY_OCID = self.mGetTenancyOcid()
@@ -1488,10 +1492,50 @@ class ebVMBackupOCI(object):
             name = aCompartmentName,
             description="Compartment Create by Exacloud for VMBackup")
 
+        # Bug ref 39070236
+        # In non R1 regions, we must set the correct 'home region' of our
+        # identity client. We will create a tmp client to make
+        # sure this override happens for Create Compartment only
+        
+        # Check if any home region is set in exabox.conf
+        # IF yes, set it on our client
+        # IF not, then try to find it from subscribed regions
+        _override_home_region = get_gcontext().mGetConfigOptions().get(
+                "vmbackup", {}).get("home_region", "")
+
+
+        if is_r1_region():
+            _home_region_identity_client = self._identity_client
+
+        elif _override_home_region:
+            ebLogInfo(f"We will override the Identity Client home region with {_override_home_region}")
+            _home_region_oci_factory = ExaOCIFactory()
+            _home_region_identity_client = _home_region_oci_factory.get_identity_client()
+            _home_region_identity_client.base_client.set_region(_override_home_region)
+            ebLogInfo(f"The endpoint set for our Identity Client is {_home_region_identity_client.base_client.endpoint}")
+
+        else:
+            ebLogInfo(f"We will try to read the home region where our Identity Client must point to")
+            _home_region_oci_factory = ExaOCIFactory()
+            _home_region_identity_client = _home_region_oci_factory.get_identity_client()
+            _tenancy_id = self.mGetTenancyOcid()
+            ebLogInfo(f"Checking Home Region for tenancy {_tenancy_id}")
+            _subs = self._identity_client.list_region_subscriptions(_tenancy_id).data
+            _home_region = next(s.region_name for s in _subs if s.is_home_region)
+
+            if not _home_region:
+                _err = (f"No home region found for tenancy {_tenancy_id}. "
+                        f"The list of subscribed regions is {_subs}")
+                ebLogError(_err)
+                raise ExacloudRuntimeError(0x095, 0xA, _err)
+
+            ebLogInfo(f"We detected the home region {_home_region}")
+            _home_region_identity_client.base_client.set_region(_home_region)
+            ebLogInfo(f"The endpoint set for our Identity Client is {_home_region_identity_client.base_client.endpoint}")
 
         # Trigger call and fail on error
         try:
-           _response = self._identity_client.create_compartment(
+           _response = _home_region_identity_client.create_compartment(
                create_compartment_details = _create_compartment_details)
 
             # (Pdb) _response = self._identity_client.create_compartment(

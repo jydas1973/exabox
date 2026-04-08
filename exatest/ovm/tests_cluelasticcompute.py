@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 #
-# $Header: ecs/exacloud/exabox/exatest/ovm/tests_cluelasticcompute.py /main/94 2025/12/03 16:38:14 jfsaldan Exp $
+# $Header: ecs/exacloud/exabox/exatest/ovm/tests_cluelasticcompute.py /main/96 2026/02/20 06:43:17 aararora Exp $
 #
 # tests_cluelasticcompute.py
 #
-# Copyright (c) 2022, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2022, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_cluelasticcompute.py - <one-line expansion of the name>
@@ -16,6 +16,10 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    aypaul      03/30/26 - Adding unit tests for aypaul_bug-38277507
+#    pbellary    03/04/26 - Bug 39037277 - CLUSTER XMLS GET BONDETH4 SET FOR BACKUP NETWORK CONFIGURATION INSTEAD OF BONDETH1
+#    aararora    02/17/26 - Codex UT enhancement
+#    aypaul      01/29/26 - Updating unit tests for selinux code refactor
 #    jfsaldan    12/01/25 - Bug 38693893 - EXACS:BUTTERFLY:OC39:ADD VM FAILING
 #                           AT RUN ROOTSCRIPT STEP:ERROR:OEDA-1200: ROOT.SH
 #                           INITIALIZATION FOR CLUSTER CL-K3YQCYTA FAILED ON
@@ -80,9 +84,10 @@ from unittest.mock import patch, MagicMock, PropertyMock, mock_open, Mock
 import warnings
 import warnings
 import shutil
-import uuid
 import os, re
 import copy
+import uuid
+from contextlib import ExitStack
 
 RESHAPE_CONF = {'ADD_COMPUTES': ({'dom0': {'hostname': 'iad103716exdd017.iad103716exd.adminiad1.oraclevcn.com', 'rack_num': 1, 'uloc': '17', 'priv1': {'fqdn': 'iad103716exdd017-priv1.iad103716exd.adminiad1.oraclevcn.com', 'ipaddr': '192.168.132.4'}, 'priv2': {'fqdn': 'iad103716exdd017-priv2.iad103716exd.adminiad1.oraclevcn.com', 'ipaddr': '192.168.132.5'}, 'admin': {'fqdn': 'iad103716exdd017.iad103716exd.adminiad1.oraclevcn.com', 'gateway': '10.0.7.129', 'ipaddr': '10.0.7.146', 'netmask': '255.255.255.128'}, 'ilom': {'fqdn': 'iad103716exdd017lo.iad103716exd.adminiad1.oraclevcn.com', 'gateway': '10.0.7.129', 'ipaddr': '10.0.7.164', 'netmask': '255.255.255.128'}}, 'domU': {'hostname': 'iad103716x8mcompexpn17c.clientsubnet.devx8melastic.oraclevcn.com', 'priv1': {'fqdn': 'iad103716exddu1701-stre0.iad103716exd.adminiad1.oraclevcn.com', 'ipaddr': '100.106.123.16'}, 'priv2': {'fqdn': 'iad103716exddu1701-stre1.iad103716exd.adminiad1.oraclevcn.com', 'ipaddr': '100.106.123.17'}, 'admin': {'fqdn': 'iad103716x8mcompexpn17c.clientsubnet.devx8melastic.oraclevcn.com'}, 'client': {'fqdn': 'iad103716x8mcompexpn17c.clientsubnet.devx8melastic.oraclevcn.com', 'gateway': '10.0.0.1', 'ipaddr': '10.0.0.84', 'mac': '00:10:C9:C8:D4:CA', 'natdomain': 'iad103716exd.adminiad1.oraclevcn.com', 'nathostname': 'iad103716exddu1701', 'natip': '10.0.7.191', 'natnetmask': '255.255.255.128', 'netmask': '255.255.224.0', 'slaves': 'eth1 eth2', 'vlantag': None}, 'backup': {'fqdn': 'iad103716x8mcompexpn17b.backupsubnet.devx8melastic.oraclevcn.com', 'gateway': '10.0.32.1', 'ipaddr': '10.0.32.35', 'mac': '00:00:17:00:52:1A', 'netmask': '255.255.224.0', 'slaves': 'eth1 eth2', 'vlantag': '1'}, 'interconnect1': {'fqdn': 'iad103716exddu1701-clre0.iad103716exd.adminiad1.oraclevcn.com', 'ipaddr': '100.107.181.16'}, 'interconnect2': {'fqdn': 'iad103716exddu1701-clre1.iad103716exd.adminiad1.oraclevcn.com', 'ipaddr': '100.107.181.17'}, 'vip': {'fqdn': 'iad103716exddu1701-vip.clientsubnet.devx8melastic.oraclevcn.com', 'ipaddr': '10.0.0.90'}}},), 'DELETE_COMPUTES': (), 'ADD_CELLS': ({'hostname': 'iad103712exdcl07.iad103712exd.adminiad1.oraclevcn.com', 'rack_num': 1, 'uloc': 6, 'priv1': {'fqdn': 'iad103712exdcl07-priv1.iad103712exd.adminiad1.oraclevcn.com', 'ipaddr': '100.106.30.24'}, 'priv2': {'fqdn': 'iad103712exdcl07-priv2.iad103712exd.adminiad1.oraclevcn.com', 'ipaddr': '100.106.30.25'}, 'admin': {'fqdn': 'iad103712exdcl07.iad103712exd.adminiad1.oraclevcn.com', 'gateway': '10.0.4.129', 'ipaddr': '10.0.4.136', 'netmask': '255.255.255.128'}, 'ilom': {'fqdn': 'iad103712exdcl07lo.iad103712exd.adminiad1.oraclevcn.com', 'gateway': '10.0.4.129', 'ipaddr': '10.0.4.151', 'netmask': '255.255.255.128'}},), 'DELETE_CELLS': (), "ecra": {"servers": ["10.0.1.112/28"]}}
 DELETE_CONF = {'reshaped_node_subset': {'added_computes': [], 'retained_computes': [{'compute_node_alias': 'node-1','compute_node_hostname': 'iad103716exdd015.iad103716exd.adminiad1.oraclevcn.com'}],'removed_computes': [{'compute_node_alias': 'node-2','compute_node_hostname': 'iad103716exdd016.iad103716exd.adminiad1.oraclevcn.com', 'compute_node_virtual_hostname': 'iad103716x8mcompexpn16c.clientsubnet.devx8melastic.oraclevcn.com'}],'participating_computes': [{'compute_node_alias': 'node-1','compute_node_hostname': 'iad103716exdd015.iad103716exd.adminiad1.oraclevcn.com'},{'compute_node_alias':'node-2','compute_node_hostname': 'iad103716exdd016.iad103716exd.adminiad1.oraclevcn.com'}],'full_compute_to_virtualcompute_list': [{'compute_node_hostname':'iad103716exdd015.iad103716exd.adminiad1.oraclevcn.com','compute_node_virtual_hostname':'iad103716x8mcompexpn15c.clientsubnet.devx8melastic.oraclevcn.com'},{'compute_node_hostname': 'iad103716exdd016.iad103716exd.adminiad1.oraclevcn.com','compute_node_virtual_hostname': 'iad103716x8mcompexpn16c.clientsubnet.devx8melastic.oraclevcn.com'}]}, "ecra": {"servers": ["10.0.1.112/28"]}}
@@ -503,6 +508,69 @@ class ebTestCluElasticComp(ebTestClucontrol):
         except Exception as e:
             self.assertTrue("Connectivity checks" or "mConnectivityChecks" in str(e))
 
+    @patch("exabox.ovm.cluelasticcompute.ebCluReshapeCompute.mExecutePreVMStep")
+    @patch("exabox.ovm.cluelasticcompute.ebCluReshapeCompute.mUpgradeSystemImage")
+    @patch ('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetImageVersion', return_value="23.1.15.0.0.240605")
+    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mSetU02Size')
+    @patch("exabox.ovm.cluelasticcompute.ebCluReshapeCompute.mGetNodeU02Size")
+    @patch("exabox.ovm.clumisc.ebCluPreChecks.mNetworkDom0PreChecks")
+    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mUpdateClusterName')
+    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mCheckCrsIsUp')
+    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mCheckSharedEnvironment')
+    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mUpdateOEDAProperties')
+    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetOracleBaseDirectories', return_value=("/u01/app/19.0.0.0/grid", None, None))
+    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGenBondMap', return_value={})
+    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetNodeModel', return_value='X9')
+    @patch("exabox.ovm.cluelasticcompute.ebCluReshapeCompute.mSetSrcDom0DomU")
+    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mLogStepElapsedTime')
+    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mResetDom0NetworkMapping')
+    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mCheckConfigOption')
+    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mCheckDom0NetworkType', return_value=True)
+    def test_mAddNode_resets_dom0_network_mapping(self, mock_mExecutePreVMStep, mock_mUpgradeSystemImage, mock_imageVersion, mock_setu02size, mock_getu02size, mock_mNetworkDom0PreChecks, mock_clusterName, mock_mCheckCrsIsUp, 
+                                                 mock_mCheckSharedEnvironment, mock_mUpdateOEDAProperties, 
+                                                 mock_mGetOracleBaseDirectories, mock_check_dom0_network, mock_check_config_option,
+                                                 mock_reset_net_mapping, mock_log_step_time,
+                                                 mock_set_src_dom0domu, mock_get_node_model, mock_gen_bond_map):
+        ebLogInfo("Running unit test on cluelasticcompute.py:mAddNode network mapping reset")
+        fullOptions = copy.deepcopy(self.mGetClubox().mGetArgsOptions())
+        fullOptions.steplist = "OSTP_PREVM_INSTALL"
+
+        _cmds = {                                           
+                self.mGetRegexVm():
+                [
+                    [
+                        exaMockCommand("/usr/local/bin/imageinfo *", aRc=0, aStdout="20.1.12.0.0.210901" ,aPersist=True),
+                    ],
+                ],
+                self.mGetRegexDom0():
+                [
+                    [
+                        exaMockCommand("test -e /EXAVMIMAGES/System.first.boot.20.1.12.0.0.210901.kvm.img", aRc=0, aStdout="", aPersist=True),
+                        exaMockCommand("mv /EXAVMIMAGES/System.first.boot.20.1.12.0.0.210901.kvm.img /EXAVMIMAGES/System.first.boot.20.1.12.0.0.210901.img", aRc=0, aStdout="", aPersist=True),
+                        exaMockCommand("/opt/oracle.cellos/exadata.img.hw --get model", aRc=0, aStdout="ORACLE SERVER X5-2" ,aPersist=True),
+                    ],
+                    [
+                        exaMockCommand("test -e /EXAVMIMAGES/System.first.boot.20.1.12.0.0.210901.kvm.img", aRc=0, aStdout="", aPersist=True),
+                        exaMockCommand("mv /EXAVMIMAGES/System.first.boot.20.1.12.0.0.210901.kvm.img /EXAVMIMAGES/System.first.boot.20.1.12.0.0.210901.img", aRc=0, aStdout="", aPersist=True),
+                        exaMockCommand("/opt/oracle.cellos/exadata.img.hw --get model", aRc=0, aStdout="ORACLE SERVER X5-2" ,aPersist=True),
+                    ],
+                    []
+                ],
+                self.mGetRegexLocal():
+                [
+                    [
+                        exaMockCommand("sed.*es.properties", aRc=0, aStdout="", aPersist=True),
+                        exaMockCommand("cp.*", aRc=0, aStdout="", aPersist=True),
+                        exaMockCommand("ping*", aRc=0, aStdout=""),
+                        exaMockCommand("ping*", aRc=1, aStdout="", aPersist=True),
+                    ]
+                ]
+            }                                        
+
+        self.mPrepareMockCommands(_cmds)
+        _reshape_obj = ebCluReshapeCompute( self.mGetClubox(), fullOptions)
+        _reshape_obj.mAddNode(fullOptions)
+
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mUpdateClusterName')
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetOracleBaseDirectories', return_value=("/u01/app/19.0.0.0/grid", None, None))
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mCheckCrsIsUp')
@@ -524,15 +592,21 @@ class ebTestCluElasticComp(ebTestClucontrol):
         _reshape_obj = ebCluReshapeCompute( self.mGetClubox(), fullOptions)
 
         with patch ('exabox.ovm.clucontrol.exaBoxCluCtrl.mHasNatAndCustomerNet', return_value=False),\
-             patch ('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetSELinuxMode', return_value=True),\
-             patch ('exabox.ovm.clucontrol.exaBoxCluCtrl.mProcessSELinuxUpdate', return_value=0),\
+             patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetNodeModel', return_value='X9'),\
+             patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGenBondMap', return_value={}),\
+             patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mExecuteLocal', return_value=(None, None, 'SKIPPAASPROPERTIES=false', None)),\
+             patch ('exabox.ovm.cluelasticcompute.ebSelinuxControls.mGetSELinuxMode', return_value=True),\
+             patch ('exabox.ovm.cluelasticcompute.ebSelinuxControls.mProcessSELinuxUpdate', return_value=0),\
              patch ('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetImageVersion', return_value="23.1.15.0.0.240605"),\
              patch ('exabox.ovm.clucontrol.exaBoxCluCtrl.mSaveXMLClusterConfiguration', return_value=True):
              _return_code = _reshape_obj.mAddNode(fullOptions)
 
         with patch ('exabox.ovm.clucontrol.exaBoxCluCtrl.mHasNatAndCustomerNet', return_value=False),\
-             patch ('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetSELinuxMode', return_value=True),\
-             patch ('exabox.ovm.clucontrol.exaBoxCluCtrl.mProcessSELinuxUpdate', side_effect=ExacloudRuntimeError(0x0121, 0xA, "Failed to process SELinux update.")),\
+             patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetNodeModel', return_value='X9'),\
+             patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGenBondMap', return_value={}),\
+             patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mExecuteLocal', return_value=(None, None, 'SKIPPAASPROPERTIES=false', None)),\
+             patch ('exabox.ovm.cluelasticcompute.ebSelinuxControls.mGetSELinuxMode', return_value=True),\
+             patch ('exabox.ovm.cluelasticcompute.ebSelinuxControls.mProcessSELinuxUpdate', side_effect=ExacloudRuntimeError(0x0121, 0xA, "Failed to process SELinux update.")),\
              patch ('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetImageVersion', return_value="23.1.15.0.0.240605"),\
              patch ('exabox.ovm.clucontrol.exaBoxCluCtrl.mSaveXMLClusterConfiguration', return_value=True):
              _return_code = _reshape_obj.mAddNode(fullOptions)
@@ -578,6 +652,18 @@ class ebTestCluElasticComp(ebTestClucontrol):
                         exaMockCommand("/usr/bin/sudo -u oracle /bin/scp*"),
                         exaMockCommand("/usr/bin/chmod -R 775 /u01/app/grid/diag/crs*")
                     ]
+                ],
+                self.mGetRegexDom0():
+                [
+                    [
+                        exaMockCommand("/opt/oracle.cellos/exadata.img.hw --get model", aRc=0, aStdout="ORACLE SERVER X5-2", aPersist=True)
+                    ],
+                    [
+                        exaMockCommand("/opt/oracle.cellos/exadata.img.hw --get model", aRc=0, aStdout="ORACLE SERVER X5-2", aPersist=True)
+                    ],
+                    [
+                        exaMockCommand("/opt/oracle.cellos/exadata.img.hw --get model", aRc=0, aStdout="ORACLE SERVER X5-2", aPersist=True)
+                    ]
                 ]
             }
 
@@ -593,8 +679,11 @@ class ebTestCluElasticComp(ebTestClucontrol):
             break
 
         with patch ('exabox.ovm.clucontrol.exaBoxCluCtrl.mHasNatAndCustomerNet', return_value=False),\
-             patch ('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetSELinuxMode', return_value=True),\
-             patch ('exabox.ovm.clucontrol.exaBoxCluCtrl.mProcessSELinuxUpdate', return_value=0),\
+             patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetNodeModel', return_value='X9'),\
+             patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGenBondMap', return_value={}),\
+             patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mExecuteLocal', return_value=(None, None, 'SKIPPAASPROPERTIES=false', None)),\
+             patch ('exabox.ovm.cluelasticcompute.ebSelinuxControls.mGetSELinuxMode', return_value=True),\
+             patch ('exabox.ovm.cluelasticcompute.ebSelinuxControls.mProcessSELinuxUpdate', return_value=0),\
              patch ('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetImageVersion', return_value="23.1.15.0.0.240605"),\
              patch ('exabox.ovm.clucontrol.exaBoxCluCtrl.mSaveXMLClusterConfiguration', return_value=True),\
              patch ('exabox.ovm.clucontrol.exaBoxCluCtrl.IsZdlraProv', return_value=True):
@@ -2032,10 +2121,10 @@ class ebTestCluElasticComp(ebTestClucontrol):
                          exaMockCommand(re.escape("ORACLE_HOME=/u01/app/oracle/product/18.0.0.0/dbhome_2;export ORACLE_HOME;$ORACLE_HOME/bin/srvctl status database -d c12145_mfn_sea"), aRc=0, aStdout="Instance c12145_L0oon1 is running on node iad103716x8mcompexpn15c" ,aPersist=True),
                          exaMockCommand(re.escape("ORACLE_HOME=/u01/app/oracle/product/18.0.0.0/dbhome_2;export ORACLE_HOME;$ORACLE_HOME/bin/srvctl status service -d c12145_mfn_sea"), aRc=0, aStdout="Service c12145_pdb1.paas.oracle.com is running on instance(s) c12145_L0oon1" ,aPersist=True),
                          exaMockCommand(re.escape("ORACLE_HOME=/u01/app/oracle/product/18.0.0.0/dbhome_2;export ORACLE_HOME;$ORACLE_HOME/bin/srvctl config service -d c12145_mfn_sea -service c12145_pdb1.paas.oracle.com | grep 'Preferred instances'"), aRc=0, aStdout="Preferred instances: c12145_L0oon1" ,aPersist=True),
-                         exaMockCommand(re.escape("ORACLE_HOME=/u01/app/oracle/product/18.0.0.0/dbhome_2;export ORACLE_HOME;$ORACLE_HOME/bin/srvctl config service -d c12145_mfn_sea -service c12145_pdb1.paas.oracle.com | grep -E 'Preferred instances|Available instances'"), aRc=0, aStdout="" ,aPersist=True),
+                        exaMockCommand(re.escape("ORACLE_HOME=/u01/app/oracle/product/18.0.0.0/dbhome_2;export ORACLE_HOME;$ORACLE_HOME/bin/srvctl config service -d c12145_mfn_sea -service c12145_pdb1.paas.oracle.com | grep -E 'Preferred instances|Available instances'"), aRc=0, aStdout="" ,aPersist=True),
                          
-                     ],
-                     [
+                    ],
+                    [
                          exaMockCommand("/u01/app/19.0.0.0/grid/bin/srvctl *", aRc=1, aStdout="" ,aPersist=True),
                          exaMockCommand("/u01/app/19.0.0.0/grid/bin/crsctl *", aRc=0, aStdout="" ,aPersist=True),
                          exaMockCommand("/u01/app/19.0.0.0/grid/bin/olsnodes *", aRc=1, aStdout="iad103716x8mcompexpn16c" ,aPersist=True),
@@ -2750,6 +2839,53 @@ class ebTestCluElasticComp(ebTestClucontrol):
         self.mGetClubox().mSetUt(False)
 
         ebLogInfo("Unit test on cluelasticcompute.py:mExecDelNodeEndStep successful")
+
+    @patch("exabox.ovm.cluelasticcompute.ebCluReshapeCompute.mSetSrcDom0DomU")
+    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mLogStepElapsedTime')
+    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mResetDom0NetworkMapping')
+    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mCheckConfigOption')
+    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mCheckDom0NetworkType', return_value=True)
+    def test_mDeleteNode_resets_dom0_network_mapping(self, mock_check_dom0_network, mock_check_config_option,
+                                                     mock_reset_net_mapping, mock_log_step_time, mock_set_src_dom0domu):
+        ebLogInfo("Running unit test on cluelasticcompute.py:mDeleteNode network mapping reset")
+        options = copy.deepcopy(self.mGetClubox().mGetArgsOptions())
+        reshape_obj = ebCluReshapeCompute(self.mGetClubox(), options)
+
+        def _config_option(name, default=None):
+            if name == 'reset_net_mapping':
+                return 'True'
+            return default if default is not None else 'False'
+
+        mock_check_config_option.side_effect = _config_option
+
+        class _ResilientList(list):
+            def remove(self, value):
+                if value in self:
+                    super().remove(value)
+        reshaped_pairs = _ResilientList([
+            ['iad103716exdd015.iad103716exd.adminiad1.oraclevcn.com', 'iad103716x8mcompexpn15c.clientsubnet.devx8melastic.oraclevcn.com'],
+            ['iad103716exdd016.iad103716exd.adminiad1.oraclevcn.com', 'iad103716x8mcompexpn16c.clientsubnet.devx8melastic.oraclevcn.com']
+        ])
+        with ExitStack() as stack:
+            stack.enter_context(patch.object(ebCluReshapeCompute, 'mUpdateDom0DomUPair'))
+            stack.enter_context(patch.object(self.mGetClubox(), 'mGetOrigDom0sDomUs', return_value=reshaped_pairs))
+            stack.enter_context(patch.object(self.mGetClubox(), 'mSetOrigDom0sDomUs'))
+            stack.enter_context(patch.object(self.mGetClubox(), 'mSetSharedEnv'))
+            stack.enter_context(patch.object(self.mGetClubox(), 'mCheckSharedEnvironment'))
+            stack.enter_context(patch.object(self.mGetClubox(), 'mUpdateOEDAProperties', side_effect=StopIteration("stop delete node")))
+            stack.enter_context(patch('os.path.exists', return_value=True))
+            stack.enter_context(patch('os.makedirs'))
+            stack.enter_context(patch('shutil.copyfile'))
+            stack.enter_context(patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetNodeModel', return_value='X9'))
+            stack.enter_context(patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGenBondMap', return_value={}))
+            stack.enter_context(patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mExecuteLocal', return_value=(None, None, 'SKIPPAASPROPERTIES=false', None)))
+            stack.enter_context(patch('builtins.sorted', side_effect=lambda iterable, *args, **kwargs: list(iterable)))
+            with self.assertRaises(StopIteration):
+                reshape_obj.mDeleteNode(options)
+
+        mock_check_dom0_network.assert_called_once()
+        mock_reset_net_mapping.assert_called_once()
+        mock_log_step_time.assert_any_call(mock.ANY, 'Check Network Discovery Completed')
 
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetOracleBaseDirectories', return_value=("/u01/app/19.0.0.0/grid", None, None))
     @mock.patch("exabox.ovm.cluelasticcompute.ebCluReshapeCompute.mGetDbInfo")
@@ -4073,6 +4209,234 @@ class ebTestCluElasticComp(ebTestClucontrol):
         _obj.mUpdateKMSRPM('iad103716x8mcompexpn15c.clientsubnet.devx8melastic.oraclevcn.com')
 
         ebLogInfo("Unit test on mUpdateKMSRPM copy from images successful")
-        
+
+    @patch('exabox.ovm.clucontrol.expand_domu_filesystem')
+    def test_mAddPostGINIDSteps_reinstalls_dbaastools_for_exacc(self, mock_expand):
+        # Auto-generated test for mAddPostGINIDSteps
+        clubox = self.mGetClubox()
+
+        def _set_attr(name, value):
+            original = getattr(clubox, name)
+            setattr(clubox, name, value)
+            self.addCleanup(lambda name=name, original=original: setattr(clubox, name, original))
+
+        def _patch(name, **kwargs):
+            patcher = patch.object(clubox, name, **kwargs)
+            mocked = patcher.start()
+            self.addCleanup(patcher.stop)
+            return mocked
+
+        _set_attr('_exaBoxCluCtrl__cmd', 'vmgi_reshape')
+        _set_attr('_exaBoxCluCtrl__remoteconfig', '/tmp/remote')
+        _set_attr('_exaBoxCluCtrl__oeda_path', '/tmp/oeda')
+        _set_attr('_exaBoxCluCtrl__exabm', False)
+        _set_attr('_exaBoxCluCtrl__exacm', False)
+
+        original_zdlra = getattr(clubox, '_exaBoxCluCtrl__ZDLRA', None)
+        _set_attr('_exaBoxCluCtrl__ZDLRA', MagicMock())
+        clubox._exaBoxCluCtrl__ZDLRA.mUpdateHugePages = MagicMock()
+
+        dom_pairs = [('dom0a', 'domuA'), ('dom0b', 'domuB')]
+
+        _patch('mAcquireRemoteLock')
+        _patch('mAddOratabEntry')
+        _patch('mUpdateStatusOEDA')
+        _patch('mLogStepElapsedTime')
+        release_mock = _patch('mReleaseRemoteLock')
+        _patch('mSaveCellInformation')
+        _patch('mGetExadataCellModel', return_value='X9')
+        _patch('mCompareExadataModel', return_value=1)
+        _patch('mCreateAcfsDirs')
+        _patch('mCheckConfigOption', side_effect=lambda *_, **__: False)
+        _patch('mReturnDom0DomUPair', side_effect=lambda: [tuple(pair) for pair in dom_pairs])
+        _patch('mCheckCrsIsUp')
+        _patch('mCheckAsmIsUp')
+        _patch('mRunScript', return_value=(0, 'ok'))
+        _patch('mExecuteDbaaSApi')
+        _patch('mIsOciEXACC', return_value=True)
+        _patch('mIsFedramp', return_value=True)
+        fedramp_mock = _patch('mEnsureFedRampCpropsIni')
+        _patch('mIsAdbs', return_value=False)
+        _patch('IsZdlraProv', return_value=False)
+        _patch('isATP', return_value=False)
+        _patch('mExecuteOnAllNodes')
+        _patch('mSetupDomUsForSecureDBCSCommunication')
+        _patch('mAddAgentWallet')
+        update_rpm_mock = _patch('mUpdateRpm')
+        _patch('mGetMajorityHostVersion', return_value='OL7')
+        _patch('mIsExabm', return_value=False)
+        _patch('mSetOraInventoryPermissions')
+        _patch('mStoreDomUInterconnectIps')
+        _patch('mIsKVM', return_value=False)
+        _patch('mMakeFipsCompliant')
+        _patch('mUpdateVmetrics')
+        _patch('mStartVMExacsService')
+        _patch('mEnvTarget', return_value=True)
+        _patch('mEnableTFABlackout')
+        _patch('mAddUserPubKey')
+        _patch('mCopySAPfile')
+        _patch('mDisableTFA')
+        _patch('mAtpConfig')
+        _patch('mAddOracleFolderTmpConf')
+        _patch('mApplyExtraSrvctlConfig')
+        _patch('mInstallSuricataRPM')
+
+        mock_expand.return_value = None
+
+        options = MagicMock()
+        reshape_obj = MagicMock()
+        reshape_obj.mGetSrcDomU.return_value = 'domuSrc'
+
+        agent_instance = MagicMock()
+        node_instance = MagicMock()
+        node_instance.mFileExists.return_value = True
+
+        with patch('exabox.ovm.clucontrol.ebCopyDBCSAgentpfxFile', return_value=agent_instance) as mock_agent_cls,\
+             patch('exabox.ovm.clucontrol.exaBoxNode', return_value=node_instance):
+            clubox.mAddPostGINIDSteps([], options, aGridHome='/u01/app/grid', aReshapeObj=reshape_obj)
+
+        expected_calls = [
+            mock.call('domuSrc', 'domuA', options, aInstallDbaastoolsOnly=True),
+            mock.call('domuSrc', 'domuB', options, aInstallDbaastoolsOnly=True)
+        ]
+        reshape_obj.mUpdateRPM.assert_has_calls(expected_calls, any_order=False)
+        self.assertEqual(reshape_obj.mUpdateRPM.call_count, 2)
+        self.assertEqual(reshape_obj.mGetSrcDomU.call_count, 2)
+        fedramp_mock.assert_called_once_with([('dom0a', 'domuA'), ('dom0b', 'domuB')], options)
+        mock_expand.assert_called_once_with(clubox)
+        agent_instance.mCopyDbcsAgentpfxFiletoDomUsForFedramp.assert_called_once_with()
+        node_instance.mConnect.assert_any_call(aHost='domuA')
+        update_rpm_mock.assert_any_call('dbcs-agent-exacc.OL7.x86_64.rpm')
+        release_mock.assert_called()
+
+    @patch('exabox.ovm.clucontrol.expand_domu_filesystem')
+    def test_mAddPostGINIDSteps_skips_reinstall_when_not_exacc(self, mock_expand):
+        # Auto-generated test for mAddPostGINIDSteps
+        clubox = self.mGetClubox()
+
+        def _set_attr(name, value):
+            original = getattr(clubox, name)
+            setattr(clubox, name, value)
+            self.addCleanup(lambda name=name, original=original: setattr(clubox, name, original))
+
+        def _patch(name, **kwargs):
+            patcher = patch.object(clubox, name, **kwargs)
+            mocked = patcher.start()
+            self.addCleanup(patcher.stop)
+            return mocked
+
+        _set_attr('_exaBoxCluCtrl__cmd', 'vmgi_reshape')
+        _set_attr('_exaBoxCluCtrl__remoteconfig', '/tmp/remote')
+        _set_attr('_exaBoxCluCtrl__oeda_path', '/tmp/oeda')
+        _set_attr('_exaBoxCluCtrl__exabm', False)
+        _set_attr('_exaBoxCluCtrl__exacm', False)
+
+        original_zdlra = getattr(clubox, '_exaBoxCluCtrl__ZDLRA', None)
+        _set_attr('_exaBoxCluCtrl__ZDLRA', MagicMock())
+        clubox._exaBoxCluCtrl__ZDLRA.mUpdateHugePages = MagicMock()
+
+        dom_pairs = [('dom0a', 'domuA')]
+
+        _patch('mAcquireRemoteLock')
+        _patch('mAddOratabEntry')
+        _patch('mUpdateStatusOEDA')
+        _patch('mLogStepElapsedTime')
+        _patch('mReleaseRemoteLock')
+        _patch('mSaveCellInformation')
+        _patch('mGetExadataCellModel', return_value='X9')
+        _patch('mCompareExadataModel', return_value=1)
+        _patch('mCreateAcfsDirs')
+        _patch('mCheckConfigOption', side_effect=lambda *_, **__: False)
+        _patch('mReturnDom0DomUPair', side_effect=lambda: [tuple(pair) for pair in dom_pairs])
+        _patch('mCheckCrsIsUp')
+        _patch('mCheckAsmIsUp')
+        _patch('mRunScript', return_value=(0, 'ok'))
+        _patch('mExecuteDbaaSApi')
+        _patch('mIsOciEXACC', return_value=False)
+        fedramp_mock = _patch('mEnsureFedRampCpropsIni')
+        _patch('mIsFedramp', return_value=False)
+        _patch('mIsAdbs', return_value=False)
+        _patch('IsZdlraProv', return_value=False)
+        _patch('isATP', return_value=False)
+        _patch('mExecuteOnAllNodes')
+        _patch('mSetupDomUsForSecureDBCSCommunication')
+        _patch('mAddAgentWallet')
+        update_rpm_mock = _patch('mUpdateRpm')
+        _patch('mGetMajorityHostVersion', return_value='OL7')
+        _patch('mIsExabm', return_value=False)
+        _patch('mSetOraInventoryPermissions')
+        _patch('mStoreDomUInterconnectIps')
+        _patch('mIsKVM', return_value=False)
+        _patch('mMakeFipsCompliant')
+        _patch('mUpdateVmetrics')
+        _patch('mStartVMExacsService')
+        _patch('mEnvTarget', return_value=True)
+        _patch('mEnableTFABlackout')
+        _patch('mAddUserPubKey')
+        _patch('mCopySAPfile')
+        _patch('mDisableTFA')
+        _patch('mAtpConfig')
+        _patch('mAddOracleFolderTmpConf')
+        _patch('mApplyExtraSrvctlConfig')
+        _patch('mInstallSuricataRPM')
+
+        mock_expand.return_value = None
+
+        options = MagicMock()
+        reshape_obj = MagicMock()
+        reshape_obj.mGetSrcDomU.return_value = 'domuSrc'
+
+        node_instance = MagicMock()
+        node_instance.mFileExists.return_value = True
+
+        with patch('exabox.ovm.clucontrol.ebCopyDBCSAgentpfxFile', return_value=MagicMock()),\
+             patch('exabox.ovm.clucontrol.exaBoxNode', return_value=node_instance):
+            clubox.mAddPostGINIDSteps([], options, aGridHome='/u01/app/grid', aReshapeObj=reshape_obj)
+
+        reshape_obj.mUpdateRPM.assert_not_called()
+        fedramp_mock.assert_not_called()
+        mock_expand.assert_called_once_with(clubox)
+
+    @patch('exabox.ovm.clucontrol.expand_domu_filesystem')
+    def test_mAddPostGINIDSteps_raises_on_failed_create_asm(self, mock_expand):
+        # Auto-generated test for mAddPostGINIDSteps
+        clubox = self.mGetClubox()
+
+        def _set_attr(name, value):
+            original = getattr(clubox, name)
+            setattr(clubox, name, value)
+            self.addCleanup(lambda name=name, original=original: setattr(clubox, name, original))
+
+        def _patch(name, **kwargs):
+            patcher = patch.object(clubox, name, **kwargs)
+            mocked = patcher.start()
+            self.addCleanup(patcher.stop)
+            return mocked
+
+        _set_attr('_exaBoxCluCtrl__cmd', 'vmgi_install')
+        _set_attr('_exaBoxCluCtrl__remoteconfig', '/tmp/remote')
+        _set_attr('_exaBoxCluCtrl__oeda_path', '/tmp/oeda')
+        _set_attr('_exaBoxCluCtrl__exabm', False)
+        _set_attr('_exaBoxCluCtrl__exacm', False)
+
+        _patch('mAcquireRemoteLock')
+        _patch('mAddOratabEntry')
+        _patch('mUpdateStatusOEDA')
+        _patch('mLogStepElapsedTime')
+        release_mock = _patch('mReleaseRemoteLock')
+        _patch('mFetchOedaStep', return_value='create_asm')
+        _patch('mGetOEDAExtraArgs', return_value='--args')
+        _patch('mExecuteCmdLog2', return_value='log')
+        _patch('mParseOEDALog', return_value=False)
+        _patch('mReturnDom0DomUPair', return_value=[])
+
+        mock_expand.return_value = None
+
+        with self.assertRaises(ExacloudRuntimeError):
+            clubox.mAddPostGINIDSteps([], MagicMock(), aGridHome='/u01/app/grid')
+
+        release_mock.assert_not_called()
+        mock_expand.assert_called_once_with(clubox)
+
 if __name__ == '__main__':
     unittest.main() 

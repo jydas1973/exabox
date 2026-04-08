@@ -1,0 +1,248 @@
+{ 
+  "bonding_operation": "create-service",
+  "jsonconf": {},
+  "atp": {
+    "omvcnSubnet": "192.144.75.120/29",
+    "AutonomousDb": "Y",
+    "casperIp": "134.70.0.0/17",
+    "whitelist": {
+      "client": {
+        "protocol": {
+          "tcp": [
+            "@1521@in",
+            "@1521@out",
+            "@2484@in",
+            "@2484@out",
+            "@443@in",
+            "@443@out",
+            "@6200@in",
+            "s169.254.169.254@7060@in"
+          ]
+        }
+      }
+    },
+    "reserved_subnets": [
+      "192.144.75.64/29",
+      "192.144.75.32/29",
+      "192.144.75.24/29",
+      "192.144.75.16/29",
+      "192.144.75.72/29",
+      "192.144.75.8/29",
+      "192.144.75.0/29"
+    ]
+  },
+  "customer_network": {
+    "nodes": [
+      {
+        "client": {
+          "dom0_oracle_name": "scaqab10adm02",
+          "domainname": "us.oracle.com",
+          "domu_oracle_name": "scaqab10adm02vm08",
+          "gateway": "10.31.124.1",
+          "hostname": "scaqab10adm02vm08",
+          "hw_node_id": 1,
+          "ip": "10.31.124.64",
+          "mac": "02:bb:2e:59:f8:a0",
+          "netmask": "255.255.254.0",
+          "vlantag": null
+        },
+        "backup": {
+          "dom0_oracle_name": "scaqab10adm02",
+          "domainname": "us.oracle.com",
+          "domu_oracle_name": "scaqab10adm02vm08",
+          "gateway": "10.31.127.1",
+          "hostname": "scaqab10adm01vm08-bk",
+          "hw_node_id": 1,
+          "ip": "10.31.127.15",
+          "mac": "02:bb:2e:59:f8:a0",
+          "netmask": "255.255.254.0",
+          "vlantag": null
+        },
+        "vip": {
+          "domainname": "us.oracle.com",
+          "hostname": "scaqab10adm02vm08-vip",
+          "ip": "10.31.124.66"
+        },
+        "volumes": 
+            [
+                {
+                    "volumetype": "GCV",
+                    "volumedevicepath": "/dev/exc/hostr9514035excvolconf"
+                },
+                {
+                    "volumetype": "System",
+                    "volumedevicepath": "/dev/exc/hostr9514035excvolsys"
+                },
+                {
+                    "volumetype": "GI",
+                    "volumedevicepath": "/dev/exc/hostr9514035excvolgi"
+                }
+            ]
+        
+      },
+      {
+        "client": {
+          "dom0_oracle_name": "scaqab10adm01",
+          "domainname": "us.oracle.com",
+          "domu_oracle_name": "scaqab10adm01vm08",
+          "gateway": "10.31.124.1",
+          "hostname": "scaqab10adm01vm08",
+          "hw_node_id": 1,
+          "ip": "10.31.124.63",
+          "mac": "02:bb:2e:59:f8:a0",
+          "netmask": "255.255.254.0",
+          "vlantag": "1"
+        },
+        "backup": {
+          "dom0_oracle_name": "scaqab10adm01",
+          "domainname": "us.oracle.com",
+          "domu_oracle_name": "scaqab10adm01vm08",
+          "gateway": "10.31.127.1",
+          "hostname": "scaqab10adm01vm08",
+          "hw_node_id": 1,
+          "ip": "10.31.127.14",
+          "mac": "02:bb:2e:59:f8:a0",
+          "netmask": "255.255.254.0",
+          "vlantag": "2"
+        },
+        "vip": {
+          "domainname": "us.oracle.com",
+          "hostname": "scaqab10adm01vm08-vip",
+          "ip": "10.31.124.65"
+        }
+      }
+    ],
+    "network_services": {
+      "ntp": [
+        "10.31.138.20",
+        "10.246.6.36"
+      ],
+      "dns": [
+        "10.31.138.25",
+        "10.231.225.65",
+        "206.223.27.1"
+      ]
+    },
+    "scan": {
+      "ips": [
+        "10.31.124.67",
+        "10.31.124.68",
+        "10.31.124.69"
+      ],
+      "hostname": "scaqab10vm08-scan1",
+      "port": "1521"
+    },
+    "backup_scans": {
+      "ips": [
+        "10.31.124.65"
+      ],
+      "hostname": "scaqab10vm08-scanbk",
+      "port": "1522"
+    },
+    "customvip": [
+      {
+        "interfacetype": "client",
+        "ip": "10.0.0.5",
+        "standby_vnic_mac": "00:09:A9:78:67"
+      },
+      {
+        "interfacetype": "backup",
+        "ip": "10.0.0.6",
+        "standby_vnic_mac": "00:09:A9:78:68"
+      }
+    ]
+  },
+  "preprov_network": {
+    "nodes": [
+      {
+        "client": {
+          "dom0_oracle_name": "scaqab10adm02",
+          "domainname": "us.oracle.com",
+          "domu_oracle_name": "scaqab10adm02vm08",
+          "gateway": "10.31.124.1",
+          "hostname": "scaqab10adm02vm08",
+          "hw_node_id": 1,
+          "ip": "10.31.124.64",
+          "mac": "02:bb:2e:59:f8:a0",
+          "netmask": "255.255.254.0",
+          "vlantag": "1"
+        },
+        "backup": {
+          "dom0_oracle_name": "scaqab10adm02",
+          "domainname": "us.oracle.com",
+          "domu_oracle_name": "scaqab10adm02vm08",
+          "gateway": "10.31.127.1",
+          "hostname": "scaqab10adm01vm08-bk",
+          "hw_node_id": 1,
+          "ip": "10.31.127.15",
+          "mac": "02:bb:2e:59:f8:a0",
+          "netmask": "255.255.254.0",
+          "vlantag": "1"
+        },
+        "vip": {
+          "domainname": "us.oracle.com",
+          "hostname": "scaqab10adm02vm08-vip",
+          "ip": "10.31.124.66"
+        }
+      },
+      {
+        "client": {
+          "dom0_oracle_name": "scaqab10adm01",
+          "domainname": "us.oracle.com",
+          "domu_oracle_name": "scaqab10adm01vm08",
+          "gateway": "10.31.124.1",
+          "hostname": "scaqab10adm01vm08",
+          "hw_node_id": 1,
+          "ip": "10.31.124.63",
+          "mac": "02:bb:2e:59:f8:a0",
+          "netmask": "255.255.254.0",
+          "vlantag": null
+        },
+        "backup": {
+          "dom0_oracle_name": "scaqab10adm01",
+          "domainname": "us.oracle.com",
+          "domu_oracle_name": "scaqab10adm01vm08",
+          "gateway": "10.31.127.1",
+          "hostname": "scaqab10adm01vm08",
+          "hw_node_id": 1,
+          "ip": "10.31.127.14",
+          "mac": "02:bb:2e:59:f8:a0",
+          "netmask": "255.255.254.0",
+          "vlantag": null
+        },
+        "vip": {
+          "domainname": "us.oracle.com",
+          "hostname": "scaqab10adm01vm08-vip",
+          "ip": "10.31.124.65"
+        }
+      }
+    ],
+    "network_services": {
+      "ntp": [
+        "10.31.138.20",
+        "10.246.6.36"
+      ],
+      "dns": [
+        "10.31.138.25",
+        "10.231.225.65",
+        "206.223.27.1"
+      ]
+    },
+    "scan": {
+      "ips": [
+        "10.31.124.67",
+        "10.31.124.68",
+        "10.31.124.69"
+      ],
+      "hostname": "scaqab10vm08-scan1",
+      "port": "1521"
+    },
+    "backup_scans": {
+      "ips": [
+        "10.31.124.65"
+      ],
+      "hostname": "scaqab10vm08-scanbk",
+      "port": "1522"
+    }
+  }
+}

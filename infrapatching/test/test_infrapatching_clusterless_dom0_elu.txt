@@ -1,0 +1,127 @@
+# $Header: ecs/exacloud/exabox/infrapatching/test/test_infrapatching_clusterless_dom0_elu.txt /main/1 2026/01/27 19:55:46 kdas Exp $
+#
+# test_infrapatching_clusterless_dom0_elu.py
+#
+# Copyright (c) 2020, 2026, Oracle and/or its affiliates.
+#
+#    NAME
+#      test_infrapatching_dom0_elu.py - Unit test case script for clusterless Dom0 ELU operations.
+#
+#    DESCRIPTION
+#      Unit test case script for clusterless Dom0 ELU operations.
+#
+#    NOTES
+#      Unit test case script for clusterless Dom0 ELU operations.
+#   MODIFIED   (MM/DD/YY)
+#    sdevasek    02/26/26 - Bug 39008110 - REMOVE ELUOPTIONS FROM ADDITIONAL
+#                           OPTIONS IN DOM0 TEST SETUP
+#    kdas        12/20/25 - Enh 38735521 - Automation for supporting
+#                           SMR patching of Clusterless free nodes 
+#                                    
+
+import pytest
+import unittest
+
+from utils import *
+from constants import *
+
+
+@pytest.mark.clusterless_dom0_elu
+class Test_clusterless_dom0_elu(unittest.TestCase):
+    __dom0s = []
+
+    @classmethod
+    def setUpClass(cls):
+        cls.__dom0s = mGetInfraPatchingTestConfigParam('dom0s')
+
+    def setUp(self):
+        mUpdateInfraPatchingTestConfigParam("cluster", mGetInfraPatchingTestConfigParam('compute_cabinet'))
+        mUpdateAdditionalOptionsInPayload("ClusterLess", "yes")
+        mUpdateAdditionalOptionsInPayload("exasplice", "yes")
+        mUpdateParamInPayload("EnablePlugins", "no")
+        mUpdateParamInPayload("PluginTypes", "none")
+        mUpdateParamInPayload("BackupMode", "yes")
+        mDeleteAdditionalOptionsFromPayload('LaunchNode')
+        mDeleteAdditionalOptionsFromPayload('LaunchNodeType')
+        mUpdateAdditionalOptionsInPayload("IncludeNodeList", "none")
+
+    def tearDown(self):
+        mDeleteAdditionalOptionsFromPayload("ClusterLess")
+        mDeleteAdditionalOptionsFromPayload("exasplice")
+        mDeleteAdditionalOptionsFromPayload('LaunchNode')
+        mDeleteAdditionalOptionsFromPayload('LaunchNodeType')
+        mUpdateAdditionalOptionsInPayload("IncludeNodeList", "none")
+      
+
+    @pytest.mark.clusterless_dom0_elu_prereq_check
+    def test_clusterless_dom0_elu_pre_check(self):
+        result, _ = mExecuteInfraPatchCommand(TASK_PREREQ_CHECK, PATCH_DOM0, OP_STYLE_AUTO)
+        self.assertTrue(result, "Clusterless dom0 ELU precheck failed")
+
+    @pytest.mark.clusterless_dom0_elu_patch
+    def test_clusterless_dom0_elu_patch(self):
+        result, _ = mExecuteInfraPatchCommand(TASK_PATCH, PATCH_DOM0, OP_STYLE_AUTO)
+        self.assertTrue(result, "Clusterless dom0 ELU patch failed")
+
+    @pytest.mark.clusterless_dom0_elu_postcheck
+    def test_clusterless_dom0_elu_postcheck(self):
+        result, _ = mExecuteInfraPatchCommand(TASK_POSTCHECK, PATCH_DOM0, OP_STYLE_AUTO)
+        self.assertTrue(result, "Clusterless dom0 ELU postcheck failed")
+
+    @pytest.mark.clusterless_dom0_elu_rollback
+    def test_clusterless_dom0_elu_rollback(self):
+        result, _ = mExecuteInfraPatchCommand(TASK_ROLLBACK, PATCH_DOM0, OP_STYLE_AUTO)
+        self.assertTrue(result, "Clusterless dom0 ELU rollback failed")
+
+   
+
+    @pytest.mark.clusterless_dom0_elu_prereq_check_with_launch_node
+    def test_clusterless_dom0_elu_prereq_check_with_launch_node(self):
+
+        _dom0s = Test_clusterless_dom0_elu.__dom0s
+        launch_dom0 = ",".join(_dom0s[:1])
+        target_dom0s = ",".join(_dom0s[1:])
+        mUpdateAdditionalOptionsInPayload('LaunchNode', launch_dom0)
+        mUpdateAdditionalOptionsInPayload('LaunchNodeType', 'COMPUTE')
+        mUpdateAdditionalOptionsInPayload('IncludeNodeList', target_dom0s)
+
+
+        result, _ = mExecuteInfraPatchCommand(TASK_PREREQ_CHECK, PATCH_DOM0, OP_STYLE_AUTO)
+        self.assertTrue(result, "Clusterless dom0 ELU prereq check with explicit launch node failed")
+
+    @pytest.mark.clusterless_dom0_elu_patch_with_launch_node
+    def test_clusterless_dom0_elu_patch_with_launch_node(self):
+        _dom0s = Test_clusterless_dom0_elu.__dom0s
+        launch_dom0 = ",".join(_dom0s[:1])
+        target_dom0s = ",".join(_dom0s[1:])
+        mUpdateAdditionalOptionsInPayload('LaunchNode', launch_dom0)
+        mUpdateAdditionalOptionsInPayload('LaunchNodeType', 'COMPUTE')
+        mUpdateAdditionalOptionsInPayload('IncludeNodeList', target_dom0s)
+
+        result, _ = mExecuteInfraPatchCommand(TASK_PATCH, PATCH_DOM0, OP_STYLE_AUTO)
+        self.assertTrue(result, "Clusterless dom0 ELU patch with explicit launch node failed")
+
+    @pytest.mark.clusterless_dom0_elu_postcheck_with_launch_node
+    def test_clusterless_dom0_elu_postcheck_with_launch_node(self):
+      
+        _dom0s = Test_clusterless_dom0_elu.__dom0s
+        launch_dom0 = ",".join(_dom0s[:1])
+        target_dom0s = ",".join(_dom0s[1:])
+        mUpdateAdditionalOptionsInPayload('LaunchNode', launch_dom0)
+        mUpdateAdditionalOptionsInPayload('LaunchNodeType', 'COMPUTE')
+        mUpdateAdditionalOptionsInPayload('IncludeNodeList', target_dom0s)
+
+        result, _ = mExecuteInfraPatchCommand(TASK_POSTCHECK, PATCH_DOM0, OP_STYLE_AUTO)
+        self.assertTrue(result, "Clusterless dom0 ELU post check with explicit launch node failed")
+
+    @pytest.mark.clusterless_dom0_elu_rollback_with_launch_node
+    def test_clusterless_dom0_elu_rollback_with_launch_node(self):
+        _dom0s = Test_clusterless_dom0_elu.__dom0s
+        launch_dom0 = ",".join(_dom0s[:1])
+        target_dom0s = ",".join(_dom0s[1:])
+        mUpdateAdditionalOptionsInPayload('LaunchNode', launch_dom0)
+        mUpdateAdditionalOptionsInPayload('LaunchNodeType', 'COMPUTE')
+        mUpdateAdditionalOptionsInPayload('IncludeNodeList', target_dom0s)
+
+        result, _ = mExecuteInfraPatchCommand(TASK_ROLLBACK, PATCH_DOM0, OP_STYLE_AUTO)
+        self.assertTrue(result, "Clusterless dom0 ELU rollback with explicit launch node failed")

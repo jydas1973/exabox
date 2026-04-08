@@ -1,9 +1,9 @@
 #
-# $Header: ecs/exacloud/exabox/infrapatching/test/test_infrapatching_clusterless_dom0.txt /main/4 2025/09/26 16:25:32 sdevasek Exp $
+# $Header: ecs/exacloud/exabox/infrapatching/test/test_infrapatching_clusterless_dom0.txt /main/5 2026/02/06 07:00:36 araghave Exp $
 #
 # test_infrapatching_clusterless_dom0.py
 #
-# Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      test_infrapatching_dom0.py - Unit test case script for all Dom0 operations.
@@ -15,6 +15,8 @@
 #      Unit test case script for all Dom0 operations.
 #
 #    MODIFIED   (MM/DD/YY)
+#       araghave 02/04/26 - Enh 38901411 - VALIDATE AND ADD TESTS RELATED TO
+#                           PLUGIN AND CLUSTERLESS FLOW
 #       apotluri 08/28/25 - Bug 38301663 - EXACS:25.2.2.1:RAISE AN ERROR WHEN
 #                           THE EXTERNAL LAUNCH NODE IS UNAVAILABLE DUE TO
 #                           REACHING THE MAXIMUM ALLOWED CONCURRENT SESSIONS
@@ -46,7 +48,19 @@ class Test_clusterless_dom0_class(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.__dom0s = mGetInfraPatchingTestConfigParam('dom0s')
+        cls.__plugin_meta_data_handler = InfrapatchPluginMetadataHandler()
+        cls.__plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScripts(PATCH_DOM0, ONEOFF_PLUGIN)
+        cls.__plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScripts(PATCH_DOM0, EXACLOUD_PLUGIN, "Pre")
+        cls.__plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScripts(PATCH_DOM0, EXACLOUD_PLUGIN, "Post")
 
+    @classmethod
+    def tearDownClass(cls):
+        cls.__plugin_meta_data_handler.mDeleteRegisteredInfrapatchPlugineMetadataScripts(
+            "script_%s_%s" % (PATCH_DOM0, ONEOFF_PLUGIN), PATCH_DOM0, ONEOFF_PLUGIN)
+        cls.__plugin_meta_data_handler.mDeleteRegisteredInfrapatchPlugineMetadataScripts(
+            "script_%s_%s_pre" % (PATCH_DOM0, EXACLOUD_PLUGIN), PATCH_DOM0, EXACLOUD_PLUGIN)
+        cls.__plugin_meta_data_handler.mDeleteRegisteredInfrapatchPlugineMetadataScripts(
+            "script_%s_%s_post" % (PATCH_DOM0, EXACLOUD_PLUGIN), PATCH_DOM0, EXACLOUD_PLUGIN)
 
     def __init__(self, *initial_data, **kwargs):
         super(Test_clusterless_dom0_class, self).__init__(*initial_data, **kwargs)
@@ -82,6 +96,17 @@ class Test_clusterless_dom0_class(unittest.TestCase):
         mExecuteRemoteExasshCmd(
             "/bin/sed  \\'s/ClientAliveInterval.*/ClientAliveInterval 600/\\' -i /etc/ssh/sshd_config",
             Test_clusterless_dom0_class.__dom0s)
+
+
+    @pytest.mark.clusterless_dom0_one_off_v2
+    def test_clusterless_dom0_one_off_v2(self):
+        self.__operation = TASK_ONEOFFV2
+        self.__operation_style = OP_STYLE_AUTO
+        self.__patch_node_list = Test_clusterless_dom0_class.__dom0s
+        mUpdateParamInPayload("OneoffScriptAlias", "script_%s_%s" % (PATCH_DOM0, ONEOFF_PLUGIN))
+        mUpdateAdditionalOptionsInPayload("OneoffCustomPluginFile", "none")
+        mUpdateAdditionalOptionsInPayload("OneoffScriptArgs", "stage=Pre,EXACS=yes,root_access=True")
+        self.mValidatePatchOperationWithIncludeNodeList()
 
     @pytest.mark.dom0_patch_prereq_check_patchmgr_failure
     def test_dom0_patch_prereq_check_patchmgr_failure(self):
@@ -329,7 +354,7 @@ class Test_clusterless_dom0_class(unittest.TestCase):
 
         if self.__operation in [TASK_ONEOFF, TASK_ONEOFFV2]:
             # Use custom script in first iteration and default script in second iteration, so default script here.
-            self.mExecuteAndValidateOneoffOperation()
+            self.mExecuteAndValidateOneoffOperation(aUseDefaultScript=self.__operation != TASK_ONEOFFV2)
         else:
             self.mExecuteAndValidatePatchOperationWithExacloudPlugins()
 

@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     DBStore - Basic DB functionality
@@ -12,6 +12,11 @@ NOTE:
 
 History:
     MODIFIED   (MM/DD/YY)
+    jesandov    03/20/26 - 39094088: Add race condition check on creation of
+                           tables
+    rbhandar    01/07/26 - Bug 38336893 - OCI: OCI1 | EXACS | QMR PATCHING
+                           FAILED WITH LOCK WAIT TIMEOUT EXCEEDED
+    joysjose    12/15/25 - Bug 38689856 - Fix condition issue
     ririgoye    11/26/25 - Bug 38636333 - EXACLOUD PYTHON:ADD INSTANTCLIENT TO
                            LD_LIBRARY_PATH
     aararora    04/25/25 - ER 37732745: Exacloud to send status response to
@@ -766,7 +771,7 @@ class ebRacksDB(ebMysqlDB):
             6. misc
         """
         if not self.mCheckTableExist('keys'):
-            self.mExecute('''CREATE TABLE keys (uuid text,
+            self.mExecute('''CREATE TABLE IF NOT EXISTS keys (uuid text,
                                                 hostname text,
                                                 user text,
                                                 keydata text,
@@ -786,7 +791,7 @@ class ebRacksDB(ebMysqlDB):
             5. timestamp-stop
         """
         if not self.mCheckTableExist('registry'):
-            self.mExecute('''CREATE TABLE registry (uuid text,
+            self.mExecute('''CREATE TABLE IF NOT EXISTS registry (uuid text,
                                                     rackid text,
                                                     status text,
                                                     owner text,
@@ -802,7 +807,7 @@ class ebRacksDB(ebMysqlDB):
             3. path
         """
         if not self.mCheckTableExist('location'):
-            self.mExecute('''CREATE TABLE location (uuid text,
+            self.mExecute('''CREATE TABLE IF NOT EXISTS location (uuid text,
                                                     rackid text,
                                                     hostname text,
                                                     path text)''')
@@ -1015,7 +1020,7 @@ class ebKeysDB(ebMysqlDB):
     def mCreateSshkeyTable(self):
 
         if not self.mCheckTableExist('sshkey'):
-            self.mExecute('''CREATE TABLE sshkey (cluster_name VARCHAR(255) PRIMARY KEY,
+            self.mExecute('''CREATE TABLE IF NOT EXISTS sshkey (cluster_name VARCHAR(255) PRIMARY KEY,
                                                         sshkeys text)''')
 
     def mUpsertSshkey(self, aCluster, aSshkey):
@@ -1147,7 +1152,7 @@ class ebExacloudDB(ebMysqlDB):
     def mCreateExaKmsHistoryTable(self):
 
         if not self.mCheckTableExist('exakmshistory'):
-            self.mExecute('''CREATE TABLE exakmshistory (rowidx INTEGER NOT NULL AUTO_INCREMENT,
+            self.mExecute('''CREATE TABLE IF NOT EXISTS exakmshistory (rowidx INTEGER NOT NULL AUTO_INCREMENT,
                                                          exakmshostname TEXT,
                                                          exakmsusername TEXT,
                                                          exakmshash TEXT,
@@ -1203,7 +1208,7 @@ class ebExacloudDB(ebMysqlDB):
     def mCreateEnvironmentResourceDetails(self):
 
         if not self.mCheckTableExist('environmentresourcedetails'):
-            self.mExecute('''CREATE TABLE environmentresourcedetails (usedcpupercent TEXT,
+            self.mExecute('''CREATE TABLE IF NOT EXISTS environmentresourcedetails (usedcpupercent TEXT,
                                                                       usedmemorypercent TEXT,
                                                                       updatetime TEXT)''')
 
@@ -1251,7 +1256,7 @@ class ebExacloudDB(ebMysqlDB):
             _sql = "SELECT usedcpupercent, usedmemorypercent, updatetime FROM environmentresourcedetails"
 
             _list = self.mFetchOne(_sql)
-            if _list is not None or len(_list) > 0:
+            if _list is not None and len(_list) > 0:
                 _usedcpupercent = str(_list[0])
                 _usedmemorypercent = str(_list[1])
                 _updatetime = str(_list[2])
@@ -1262,7 +1267,7 @@ class ebExacloudDB(ebMysqlDB):
     def mCreateExacloudInstanceTable(self):
 
         if not self.mCheckTableExist('exacloudinstances'):
-            self.mExecute('''CREATE TABLE exacloudinstances (ecinstanceid VARCHAR(255) PRIMARY KEY,
+            self.mExecute('''CREATE TABLE IF NOT EXISTS exacloudinstances (ecinstanceid VARCHAR(255) PRIMARY KEY,
                                                              hostname text,
                                                              port text,
                                                              version text,
@@ -1361,7 +1366,7 @@ class ebExacloudDB(ebMysqlDB):
     def mCreateUUIDToExacloudInstanceTable(self):
 
         if not self.mCheckTableExist('requestuuidtoexacloud'):
-            self.mExecute('''CREATE TABLE requestuuidtoexacloud (requuid VARCHAR(255) PRIMARY KEY,
+            self.mExecute('''CREATE TABLE IF NOT EXISTS requestuuidtoexacloud (requuid VARCHAR(255) PRIMARY KEY,
                                                                  ecinstanceid text,
                                                                  reqstatus text,
                                                                  requestcreationtimestamp text)''')
@@ -1432,7 +1437,7 @@ class ebExacloudDB(ebMysqlDB):
     def mCreateProxyRequestsTable(self):
 
         if not self.mCheckTableExist('proxyrequests'):
-            self.mExecute('''CREATE TABLE proxyrequests (uuid VARCHAR(255) PRIMARY KEY,
+            self.mExecute('''CREATE TABLE IF NOT EXISTS proxyrequests (uuid VARCHAR(255) PRIMARY KEY,
                                                          cmdtype TEXT, 
                                                          params LONGTEXT, 
                                                          urlfullpath LONGTEXT,
@@ -1530,7 +1535,7 @@ class ebExacloudDB(ebMysqlDB):
     def mCreateMockCallTable(self):
 
         if not self.mCheckTableExist('mock_calls'):
-            self.mExecute('''CREATE TABLE mock_calls (uuid VARCHAR(255) PRIMARY KEY,
+            self.mExecute('''CREATE TABLE IF NOT EXISTS mock_calls (uuid VARCHAR(255) PRIMARY KEY,
                                                       starttime TEXT, 
                                                       status TEXT,
                                                       cmdtype TEXT,
@@ -1571,7 +1576,7 @@ class ebExacloudDB(ebMysqlDB):
 
         if not self.mCheckTableExist('agent_signal'):
             _columns = ",".join(list(map(lambda col: f"{col} TEXT", AgentSignal.mGetColumns())))
-            self.mExecute(f'''CREATE TABLE agent_signal ({_columns})''')
+            self.mExecute(f'''CREATE TABLE IF NOT EXISTS agent_signal ({_columns})''')
 
     def mInsertAgentSignal(self, aAgentSignal: AgentSignal) -> None:
 
@@ -1645,7 +1650,7 @@ class ebExacloudDB(ebMysqlDB):
     def mCreateDataCacheTable(self):
 
         if not self.mCheckTableExist('data_cache'):
-            self.mExecute('''CREATE TABLE data_cache (name TEXT,
+            self.mExecute('''CREATE TABLE IF NOT EXISTS data_cache (name TEXT,
                                                  data TEXT,
                                                  creation_date TEXT)''')
         """
@@ -1704,7 +1709,7 @@ class ebExacloudDB(ebMysqlDB):
     def mCreateAgentTable(self):
 
         if not self.mCheckTableExist('agent'):
-            self.mExecute('''CREATE TABLE agent (uuid TEXT,
+            self.mExecute('''CREATE TABLE IF NOT EXISTS agent (uuid TEXT,
                                                  pid TEXT,
                                                  status TEXT,
                                                  ttstart TEXT,
@@ -1792,7 +1797,7 @@ class ebExacloudDB(ebMysqlDB):
     def mCreateScheduleTable(self):
 
         if not self.mCheckTableExist('schedule'):
-            self.mExecute('''CREATE TABLE schedule (
+            self.mExecute('''CREATE TABLE IF NOT EXISTS schedule (
                       uuid VARCHAR(255) PRIMARY KEY,
                       command TEXT,
                       mode TEXT,
@@ -1908,7 +1913,7 @@ class ebExacloudDB(ebMysqlDB):
     def mCreateScheduleArchiveTable(self):
 
         if not self.mCheckTableExist('schedule_archive'):
-            self.mExecute('''CREATE TABLE schedule_archive (
+            self.mExecute('''CREATE TABLE IF NOT EXISTS schedule_archive (
                       uuid VARCHAR(255) PRIMARY KEY,
                       command TEXT,
                       mode TEXT,
@@ -2015,7 +2020,7 @@ class ebExacloudDB(ebMysqlDB):
     def mCreateWorkersTable(self):
 
         if not self.mCheckTableExist('workers'):
-            self.mExecute('''CREATE TABLE workers (uuid TEXT,
+            self.mExecute('''CREATE TABLE IF NOT EXISTS workers (uuid TEXT,
                                                    status TEXT,
                                                    starttime TEXT,
                                                    endtime TEXT,
@@ -2213,7 +2218,7 @@ class ebExacloudDB(ebMysqlDB):
     def mCreateClusterStatusTable(self):
 
         if not self.mCheckTableExist('status'):
-            self.mExecute("""CREATE TABLE status (cluid TEXT,
+            self.mExecute("""CREATE TABLE IF NOT EXISTS status (cluid TEXT,
                                                   hostname VARCHAR(255) PRIMARY KEY,
                                                   nodetype TEXT,
                                                   network TEXT,
@@ -2306,7 +2311,7 @@ class ebExacloudDB(ebMysqlDB):
     def mCreateRegTable(self):
 
         if not self.mCheckTableExist('registry'):
-            self.mExecute('''CREATE TABLE registry (_key TEXT,
+            self.mExecute('''CREATE TABLE IF NOT EXISTS registry (_key TEXT,
                                                     value TEXT,
                                                     uuid TEXT,
                                                     worker TEXT)''')
@@ -2314,7 +2319,7 @@ class ebExacloudDB(ebMysqlDB):
     def mCreateSELinuxPolicyTable(self):
 
         if not self.mCheckTableExist('selinuxpolicystore'):
-            self.mExecute('''CREATE TABLE selinuxpolicystore (requuid VARCHAR(255),
+            self.mExecute('''CREATE TABLE IF NOT EXISTS selinuxpolicystore (requuid VARCHAR(255),
                                                               hostname TEXT,
                                                               createtime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                                                               selinuxpolicy LONGTEXT,
@@ -2358,7 +2363,7 @@ class ebExacloudDB(ebMysqlDB):
     def mCreateProfilerTable(self):
 
         if not self.mCheckTableExist('profiler'):
-            self.mExecute('''CREATE TABLE profiler (step TEXT,
+            self.mExecute('''CREATE TABLE IF NOT EXISTS profiler (step TEXT,
                                                     details TEXT,
                                                     exec_type TEXT,
                                                     profiler_type TEXT,
@@ -2375,7 +2380,7 @@ class ebExacloudDB(ebMysqlDB):
     def mCreateRequestsTable(self):
 
         if not self.mCheckTableExist('requests'):
-            self.mExecute('''CREATE TABLE requests (uuid VARCHAR(255) PRIMARY KEY,
+            self.mExecute('''CREATE TABLE IF NOT EXISTS requests (uuid VARCHAR(255) PRIMARY KEY,
                                                     status TEXT,
                                                     starttime TEXT,
                                                     endtime TEXT,
@@ -2416,7 +2421,7 @@ class ebExacloudDB(ebMysqlDB):
     def mCreateRequestsArchiveTable(self):
 
         if not self.mCheckTableExist('requests_archive'):
-            self.mExecute('''CREATE TABLE requests_archive (uuid TEXT,
+            self.mExecute('''CREATE TABLE IF NOT EXISTS requests_archive (uuid TEXT,
                                                             status TEXT,
                                                             starttime TEXT,
                                                             endtime TEXT,
@@ -2484,6 +2489,36 @@ class ebExacloudDB(ebMysqlDB):
                  _aq_name]
         self.mExecuteLog(_sql, _data)
 
+    def mExecuteWithRetryLock(self, aSql, aData, aUuid):
+        """
+        We implemented Helper method to manual retry and put the requests inside a transaction.
+        """
+        _retry = 3
+
+        while _retry > 0:
+            _success = True
+            try:
+                self.mGetConnection().begin()
+                self.mSetTransaction(True)
+
+                self.mNativeExecute(aSql, aData)
+
+                break
+
+            except pymysql.err.OperationalError as err:
+                ebLogError("mExecuteWithRetryLock error %s for request id=%s" % (str(err), aUuid))
+                _retry -= 1
+                _success = False
+            except Exception as err:
+                ebLogError("mExecuteWithRetryLock error %s for request id=%s" % (str(err), aUuid))
+                raise err
+            finally:
+                if _success:
+                    self.mCommit()
+                else:
+                    self.mRollback()
+                    ebLogError("Rolling back transaction for request Id=%s" % aUuid)
+
     @mUpdateResponseToEcra
     def mUpdateStatusRequestWithLock(self, aRequest):
 
@@ -2497,37 +2532,17 @@ class ebExacloudDB(ebMysqlDB):
         _uuid   = aRequest.mGetUUID()
         _status = aRequest.mGetStatus()
         _statusinfo = aRequest.mGetStatusInfo()
-        _retry = 3
 
         _sql = """UPDATE requests
                   SET status=%(1)s, statusinfo=%(2)s
                   WHERE uuid=%(3)s"""
 
-        while _retry > 0:
-            _success = True
-            try:
-                # Start transaction
-                self.mGetConnection().begin()
-                self.mSetTransaction(True)
-
-                _data = [_status, _statusinfo, _uuid]
-                self.mNativeExecute(_sql, _data)
-
-                break
-
-            except pymysql.err.OperationalError as e:
-                ebLogError("mUpdateStatusRequestWithLock error %s for request id=%s" %(str(e),  _uuid))
-                _retry-=1
-                _success = False
-            except Exception as ex:
-                ebLogError("mUpdateStatusRequestWithLock error %s for request id=%s" %(str(ex),  _uuid))
-                raise ex
-            finally:
-                if _success:
-                    self.mCommit()
-                else:
-                    self.mRollback()
-                    ebLogError("Rolling back mUpdateStatusRequestWithLock for request Id=%s" % _uuid)
+        _data = [_status, _statusinfo, _uuid]
+        try:
+            self.mExecuteWithRetryLock(_sql, _data, _uuid)
+        except Exception as err:
+            ebLogError("mUpdateStatusRequestWithLock failed for request id=%s with error %s" % (_uuid, str(err)))
+            raise err
 
     @mUpdateResponseToEcra
     def mUpdateStatusRequest(self, aRequest):
@@ -3167,7 +3182,7 @@ class ebExacloudDB(ebMysqlDB):
             4 lockcount                 -> Number of clusters doing some patch in the fabric
          """
         if not self.mCheckTableExist('ibfabriclocks'):
-            self.mExecute('''CREATE TABLE ibfabriclocks (
+            self.mExecute('''CREATE TABLE IF NOT EXISTS ibfabriclocks (
                       id                        INTEGER PRIMARY KEY AUTO_INCREMENT,
                       ibswitches_output_sha512  VARCHAR(255) UNIQUE,
                       do_switch                 TEXT,
@@ -3364,7 +3379,7 @@ class ebExacloudDB(ebMysqlDB):
             2. clustername
         """
         if not self.mCheckTableExist('ibfabricclusters'):
-            self.mExecute('''CREATE TABLE ibfabricclusters (
+            self.mExecute('''CREATE TABLE IF NOT EXISTS ibfabricclusters (
                       id            INTEGER PRIMARY KEY AUTO_INCREMENT,
                       fabric_id     INTEGER,
                       clustername   VARCHAR(760) UNIQUE,
@@ -3423,7 +3438,7 @@ class ebExacloudDB(ebMysqlDB):
         """
 
         if not self.mCheckTableExist('ibfabricibswitches'):
-            self.mExecute('''CREATE TABLE ibfabricibswitches (
+            self.mExecute('''CREATE TABLE IF NOT EXISTS ibfabricibswitches (
                       id            INTEGER PRIMARY KEY AUTO_INCREMENT,
                       fabric_id     INTEGER,
                       ibswitchname  VARCHAR(255) UNIQUE,
@@ -3488,7 +3503,7 @@ class ebExacloudDB(ebMysqlDB):
         """
 
         if not self.mCheckTableExist('patchlist'):
-            self.mExecute('''CREATE TABLE patchlist (
+            self.mExecute('''CREATE TABLE IF NOT EXISTS patchlist (
                       master_uuid   VARCHAR(255),
                       child_uuid    VARCHAR(255),
                       reqstatus     TEXT,
@@ -3567,6 +3582,26 @@ class ebExacloudDB(ebMysqlDB):
         else:
             raise Exception('mUpdateJsonPatchReport: Invalid input provided')
 
+    def mUpdateJsonPatchReportWithLock(self, aChildUUID, aData):
+        """
+        We implemented a manual retry and put the requests inside a transaction.
+
+        We use IMMEDIATE transactions.
+        It locks all the writers to the db until a commit/rollback is executed.
+        """
+
+        if aChildUUID and aData:
+            _sql = """UPDATE patchlist SET json_report=%(2)s
+                      WHERE child_uuid=%(1)s"""
+            _data = [aChildUUID, aData]
+            try:
+                self.mExecuteWithRetryLock(_sql, _data, aChildUUID)
+            except Exception as err:
+                ebLogError("mUpdateJsonPatchReportWithLock failed for child request id=%s with error %s" % (aChildUUID, str(err)))
+                raise err
+        else:
+            raise Exception('mUpdateJsonPatchReportWithLock: Invalid input provided')
+
     def mCreateClusterPatchOperationsTable(self):
         """
         request fields:
@@ -3579,7 +3614,7 @@ class ebExacloudDB(ebMysqlDB):
             6. operation style
         """
         if not self.mCheckTableExist('clusterpatchoperations'):
-            self.mExecute('''CREATE TABLE clusterpatchoperations (
+            self.mExecute('''CREATE TABLE IF NOT EXISTS clusterpatchoperations (
                       id               INTEGER PRIMARY KEY AUTO_INCREMENT,
                       clustername      VARCHAR(760),
                       master_req_uuid  VARCHAR(255) UNIQUE,
@@ -3680,7 +3715,7 @@ class ebExacloudDB(ebMysqlDB):
             11. duration_in_seconds -> time spent in the entire substage within a stage
         """
         if not self.mCheckTableExist('infrapatchingtimestats'):
-            self.mExecute('''CREATE TABLE infrapatchingtimestats (
+            self.mExecute('''CREATE TABLE IF NOT EXISTS infrapatchingtimestats (
         master_uuid     VARCHAR(128),
         child_uuid      VARCHAR(128),
         target_type     VARCHAR(128),
@@ -3742,7 +3777,7 @@ class ebExacloudDB(ebMysqlDB):
     def mCreateFilesTable(self, tablename):
         if not self.mCheckTableExist(tablename):
             self.mExecute(
-                '''CREATE TABLE {0} (
+                '''CREATE TABLE IF NOT EXISTS {0} (
                 ID VARCHAR(255) PRIMARY KEY,
                 CONTENT TEXT,
                 MTIME TEXT)
@@ -3769,7 +3804,7 @@ class ebExacloudDB(ebMysqlDB):
 
     def mCreateExawatcherTable(self):
         if not self.mCheckTableExist('exawatcher'):
-            self.mExecute('''CREATE TABLE exawatcher (
+            self.mExecute('''CREATE TABLE IF NOT EXISTS exawatcher (
                                                   uuid TEXT,
                                                   log_location TEXT,
                                                   filter TEXT,
@@ -3812,7 +3847,7 @@ class ebExacloudDB(ebMysqlDB):
 
     def mCreateCCATable(self):
         if not self.mCheckTableExist('ccadata'):
-            self.mExecute('''CREATE TABLE ccadata (
+            self.mExecute('''CREATE TABLE IF NOT EXISTS ccadata (
                                                   id VARCHAR(255) PRIMARY KEY,
                                                   pid INTEGER,
                                                   parURL TEXT,
@@ -3900,7 +3935,7 @@ class ebExacloudDB(ebMysqlDB):
     # to implement Fine Grained locking and lock keepalive in the future
     def mCreateLocksTable(self):
         if not self.mCheckTableExist('locks'):
-            self.mExecute('''CREATE TABLE locks (
+            self.mExecute('''CREATE TABLE IF NOT EXISTS locks (
                                                   uuid VARCHAR(128),
                                                   lock_type VARCHAR(256),
                                                   lock_hostname VARCHAR(256),
@@ -3962,7 +3997,7 @@ class ebExacloudDB(ebMysqlDB):
 
     def mCreateErrCodeTable(self):
         if not self.mCheckTableExist('errorresponse'):
-            self.mExecute('''CREATE TABLE errorresponse (
+            self.mExecute('''CREATE TABLE IF NOT EXISTS errorresponse (
                                                   uuid VARCHAR(128) PRIMARY KEY,
                                                   errorCode text,
                                                   errorMsg text,
@@ -3991,7 +4026,7 @@ class ebExacloudDB(ebMysqlDB):
 
     def mCreateRunningDBsList(self):
         if not self.mCheckTableExist('runningdblist'):
-            self.mExecute('''CREATE TABLE runningdblist (
+            self.mExecute('''CREATE TABLE IF NOT EXISTS runningdblist (
                                                   virtualMachineName VARCHAR(128) PRIMARY KEY,
                                                   dbRunning LONGTEXT)''')
 
@@ -4017,7 +4052,7 @@ class ebExacloudDB(ebMysqlDB):
 
     def mCreateAsyncProcessTable(self):
         if not self.mCheckTableExist('asyncprocess'):
-            self.mExecute('''CREATE TABLE asyncprocess (uuid VARCHAR(255) PRIMARY KEY,
+            self.mExecute('''CREATE TABLE IF NOT EXISTS asyncprocess (uuid VARCHAR(255) PRIMARY KEY,
                                                     return_value LONGTEXT,
                                                     name LONGTEXT,
                                                     alive TINYINT,
@@ -4061,7 +4096,7 @@ class ebExacloudDB(ebMysqlDB):
                 PRIMARY KEY(metricid)
         '''
         if not self.mCheckTableExist('metrics'):
-            self.mExecute('''CREATE TABLE metrics (
+            self.mExecute('''CREATE TABLE IF NOT EXISTS metrics (
                                 metricid INTEGER NOT NULL AUTO_INCREMENT,
                                 category VARCHAR(30) NOT NULL,
                                 created_at TIMESTAMP NOT NULL,

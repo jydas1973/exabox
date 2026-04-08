@@ -1,9 +1,15 @@
+#    MODIFIED   (MM/DD/YY)
+#    aypaul      03/27/26 - Fix unit tests for code changes
+#    aypaul      01/30/26 - Updating unit tests for selinux implementation
+
+
 import json
 import unittest
 from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
 from exabox.core.Node import exaBoxNode
 from exabox.core.MockCommand import exaMockCommand
 from exabox.log.LogMgr import ebLogInfo
+from exabox.ovm.selinuxcontrols import ebSelinuxControls
 
 """
 "se_linux" :  {
@@ -74,7 +80,8 @@ class ebTestSELinux(ebTestClucontrol):
         fullOptions.jsonconf = aSeLinuxPayload
 
         self.mGetClubox().mSetOptions(fullOptions)
-        _selinux = self.mGetClubox().mGetSELinuxMode("dom0")
+        _selinuxcontrols = ebSelinuxControls(self.mGetClubox())
+        _selinux = _selinuxcontrols.mGetSELinuxMode("dom0")
         ebLogInfo("Key se_linux key should be added to payload with value: {0}".format(_selinux))
         _status_dict = { "disabled": "disabled", "permissive": "permissive", "enforcing" : "enforcing" }
         _boolean_dict = {True: 1, False: 0}
@@ -100,7 +107,8 @@ class ebTestSELinux(ebTestClucontrol):
         for _dom0, _ in self.mGetClubox().mReturnDom0DomUPair():
             _node = exaBoxNode(self.mGetContext())
             _node.mConnect(aHost = _dom0)
-            _sereturned = self.mGetClubox().mSetSeLinux(_node, _selinux, "dom0") 
+            _selinuxcontrols = ebSelinuxControls(self.mGetClubox())
+            _sereturned = _selinuxcontrols.mSetSeLinux(_node, _selinux, "dom0") 
             ebLogInfo("My function returns: {0}".format(_sereturned))
             self.assertEqual(_boolean_dict[_sereturned], _expected_rc)
             _node.mDisconnect()
@@ -139,7 +147,8 @@ class ebTestSELinux(ebTestClucontrol):
         fullOptions.jsonconf = self.createSELinuxPayload("enforcing")
 
         self.mGetClubox().mSetOptions(fullOptions)
-        _selinux = self.mGetClubox().mGetSELinuxMode("dom0")
+        _selinuxcontrols = ebSelinuxControls(self.mGetClubox())
+        _selinux = _selinuxcontrols.mGetSELinuxMode("dom0")
         ebLogInfo("Key se_linux key should be added to payload with value: {0}".format(_selinux))
         aSeLinuxCurrentConfig = "disabled"
 
@@ -159,11 +168,11 @@ class ebTestSELinux(ebTestClucontrol):
             _node = exaBoxNode(self.mGetContext())
             _node.mConnect(aHost = _dom0)
             operationStatusDict = dict()
-            _sereturned = self.mGetClubox().mSetSeLinux(_node, _selinux, "dom0", operationStatusDict) 
+            _selinuxcontrols = ebSelinuxControls(self.mGetClubox())
+            _sereturned = _selinuxcontrols.mSetSeLinux(_node, _selinux, "dom0", operationStatusDict) 
             ebLogInfo("mSetSeLinux function returns: {0}".format(_sereturned))
             self.assertEqual(_sereturned, False)
             self.assertEqual(operationStatusDict["modeUpdate"], "Failure")
-            self.assertEqual(operationStatusDict["policyUpdate"], "Success")
             _node.mDisconnect()
             break
 

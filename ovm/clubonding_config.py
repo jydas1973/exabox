@@ -1,7 +1,7 @@
 #
 # clubonding_config.py
 #
-# Copyright (c) 2021, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      clubonding_config.py - Bonding configuration parsing logic
@@ -12,6 +12,7 @@
 #    NOTES
 #
 #    MODIFIED   (MM/DD/YY)
+#    scoral      12/22/25 - Bug 38776681 - Make backup network optional.
 #    ririgoye    11/26/25 - Bug 38636333 - EXACLOUD PYTHON:ADD INSTANTCLIENT TO
 #                           LD_LIBRARY_PATH
 #    prsshukl    11/20/25 - Bug 38675257 - EXADBXS PROVISIONING FAILING IN
@@ -478,7 +479,7 @@ def build_monitor_conf(
     client_standby_mac = client.get('standby_vnic_mac')
     client_vlantag = int(client.get('vlantag', 0))
 
-    backup_mac = backup['mac']
+    backup_mac = backup.get('mac', '')
     backup_standby_mac = backup.get('standby_vnic_mac')
     backup_vlantag = int(backup.get('vlantag', 0))
     nw_utils = NetworkUtils()
@@ -554,15 +555,16 @@ def build_monitor_conf(
             IPv4Address(ipv4), floating=False, ip_type="host_ip",
             ipv6_addr=IPv6Address(ipv6)))
 
-    ipv4, ipv6 = nw_utils.mGetIPv4IPv6PayloadNotNoneValues(backup)
+    if 'ip' in backup or 'ipv6' in backup:
+        ipv4, ipv6 = nw_utils.mGetIPv4IPv6PayloadNotNoneValues(backup)
 
-    entries.append(
-        __build_backup_entry(
-            IPv4Address(ipv4), floating=False, ip_type="host_ip",
-            ipv6_addr=IPv6Address(ipv6)))
+        entries.append(
+            __build_backup_entry(
+                IPv4Address(ipv4), floating=False, ip_type="host_ip",
+                ipv6_addr=IPv6Address(ipv6)))
 
     # VIPs.  These are optional.
-    if 'vip' in node_payload:
+    if node_payload.get('vip'):
         ipv4, ipv6 = nw_utils.mGetIPv4IPv6PayloadNotNoneValues(
             node_payload['vip'])
         entries.append(__build_client_entry(ipv4, floating=True, ip_type="vip",
@@ -709,9 +711,10 @@ def extract_bonding_conf_from_common_payload(
 
     if extract_monitor_conf:
         # if payload has Scan IPs, prefer it over the ones received as param
-        if 'scan' in net_payload:
+        scan = net_payload.get('scan', {})
+        if 'ip' in scan or 'ipv6' in scan:
             scan_ips, scan_ipv6 = nw_utils.mGetIPv4IPv6Scans(
-                net_payload['scan'], aReturnIPv4IPv6Scans=True)
+                scan, aReturnIPv4IPv6Scans=True)
             scan_ips = tuple(map(IPv4Address, scan_ips))
             scan_ipv6 = tuple(map(IPv6Address, scan_ipv6))
 

@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     vmbackup.py - Basic functionality
@@ -13,6 +13,19 @@ NOTE:
 History:
 
     MODIFIED   (MM/DD/YY)
+       aararora 02/27/26 - Bug 38902170: Correct resource leak issues
+       arturjim 02/27/26 - Enh 39017726 - ECRA:VMBACKUP: ADD OPTIONAL PARAM
+                           'VMNAME' FOR GRANULAR VM BACKUPS PER VM BASIS
+       arturjim 02/23/26 - Enh 38694500 - ECRA: ADD SUPPORT TO READ ALL VM BACKUPS
+                           INCLUDING IN FAILURE STATE OPTIONAL PARAM FAILURE=TRUE 
+       enrivera 02/06/26 - Enh 38922650 - VMBACKUP: ADD SUPPORT FOR CUSTOM UUID IN 
+                           EXACLOUD PAYLOAD FOR RESTORE OPERATION
+       prsshukl 01/30/26 - Bug 38906531 - NODE RECOVERY (MVM ENV) - Use updated
+                           vmbackup list --vm command to get the available
+                           backups
+       oespinos 01/26/26 - Bug 38820827 - Add option to check_install_status
+       jfsaldan 01/26/26 - Bug 38875564 - EXACS:25.4.1: VMBACKUP RESTORE ERROR
+                           WHILE EXECUTING JSONDISPATCH VMBACKUP
        ririgoye 11/20/25 - Bug 38667586 - EXACS: MAIN: PYTHON3.11: SUPRASS ALL
                            PYTHON WARNINGS
        enrivera 11/04/25 - Bug 38614602 - EXACC:VMBACKUP: BACKUP OPERATION DOING 
@@ -319,7 +332,7 @@ class ebCluManageVMBackup(object):
         elif _options.vmbackup_operation == "list":
             _vmbackupdata["Command"] = "list"
             ebLogInfo("Running vmbackup operation: list")
-            _rc = self.mListVMbackup()
+            _rc = self.mListVMbackup(_options)
 
         elif _options.vmbackup_operation == "list_oss":
             _vmbackupdata["Command"] = "list_oss"
@@ -361,6 +374,11 @@ class ebCluManageVMBackup(object):
             ebLogInfo("Running vmbackup operation: update_passwordless")
             _rc = self.mUpdatePasswordlessChain(_options)
 
+        elif _options.vmbackup_operation == "check_install_status":
+            _vmbackupdata["Command"] = "check_install_status"
+            ebLogInfo("Running vmbackup operation: check_install_status")
+            _rc = self.mCheckInstallStatus()
+
         ebLogTrace("JSON returned from Exacloud: %s" % _vmbackupdata)
 
         _reqobj = self.__ebox.mGetRequestObj()
@@ -394,29 +412,31 @@ class ebCluManageVMBackup(object):
             _node = exaBoxNode(get_gcontext())
             _node.mConnect(aHost=_dom0)
             _vmbackupdata[_dom0] = {}
+            try:
+                _node.mExecuteCmdLog("cp " + self.VMBACKUPCONF_FILE + " " + self.VMBACKUPOFF_FILE)
 
-            _node.mExecuteCmdLog("cp " + self.VMBACKUPCONF_FILE + " " + self.VMBACKUPOFF_FILE)
+                _, _o, _e = _node.mExecuteCmd(_cmdstr)
+                _out = _o.readlines()
+                if not _out or len(_out) == 0:
+                    if _flag:
+                        _log = "Turned VM backup ON on Dom0 %s" % (_dom0)
+                    else:
+                        _log = "Turned VM backup OFF on Dom0 %s" % (_dom0)
 
-            _, _o, _e = _node.mExecuteCmd(_cmdstr)
-            _out = _o.readlines()
-            if not _out or len(_out) == 0:
-                if _flag:
-                    _log = "Turned VM backup ON on Dom0 %s" % (_dom0)
+                    ebLogInfo(_log)
+                    _vmbackupdata[_dom0]["Exacloud Cmd Status"] = self.PASS
+                    _vmbackupdata[_dom0]["Log"] = _log
+                    _vmbackupdata["Log"].append(_log)
+                    _rc = 0
                 else:
-                    _log = "Turned VM backup OFF on Dom0 %s" % (_dom0)
-
-                ebLogInfo(_log)
-                _vmbackupdata[_dom0]["Exacloud Cmd Status"] = self.PASS
-                _vmbackupdata[_dom0]["Log"] = _log
-                _vmbackupdata["Log"].append(_log)
-                _rc = 0
-            else:
-                _log = "Failed to set VM backup to %s on Dom0(%s)" % (_flag, _dom0)
-                ebLogError(_log)
-                _vmbackupdata[_dom0]["Exacloud Cmd Status"] = self.FAIL
-                _vmbackupdata[_dom0]["Log"] = _log
-                _vmbackupdata["Log"].append(_log)
-                _rc = 1
+                    _log = "Failed to set VM backup to %s on Dom0(%s)" % (_flag, _dom0)
+                    ebLogError(_log)
+                    _vmbackupdata[_dom0]["Exacloud Cmd Status"] = self.FAIL
+                    _vmbackupdata[_dom0]["Log"] = _log
+                    _vmbackupdata["Log"].append(_log)
+                    _rc = 1
+            finally:
+                _node.mDisconnect()
 
         return _rc
 
@@ -657,8 +677,11 @@ class ebCluManageVMBackup(object):
 
     # mCheckAvailableVMbackups:
     # Check if there are available backups of a vm
-    def mCheckAvailableVMbackups(self, aNode, aVmName):
+    # in node recovery case we will check for the particular vm we want to recover, which will be deleted
+    def mCheckAvailableVMbackups(self, aNode, aVmName, aNodeRecovery=False):
         _cmd_str = f"source {self.VMBACKUPENV_FILE}; vmbackup list | grep {aVmName} | grep success | sed 's/\s\s*/ /g' | cut -d' ' -f2"
+        if aNodeRecovery:
+            _cmd_str = f"source {self.VMBACKUPENV_FILE}; vmbackup list --vm {aVmName} | grep {aVmName} | grep success | awk '{{print $1}}'"
         _, _o, _ = aNode.mExecuteCmd(_cmd_str)
         _out = _o.readlines()
         if _out:
@@ -666,6 +689,31 @@ class ebCluManageVMBackup(object):
             return _out
         else:
             return False
+
+    def mCheckInstallStatus(self):
+        _dpairs = self.__ebox.mReturnDom0DomUPair()
+        _installed = 0
+
+        for _dom0, _ in _dpairs:
+            _node = exaBoxNode(get_gcontext())
+            _node.mConnect(aHost=_dom0)
+            if self.mCheckVMbackupInstalled(_node):
+                ebLogInfo(f"VMBackup is installed in {_dom0}")
+                _installed += 1
+            else:
+                ebLogInfo(f"VMBackup is not installed in {_dom0}")
+            _node.mDisconnect()
+
+        _vmbackupdata = self.mGetVMBackupData()
+
+        if _installed == len(_dpairs):
+            _vmbackupdata["Install Status"] = "Installed"
+        elif _installed > 0:
+            _vmbackupdata["Install Status"] = "Partially Installed"
+        else:
+            _vmbackupdata["Install Status"] = "Not Installed"
+
+        return 0
 
     # mCheckVMbackupInstalled:
     # Check if the utility is installed, sourcing the shiped environment
@@ -853,11 +901,17 @@ class ebCluManageVMBackup(object):
 
     # mListVMbackup:
     # List available local and remote backups the dom
-    def mListVMbackup(self):
+    def mListVMbackup(self, aOptions):
 
+        _options = aOptions
         _vmbackupdata = self.mGetVMBackupData()
         _dpairs = self.__ebox.mReturnDom0DomUPair()
         _cmd_str = 'source ' + self.VMBACKUPENV_FILE + '; vmbackup list'
+        _failure = False
+        if aOptions.jsonconf is not None:
+            _failure = aOptions.jsonconf.get("failure", False)
+        if _failure:
+            _cmd_str += " --failure"
         _vmbackupdata["Log"] = ''
         _rc = 0
         for _dom0, _ in _dpairs:
@@ -1087,8 +1141,9 @@ class ebCluManageVMBackup(object):
 
     # mCreateVMbackup:
     # Perform a backup of the existing VMs on the dom0
-    def mCreateVMbackup(self, aNode):
+    def mCreateVMbackup(self, aNode, aVmName=None):
         _node = aNode
+        _vm_name = aVmName
         _vmbackupdata = self.mGetVMBackupData()
         _rc = 0
         if not self.mCheckVMbackupInstalled(_node):
@@ -1100,6 +1155,8 @@ class ebCluManageVMBackup(object):
             raise ExacloudRuntimeError(0x095, 0xA, _log)
 
         _cmd_str = 'source ' + self.VMBACKUPENV_FILE + '; vmbackup backup'
+        if _vm_name is not None:
+            _cmd_str += f" --vm {_vm_name}"
         ebLogInfo(f"{_node.mGetHostname()} - Triggering backup command, "
             f"this operation may take a while:\n{_cmd_str}")
         _, _o, _e = _node.mExecuteCmd(_cmd_str)
@@ -1188,7 +1245,7 @@ class ebCluManageVMBackup(object):
         return _rc
 
     # Actual execution of the VM backup operation 
-    def mRunVMBackup(self, aDom0, aProcessDict):
+    def mRunVMBackup(self, aDom0, aProcessDict, aVmName=None):
         # Initalize result dictionary
         _proxy_dict = {
             "start_time": datetime.datetime.now(),
@@ -1203,7 +1260,7 @@ class ebCluManageVMBackup(object):
             # Run VM backup on host
             _rc = 1
             try:
-                _rc = self.mCreateVMbackup(_node)
+                _rc = self.mCreateVMbackup(_node, aVmName)
             except ExacloudRuntimeError as e:
                 # If error is raised, mCreateVMbackup will return _rc = 0 anyways, so we need to handle this use case
                 _rc = 1
@@ -1237,6 +1294,12 @@ class ebCluManageVMBackup(object):
     # Perform a backup of the existing VMs on all dom0s, secuentially
     def mVMbackupAll(self, aOptions):
         _dpairs = self.__ebox.mReturnDom0DomUPair()
+
+        _target_dom0 = None
+        _vm_name = None
+        if aOptions.jsonconf is not None:
+            _target_dom0 = aOptions.jsonconf.get("dom0")
+            _vm_name = aOptions.jsonconf.get("vm_name")
 
         # If the payload has a non-empty vmboss section, we proceeed with the VMBackup
         # OCI cache file update, and credentials population
@@ -1282,8 +1345,17 @@ class ebCluManageVMBackup(object):
         _maxTime = get_gcontext().mGetConfigOptions().get("vmbackup", {}).get("max_timeout", _defaultMaxTime)
 
         # Add tasks to parallel processing manager
-        for _dom0, _ in _dpairs:
-            _task = ProcessStructure(self.mRunVMBackup, aArgs=[_dom0, _procDict], aId=_dom0)
+        for _dom0, _domu in _dpairs:
+            if _target_dom0 and _dom0 != _target_dom0:
+                continue
+            if _vm_name and _domu != _vm_name:
+                continue
+
+            _args = [_dom0, _procDict]  
+            if _vm_name:
+                _args.append(_vm_name)
+
+            _task = ProcessStructure(self.mRunVMBackup, aArgs=_args, aId=_dom0)
             _task.mSetMaxExecutionTime(int(_maxTime))
             _task.mSetLogTimeoutFx(ebLogWarn)
             _procManager.mStartAppend(_task)
@@ -2032,6 +2104,8 @@ class ebCluManageVMBackup(object):
         _node_recovery = False
         _recoveryObj = None
 
+        _restore_uuid = None
+
         if aNode is None or aVmName is None:
             if aOptions.jsonconf is None:
                 _log = '*** VMBackup Restore payload required'
@@ -2049,6 +2123,7 @@ class ebCluManageVMBackup(object):
                 _dest = ""
                 _jconf_keys = list(_json.keys())
                 _forceapply = False
+                _restore_uuid = _json.get("uuid") if _json else None
                 if _jconf_keys is not None and "forceapply" in _jconf_keys:
                     _forceapply = _json["forceapply"]
 
@@ -2069,7 +2144,7 @@ class ebCluManageVMBackup(object):
                         _node.mDisconnect()
                         raise ExacloudRuntimeError(0x0822, 0xA, 'VMBackup utility is not installed')
 
-                    _available_bkp = self.mCheckAvailableVMbackups(_node, _vm_name)
+                    _available_bkp = self.mCheckAvailableVMbackups(_node, _vm_name, aNodeRecovery=_node_recovery)
                     if _available_bkp is False:
                         _log = '*** Error, not available backups for restore'
                         ebLogError(_log)
@@ -2155,7 +2230,11 @@ class ebCluManageVMBackup(object):
                     ebLogError('*** Valid backup seq numbers: {0} '.format(_available_bkp))
                     raise ExacloudRuntimeError(0x0823, 0xA, ' Valid backup seq number not available')
 
-                _uuid = str(uuid.uuid1())
+                if _restore_uuid:
+                    _uuid = str(_restore_uuid)
+                    ebLogInfo(f"Using custom UUID for restore: {_uuid}")
+                else:
+                    _uuid = str(uuid.uuid1())
                 #Multiprorcess of check an copy file
                 _processes = ProcessManager()
                 _rc = _processes.mGetManager().list()
@@ -2255,8 +2334,18 @@ class ebCluManageVMBackup(object):
                     _vmbackupdata["Exacloud Cmd Status"] = self.FAIL
                     _rc = 1
 
-               # Trigger the restore command on the Dom0 for the given DomU
+                # Trigger the restore command on the Dom0 for the given DomU
                 else:
+                    # Ensure no vmbackup process is already active before triggering restore
+                    if self.mCheckRemoteProcessOngoing(_node):
+                        _log = (f"*** Detected an existing vmbackup process on "
+                            f"{_dom0}; skipping restore request")
+                        ebLogError(_log)
+                        _vmbackupdata["Log"] = _log
+                        _vmbackupdata["Exacloud Cmd Status"] = self.FAIL
+                        _rc = 1
+                        continue
+
                     ebLogInfo(f"Triggering restore command, this operation may take a while:\n{_cmd_str}")
                     _, _o, _e = _node.mExecuteCmd(_cmd_str)
                     _restore_rc = _node.mGetCmdExitStatus()
@@ -2846,12 +2935,15 @@ class ebCluManageVMBackup(object):
         _options.jsonconf = _set_param_dict
         _rc = self.mSetVMBackupParameter(_options, _ddpair)
         ebLogTrace(f"Log from vmbackup operation: {self.mGetVMBackupData()}")
-        if _rc:
+        if _rc not in (0, 1):
             _msg = ("Exacloud failed to set the parameter with data: "
                 f"'{_set_param_dict}'")
             ebLogError(_msg)
             raise ExacloudRuntimeError(0x095, 0xA, _msg)
-        ebLogInfo(f"Exacloud set the parameter with data: '{_set_param_dict}'")
+        if _rc == 0:
+            ebLogInfo(f"Exacloud set the parameter with data: '{_set_param_dict}'")
+        else:
+            ebLogInfo(f"Parameter already set with data: '{_set_param_dict}'")
 
         return 0
 
@@ -2911,12 +3003,15 @@ class ebCluManageVMBackup(object):
         _options.jsonconf = _set_param_dict
         _rc = self.mSetVMBackupParameter(_options, _nodes)
         ebLogTrace(f"Log from vmbackup operation: {self.mGetVMBackupData()}")
-        if _rc:
+        if _rc not in (0, 1):
             _msg = ("Exacloud failed to set the parameter with data: "
                 f"'{_set_param_dict}'")
             ebLogError(_msg)
             raise ExacloudRuntimeError(0x095, 0xA, _msg)
-        ebLogInfo(f"Exacloud set the parameter with data: '{_set_param_dict}'")
+        if _rc == 0:
+            ebLogInfo(f"Exacloud set the parameter with data: '{_set_param_dict}'")
+        else:
+            ebLogInfo(f"Parameter already set with data: '{_set_param_dict}'")
 
         return 0
 

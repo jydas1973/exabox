@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 #
-# $Header: ecs/exacloud/exabox/ovm/remotelock.py /main/20 2025/07/04 12:47:23 jesandov Exp $
+# $Header: ecs/exacloud/exabox/ovm/remotelock.py /main/23 2026/02/12 08:50:07 dekuckre Exp $
 #
 # remotelock.py
 #
-# Copyright (c) 2021, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      remotelock.py - Remote (Host) Lock
@@ -17,6 +17,9 @@
 #      https://confluence.oraclecorp.com/confluence/display/EDCS/Remote+Lock+Heartbeat
 #
 #    MODIFIED   (MM/DD/YY)
+#    jesandov    06/02/26 - Bug 38938299 - Refactor to works without clucontrol depdency
+#    dekuckre    02/09/25 - 38925490: Fix acquire and release of lock
+#    bhpati      12/08/25 - Bug 38635249 - FIX DOM0 LOCK HANG ISSUE
 #    jesandov    06/30/25 - Bug 38127875 - Add logic for multiprocess in lock
 #    jfsaldan    01/31/25 - Bug 37468472 - EXACLOUD - LOCK ACQUISITION IS
 #                           DELAYED BY UP TO 60 SECONDS AFTER ANOTHER
@@ -51,6 +54,7 @@ import time
 import subprocess
 import uuid as uuidx
 import copy
+import shlex
 
 from base64 import b64encode
 
@@ -66,6 +70,9 @@ from exabox.utils.node import (connect_to_host,
                                node_exec_cmd,
                                node_exec_cmd_check)
 from exabox.BaseServer.AsyncProcessing import ProcessManager, ProcessStructure, ExitCodeBehavior
+from exabox.core.Context import get_gcontext
+from subprocess import PIPE
+from exabox.tools.AttributeWrapper import wrapStrBytesFunctions
 
 # We need to import exaBoxCluCtrl for type annotations, but it will cause a
 # cyclic-import at runtime.  Thus we import it only when type-checking.  We
@@ -134,6 +141,7 @@ class RemoteLock:
         self._active_processes = None
         self._worker_port = None
         self._force_host_list = force_host_list
+        self._latest_uuid = None
         # _active_processes is ProcessManager with the active process
 
     def set_lock_type(self, aType):
@@ -153,6 +161,59 @@ class RemoteLock:
     def get_request_state(self) -> LockState:
         """ Return the lock state for the current exacloud request """
         return self._request_lock_state
+
+    def mPingHost(self,aHostname,aCount=4, aTimeout=0, aIPtype='4'):
+
+        _host = aHostname
+
+        _count = int(aCount)
+        # If IP address in passed as _host - detect if it is ipv6 address.
+        # If a hostname is passed, : (colon) in hostname is invalid
+        if ':' in _host:
+            aIPtype = 6
+        while _count:
+            if aIPtype == '4':
+                _ping_cmd = '/bin/ping'
+            else:
+                _ping_cmd = '/bin/ping -6'
+            if aTimeout == 0:
+                #use original code if no timeout given
+                _cmd = f'{_ping_cmd} -c 1 ' + _host + ' '
+            else:
+                _cmd = f'{_ping_cmd} -c 1 -W '+str(aTimeout)+' '+_host + ' '
+            _rc, _, _, _err = self.mExecuteLocal(_cmd)
+            if _rc == 0:
+                return True
+            elif _err and len(_err) != 0:
+                ebLogError(f"*** Ping failed with Error:  {str(_err)}")
+
+            _count -= 1
+            ebLogWarn('*** Ping Failed retrying for host: %s' % (_host))
+
+        return False
+
+    def mExecuteLocal(self, aCmd, aCurrDir=None, aStdIn=PIPE, aStdOut=PIPE, aStdErr=PIPE, aTimeOut=None,
+                      aLogOutError=False):
+
+        _opt = get_gcontext().mGetArgsOptions()
+        _args = shlex.split(aCmd)
+        _current_dir = aCurrDir
+        _stdin = aStdIn
+        _std_out = aStdOut
+        _stderr = aStdErr
+        try:
+            _proc = subprocess.Popen(_args, stdin=_stdin, stdout=_std_out, stderr=_stderr, cwd=_current_dir)
+            _std_out, _std_err = wrapStrBytesFunctions(_proc).communicate(timeout=aTimeOut)
+            _rc = _proc.returncode
+        except Exception as e:
+            _rc = 2
+            _std_out = ""
+            _std_err = str(e)
+
+        ebLogTrace(f"*** mExecuteLocal: Executed command: {aCmd}. Return code: {_rc}.")
+        if aLogOutError:
+            ebLogTrace(f"*** mExecuteLocal: Output: \n{_std_out} Error: \n{_std_err}")
+        return _rc, None, _std_out, _std_err
 
     def acquire(self,
                 lock_name: str = "Default",
@@ -188,35 +249,57 @@ class RemoteLock:
         """
         if self._worker_port is None:
             self.update_worker_port()
-        if not self._clu_ctrl.SharedEnv():
+        if self._clu_ctrl and not self._clu_ctrl.SharedEnv():
             ebLogInfo(f'Single-VM environment detected, skipping remote locking')
             return
 
-        uuid = f"{self._clu_ctrl.mGetUUID()}_{os.getpid()}"
+        if self._clu_ctrl:
+            uuid = f"{self._clu_ctrl.mGetUUID()}_{os.getpid()}"
+        else:
+            uuid = f"{uuidx.uuid4()}_{os.getpid()}"
+
+        self._latest_uuid = uuid
 
         host_list = []
 
         if not self._force_host_list:
-            _dom0s, _domUs, _cells, _switches = self._clu_ctrl.mReturnAllClusterHosts()
+            if self._clu_ctrl:
+                _dom0s, _domUs, _cells, _switches = self._clu_ctrl.mReturnAllClusterHosts()
 
-            if lock_name.lower() in ["dom0", "default"]:
-                host_list = _dom0s
+                if lock_name.lower() in ["dom0", "default"]:
+                    host_list = _dom0s
 
-            if lock_name.lower() in ["domu", "vm"]:
-                host_list = _domUs
+                if lock_name.lower() in ["domu", "vm"]:
+                    host_list = _domUs
 
-            if lock_name.lower() in ["cell"]:
-                host_list = _cells
+                if lock_name.lower() in ["cell"]:
+                    host_list = _cells
 
-            if lock_name.lower() in ["switch"]:
-                host_list = _switches
+                if lock_name.lower() in ["switch"]:
+                    host_list = _switches
 
         else:
             host_list = copy.deepcopy(self._force_host_list)
 
         host_list.sort()
-        try:
 
+        unreachable_hosts = []
+        for host in host_list:
+            _node = exaBoxNode(get_gcontext())
+            try:
+                if not _node.mIsConnectable(host):
+                    unreachable_hosts.append(host)
+            except Exception as connectivity_error:
+                ebLogError(f'SSH Connectivity failed from exacloud to {host}: {connectivity_error}')
+                unreachable_hosts.append(host)
+
+        if unreachable_hosts:
+            msg = (f'Remote lock acquisition aborted: SSH Connectivity failed from exacloud to hosts:'
+                   f'{unreachable_hosts}')
+            ebLogError(msg)
+            raise ExacloudRuntimeError(0x806, 0xA, msg)
+        try:
+            acquired_hosts = []
             # Create Process Manager
             self._active_processes = ProcessManager(aExitCodeBehavior=ExitCodeBehavior.IGNORE)
 
@@ -237,6 +320,7 @@ class RemoteLock:
             for acquired_count, host in enumerate(host_list, start=1):
                 self._acquire_per_host(host, uuid, lock_name,
                                        acquired_count, host_count)
+                acquired_hosts.append(host)
 
             self._counter = self._counter + 1
             ebLogInfo(f'Full remote lock ACQUIRED for {uuid}')
@@ -244,6 +328,16 @@ class RemoteLock:
             msg = ('Remote lock acquisition failed: '
                    f'host_list:{host_list}; uuid:{uuid}; error:"{exp}"')
             ebLogError(msg)
+
+            # rollback: unlock those already locked
+            host_list = list(reversed(acquired_hosts))
+            total_locks = len(host_list)
+            for released_count, host in enumerate(host_list, start=1):
+                try:
+                    self._release_per_host(host, uuid, lock_name,
+                                           released_count, total_locks)
+                except Exception as rexp:
+                    ebLogError(f"Rollback unlock failed on {host}: {rexp}")
 
             self._cleanup_processes(uuid)
 
@@ -305,15 +399,15 @@ class RemoteLock:
 
     """Sample lock metadata:
     {
-        "exacloud_service_path": "", 
-        "acquire_date": "", 
-        "owner_hostname": "", 
-        "exadata_cluster_name": "", 
-        "owner_user_name": "", 
-        "owner_uuid": "", 
-        "exadata_host": "", 
-        "expire_date": "", 
-        "exadata_cluster_key": "", 
+        "exacloud_service_path": "",
+        "acquire_date": "",
+        "owner_hostname": "",
+        "exadata_cluster_name": "",
+        "owner_user_name": "",
+        "owner_uuid": "",
+        "exadata_host": "",
+        "expire_date": "",
+        "exadata_cluster_key": "",
         "exacloud_command": "",
         "worker_port" : ""
     }
@@ -342,7 +436,7 @@ class RemoteLock:
                         ebLogError(f"Worker with port {_acquired_worker_port} is running job with uuid {_worker_current_uuid} which doesn't match acquired lock uuid {_acquire_lock_uuid}.")
                         _release_currenthost_lock = True
         elif _acquired_lock_owner_process_hostname is not None:
-            _ping_check = self._clu_ctrl.mPingHost(_acquired_lock_owner_process_hostname)
+            _ping_check = self.mPingHost(_acquired_lock_owner_process_hostname)
             if not _ping_check:
                 ebLogError(f"Ping check for host which acquired the current lock {_acquired_lock_owner_process_hostname} has failed.")
                 _release_currenthost_lock = True
@@ -369,7 +463,7 @@ class RemoteLock:
                           host_count: int) -> None:
         """ Helper method to acquire a lock on a single host """
 
-        with connect_to_host(host, self._clu_ctrl.mGetCtx()) as node:
+        with connect_to_host(host, get_gcontext()) as node:
 
             # Make sure Host has our host_lock.py version
             remote_script = f'/opt/exacloud/host_lock{uuid.replace("-", "")}.py'
@@ -377,7 +471,7 @@ class RemoteLock:
 
             if not self.isRemoteLocalFileSame(node, local_script, remote_script):
                 ebLogInfo('***Copying host_lock.py to remote node !')
-                node.mExecuteCmdLog('/bin/mkdir -p /opt/exacloud') 
+                node.mExecuteCmdLog('/bin/mkdir -p /opt/exacloud')
                 node.mCopyFile(local_script, remote_script)
                 node_exec_cmd_check(node, f'chmod 755 {remote_script}')
 
@@ -466,7 +560,7 @@ class RemoteLock:
         ExacloudRuntimeError is raised if unacquired lock is tried to be released
         or if there's an error acquiring the lock.
         """
-        if not self._clu_ctrl.SharedEnv():
+        if self._clu_ctrl and not self._clu_ctrl.SharedEnv():
             ebLogInfo(f'Single VM detected, skipping remote unlocking')
             return
 
@@ -477,26 +571,30 @@ class RemoteLock:
             raise ExacloudRuntimeError(0x806, 0xA, msg)
 
         if not uuid:
-            uuid = f"{self._clu_ctrl.mGetUUID()}_{os.getpid()}"
+            if self._clu_ctrl:
+                uuid = f"{self._clu_ctrl.mGetUUID()}_{os.getpid()}"
+            else:
+                uuid = self._latest_uuid
 
         if self._counter > 0:
             ebLogInfo(f'Releasing NESTED remote lock for {uuid}. No-op')
             return
 
         if not self._force_host_list:
-            _dom0s, _domUs, _cells, _switches = self._clu_ctrl.mReturnAllClusterHosts()
+            if self._clu_ctrl:
+                _dom0s, _domUs, _cells, _switches = self._clu_ctrl.mReturnAllClusterHosts()
 
-            if lock_name.lower() in ["dom0", "default"]:
-                host_list = _dom0s
+                if lock_name.lower() in ["dom0", "default"]:
+                    host_list = _dom0s
 
-            if lock_name.lower() in ["domu", "vm"]:
-                host_list = _domUs
+                if lock_name.lower() in ["domu", "vm"]:
+                    host_list = _domUs
 
-            if lock_name.lower() in ["cell"]:
-                host_list = _cells
+                if lock_name.lower() in ["cell"]:
+                    host_list = _cells
 
-            if lock_name.lower() in ["switch"]:
-                host_list = _switches
+                if lock_name.lower() in ["switch"]:
+                    host_list = _switches
 
         else:
             host_list = copy.deepcopy(self._force_host_list)
@@ -506,21 +604,45 @@ class RemoteLock:
         total_locks = len(host_list)
         ebLogInfo(f'Releasing remote lock for {uuid} on {host_list}')
 
+        errors = []
+
         try:
             for released_count, host in enumerate(host_list, start=1):
-                self._release_per_host(host, uuid, lock_name,
-                                       released_count, total_locks)
+                try:
+                    self._release_per_host(
+                        host,
+                        uuid,
+                        lock_name,
+                        released_count,
+                        total_locks
+                    )
+                except Exception as exp:
+                    # Log but do NOT stop the loop
+                    ebLogError(
+                        f'Remote lock release failed on host {host}: '
+                        f'uuid:{uuid}; error:"{exp}"'
+                    )
+                    errors.append((host, exp))
 
-            ebLogInfo(f'Full remote lock RELEASED for {uuid}')
-        except Exception as exp:
-            msg = ('Remote lock release failed: '
-                   f'host_list: {host_list}; uuid:{uuid}; error:"{exp}"')
-            ebLogError(msg)
-            raise ExacloudRuntimeError(0x806, 0xA, msg) from exp
+            ebLogInfo(f'Full remote lock RELEASE attempted for {uuid}')
+
+            # After all hosts are tried, decide whether to fail
+            if errors:
+                failed_hosts = [host for host, _ in errors]
+                msg = (
+                    'Remote lock release failed on some hosts: '
+                    f'hosts: {failed_hosts}; uuid:{uuid}'
+                )
+                raise ExacloudRuntimeError(0x806, 0xA, msg)
+
         finally:
-            ebLogInfo((f'Waiting for heartbeat process for {uuid}'
-                       f' on {host_list} to stop'))
+            ebLogInfo(
+                f'Waiting for heartbeat process for {uuid} '
+                f'on {host_list} to stop'
+            )
             self._cleanup_processes(uuid)
+
+
 
     def _release_per_host_unowned(self,
                                   host: str,
@@ -528,7 +650,7 @@ class RemoteLock:
                                   lock_name: str,
                                   released_count: str,
                                   host_count: int) -> None:
-        """ Helper method to release an unowned lock on a single host 
+        """ Helper method to release an unowned lock on a single host
         :param host: Host for which lock needs to be released
         :param uuid: Releases lock associated with a special uuid provided
         :param lock_name: A string to identify the lock to release
@@ -536,7 +658,7 @@ class RemoteLock:
         :param host_count: The total number of hosts for which lock needs to be released
         ExacloudRuntimeError is raised if there's an error releasing the lock. """
 
-        with connect_to_host(host, self._clu_ctrl.mGetCtx()) as node:
+        with connect_to_host(host, get_gcontext()) as node:
 
             # Make sure Host has our host_lock.py version
             remote_script = f'/opt/exacloud/host_lock{uuid.replace("-", "")}.py'
@@ -582,24 +704,25 @@ class RemoteLock:
         Don't raise an exception if the lock could not be released.
         Log it, since this is for releasing unowned lock.
         """
-        if not self._clu_ctrl.SharedEnv():
+        if self._clu_ctrl and not self._clu_ctrl.SharedEnv():
             ebLogInfo(f'Single VM detected, skipping remote unlocking')
             return
 
         if not self._force_host_list:
-            _dom0s, _domUs, _cells, _switches = self._clu_ctrl.mReturnAllClusterHosts()
+            if self._clu_ctrl:
+                _dom0s, _domUs, _cells, _switches = self._clu_ctrl.mReturnAllClusterHosts()
 
-            if lock_name.lower() in ["dom0", "default"]:
-                host_list = _dom0s
+                if lock_name.lower() in ["dom0", "default"]:
+                    host_list = _dom0s
 
-            if lock_name.lower() in ["domu", "vm"]:
-                host_list = _domUs
+                if lock_name.lower() in ["domu", "vm"]:
+                    host_list = _domUs
 
-            if lock_name.lower() in ["cell"]:
-                host_list = _cells
+                if lock_name.lower() in ["cell"]:
+                    host_list = _cells
 
-            if lock_name.lower() in ["switch"]:
-                host_list = _switches
+                if lock_name.lower() in ["switch"]:
+                    host_list = _switches
 
         else:
             host_list = copy.deepcopy(self._force_host_list)
@@ -639,7 +762,7 @@ class RemoteLock:
                           host_count: int) -> None:
         """ Helper method to release a lock on a single host """
 
-        with connect_to_host(host, self._clu_ctrl.mGetCtx()) as node:
+        with connect_to_host(host, get_gcontext()) as node:
 
             # Make sure Host has our host_lock.py version
             remote_script = f'/opt/exacloud/host_lock{uuid.replace("-", "")}.py'
@@ -736,15 +859,15 @@ class RemoteLock:
             host_list = [aHost]
         ebLogInfo(f'Forcefully REMOVING locks on {host_list}')
         for host in host_list:
-            with connect_to_host(host, self._clu_ctrl.mGetCtx()) as node:
+            with connect_to_host(host, get_gcontext()) as node:
                 # Make sure Host has our host_lock.py version
-                _uuid = str(uuidx.uuid1())
+                _uuid = str(uuidx.uuid4())
                 remote_script = f'/opt/exacloud/host_lock{_uuid.replace("-", "")}.py'
                 local_script = 'scripts/network/dom0_lock.py'
 
                 if not self.isRemoteLocalFileSame(node, local_script, remote_script):
                     ebLogInfo('***Copying host_lock.py to remote node !')
-                    node.mExecuteCmdLog('/bin/mkdir -p /opt/exacloud') 
+                    node.mExecuteCmdLog('/bin/mkdir -p /opt/exacloud')
                     node.mCopyFile(local_script, remote_script)
                     node_exec_cmd_check(node, f'chmod 755 {remote_script}')
 
@@ -776,9 +899,14 @@ class RemoteLock:
         """ Return a dictionary with current host's lock information """
         user_name = pwd.getpwuid(os.getuid()).pw_name
         host_name = socket.getfqdn()
-        service_path = self._clu_ctrl.mGetCtx().mGetBasePath()
-        cluster_key = self._clu_ctrl.mGetKey()
-        cluster_name = self._clu_ctrl.mGetClusterName()
+        service_path = get_gcontext().mGetBasePath()
+
+        cluster_key = "None"
+        cluster_name = "None"
+        if self._clu_ctrl:
+            cluster_key = self._clu_ctrl.mGetKey()
+            cluster_name = self._clu_ctrl.mGetClusterName()
+
         worker_port = self._worker_port
 
         lock_info = {
@@ -794,9 +922,10 @@ class RemoteLock:
 
         # Request's command can give a hint of how long the lock is expected
         # to be be held
-        request = self._clu_ctrl.mGetRequestObj()
-        if request and request.mGetCmd():
-            lock_info["exacloud_command"] = request.mGetCmd()
+        if self._clu_ctrl:
+            request = self._clu_ctrl.mGetRequestObj()
+            if request and request.mGetCmd():
+                lock_info["exacloud_command"] = request.mGetCmd()
 
         if self._extra_lock_info:
             lock_info["extra_info"] = self._extra_lock_info
@@ -805,22 +934,24 @@ class RemoteLock:
 
     def _update_request_state(self, lock_state: LockState) -> None:
 
-        self._request_lock_state = lock_state
-        req_obj = self._clu_ctrl.mGetRequestObj()
+        if self._clu_ctrl:
 
-        if not req_obj:
-            ebLogWarn('Request Object not found - lockstate update not possible')
-            return
+            self._request_lock_state = lock_state
+            req_obj = self._clu_ctrl.mGetRequestObj()
 
-        ebLogDebug('Request Object found updating lockstate')
-        req_obj.mSetLock(lock_state)
-        ebGetDefaultDB().mUpdateRequest(req_obj)
+            if not req_obj:
+                ebLogWarn('Request Object not found - lockstate update not possible')
+                return
+
+            ebLogDebug('Request Object found updating lockstate')
+            req_obj.mSetLock(lock_state)
+            ebGetDefaultDB().mUpdateRequest(req_obj)
 
     # Heartbeat thread, keep the lock alive until release()
     def _lock_heartbeat(self, host: str, lock_name: str, uuid: str) -> None:
         """ Thread for refreshing the remote lock (a.k.a. heartbeat) """
 
-        with connect_to_host(host, self._clu_ctrl.mGetCtx()) as thread_node:
+        with connect_to_host(host, get_gcontext()) as thread_node:
 
             remote_script = f'/opt/exacloud/host_lock{uuid.replace("-", "")}.py'
             thread_cmd = (f'{remote_script} refresh '
@@ -836,7 +967,7 @@ class RemoteLock:
 
                 if (time.time() - _lastPing) > RemoteLock.LOCK_PING_TIME_SECONDS:
 
-                    if not self._clu_ctrl.mPingHost(host):
+                    if not self.mPingHost(host):
                         ebLogInfo(f"Host {host} is shutdown, stopping heartbeat process")
                         ebLogInfo(f"Once the host avaliable again, please make sure to remove the locks")
                         break

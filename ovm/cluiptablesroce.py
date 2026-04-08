@@ -1,5 +1,5 @@
 """
- Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 
 NAME:
     clueiptablesroce.py - Exacloud RoCE Libvirt iptables configuration logic, specific to ExaBM OCI
@@ -22,6 +22,13 @@ NOTE:
 History:
 
     MODIFIED   (MM/DD/YY)
+    scoral   03/26/26 - Enh 39133953 - Now mRemoveSecurityRulesExaBM also
+                        also removes the "_lock" rules.
+    scoral   03/11/26 - Enh 39003138 - Now mLockGuestSSHTraffic enables the
+                        traffic between VMs in the cluster blocking only
+                        traffic of external hosts.
+    scoral   12/13/25 - Enh 38200446 - Implemented mLockGuestSSHTraffic &
+                        mUnlockGuestSSHTraffic.
     mpedapro 11/20/25 - Enh::38602758 dcsagent nft rules are not required for
                         sriov enabled clusters
     scoral   01/14/25 - Bug 37102810: Support duplicate "bridge filter FORWARD"
@@ -1105,7 +1112,6 @@ case a manual removal of the filter must be performed on Dom0 ***")
                 _hostname = _ctx.mGetRegEntry('_natHN_' + _domU)
 
             _hostname = _hostname.split(".")[0]
-            _bridge = f"vm_{_hostname}"
 
             _node = exaBoxNode(get_gcontext())
 
@@ -1114,32 +1120,34 @@ case a manual removal of the filter must be performed on Dom0 ***")
 
                 if aExaBoxCluCtrlObj.mIsHostOL8(_dom0):
 
-                    _ruleArgs = ["jump", _bridge]
-                    _handle = ebIpTablesRoCE.mGetNFTRuleHandle(_node, _ruleArgs)
-                    _foundHandle = True if _handle else False
-
-                    # We keep checking for duplicate rules and remove each handle
-                    while _handle:
-
-                        _cmd = f"/usr/sbin/nft delete rule bridge filter FORWARD handle {_handle}"
-                        node_exec_cmd_check(_node, _cmd)
-
+                    _bridges = [f"vm_{_hostname}", f"vm_{_hostname}_lock"]
+                    for _bridge in _bridges:
+                        _ruleArgs = ["jump", _bridge]
                         _handle = ebIpTablesRoCE.mGetNFTRuleHandle(_node, _ruleArgs)
+                        _foundHandle = True if _handle else False
 
-                    # Flush chain if handle was found, otherwise it doesn't have to be done
-                    if _foundHandle:
+                        # We keep checking for duplicate rules and remove each handle
+                        while _handle:
 
-                        _cmd = f"/usr/sbin/nft flush chain bridge filter {_bridge}"
-                        node_exec_cmd_check(_node, _cmd)
+                            _cmd = f"/usr/sbin/nft delete rule bridge filter FORWARD handle {_handle}"
+                            node_exec_cmd_check(_node, _cmd)
 
-                        _cmd = f"/usr/sbin/nft delete chain bridge filter {_bridge}"
-                        node_exec_cmd_check(_node, _cmd)
+                            _handle = ebIpTablesRoCE.mGetNFTRuleHandle(_node, _ruleArgs)
 
-                    # By this point we can confirm that no chain is found.
-                    if not _handle:
-                        ebLogWarn(f"Chain not found: {_bridge}")
+                        # Flush chain if handle was found, otherwise it doesn't have to be done
+                        if _foundHandle:
+
+                            _cmd = f"/usr/sbin/nft flush chain bridge filter {_bridge}"
+                            node_exec_cmd_check(_node, _cmd)
+
+                            _cmd = f"/usr/sbin/nft delete chain bridge filter {_bridge}"
+                            node_exec_cmd_check(_node, _cmd)
+
+                        else:
+                            ebLogWarn(f"Chain not found: {_bridge}")
 
                 else:
+                    _bridge = f"vm_{_hostname}"
 
                     _cmd = f"/sbin/iptables -D FORWARD -j {_bridge}"
                     node_exec_cmd_check(_node, _cmd)
@@ -1272,6 +1280,119 @@ case a manual removal of the filter must be performed on Dom0 ***")
                     ebIpTablesRoCE.mCommitNFTables(_node)
                 else:
                     ebIpTablesRoCE.mCommitIPTables(_node)
+
+
+    @staticmethod
+    def mLockGuestSSHTraffic(aNode, aDomUNATHostname, aClientIPs):
+
+        # Find the DomU client bonding interface
+        _vm_chain_name = f"vm_{aDomUNATHostname}"
+        _nft_cmd = "/usr/sbin/nft"
+        _cmd = f"{_nft_cmd} list chain bridge filter {_vm_chain_name}"
+        try:
+            _out = node_exec_cmd_check(aNode, _cmd).stdout
+        except Exception as e:
+            raise ExacloudRuntimeError(0x0821, 0xA, 
+                "Customer network NFTables rules not setup for "
+                f"{aDomUNATHostname}, we cannot lock the VM traffic.") from e
+
+        _pattern = r'iifname "(bondeth0.\d+)"'
+        _bond_ifaces = sorted(set(re.findall(_pattern, _out)))
+        try:
+            _client_bond, *_ = _bond_ifaces
+        except Exception as e:
+            raise ExacloudRuntimeError(0x0821, 0xA,
+                "VM bonding interfaces not fount in NFTables rules for "
+                f"{aDomUNATHostname}, we cannot lock the VM traffic.") from e
+        
+        # Remove existing jump rule first because the lock jump goes before.
+        _ruleArgs = ["jump", _vm_chain_name]
+        _handle = ebIpTablesRoCE.mGetNFTRuleHandle(aNode, _ruleArgs)
+        while _handle:
+            _cmd = f"{_nft_cmd} delete rule bridge filter FORWARD handle {_handle}"
+            node_exec_cmd_check(aNode, _cmd)
+            _handle = ebIpTablesRoCE.mGetNFTRuleHandle(aNode, _ruleArgs)
+
+        # Load the set of rules needed and apply them
+        _rules_json = {}
+        with open("properties/exacs_lockvm_ssh_nft.json") as _f:
+            _rules_json = json.load(_f)
+
+        _replace_values = {
+            "domu_nat_hostname": aDomUNATHostname,
+            "client_vnet": 'vnet*',
+            "client_bond": _client_bond
+        }
+        _nft = NfTables()
+        _rules = _nft.mReplaceValuesJsonRules(
+            _rules_json,
+            'lockvm_ssh_customer_traffic_chains',
+            _replace_values
+        )
+
+        # Consider also the rules to enable VMs interconnection
+        for _ip in aClientIPs:
+            _replace_values["client_ip"] = _ip
+            _rules += _nft.mReplaceValuesJsonRules(
+                _rules_json,
+                'lockvm_ssh_allow_vms_interconnect',
+                _replace_values
+            )
+
+        # Finally block every other SSH connection
+        _rules += _nft.mReplaceValuesJsonRules(
+            _rules_json,
+            'lockvm_ssh_customer_traffic_rules',
+            _replace_values
+        )
+
+        _cmd = f"{_nft_cmd} -as list table bridge filter"
+        _out = node_exec_cmd_check(aNode, _cmd).stdout.splitlines()
+        _curr_filter_rules_json = _nft.convertConfigToJson(_out)
+
+        # Apply the rules
+        for _rule in _rules:
+            _exist_rule = _nft.mRuleExists(
+                _rule,
+                _curr_filter_rules_json
+            )
+            if not _exist_rule:
+                _cmd = _nft.convertJsonConfigToCmd(_rule)
+                node_exec_cmd_check(aNode, f"{_nft_cmd} {_cmd}")
+            else:
+                ebLogWarn(f"Rule already exists: {_rule}")
+
+        # Persist the rules
+        ebIpTablesRoCE.mCommitNFTables(aNode)
+
+        ebLogInfo(f"Successfully locked SSH traffic on customer network for VM {aDomUNATHostname} !!!")
+
+    
+    @staticmethod
+    def mUnlockGuestSSHTraffic(aNode, aDomUNATHostname):
+
+        _vm_chain_lock_name = f"vm_{aDomUNATHostname}_lock"
+        _nft_cmd = "/usr/sbin/nft"
+        _ruleArgs = ["jump", _vm_chain_lock_name]
+        _handle = ebIpTablesRoCE.mGetNFTRuleHandle(aNode, _ruleArgs)
+        _foundHandle = True if _handle else False
+
+        while _handle:
+            _cmd = f"{_nft_cmd} delete rule bridge filter FORWARD handle {_handle}"
+            node_exec_cmd_check(aNode, _cmd)
+            _handle = ebIpTablesRoCE.mGetNFTRuleHandle(aNode, _ruleArgs)
+
+        # Flush chain if handle was found, otherwise it doesn't have to be done
+        if _foundHandle:
+            _cmd = f"{_nft_cmd} flush chain bridge filter {_vm_chain_lock_name}"
+            node_exec_cmd_check(aNode, _cmd)
+            _cmd = f"{_nft_cmd} delete chain bridge filter {_vm_chain_lock_name}"
+            node_exec_cmd_check(aNode, _cmd)
+
+        # Persist the rules
+        ebIpTablesRoCE.mCommitNFTables(aNode)
+
+        ebLogInfo(f"Successfully unlocked SSH traffic on customer network for VM {aDomUNATHostname} !!!")
 
 
     @staticmethod

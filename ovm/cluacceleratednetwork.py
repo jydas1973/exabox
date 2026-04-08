@@ -1,10 +1,10 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/ovm/cluacceleratednetwork.py /main/2 2025/12/01 04:43:08 mpedapro Exp $
+# $Header: ecs/exacloud/exabox/ovm/cluacceleratednetwork.py /main/3 2026/02/21 03:56:44 mpedapro Exp $
 #
 # cluacceleratednetwork.py
 #
-# Copyright (c) 2025, Oracle and/or its affiliates.
+# Copyright (c) 2025, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      cluacceleratednetwork.py - <one-line expansion of the name>
@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    mpedapro    02/03/26 - Enh::38914367 library functions for mtu setting and
+#                           oeda bonding options
 #    mpedapro    11/24/25 - Enh::38602758 add lib functions for sriov
 #    mpedapro    11/12/25 - File to contain changes for sriov feature
 #    mpedapro    11/12/25 - Creation
@@ -28,6 +30,9 @@ from exabox.utils.node import (
     node_exec_cmd, node_exec_cmd_check, node_update_key_val_file,
     node_write_text_file, node_read_text_file
 )
+import ipaddress
+import textwrap
+
 #Constants
 NETWORK_VIRTUALIZATION_XML_KEY = 'network_virtualization'
 ACCELERATED_NETWORK_SUPPORT_EXABOX_PARAM = 'accelerated_network_support'
@@ -39,6 +44,8 @@ NETWORK_VIRTUALIZATION_POSSIBLE_XML_KEYVALUEMAP = {
 }
 CLIENT_NETWORK_KEY = 'client'
 BACKUP_NETWORK_KEY = 'backup'
+CLIENT_ACCELERATED_NETWORK_SLAVES_DOMU_MASTER = 'eth1 eth2'
+BACKUP_ACCELERATED_NETWORK_SLAVES_DOMU_MASTER = 'eth3 eth4'
 
 class ebCluAcceleratedNetwork():
 
@@ -75,62 +82,66 @@ class ebCluAcceleratedNetwork():
             raise ExacloudRuntimeError(0x0740, 0xA, detailedError)
 
     @staticmethod
-    def addAcceleratedNetworkOedaAction(ebCluControlObj, netId, dom0Name, domuName, networkVirtualizationValue="virtio", listToAddOedaAction=[]):
-        if ebCluAcceleratedNetwork.checkInputAndValidateEnvForAcceleratedNetwork(ebCluControlObj, dom0Name, domuName, networkVirtualizationValue):
+    def addAcceleratedNetworkOedaAction(ebCluControlObj, netId, ipv6Gateway, dom0Name, domuId, networkVirtualizationValue="virtio", listToAddOedaAction=[]):
+        if ebCluAcceleratedNetwork.checkInputAndValidateEnvForAcceleratedNetwork(ebCluControlObj, dom0Name, domuId, networkVirtualizationValue):
             ebLogInfo('** Setting ACCELERATEDNETWORK property for network **' + netId + '**to value** ENABLED')
             propertiesToUpdate = {"ACCELERATEDNETWORK": 'ENABLED'}
-            '''
-            OEDA is yet to support below bonding_opts argument. Once it supports will uncomment and test this code.
-
-            hostName = ebCluControlObj.mGetNetworks().mGetNetworkConfig(netId).mGetNetHostName()
-            gatewayIp = ebCluControlObj.mGetNetworks().mGetNetworkConfig(netId).mGetNetGateWay()
-            slaves = ebCluControlObj.mGetNetworks().mGetNetworkConfig(netId).mGetNetSlave()
-            propertiesToUpdate["BONDING_OPTS"] = ebCluAcceleratedNetwork.getBondingOptions(ebCluControlObj, gatewayIp, slaves, hostName)
-            '''
+            if ebCluControlObj.mGetNetworks().mGetNetworkConfig(netId).mGetNetType() == "backup":
+                propertiesToUpdate["slave"] = ebCluAcceleratedNetwork.getAcceleratedNetworkSlavesForDomuMaster("backup")
             _cmd = [
                 "ALTER NETWORK",
                 propertiesToUpdate,
                 {"ID": netId}
             ]
             listToAddOedaAction.append(_cmd)
+            ebCluAcceleratedNetwork.addBondingConfigOedaAction(ebCluControlObj, netId, ipv6Gateway, dom0Name, domuId, networkVirtualizationValue, listToAddOedaAction)
         return listToAddOedaAction
 
     @staticmethod
-    def getBondingOptions(ebCluControlObj, gateWayIp, slaves, hostName, mode='active-backup', fail_over_mac='1', num_grat_arp='8',
-                          arp_interval='1000', primary_reselect='failure', arp_allslaves='1'):
+    def getBondingOptions(ebCluControlObj, gateWayIp, ipv6GatewayIp, slaves, domuId, mode='active-backup', fail_over_mac='0', num_grat_arp='8',arp_interval='1000', primary_reselect='failure', arp_allslaves='0'):
         preferredSlave = 'eth1'
         if slaves is not None:
-            preferredSlave = slaves.split(' ')[0]
-        elif hostName is not None:
+            preferredSlave = slaves.split()[0]
+        elif domuId is not None:
+            hostName = ebCluControlObj.mGetMachines().mGetMachineConfig(domuId).mGetMacHostName()
             preferredSlave = ebCluControlObj.mGetNetworks().mGetNetworkConfigByName(hostName).mGetNetSlave().split('.')[0]
+        bondOptions = 'mode={0} fail_over_mac={1} arp_interval={2} primary_reselect={3} arp_allslaves={4} primary={5}'.format(mode, fail_over_mac,
+                                                                                               arp_interval, primary_reselect, arp_allslaves,preferredSlave)
+        if ipaddress.ip_address(gateWayIp).version == 4:
+            bondOptions = bondOptions + ' num_grat_arp={0} arp_ip_target={1}'.format(num_grat_arp, gateWayIp)
+        elif ipaddress.ip_address(gateWayIp).version == 6:
+            bondOptions = bondOptions + ' num_unsol_na={0} ns_ip6_target={1}'.format(num_grat_arp, gateWayIp)
 
-        return 'mode={0} fail_over_mac={1} num_grat_arp={2} arp_interval={3} primary_reselect={4} arp_allslaves={5} arp_ip_target={6} primary={7}'.format(mode, fail_over_mac, num_grat_arp,
-                                                                                               arp_interval, primary_reselect, arp_allslaves,
-                                                                                               gateWayIp, preferredSlave)
+        #For only dual stack ipv6GatewayIp will have to gateway ipv6 address. For single stack, it is None.
+        if ipv6GatewayIp is not None and ipaddress.ip_address(ipv6GatewayIp).version == 6:
+            bondOptions = bondOptions + ' num_unsol_na={0} ns_ip6_target={1}'.format(num_grat_arp, ipv6GatewayIp)
+
+        return bondOptions
 
     @staticmethod
-    def addBondingConfigOedaAction(ebCluControlObj, netId, dom0Name, domuName, networkVirtualizationValue="virtio", listToAddOedaAction=[]):
-        if ebCluAcceleratedNetwork.checkInputAndValidateEnvForAcceleratedNetwork(ebCluControlObj, dom0Name, domuName, networkVirtualizationValue):
-            ebLogInfo('** Setting Bonding configuration for for network **' + netId + '**to value**' + "")
+    def addBondingConfigOedaAction(ebCluControlObj, netId, ipv6Gateway, dom0Name, domuId, networkVirtualizationValue="virtio", listToAddOedaAction=[]):
+        if ebCluAcceleratedNetwork.checkInputAndValidateEnvForAcceleratedNetwork(ebCluControlObj, dom0Name, domuId, networkVirtualizationValue):
             gatewayIp = ebCluControlObj.mGetNetworks().mGetNetworkConfig(netId).mGetNetGateWay()
-            slaves = ebCluControlObj.mGetNetworks().mGetNetworkConfig(netId).mGetNetSlave()
-            hostName = ebCluControlObj.mGetNetworks().mGetNetworkConfig(netId).mGetNetHostName()
+            hostName = ebCluControlObj.mGetMachines().mGetMachineConfig(domuId).mGetMacHostName()
+            networkType = ebCluControlObj.mGetNetworks().mGetNetworkConfig(netId).mGetNetType()
+            slaves = ebCluAcceleratedNetwork.getAcceleratedNetworkSlavesForDomuMaster(networkType)
+            ebLogInfo('** Setting Bonding configuration for for network **' + netId + '**to value**' + ebCluAcceleratedNetwork.getBondingOptions(ebCluControlObj, gatewayIp, ipv6Gateway, slaves, hostName))
             _cmd = [
                 "ALTER NETWORK",
-                {"BONDING_OPTS": ebCluAcceleratedNetwork.getBondingOptions(ebCluControlObj, gatewayIp, slaves, hostName)},
-                {"ID": netId}
+                {"BONDING_OPTS": ebCluAcceleratedNetwork.getBondingOptions(ebCluControlObj, gatewayIp, ipv6Gateway, slaves, hostName)},
+                {"HOSTNAME": hostName, "networktype": networkType}
             ]
             listToAddOedaAction.append(_cmd)
         return listToAddOedaAction
 
     @staticmethod
-    def checkInputAndValidateEnvForAcceleratedNetwork(ebCluControlObj, dom0Name, domuName, networkVirtualizationValue="virtio"):
+    def checkInputAndValidateEnvForAcceleratedNetwork(ebCluControlObj, dom0Name, domuId, networkVirtualizationValue="virtio"):
         if networkVirtualizationValue is None or networkVirtualizationValue == 'UNDEFINED' or networkVirtualizationValue.lower() == NETWORK_VIRTUALIZATION_POSSIBLE_XML_KEYVALUEMAP[VIRTIO]:
-            ebLogInfo("No need to enable accelerated network for domu :: " + domuName)
+            ebLogInfo("No need to enable accelerated network for domu :: " + domuId)
             return False
         elif networkVirtualizationValue is not None and networkVirtualizationValue.lower() == NETWORK_VIRTUALIZATION_POSSIBLE_XML_KEYVALUEMAP.get(SRIOV):
             ebCluAcceleratedNetwork.validateEnvForacceletedNetworkFeature(ebCluControlObj, dom0Name)
-            ebLogInfo("Accelerated network option can be enabled for domu :: " + domuName)
+            ebLogInfo("Accelerated network option can be enabled for domu :: " + domuId)
             return True
         else:
             detailedError = 'Invalid network_virtualization value in payload. It should be one of ' + str(NETWORK_VIRTUALIZATION_POSSIBLE_XML_KEYVALUEMAP.keys())
@@ -156,34 +167,28 @@ class ebCluAcceleratedNetwork():
            return False
 
     @staticmethod
-    def isDom0InterfaceEnabledWithSwitchDevMode(node, interfaceName):
+    def isDom0InterfaceEnabledWithSwitchDevMode(node, vFinterfaceName):
         """
-            Returns True if the given interface is in switchdev mode using devlink,
+            Returns True if the given interface is virtual function and it's pf is in switch dev mode,
             otherwise returns False.
         """
-        # Step 1: find PCI address for the interface
+        pciAddr = None
         try:
-            pciAddr = None
-            binCatAbsPath = node_cmd_abs_path_check(node, "cat", sbin=False)
-            ueventPathCmd = f'{binCatAbsPath} /sys/class/net/{interfaceName}/device/uevent'
-            retObj = node_exec_cmd(node, ueventPathCmd, True, True, True, False, None)
+            binReadLinkAbsPath = node_cmd_abs_path_check(node, "readlink", sbin=False)
+            readLinkCmd = f'{binReadLinkAbsPath} /sys/class/net/{vFinterfaceName}/device/physfn'
+            retObj = node_exec_cmd(node, readLinkCmd, True, True, True, False, None)
             if retObj.exit_code != 0:
+                ebLogWarn("Given interface :: " + vFinterfaceName + " in dom0 :: " + node.mGetHostname() + " is not virtual function.")
                 return False
-            ebLogInfo('Ouput of ' + ueventPathCmd + ' :: ' + retObj.stdout)
-            outputLines = retObj.stdout.splitlines()
-            for line in outputLines:
-                if line.startswith("PCI_SLOT_NAME="):
-                    pciAddr = line.strip().split("=", 1)[1]
-                    break
+            #Get the physical function pci address from output.
+            pciAddr = retObj.stdout.strip().split("/")[-1]
+            if not pciAddr:
+                ebLogWarn('Could not get PCI_SLOT_NAME from the out of ' + readLinkCmd + ' :: ' + retObj.stdout)
+                return False
         except Exception as e:
             ebLogWarn('Exception occurred while getting PCI_SLOT_NAME. Exception :: '+ str(e))
             return False
-
-        if not pciAddr:
-            ebLogWarn('Could not get PCI_SLOT_NAME from the out of ' + ueventPathCmd + ' :: ' + retObj.stdout)
-            return False
-
-        # Step 2: run devlink
+        # Step 2: run devlink command to check whether pf pciAddr is in switch dev mode or not.
         try:
             binDevlinkAbsPath = node_cmd_abs_path_check(node, "devlink", sbin=True)
             devlinkCmd = f'{binDevlinkAbsPath} dev eswitch show pci/{pciAddr}'
@@ -226,13 +231,64 @@ class ebCluAcceleratedNetwork():
             ebLogWarn('Exception occurred while getting virtual fn associated with physical fn. Exception :: ' + str(e))
             return None
 
+    @staticmethod
+    def createIfcfgPfFile(node, interfaceName, filePath):
+        '''
+        As per suggestion from exadata team, we can create this file with below template.
+        cat /etc/sysconfig/network-scripts/ifcfg-eth1pf
+        #### DO NOT REMOVE THESE LINES ####
+        #### %GENERATED BY CELL% ####
+        DEVICE=eth1pf
+        TYPE=Ethernet
+        USERCTL=no
+        ONBOOT=yes
+        BOOTPROTO=none
+        HOTPLUG=no
+        IPV6INIT=no
+        NM_CONTROLLED=no
+        '''
+        data = textwrap.dedent("""\
+            DEVICE={interfaceName}
+            TYPE=Ethernet
+            USERCTL=no
+            ONBOOT=yes
+            BOOTPROTO=none
+            MTU=9000
+            HOTPLUG=no
+            IPV6INIT=no
+            NM_CONTROLLED=no
+            """).format(interfaceName=interfaceName)
+        ebLogInfo('Creating ' + filePath + ' with data :: ' + data)
+        node_write_text_file(node, filePath, data)
 
+    @staticmethod
+    def setMtuForPhysicalFunction(node, virtualFunctionName):
+        try:
+            #Check if dom0 is enabled in switch dev mode for
+            if ebCluAcceleratedNetwork.isDom0InterfaceEnabledWithSwitchDevMode(node, virtualFunctionName):
+                pfName = virtualFunctionName + "pf"
+                ebLogInfo('Physical function for :: ' + virtualFunctionName + ' is :: ' + pfName)
+                #Set MTU runtime with ip link set command.
+                ipLinkAbsPath = node_cmd_abs_path_check(node, "ip", sbin=True)
+                mtuSetCmd = f'{ipLinkAbsPath} link set dev {pfName} mtu 9000'
+                node_exec_cmd(node, mtuSetCmd, True, True, True, False, None)
+                #Set MTU in persistent setting.
+                ifcfgFilePath = f'/etc/sysconfig/network-scripts/ifcfg-{pfName}'
+                mtuMap = { "MTU": "9000" }
+                if node.mFileExists(ifcfgFilePath):
+                    node_update_key_val_file(node, ifcfgFilePath, mtuMap)
+                else:
+                    ebLogInfo('ifcfg file :: ' + ifcfgFilePath + ' is not present. Creating..')
+                    ebCluAcceleratedNetwork.createIfcfgPfFile(node, pfName, ifcfgFilePath)
+        except Exception as e:
+            ebLogWarn('Exception occurred while setting MTU for physical function of virtual function ' + virtualFunctionName + '. Exception :: ' + str(e))
+            return False
+        return True
 
-
-
-
-
-
-
-
-
+    @staticmethod
+    def getAcceleratedNetworkSlavesForDomuMaster(networkType="client"):
+        if networkType == CLIENT_NETWORK_KEY:
+            return CLIENT_ACCELERATED_NETWORK_SLAVES_DOMU_MASTER
+        elif networkType == BACKUP_NETWORK_KEY:
+            return BACKUP_ACCELERATED_NETWORK_SLAVES_DOMU_MASTER
+        return None

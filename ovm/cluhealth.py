@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     OVM - Healthcheck functionality
@@ -12,6 +12,7 @@ NOTE:
 
 History:
     MODIFIED (MM/DD/YY)
+    scoral    03/31/26 - Bug 39147565 - Fix ipconf.pl path for multi-platform support.
     aypaul    07/10/25 - Bug#38161432 Support multiprocessing update for shared
                          dictionary.
     aararora  05/28/25 - Bug 37981919: cellcli alerthistory command output is
@@ -2334,7 +2335,7 @@ class ebCluHealthCheck(object):
             _testResult = "Fail"
             _loglist = []
 
-            _cmd_str = '/usr/local/bin/ipconf.pl -nocodes -conf /opt/oracle.cellos/cell.conf -check-consistency -semantic -at-runtime'
+            _cmd_str = '/opt/oracle.cellos/ipconf.pl -nocodes -conf /opt/oracle.cellos/cell.conf -check-consistency -semantic -at-runtime'
             _i, _o, _e = _node.mExecuteCmd(_cmd_str, aTimeout=180)
             _out = _o.readlines()
             if _out:
@@ -2350,7 +2351,7 @@ class ebCluHealthCheck(object):
                 ebLogInfo("ERROR: Network consistency check failed on %s" %(_host))
                 _recommend.append("ERROR: Network consistency check failed on %s" %(_host))
                 _dictLen = len(_jsonMap['Cluster']['hostCheck'][_host]['logs']['network'])
-                _jsonMap['Cluster']['hostCheck'][_host]['logs']['network'][_dictLen] = "Failure running /usr/local/bin/ipconf.pl -nocodes -conf /opt/oracle.cellos/cell.conf -check-consistency -semantic -at-runtime"
+                _jsonMap['Cluster']['hostCheck'][_host]['logs']['network'][_dictLen] = "Failure running /opt/oracle.cellos/ipconf.pl -nocodes -conf /opt/oracle.cellos/cell.conf -check-consistency -semantic -at-runtime"
                 self.mUpdateJSON(['Cluster', 'hostCheck', _host, 'logs'], 'Fail', '0104010022', _recommend[-1])
             else:
                 self.mUpdateJSON(['Cluster', 'hostCheck', _host, 'logs'], 'Pass', '0104010022')

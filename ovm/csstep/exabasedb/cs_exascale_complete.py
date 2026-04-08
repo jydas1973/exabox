@@ -1,10 +1,11 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/ovm/csstep/exabasedb/cs_exascale_complete.py /main/2 2025/11/26 16:56:00 prsshukl Exp $
+# $Header: ecs/exacloud/exabox/ovm/csstep/exabasedb/cs_exascale_complete.py /main/4 2026/01/02 04:46:45 naps Exp $
+# $Header: ecs/exacloud/exabox/ovm/csstep/exabasedb/cs_exascale_complete.py /main/4 2026/01/02 04:46:45 naps Exp $
 #
 # cs_exascale_complete.py
 #
-# Copyright (c) 2025, Oracle and/or its affiliates.
+# Copyright (c) 2025, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      cs_exascale_complete.py - <one-line expansion of the name>
@@ -16,6 +17,11 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    aararora    03/20/26 - 39106054: Install Falcon agent during postginid
+#    naps        12/19/25 - Bug 38746264 - call secure_vms for basedb and
+#                           exacompute.
+#    naps        12/16/25 - Bug 38769320 - Disable password expiration for
+#                           basedb and exacompute.
 #    prsshukl    11/26/25 - Bug 38694263 - EXACOMPUTE:EXACLOUD:
 #                           EXASCALE_COMPLETE FAILED IN R1 COPYING WEBLOGIC
 #                           CERT
@@ -50,6 +56,7 @@ from exabox.ovm.cluexascale import ebCluExaScale
 from exabox.exakms.ExaKmsEntry import ExaKmsHostType
 from exabox.ovm.bom_manager import ImageBOM
 from exabox.utils.ExaRegion import is_r1_region
+from exabox.ovm.utils.clu_utils import ebCluUtils
 
 # This class implements doExecute and undoExecute functions
 # for the ESTP_EXASCALE_COMPLETE step of create service
@@ -158,6 +165,11 @@ class csExaScaleComplete(CSBase):
                 _nosql.mRunInstall()
                 ebox.mLogStepElapsedTime(_step_time, 'nosql install')
 
+            _clu_utils = ebCluUtils(ebox)
+
+            _falcon_domus = [domu for _, domu in ebox.mReturnDom0DomUPair()]
+            _clu_utils.mInstallFalconAgentOnDomus(_falcon_domus, "Create Service")
+
         # Reset SSH Cluster Keys
         if not imageBom.mIsSubStepExecuted(self.step, "SSH_KEY_MANAGEMENT"):
             _step_time = time.time()
@@ -259,9 +271,15 @@ class csExaScaleComplete(CSBase):
 
                 ebox.mSingleDomURestart(_dom0,_domU,aOptions) 
             """
+        ebox.mDisablePasswordExpiration()
 
-        ebLogInfo('*** Exacloud Operation Successful : POST GI Install')
-        ebLogInfo('csExaScaleComplete: Completed doExecute Successfully')
+        # Remove DomU Access
+        if ebox.mGetCmd() == "createservice" and aOptions and aOptions.jsonconf and \
+           "delete_domu_keys" in aOptions.jsonconf and \
+           aOptions.jsonconf['delete_domu_keys'].lower() == "true":
+            ebox.mHandlerRemoveDomUsKeys()
+
+        ebLogInfo('*** csExaScaleComplete: Completed doExecute Successfully')
 
   
     def undoExecute(self, aExaBoxCluCtrlObj, aOptions, _steplist):

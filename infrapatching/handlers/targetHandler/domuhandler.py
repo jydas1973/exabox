@@ -1,9 +1,9 @@
 #
-# $Header: ecs/exacloud/exabox/infrapatching/handlers/targetHandler/domuhandler.py /main/118 2025/11/28 06:57:28 araghave Exp $
+# $Header: ecs/exacloud/exabox/infrapatching/handlers/targetHandler/domuhandler.py araghave_bug-38891325/1 2026/02/16 06:10:02 araghave Exp $
 #
 # domuhandler.py
 #
-# Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      domuhandler.py - Patch - DomU Basic Functionality
@@ -16,6 +16,11 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    araghave    02/19/26 - Bug 38766026 - FAIL DOMU PATCHING IN CASE OF A
+#                           VERSION VALIDATION FAILURE
+#    araghave    02/12/26 - Bug 38891325 - OCI: EXACS | SMR | SMR APPLY IS
+#                           SHOWING INCORRECT TARGET VERSION , WHILE APPLYING
+#                           CORRECT VERSION
 #    araghave    11/13/25 - Bug 38651311 - REPLACE FULLCVSS ELU OPTION WITH
 #                           FULL IN DOMU ELU INFRA PATCHING CODE
 #    araghave    09/11/25  - Enh 38173247 - EXACLOUD CHANGES TO SUPPORT DOMU
@@ -1580,6 +1585,34 @@ class DomUHandler(TargetHandler):
                     self.mAddError(_ret, _suggestion_msg)
                     return _ret, _no_action_taken
 
+            '''
+             ELU behavior adjustments:
+             - For applypending, always send the node list to the 
+               patchmgr to finish any pending work.
+             - If a request expands ELU scope for the same version, 
+               don’t mark nodes as up-to-date—include them again so 
+               the wider update is applied.
+            '''
+            if self.mIsElu() and len(_list_of_nodes) == 0 and len(_discarded) == 1 and self.mGetEluOptions():
+                try:
+                    _domu = _discarded[0]
+                    _rc, _current_qmr, _elu_info, _ = self.mGetExadataLiveUpdateDetails(_domu)
+                    if (_rc == PATCH_SUCCESS_EXIT_CODE and _elu_info and _elu_info.get('elu_version') and str(_elu_info.get('elu_version')) == str(self.mGetTargetVersion())):
+                        _applied   = str(_elu_info.get('elu_type') or '').lower()
+                        _requested = self.mGetEluOptions().lower()
+                        _allowed   = {
+                          'high'    : ['allcvss', 'full', 'applypending'],
+                          'highcvss': ['allcvss', 'full', 'applypending'],
+                          'all'     : ['full', 'applypending'],
+                          'allcvss' : ['full', 'applypending'],
+                        }
+                        if _applied in _allowed and _requested in _allowed[_applied]:
+                            self.mPatchLogInfo(f"ELU same-version option migration detected ({_applied} -> {_requested}, re-adding {_domu} to node list for ELU handling.")
+                            _list_of_nodes = [_domu]
+                            _discarded = []
+                except Exception:
+                    self.mPatchLogTrace(traceback.format_exc())
+
             #2. Check for idempotency
             if len(_discarded) > 0:
                 _ret, _no_action_taken = self.mCheckIdemPotency(_discarded)
@@ -2416,11 +2449,21 @@ class DomUHandler(TargetHandler):
             self.mCleanSSHEnvSetUp(aSingleVmHandler=self.mGetSingleVMHandler())
             return _ret, _no_action_taken
 
-
-    # Sets the base envrionment for all tasks in domu
     def mSetEnvironment(self):
+        '''
+         Sets the base envrionment for all tasks in domu
+        '''
         #Sets all the variables used to select the domu that will run the patchmgr.
         _ret = PATCH_SUCCESS_EXIT_CODE
+
+        # Picks the latest dbserver patch zip from the available patches under PatchPayloads.
+        _dbzip_file, _msg = self.mResolveDbserverPatchZip()
+        if _dbzip_file and self.mGetDom0DomUPatchZipFile():
+            _patch_list = list(self.mGetDom0DomUPatchZipFile())
+            if len(_patch_list) >= 1:
+                _patch_list[0] = _dbzip_file
+                self.mPatchLogInfo("DomU dbserver.patch.zip resolved during mSetEnvironment: " + str(_dbzip_file) + " (" + str(_msg) + ")")
+                self.__domu_local_patch_zip = _patch_list[0]
 
         if self.mGetInfrapatchExecutionValidator().mCheckCondition('mIsSingleDomUVMCluster'):
             self.__single_vm_handler = SingleVMHandler(is_exacc = self.mIsExaCC())
@@ -3115,9 +3158,9 @@ class DomUHandler(TargetHandler):
 
             if self.mIsElu() and self.mGetEluOptions() == "applypending":
                  # Patching must fail in case of mGetExadataLiveUpdateDetails returns True.
-                 _outstanding_work_apply_flag = False
-                 _, _, _, _outstanding_work_apply_flag = self.mGetExadataLiveUpdateDetails(aDomU)
-                 if _outstanding_work_apply_flag:
+                 _is_elu_apply_eligible = False
+                 _, _, _, _is_elu_apply_eligible = self.mGetExadataLiveUpdateDetails(aDomU)
+                 if _is_elu_apply_eligible:
                      _ret = ELU_OUTSTANDING_WORK_APPLY_FAILURE
                      _suggestion_msg = f"Apply outstanding work items not applied after an elu upgrade with applypending was performed on {aDomU}."
                      self.mAddError(_ret, _suggestion_msg)
@@ -3125,7 +3168,7 @@ class DomUHandler(TargetHandler):
                      self.mPatchLogInfo(f"Apply outstanding work items based ELU upgrade successful on {aDomU}.")
             elif aRollback:
                 if self.mGetCluPatchCheck().mCheckTargetVersion(
-                        aDomU, PATCH_DOMU, aPrePatchVersion, aDomUPostCheck=True) >= 0:
+                        aDomU, PATCH_DOMU, aPrePatchVersion, aDomUPostCheck=True) > 0:
                     _ret = DOMU_VERSION_LOWER_THAN_EXPECTED_VERSION
                     _suggestion_msg = f"VM rollback was requested but the version seems to be unchanged, found version {aPrePatchVersion}, expected to be lower than {_current_domu_version}."
                     self.mAddError(_ret, _suggestion_msg)
@@ -3140,6 +3183,14 @@ class DomUHandler(TargetHandler):
                 _ret = DOMU_VERSION_NOT_AT_EXPECTED_VERSION
                 _suggestion_msg = f"VM is not at the requested upgrade version {aPrePatchVersion}, found version {_current_domu_version}."
                 self.mAddError(_ret, _suggestion_msg)
+
+            '''
+             In case of above postchecks related to version validation fails, CRS checks
+             must not be performed and patching must fail.
+            '''
+            if _ret != PATCH_SUCCESS_EXIT_CODE:
+                self.mPatchLogError(f"Errors were reported as part of DomU version validations and other postchecks will not be performed. Return Code - {_ret}")
+                return _ret
 
             '''
              Perform CRS and Sanity checks post patching only in case 
@@ -3158,7 +3209,7 @@ class DomUHandler(TargetHandler):
              during rollback.
             '''
             if (self.mGetTask() in [ TASK_PATCH ] and self.mGetEluOptions() and self.mGetEluOptions().lower() in [ "highcvss", "allcvss", "full" ]):
-                self.mPatchLogInfo(f"Skip CRS checks when there is ELU patch applied with elu options - highcvss, allvcss, full - passed.")
+                self.mPatchLogInfo(f"Skip CRS checks when there is ELU patch applied with elu options - highcvss, allcvss, full - passed.")
             else:
                 _ret = self.mGetCRSHelper().mCheckandRestartCRSonDomU(aDomU)
                 # If CRS is running, validate if all the dbs are back up or not(DB healthchecks should not be run in autonomous vm cluster)
@@ -3170,7 +3221,7 @@ class DomUHandler(TargetHandler):
             # Checks will be performed during an ELU rollback as self.mGetEluOptions() is not passed
             # during rollback.
             if (self.mGetTask() in [TASK_PATCH] and self.mGetEluOptions() and self.mGetEluOptions().lower() in [ "highcvss", "allcvss", "full" ]):
-                self.mPatchLogInfo(f"Skip CRS checks when there is ELU patch applied with elu options - highcvss, allvcss, full - passed.")
+                self.mPatchLogInfo(f"Skip CRS checks when there is ELU patch applied with elu options - highcvss, allcvss, full - passed.")
             else:
                 _ret = self.mGetCRSHelper().mCheckandRestartCRSonDomU(aDomU)
                 if _ret in [ DOMU_INVALID_CRS_HOME, CRS_COMMAND_EXCEPTION_ENCOUNTERED ]:
@@ -3395,7 +3446,7 @@ class DomUHandler(TargetHandler):
                 # Checks will be performed during an ELU rollback as self.mGetEluOptions() is not passed
                 # during rollback.
                 if (self.mGetTask() in [TASK_PATCH] and self.mGetEluOptions() and self.mGetEluOptions().lower() in [ "highcvss", "allcvss", "full" ]):
-                    self.mPatchLogInfo(f"Skip CRS checks when there is ELU patch applied with elu options - highcvss, allvcss, full - passed.")
+                    self.mPatchLogInfo(f"Skip CRS checks when there is ELU patch applied with elu options - highcvss, allcvss, full - passed.")
                 else:
                     _rc = self.mGetCRSHelper().mCheckandRestartCRSonAllDomUWithinCluster(aListOfEluNodes=aListOfEluNodes)
                     if _rc != PATCH_SUCCESS_EXIT_CODE:
@@ -3587,9 +3638,9 @@ class DomUHandler(TargetHandler):
 
                     # Apply outstanding Items post DomU upgrade.
                     if self.mGetTask() in [ TASK_PATCH ] and self.mIsElu() and self.mGetTask() in [ TASK_PATCH ] and self.mGetEluOptions() and self.mGetEluOptions().lower() == "applypending":
-                        _outstanding_work_apply_flag = False
-                        _, _, _, _outstanding_work_apply_flag = self.mGetExadataLiveUpdateDetails(_node_to_patch)
-                        if _outstanding_work_apply_flag:
+                        _is_elu_apply_eligible = False
+                        _, _, _, _is_elu_apply_eligible = self.mGetExadataLiveUpdateDetails(_node_to_patch)
+                        if _is_elu_apply_eligible:
                             _patch_apply_outstanding_work_cmd = None
                             # prepare the patchmgr command for execution using the PatchManager object
                             # to apply outstanding work items during elu patch.
@@ -3925,7 +3976,7 @@ class DomUHandler(TargetHandler):
                     # Checks will be performed during an ELU rollback as self.mGetEluOptions() is not passed
                     # during rollback.
                     if (self.mGetTask() in [TASK_PATCH] and self.mGetEluOptions() and self.mGetEluOptions().lower() in [ "highcvss", "allcvss", "full" ]):
-                        self.mPatchLogInfo(f"Skip CRS checks when there is ELU patch applied with elu options - highcvss, allvcss, full - passed.")
+                        self.mPatchLogInfo(f"Skip CRS checks when there is ELU patch applied with elu options - highcvss, allcvss, full - passed.")
                     else:
                         _rc = self.mGetCRSHelper().mCheckandRestartCRSonAllDomUWithinCluster(aListOfEluNodes=aListOfEluNodes)
                         if _rc in [ DOMU_INVALID_CRS_HOME, CRS_COMMAND_EXCEPTION_ENCOUNTERED, DOMU_CRS_SERVICES_DOWN ]:
@@ -4076,9 +4127,9 @@ class DomUHandler(TargetHandler):
 
                     # Apply outstanding Items post DomU upgrade.
                     if self.mGetTask() in [ TASK_PATCH ] and self.mIsElu() and self.mGetTask() in [ TASK_PATCH ] and self.mGetEluOptions() and self.mGetEluOptions().lower() == "applypending":
-                        _outstanding_work_apply_flag = False
-                        _, _, _, _outstanding_work_apply_flag = self.mGetExadataLiveUpdateDetails(_node_patch_list[0]) 
-                        if _outstanding_work_apply_flag:
+                        _is_elu_apply_eligible = False
+                        _, _, _, _is_elu_apply_eligible = self.mGetExadataLiveUpdateDetails(_node_patch_list[0]) 
+                        if _is_elu_apply_eligible:
                             _patch_apply_outstanding_work_cmd = None
                             # prepare the patchmgr command for execution using the PatchManager object
                             # to apply outstanding work items during elu patch.

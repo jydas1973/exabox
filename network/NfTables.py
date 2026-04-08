@@ -1,6 +1,6 @@
 """$Header:
 
- Copyright (c) 2014, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     NfTables class
@@ -164,7 +164,9 @@ class NfTables:
         jsonConfig = self.convertConfigToJson(nftConfig)
         ebLogInfo(json.dumps(jsonConfig, indent = 4))
         for cfg in jsonConfig:
-            resultCommands += self.convertJsonConfigToCmd(cfg)
+            command = self.convertJsonConfigToCmd(cfg)
+            if command:
+                resultCommands.append(command)
         ebLogInfo(json.dumps(jsonConfig, indent = 4))
         return resultCommands
 

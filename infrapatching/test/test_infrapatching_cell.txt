@@ -1,9 +1,9 @@
 #
-# $Header: ecs/exacloud/exabox/infrapatching/test/test_infrapatching_cell.txt /main/39 2025/12/04 04:10:46 araghave Exp $
+# $Header: ecs/exacloud/exabox/infrapatching/test/test_infrapatching_cell.txt mirrodri_bug-38736476/4 2026/02/26 23:07:05 mirrodri Exp $
 #
 # test_infrapatching_cell.py
 #
-# Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      test_infrapatching_cell.py - Unit test case script for all cell operations.
@@ -15,6 +15,13 @@
 #      Unit test case script for all cell operations.
 #
 #    MODIFIED   (MM/DD/YY)
+#    mirrodri    03/27/26 - Bug 39121841 CELL_PATCH_PREREQ_CHECK_EXACLOUD
+#                           _THREAD_LOG_SPACE_CHECK TEST FAILED WITH 
+#                           KeyError: 'errorCode'
+#    sdevasek    01/06/26 - Enh 38854805 - USE DELETE API TO USE QUERY PARAMS
+#    mirrodri    02/01/25 - Bug 38736476 -CELL_PATCH_PREREQ_CHECK_EXACLOUD_
+#                           THREAD_LOG_SPACE_CHECK TEST CAUSES EXABOX.CONF 
+#                           CORRUPTION, RESULTING IN EXACLOUD STARTUP FAILURE 
 #    araghave    10/03/25 - Enhancement Request 38444755 - INFRAPATCHING TEST
 #                           AUTOMATION - TEST ADDITION TO PERFORM DOMU ELU
 #                           PATCH OPERATIONS
@@ -107,6 +114,9 @@
 #    araghave    05/27/21 - Enh 32929805 - INFRA PATCHING TEST FRAMEWORK
 #    rkhemcha    08/28/20 - Creation
 #
+
+import json
+import time
 
 import pytest
 import unittest
@@ -287,7 +297,7 @@ class Test_cell_class(unittest.TestCase):
         _scrip_alias = "script_%s_%s" % (PATCH_CELL, ONEOFF_PLUGIN)
         plugin_meta_data_handler = InfrapatchPluginMetadataHandler()
         _data = '{"ScriptName": "%s.sh", "ScriptAlias": "%s", "ChangeRequestID": "CRID-4567", "Description": ' \
-                '"sample", "PluginType": "%s", "PluginTarget": "%s", "FailOnError":"Yes"}' % (
+                '"sample", "PluginType": "%s", "PluginTarget": "%s", "FailOnError":"Yes", "ScriptBundleHash":"dummy-hash"}' % (
                     _scrip_alias,
                     _scrip_alias, ONEOFF_PLUGIN,
                     PATCH_CELL)
@@ -296,18 +306,26 @@ class Test_cell_class(unittest.TestCase):
         _result, _status_output = mExecuteInfraPatchCommandWithDCSAgentChecks(TASK_ONEOFFV2, PATCH_CELL)
         self.assertFalse(_result, "Oneoffv2 operation should have failed.")
 
-        # step3: When IsEnabled is set to No, oneoff plugin script should not get executed, execution oneoff fails
-        # since there is no script to execute which is provided as input
+    @pytest.mark.cell_plugin_metadata_delete_query
+    def test_cell_plugin_metadata_delete_with_query_params(self):
         plugin_meta_data_handler = InfrapatchPluginMetadataHandler()
+        _scrip_alias = "script_%s_%s_%d" % (PATCH_CELL, ONEOFF_PLUGIN, int(time.time()))
         _data = '{"ScriptName": "%s.sh", "ScriptAlias": "%s", "ChangeRequestID": "CRID-4567", "Description": ' \
-                '"sample", "PluginType": "%s", "PluginTarget": "%s", "FailOnError":"No","IsEnabled":"No"}' % (
+                '"sample", "PluginType": "%s", "PluginTarget": "%s", "ScriptBundleHash":"dummy-hash"}' % (
                     _scrip_alias,
                     _scrip_alias, ONEOFF_PLUGIN,
                     PATCH_CELL)
-        _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
 
-        _result, _status_output = mExecuteInfraPatchCommandWithDCSAgentChecks(TASK_ONEOFFV2, PATCH_CELL)
-        self.assertFalse(_result, "Oneoffv2 operation should have failed.")
+        _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
+        self.assertEqual(
+            _ret, 0,
+            f"Plugin metadata registration failed for cell delete test: {_out}")
+
+        _ret, _out = plugin_meta_data_handler.mDeleteRegisteredInfrapatchPluginMetadataScriptsByQuery(
+            _scrip_alias, PATCH_CELL, ONEOFF_PLUGIN)
+        self.assertEqual(
+            _ret, 0,
+            f"Plugin metadata deletion via query params failed for cell: {_out}")
 
     @pytest.mark.cell_one_off_v2_plugin_metadata_validator
     def test_cell_one_off_v2_plugin_metadata_validator(self):
@@ -488,7 +506,7 @@ class Test_cell_class(unittest.TestCase):
         Note: If the test fails at any point, ensure that the value of exacloud_patch_working_space_mb in exabox.conf is reverted to 500
               if not already reverted and restart exacloud
         """
-        # variables
+        # variables 
         _exabox_conf = "%s/config/exabox.conf" % mGetExacloudInstallPath()
         _test_location = "%s/exabox/infrapatching/test" % mGetExacloudInstallPath()
 
@@ -497,36 +515,50 @@ class Test_cell_class(unittest.TestCase):
         _current_value, _stat = mExecuteLocal(_get_current_value_cmd)
         self.assertEqual(_stat, 0, "Failed to get value for exacloud_patch_working_space_mb from exabox.conf.")
 
-        # update exacloud_patch_working_space_mb to some higher value in exabox.conf
-        _update_exabox_conf_cmd = "sed -i 's/exacloud_patch_working_space_mb.*/exacloud_patch_working_space_mb\" : \"5000000\",/g' %s" % _exabox_conf
-        _out, _stat = mExecuteLocal(_update_exabox_conf_cmd)
-        self.assertEqual(_stat, 0,"Update of exabox.conf failed.")
+        try:
+            # update exacloud_patch_working_space_mb to some higher value in exabox.conf
+            _update_exabox_conf_cmd = (
+            "sed -i 's/\"exacloud_patch_working_space_mb\"[[:space:]]*:[[:space:]]*\"[^\"]*\",/"
+            "\"exacloud_patch_working_space_mb\" : \"5000000\",/g' %s"
+            ) % _exabox_conf
+            _out, _stat = mExecuteLocal(_update_exabox_conf_cmd)
+            self.assertEqual(_stat, 0, "Update of exabox.conf failed.")
 
-        # restart exacloud
-        mPatchLogInfo("Restarting exacloud in code coverage mode")
-        _restart_exacloud_cmd = "python3 %s/infrapatching_coverage_executor.py --enable_exacloud_agent_in_code_coverage_mode" % _test_location
-        _out, _stat = mExecuteLocal(_restart_exacloud_cmd)
-        mPatchLogInfo(_out)
-        self.assertEqual(_stat, 0,"Restart of exacloud failed.")
+            _verify_updated_line_cmd = "grep exacloud_patch_working_space_mb %s" % _exabox_conf
+            _updated_line, _stat = mExecuteLocal(_verify_updated_line_cmd)
+            mPatchLogInfo("Line in exabox.conf after update: %s" % _updated_line.strip())
 
-        # run precheck
-        _result, _status_output = mExecuteInfraPatchCommand(TASK_PREREQ_CHECK, PATCH_CELL, OP_STYLE_ROLLING)
-        _status_json = json.loads(_status_output)
-        _error_code = _status_json["errorCode"]
+            # restart exacloud
+            mPatchLogInfo("Restarting exacloud in code coverage mode")
+            _restart_exacloud_cmd = ("python3 %s/infrapatching_coverage_executor.py --enable_exacloud_agent_in_code_coverage_mode" % _test_location)
+            _out, _stat = mExecuteLocal(_restart_exacloud_cmd)
+            mPatchLogInfo(_out)
+            self.assertEqual(_stat, 0, "Restart of exacloud failed.")
 
-        # revert back to original value
-        _update_exabox_conf_cmd = "sed -i 's/exacloud_patch_working_space_mb.*/exacloud_patch_working_space_mb\" : \"%s\",/g' %s" % (_current_value, _exabox_conf)
-        _out, _stat = mExecuteLocal(_update_exabox_conf_cmd)
-        self.assertEqual(_stat, 0,"Update of exabox.conf failed.")
+            # run precheck
+            _result, _status_output = mExecuteInfraPatchCommand(TASK_PREREQ_CHECK, PATCH_CELL, OP_STYLE_ROLLING)
+            _status_json = json.loads(_status_output)
+            _error_code = _status_json["errorCode"]
+            if _error_code is None:
+                self.fail("Error code not found in status output")
+        finally:
+            # revert back to original value
+            _restore_exabox_conf_cmd = (
+                "sed -i 's/\"exacloud_patch_working_space_mb\"[[:space:]]*:[[:space:]]*\"[^\"]*\",/"
+                "\"exacloud_patch_working_space_mb\" : \"%s\",/g' %s"
+            ) % (_current_value, _exabox_conf)
+            _out, _stat = mExecuteLocal(_restore_exabox_conf_cmd)
+            self.assertEqual(_stat, 0, "Restoring exabox.conf failed.")
 
-        # restart exacloud
-        mPatchLogInfo("Restarting exacloud in code coverage mode")
-        _out, _stat = mExecuteLocal(_restart_exacloud_cmd)
-        mPatchLogInfo(_out)
-        self.assertEqual(_stat, 0,"Restart of exacloud failed.")
+            _verify_updated_line_cmd = "grep exacloud_patch_working_space_mb %s" % _exabox_conf
+            _updated_line, _stat = mExecuteLocal(_verify_updated_line_cmd)
+            mPatchLogInfo("Line in exabox.conf after cleanup restore: %s" % _updated_line.strip())
 
         # check the exit code
-        self.assertEqual(_error_code, "0x03010009", " cell precheck didn't fail with expected error code.")
+        if _error_code is not None:
+            self.assertEqual(_error_code, "0x03010009", "cell precheck didn't fail with expected error code.")
+        else:
+            self.fail("Error code not found in status output")
 
     @pytest.mark.cell_patch_prereq_check_verify_cmd_timeout
     def test_cell_patch_prereq_check_verify_cmd_timeout(self):

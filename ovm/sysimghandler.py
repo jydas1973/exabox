@@ -1,9 +1,9 @@
 #
-# $Header: ecs/exacloud/exabox/ovm/sysimghandler.py /main/47 2025/12/01 22:37:00 avimonda Exp $
+# $Header: ecs/exacloud/exabox/ovm/sysimghandler.py jesandov_bug-38358445/8 2026/02/09 14:16:04 jesandov Exp $
 #
 # sysimghandler.py
 #
-# Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      sysimghandler.py - System Image Handler
@@ -14,6 +14,10 @@
 #    NOTES
 #
 #    MODIFIED   (MM/DD/YY)
+#    jfsaldan    12/12/25 - Bug 38629562 - PREVENT SGU Y25W44 FAILURES |
+#                           EXASCALE_COMPLETE STEP FAILS IF U02 VG ALREADY
+#                           EXISTS IN DOM0 | LOGIC FOR CLEANUP NOT RUNNING IN
+#                           'EXASCALE' ENVS
 #    avimonda    10/31/25 - Bug 38427813 - Enhance the robustness of image
 #                           checksum validation.
 #    jfsaldan    10/28/25 - Changes by AiDEr
@@ -124,7 +128,7 @@ def getDom0VMImageLocation():
     """
     return __DOM0_VM_IMAGE_LOC
 
-def __getVMImageShellPattern(aIsKvm=False, aIsRtg=False):
+def __getVMImageShellPattern(aIsKvm=False, aIsRtg=False, aIsUefi=False):
     # type: (bool) -> str
     """
     Get VM Image base name shell pattern.
@@ -134,10 +138,13 @@ def __getVMImageShellPattern(aIsKvm=False, aIsRtg=False):
 
     :param bool aIsKvm: Whether return pattern for a KVM image
     :param bool aIsRtg: Whether return pattern for a RTG image
+    :param bool aIsUefi: Whether return pattern for a UEFI image
     :return: The VM Image shell pattern
     :rtype: str
     """
 
+    if aIsUefi:
+        return 'System.first.boot.*.uefi.img'
     if aIsRtg:
         return 'System.first.boot.*.rtg.img'
     elif aIsKvm:
@@ -145,7 +152,7 @@ def __getVMImageShellPattern(aIsKvm=False, aIsRtg=False):
     else:
         return 'System.first.boot.*.img'
 
-def formatVMImageBaseName(aVersion, aIsKvm=False, aIsRtg=False):
+def formatVMImageBaseName(aVersion, aIsKvm=False, aIsRtg=False, aIsUefi=False):
     # type: (str, bool) -> str
     """
     Format the basename non-/KVM VM image for the given version.
@@ -153,15 +160,77 @@ def formatVMImageBaseName(aVersion, aIsKvm=False, aIsRtg=False):
     :param str aVersion: Version of the image
     :param str aIsKvm: Whether a KVM image
     :param str aIsRtg: Whether a RTG image
+    :param str aIsUefi: Whether a UEFI image
     :return: The formated image basename
     :rtype: str
     """
-    if aIsRtg:
+    if aIsUefi:
+        return 'System.first.boot.{}.uefi.img'.format(aVersion)
+    elif aIsRtg:
         return 'System.first.boot.{}.rtg.img'.format(aVersion)
     elif aIsKvm:
         return 'System.first.boot.{}.kvm.img'.format(aVersion)    
     else:
         return 'System.first.boot.{}.img'.format(aVersion)
+
+def mIsUefiImg(aVmImgVerNum:str) -> bool:
+    """
+    aVmImgVerNum: "24.1.0.0.0",
+    """
+    _config_opts = get_gcontext().mGetConfigOptions()
+    _arg_options = get_gcontext().mGetArgsOptions()
+
+    if get_gcontext().mCheckRegEntry("aOptions"):
+        _arg_options = get_gcontext().mGetRegEntry("aOptions")
+
+    def mIsUefiImageSupported(aVmImgVerNumX):
+        if version_compare(aVmImgVerNumX, "25.1") >= 0:
+            ebLogTrace("UEFI is enable in Exadata 25.1+ version or greater")
+            return True
+        else:
+            ebLogTrace("UEFI is disable in Exadata 24.1 version or lower")
+            return False
+
+    # For production we will allow this feature to be enabled based on service
+    # ExaCC
+    if "ociexacc" in _config_opts.keys() \
+        and _config_opts["ociexacc"] == "True" \
+        and "uefi_enabled_exacc" in _config_opts.keys():
+        _config_val = _config_opts["uefi_enabled_exacc"]
+        if str(_config_val).lower() == "false":
+            ebLogTrace("UEFI is disable in ExaCC by exabox.conf parameter")
+
+            if _config_opts["uefi_enforced"].lower() == "true":
+                _msg = f"UEFI image is required in this cluster: {aVmImgVerNum}"
+                raise ExacloudRuntimeError(0x0779, 0xA, _msg)
+
+            return False
+        else:
+            ebLogTrace("UEFI is enable in ExaCC by exabox.conf parameter")
+            return mIsUefiImageSupported(aVmImgVerNum)
+
+    # Exascale
+    if _arg_options is not None and _arg_options.jsonconf is not None and \
+           "storageType" in list(_arg_options.jsonconf.keys()) and \
+           str(_arg_options.jsonconf['storageType'].upper()) == "EXASCALE":
+        if "uefi_enabled_exadbxs" in _config_opts.keys():
+            _config_val = _config_opts["uefi_enabled_exadbxs"]
+            if str(_config_val).lower() == "false":
+                ebLogTrace("UEFI is disable in ExaDB-XS by exabox.conf parameter")
+                return False
+            else:
+                ebLogTrace("UEFI is enable in ExaDB-XS by exabox.conf parameter")
+                return mIsUefiImageSupported(aVmImgVerNum)
+
+    # ExaCS
+    if "uefi_enabled_exacs" in _config_opts.keys():
+        _config_val = _config_opts["uefi_enabled_exacs"]
+        if str(_config_val).lower() == "false":
+            ebLogTrace("UEFI is disable in ExaCS by exabox.conf parameter")
+            return False
+
+    ebLogTrace("UEFI is enable in ExaCS by exabox.conf parameter")
+    return mIsUefiImageSupported(aVmImgVerNum)
 
 def mIsRtgImg(aVmImgVerNum:str) -> bool:
     """
@@ -232,6 +301,7 @@ def __getVMImageInfo(aFile):
       'imgVersion': version of the VM image
       'isKvmImg': whether it is KVM VM image
       'isRtgImg': whether it is RTG VM image (introduced after 24.1)
+      'isUefiImg': whether it is UEFI VM image (introduced after 24.1)
       'isArchive': whether 'filePath' is a compressed VM image
 
     If the file name is not a valid VM image, None is returned.
@@ -245,7 +315,7 @@ def __getVMImageInfo(aFile):
     """
 
     baseName = os.path.basename(aFile)
-    regex = r'^(System\.first\.boot\.((?:\d+\.)*\d+)(\.kvm)?(\.rtg)?\.img)(\.bz2)?$'
+    regex = r'^(System\.first\.boot\.((?:\d+\.)*\d+)(\.kvm)?(\.rtg)?(\.uefi)?\.img)(\.bz2)?$'
     match = re.search(regex, baseName)
 
     if match is not None:
@@ -253,7 +323,8 @@ def __getVMImageInfo(aFile):
         version = match.group(2)
         isKvm = (match.group(3) is not None) 
         isRtg = (match.group(4) is not None)
-        isArchive = (match.group(5) is not None)
+        isUefi = (match.group(5) is not None)
+        isArchive = (match.group(6) is not None)
        
         if isArchive:
             archiveName = baseName
@@ -267,6 +338,7 @@ def __getVMImageInfo(aFile):
                 'imgVersion': version,
                 'isKvmImg': isKvm,
                 'isRtgImg': isRtg,
+                'isUefiImg': isUefi,
                 'isArchive': isArchive}
     else:
         return None  # not a proper VM Image name
@@ -306,7 +378,7 @@ def __getVMImagesInRepo(aImageBaseLocation=None):
                 .format(images, repoDir))
     return images
 
-def getVMImageArchiveInRepo(aVersion, aIsKvm, aIsRtg, aImageBaseLocation=None):
+def getVMImageArchiveInRepo(aVersion, aIsKvm, aIsRtg, aIsUefi, aImageBaseLocation=None):
     # type: (str, bool, Optional[str]) -> Optional[ImageDict]
     """
     Get information of a VM image of a specific version in the repository.
@@ -318,6 +390,7 @@ def getVMImageArchiveInRepo(aVersion, aIsKvm, aIsRtg, aImageBaseLocation=None):
     :param str aVersion: Version of the image to look for
     :param bool aIsKvm: Whether look for KVM images
     :param bool aIsRtg: Whether look for RTG images
+    :param bool aIsUefi: Whether look for UEFI images
     :param str aImageBaseLocation:
         Optional base location for the repository
     :return: The information about the image; None if not found
@@ -334,8 +407,13 @@ def getVMImageArchiveInRepo(aVersion, aIsKvm, aIsRtg, aImageBaseLocation=None):
     # When RTG is validated, by default it is considered KVM
     # but the RTG image file only has RTG prefix (in other words, 
     # kvm.rtg.img does NOT exist). Hence, forcing isKvmImg to be false.
-    if aIsRtg:
+    if aIsUefi:
+        aIsRtg = False
         aIsKvm = False
+
+    else:
+        if aIsRtg:
+            aIsKvm = False
 
     for img in imgInfos:
         ebLogTrace(f'Validating {img} in Local Image Repo')
@@ -343,12 +421,13 @@ def getVMImageArchiveInRepo(aVersion, aIsKvm, aIsRtg, aImageBaseLocation=None):
               and img['imgVersion'] == aVersion
               and img['isKvmImg'] == aIsKvm
               and img['isRtgImg'] == aIsRtg 
+              and img['isUefiImg'] == aIsUefi 
               ):
             ebLogInfo(f'Image Match: {img} in Local Image Repo')
             return img
     else:
         ebLogInfo('No Image Match in Local Image Repo for '
-            f'aVersion:{aVersion} aIsKvm:{aIsKvm} aIsRtg: {aIsRtg}')
+               f'aVersion:{aVersion} aIsKvm:{aIsKvm} aIsRtg:{aIsRtg} aIsUefi:{aIsUefi}')
         return None
 
 def getNewestVMImageArchiveInRepoNodeRecovery(aImageBaseLocation=None):
@@ -472,12 +551,14 @@ def copyVMImageVersionToDom0IfMissing(
     if not aIsKvm: 
         aIsRtg = False
         aForceRtg = False        
+        aIsUefi = False
     else:
+        aIsUefi = mIsUefiImg(aVersion)
         aIsRtg = mIsRtgImg(aVersion)
 
     ebLogInfo('*** Copying VM image to remote Dom0: host={}'
-        ' ver={} kvm={} rtg={} aForceRtg={}'
-        .format(aDom0, aVersion, aIsKvm, aIsRtg, aForceRtg))
+        ' ver={} kvm={} rtg={} aForceRtg={}, uefi={}'
+        .format(aDom0, aVersion, aIsKvm, aIsRtg, aForceRtg, aIsUefi))
 
     remoteImgFound = False
     imgInfo = None
@@ -485,7 +566,7 @@ def copyVMImageVersionToDom0IfMissing(
 
     try:
         remoteImgLoc = getDom0VMImageLocation()
-        imgBaseName = formatVMImageBaseName(aVersion, aIsKvm, aIsRtg) 
+        imgBaseName = formatVMImageBaseName(aVersion, aIsKvm, aIsRtg, aIsUefi) 
         remoteImgFile = os.path.join(remoteImgLoc, imgBaseName)
         ebLogInfo('**** Looking for image file (1st attempt): {}'
                   .format(remoteImgFile))
@@ -499,21 +580,30 @@ def copyVMImageVersionToDom0IfMissing(
         # No need to check further and we need to get from local, so we skip 
         if not aForceRtg:
 
+            if not remoteImgFound: #  NON_UEFI
+                ebLogInfo('**** Remote VM image {} not found in Dom0 {}'
+                            .format(remoteImgFile, aDom0))
+                imgBaseName = formatVMImageBaseName(aVersion, aIsKvm, True, False) 
+                remoteImgFile = os.path.join(remoteImgLoc, imgBaseName)
+                ebLogInfo('**** Looking for image file (2nd attempt): {}'
+                        .format(remoteImgFile))
+                remoteImgFound = node.mFileExists(remoteImgFile)
+
             if not remoteImgFound: #  NON_RTG
                 ebLogInfo('**** Remote VM image {} not found in Dom0 {}'
                             .format(remoteImgFile, aDom0))
-                imgBaseName = formatVMImageBaseName(aVersion, aIsKvm, False) 
+                imgBaseName = formatVMImageBaseName(aVersion, aIsKvm, False, False) 
                 remoteImgFile = os.path.join(remoteImgLoc, imgBaseName)
-                ebLogInfo('**** Looking for image file (2nd attempt): {}'
+                ebLogInfo('**** Looking for image file (3nd attempt): {}'
                         .format(remoteImgFile))
                 remoteImgFound = node.mFileExists(remoteImgFile)
 
             if not remoteImgFound and aIsKvm: # NON_KVM Force look for NON_RTG img
                 ebLogInfo('**** Remote VM image {} not found in Dom0 {}'
                             .format(remoteImgFile, aDom0))
-                imgBaseName = formatVMImageBaseName(aVersion, False, False) 
+                imgBaseName = formatVMImageBaseName(aVersion, False, False, False) 
                 remoteImgFile = os.path.join(remoteImgLoc, imgBaseName) 
-                ebLogInfo('**** Looking for image file (3rd attempt): {}'
+                ebLogInfo('**** Looking for image file (4rd attempt): {}'
                         .format(remoteImgFile))
                 remoteImgFound = node.mFileExists(remoteImgFile)
 
@@ -560,7 +650,7 @@ def copyVMImageVersionToDom0IfMissing(
                     bin_unzip = node_cmd_abs_path_check(node, 'bunzip2')
 
                 # decompress image
-                cmd = f'{bin_unzip} {remoteArchive}'
+                cmd = f'{bin_unzip} {remoteArchive} -f'
 
                 _, _, stderr = node.mExecuteCmd(cmd)
                 rc = node.mGetCmdExitStatus()
@@ -618,7 +708,7 @@ def copyVMImageVersionToDom0IfMissing(
         node.mDisconnect()
 
     if not imgInfo:
-        imgInfo = getVMImageArchiveInRepo(aVersion, aIsKvm, aIsRtg, aImageBaseLocation)
+        imgInfo = getVMImageArchiveInRepo(aVersion, aIsKvm, aIsRtg, aIsUefi, aImageBaseLocation)
 
     return (remoteImgFound, imgInfo, imgCopied)
 
@@ -857,7 +947,7 @@ def mGetSystemImageVersionMap(aEboxObj: exaBoxCluCtrl) -> Dict[str, list]:
         _versionMap[_dom0] = ""
         with connect_to_host(_dom0, get_gcontext()) as _node:
             _cmd = "/bin/ls /EXAVMIMAGES " \
-                   "| /bin/grep -E 'System.first.boot.[0-9\.]*(\.rtg)?.img$'"
+                   "| /bin/grep -E 'System.first.boot.[0-9\.]*(\.rtg|\.uefi)?.img$'"
             _, _o, _ = _node.mExecuteCmd(_cmd)
             _lines = _o.readlines()
             if _lines:
@@ -958,12 +1048,14 @@ def mGetImageFromDom0ToLocal(
 
     # RTG logic does not apply on XEN 
     _isRtgImg = False
+    _isUefiImg = False
     if aCluctrl.mIsKVM():        
+        _isUefiImg = mIsUefiImg(aVmImgVerNum)
         _isRtgImg = mIsRtgImg(aVmImgVerNum)
     else:
         aForceRtg = False
 
-    _imgNameFmt = formatVMImageBaseName(aVmImgVerNum, False, _isRtgImg) 
+    _imgNameFmt = formatVMImageBaseName(aVmImgVerNum, False, _isRtgImg, _isUefiImg) 
     _imgNameBz2 = f"{_imgNameFmt}.bz2"
     _minDom0 = aMinDom0    
 
@@ -1024,10 +1116,12 @@ def mGetImageFromOSSToLocal(
 
     # RTG logic does not apply on XEN 
     _isRtgImg = False
+    _isUefiImg = False
     if aCluctrl.mIsKVM():
+        _isRtgImg = mIsUefiImg(aVmImgVerNum)
         _isRtgImg = mIsRtgImg(aVmImgVerNum)
 
-    _imgNameFmt = formatVMImageBaseName(aVmImgVerNum, aIsKVM, _isRtgImg) 
+    _imgNameFmt = formatVMImageBaseName(aVmImgVerNum, aIsKVM, _isRtgImg, _isUefiImg) 
     _imgNameBz2 = f"{_imgNameFmt}.bz2"
 
     if not os.path.exists(f"images/{_imgNameBz2}"):
@@ -1060,22 +1154,28 @@ def mGetVMImageArchiveInfoInLocalRepo(
     ebLogInfo('**** Looking for image file in Local Repo')
 
     # Step 1: Determine if the image version supports RTG (Ready To Go) based on the provided version
+    _isUefi = mIsUefiImg(aVersion)
     _isRtg = mIsRtgImg(aVersion)
     _isKVM = False
 
     # Step 2: First attempt - Search for an RTG image in the local repository if RTG is applicable
-    imgInfo = getVMImageArchiveInRepo(aVersion, True, _isRtg, aImageBaseLocation)
+    imgInfo = getVMImageArchiveInRepo(aVersion, True, _isRtg, _isUefi, aImageBaseLocation)
+
+    if imgInfo is None and _isUefi:
+        ebLogWarn('**** NO UEFI IMAGE FOUND; FALLBACK TO RTG IMAGE')
+        imgInfo = getVMImageArchiveInRepo(aVersion, True, _isRtg, False, aImageBaseLocation)
+        _isKVM = True
 
     # Step 3: If no RTG image is found and RTG is applicable, fallback to searching for a non-RTG KVM image
     if imgInfo is None and _isRtg:
         ebLogWarn('**** NO RTG IMAGE FOUND; FALLBACK TO NON-RTG IMAGE')
-        imgInfo = getVMImageArchiveInRepo(aVersion, True, False, aImageBaseLocation)
+        imgInfo = getVMImageArchiveInRepo(aVersion, True, False, False, aImageBaseLocation)
         _isKVM = True
 
     # Step 4: If no KVM image is found and the previous search wasn't for KVM, fallback to searching for a non-KVM, non-RTG image (Xen)
     if imgInfo is None and not _isKVM:
         ebLogWarn('**** NO KVM IMAGE FOUND; FALLBACK TO NON-KVM NON-RTG IMAGE')
-        imgInfo = getVMImageArchiveInRepo(aVersion, False, False, aImageBaseLocation)
+        imgInfo = getVMImageArchiveInRepo(aVersion, False, False, False, aImageBaseLocation)
 
     return imgInfo
 
@@ -1460,6 +1560,9 @@ def mCreateImageLVM(aCluctrl, aNode, aPath, aSize, aType='ext4', aKeep=False):
         _cmd = f"/sbin/vgchange -an VGExaDbDisk.{_short_name}.img"
         _out = _process_cmd(aNode, _cmd, '*** vDisk image wipe previous LV fail (vgchange)', aWarn=True)
 
+        _cmd = f"/sbin/vgremove -f VGExaDbDisk.{_short_name}.img"
+        _out = _process_cmd(aNode, _cmd, '*** vDisk image wipe previous LV fail (vgremove)', aWarn=True)
+
         _cmd = f"/sbin/mkfs.ext4 -F /dev/mapper/{_device_id}"
         _out = _process_cmd(aNode, _cmd, '*** vDisk image wipe previous LV fail (mkfs.ext4)')
 
@@ -1792,11 +1895,45 @@ def mIsRtgImgPresent(
                         break
 
     localWithImgFile = getVMImageArchiveInRepo(
-        aVmImgVerNum,aCluctrl.mIsKVM(),True) # None if not found
+        aVmImgVerNum,aCluctrl.mIsKVM(),True, False) # None if not found
     if localWithImgFile:
         rtgImgExistInLocal = True
     
     ebLogInfo(f"RTG in Dom0s {rtgImgExistInDom0s}, Local {rtgImgExistInLocal}")
     return rtgImgExistInDom0s, rtgImgExistInLocal
 
+def mIsUefiImgPresent(
+    aCluctrl: exaBoxCluCtrl, 
+    aVmImgVerNum:str) -> Tuple[bool, bool]:
+    """
+    aVmImgVerNum format: "24.1.0.0.0",
+    This function will search if there is AT LEAST one filename MATCHING this 
+    aVmImgVerNum (version number), it will search in Dom0s and local repo
+    and return the whole Image Filename if it's found somewhere.
+    It will return the available image considering the following priority
+    * if *.UEFI.IMG is available
+    * if *.IMG is available
+    """
+    ebLogInfo(f"Validate if UEFI Image {aVmImgVerNum} exists in Dom0s or Local.")
+    uefiImgExistInDom0s = False
+    uefiImgExistInLocal = False
+    
+    dom0sWithImgFiles = mGetSystemImageVersionMap(aCluctrl) 
+    
+    for _, files in dom0sWithImgFiles.items():
+        for f in files:
+            fileInfo = __getVMImageInfo(f)
+            if fileInfo is not None:        
+                if fileInfo['imgVersion'] == aVmImgVerNum:
+                    if fileInfo['isUefiImg']:
+                        uefiImgExistInDom0s = True
+                        break
+
+    localWithImgFile = getVMImageArchiveInRepo(
+        aVmImgVerNum, False, False, True) # None if not found
+    if localWithImgFile:
+        uefiImgExistInLocal = True
+    
+    ebLogInfo(f"UEFI in Dom0s {uefiImgExistInDom0s}, Local {uefiImgExistInLocal}")
+    return uefiImgExistInDom0s, uefiImgExistInLocal
 

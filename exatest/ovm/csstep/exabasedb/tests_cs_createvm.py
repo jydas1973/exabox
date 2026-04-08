@@ -1,10 +1,10 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/exatest/ovm/csstep/exabasedb/tests_cs_createvm.py /main/1 2025/11/25 05:03:58 prsshukl Exp $
+# $Header: ecs/exacloud/exabox/exatest/ovm/csstep/exabasedb/tests_cs_createvm.py /main/2 2026/01/07 22:19:36 zpallare Exp $
 #
 # tests_cs_createvm.py
 #
-# Copyright (c) 2025, Oracle and/or its affiliates.
+# Copyright (c) 2025, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_cs_createvm.py - <one-line expansion of the name>
@@ -47,10 +47,11 @@ class ebTestCSCreateVM(ebTestClucontrol):
         warnings.filterwarnings("ignore")
 
     @patch('exabox.log.LogMgr.ebLogInfo')
-    def test_undoExecute(self, mock_log_info):
+    @patch('exabox.ovm.clubonding.cleanup_bonding_if_enabled')
+    def test_undoExecute(self, mock_log_info, mock_):
         # Set up mocks
         mock_ebox = Mock()
-        mock_options = {}
+        mock_options = self.mGetClubox().mGetArgsOptions()
         mock_step_list = ['ESTP_CREATE_VM']
 
         # Create instance

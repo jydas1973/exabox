@@ -1,10 +1,10 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/exatest/jsondispatch/eboxconf/tests_exaboxconf_operations.py /main/2 2025/05/06 06:50:19 aypaul Exp $
+# $Header: ecs/exacloud/exabox/exatest/jsondispatch/eboxconf/tests_exaboxconf_operations.py /main/3 2026/02/05 09:17:18 kanmanic Exp $
 #
 # tests_exaboxconf_operations.py
 #
-# Copyright (c) 2024, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2024, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_exaboxconf_operations.py - <one-line expansion of the name>
@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    kanmanic    02/02/26 - update vm_clusters_limit default
 #    joysjose    07/25/24 - Unit test file to include tests for the exabox.conf
 #                           operations
 #    joysjose    07/25/24 - Creation
@@ -99,7 +100,7 @@ MOCK_UPDATE_EXABOX_CONF_5 = {
 MOCK_EXABOX_CONF = {
     "virtual_memory_size": "",
     "vm_cfg_prev_limit": "0",
-    "vm_clusters_limit": "16",
+    "vm_clusters_limit": "173",
     "vm_handler": "virsh",
     "vm_prefix_dom0_version_cutoff": "23.1.90.0.0.231219",
     "vm_reboot_consolelog_markers": [

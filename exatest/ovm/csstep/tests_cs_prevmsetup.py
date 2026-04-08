@@ -1,10 +1,10 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/exatest/ovm/csstep/tests_cs_prevmsetup.py /main/7 2025/08/25 06:17:10 pbellary Exp $
+# $Header: ecs/exacloud/exabox/exatest/ovm/csstep/tests_cs_prevmsetup.py pbellary_bug-38972840/1 2026/02/24 07:31:09 pbellary Exp $
 #
 # tests_cs_prevmsetup.py
 #
-# Copyright (c) 2022, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2022, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_cs_prevmsetup.py - <one-line expansion of the name>
@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    aararora    03/03/26 - Bug 38902170: Correct resource leak issues
 #    jfsaldan    02/24/25 - Bug 37570873 - EXADB-D|XS -- EXACLOUD |
 #                           PROVISIONING | REVIEW AND ORGANIZE PREVM_CHECKS AND
 #                           PREVM_SETUP STEPS
@@ -30,15 +31,18 @@
 
 import unittest
 
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
+
+with patch('multiprocessing.Lock', return_value=MagicMock()):
+    from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
+    from exabox.exatest.common.ebExacloudUtil import *
+    from exabox.log.LogMgr import ebLogInfo
+    from exabox.ovm.csstep.cs_prevmsetup import csPreVMSetup
+    from exabox.ovm.csstep.exascale.exascaleutils import ebExascaleUtils
+    from exabox.ovm.csstep.cs_util import csUtil
 
 from exabox.core.MockCommand import exaMockCommand
-from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
-from exabox.exatest.common.ebExacloudUtil import *
-from exabox.log.LogMgr import ebLogInfo
-from exabox.ovm.csstep.cs_prevmsetup import csPreVMSetup
-from exabox.ovm.csstep.exascale.exascaleutils import ebExascaleUtils
-from exabox.ovm.csstep.cs_util import csUtil
+# imports moved under multiprocessing.Lock patch
 
 _active_storage_pool = \
 """scaqab10client01vm01.us.oracle.com
@@ -168,6 +172,28 @@ class ebTestCSPreVmSetup(ebTestClucontrol):
         with self.assertRaises(ExacloudRuntimeError):
             self.mGetClubox().mExecuteCmdLog2(_lsCmd, aTimeOut=_timeout)
 
+    def test_mExecuteCmdLog2_closes_pipes(self):
+
+        _cmd = "ls -ltr"
+        mock_proc = MagicMock()
+        mock_proc.stdout.readline.side_effect = ["line\n", ""]
+        mock_proc.stdout.close = MagicMock()
+        mock_proc.stderr.close = MagicMock()
+
+        with patch('exabox.ovm.clucontrol.subprocess.Popen', return_value=mock_proc), \
+             patch('exabox.ovm.clucontrol.wrapStrBytesFunctions', return_value=mock_proc.stdout), \
+             patch('exabox.ovm.clucontrol.select.poll') as mock_poll, \
+             patch('exabox.ovm.clucontrol.time.sleep'):
+            poll_instance = MagicMock()
+            poll_instance.poll.side_effect = [[(1, 1)], [(1, 1)]]
+            mock_poll.return_value = poll_instance
+
+            self.mGetClubox().mExecuteCmdLog2(_cmd)
+
+        mock_proc.wait.assert_called_once()
+        mock_proc.stdout.close.assert_called_once()
+        mock_proc.stderr.close.assert_called_once()
+
     def test_mRemoveStoragePool_positive(self):
 
         ebLogInfo("Running unit test on csUtil.mRemoveStoragePool")
@@ -247,9 +273,12 @@ class ebTestCSPreVmSetup(ebTestClucontrol):
 
     @patch('exabox.ovm.csstep.exascale.exascaleutils.ebExascaleUtils.mUpdateACL')
     @patch('exabox.ovm.csstep.exascale.exascaleutils.ebExascaleUtils.mDeleteFilesInDbVault')
+    @patch('exabox.ovm.csstep.exascale.exascaleutils.ebExascaleUtils.mRemoveACFS')
     @patch('exabox.ovm.csstep.exascale.exascaleutils.ebExascaleUtils.mDetachAcfsVolume')
+    @patch('exabox.ovm.csstep.exascale.exascaleutils.ebExascaleUtils.mRemoveDefaultAcfsVolume')
     @patch('exabox.ovm.csstep.cs_prevmsetup.csPreVMSetup.mPostVMDeleteSteps')
-    def test_undoExecute(self, mock_mPostVMDeleteSteps, mock_mDetachAcfsVolume, mock_mDeleteFilesInDbVault, mUpdateACL):
+    def test_undoExecute(self, mock_mPostVMDeleteSteps, mock_mRemoveDefaultAcfsVolume, mock_mRemoveACFS, 
+            mock_mDetachAcfsVolume, mock_mDeleteFilesInDbVault, mUpdateACL):
         ebLogInfo("")
         ebLogInfo("Running unit test on csPreVmSetup.undoExecute.")
 

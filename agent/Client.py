@@ -1,5 +1,5 @@
 """
- Copyright (c) 2015, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2015, 2026, Oracle and/or its affiliates.
 
 NAME:
     Client - Client RESTFull API and CLI support
@@ -11,6 +11,8 @@ NOTE:
     None
 
 History:
+    zpallare  12/19/25 - Bug 38955623 - Fix issue with diskgroupop in exacloud cli
+    pbellary    12/09/2025 - Bug 38740441 - EXACLOUD: ADD COMPUTE WF DID NOT ENABLE QINQ IN ELASTIC NODE
     abflores    06/30/2025 - Bug 38027811 - Add SOP testing
     avimonda    03/19/2024 - Bug 36405321 - Adding retry mechanism in
                              mPerformRequest in case of 503 HTTP response.
@@ -603,7 +605,7 @@ class ebExaClient(object):
             _path = REST_API_MAP['vmctrl'][self.__cmdtype]
             if options.hostname:
                 _path = _path + '?hostname=' + options.hostname
-            if options.vmid:
+            elif options.vmid:
                 _path = _path + '?vmid=' + options.vmid
             self.mBuildRequest(_path)
             self.mPerformRequest()
@@ -737,7 +739,7 @@ class ebExaClient(object):
                 _form['wf_uuid'] = options.workflowid
                 _form["ignore_uuid_check"] = True
 
-            if self.__cmdtype not in ['validate_elastic_shapes','xsvault','infra_vm_states', 'xsput', 'xsget']:
+            if self.__cmdtype not in ['validate_elastic_shapes','xsvault','infra_vm_states', 'xsput', 'xsget', 'enable_qinq']:
                 if not _xml_content:
                     self.mBuildErrorResponse('100', 'Invalid CLUCTRL command %s, missing xml config' % (self.__cmdtype,),
                                          None)
@@ -835,6 +837,7 @@ class ebExaClient(object):
                         self.__jsonresponse = self.__response.mToJson()
                         ebLogError(self.__jsonresponse)
                         return
+                    _form['diskgroupOp'] = options.diskgroupOp
 
             self.mBuildRequest(_path)
             ebLogInfo('sending POST request for cluctrl: path: %s' % (_path,))

@@ -1,10 +1,10 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/exatest/jsondispatch/sla_measurement/tests_SLA_vmCluster.py /main/3 2025/11/05 06:12:56 atgandhi Exp $
+# $Header: ecs/exacloud/exabox/exatest/jsondispatch/sla_measurement/tests_SLA_vmCluster.py /main/5 2026/02/09 06:20:21 atgandhi Exp $
 #
 # tests_SLA_vmCluster.py
 #
-# Copyright (c) 2023, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2023, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_SLA_vmCluster.py - <one-line expansion of the name>
@@ -16,6 +16,10 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    atgandhi    02/01/26 - Bug 38910261 - EXACS:SLA NOT SET TO 0 AFTER
+#                           SLA_SERVER_MAX_TIMEOUT EXPIRY WHEN ADMIN NETWORK
+#                           (ETH0) IS DOWN
+#    atgandhi    12/12/25 - 38755913 - TESTS_SLA_VMCLUSTER_PY.DIF IS FAILING
 #    atgandhi    10/24/25 - Enh 38459507 - LOG BASED SLA COLLECTION AND STORE
 #                           DOWNTIMES IN DB
 #    jiacpeng    07/10/23 - unittest for vm cluster level sla
@@ -31,6 +35,7 @@ from exabox.core.Error import ExacloudRuntimeError
 from exabox.core.MockCommand import exaMockCommand
 from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
 from exabox.jsondispatch.handler_sla_vmCluster import SLAVmClusterHandler, mExtractDowntimePeriods_with_node
+import exabox.jsondispatch.handler_sla_vmCluster as handler_mod
 
 class ebTestSLA(ebTestClucontrol):
 
@@ -130,6 +135,7 @@ class ebTestSLA(ebTestClucontrol):
         start_time = "2024-06-01 01:00:00"
         end_time = "2024-06-01 02:00:00"
         clusters = "C1"
+        aBlackoutStatus = 0
 
         class DummyNode:
             pass
@@ -137,12 +143,12 @@ class ebTestSLA(ebTestClucontrol):
         dummy_node = DummyNode()
         # Patch connect_to_host context manager and downstream logic
         with \
-            mock.patch("exabox.utils.node.connect_to_host") as mock_connect, \
+            mock.patch("exabox.jsondispatch.handler_sla_vmCluster.connect_to_host") as mock_connect, \
             mock.patch.object(SLAVmClusterHandler, "mComputeCheck_with_node", return_value=(1, 1)), \
             mock.patch("exabox.jsondispatch.handler_sla_vmCluster.mExtractDowntimePeriods_with_node", return_value={"compute": [], "network": [], "storage": []}):
             # Mocking context manager to yield the dummy_node
             mock_connect.return_value.__enter__.return_value = dummy_node
-            result = SLAVmClusterHandler.mExecuteSLA(host, s_type, freq, start_time, end_time, clusters)
+            result = SLAVmClusterHandler.mExecuteSLA(host, s_type, freq, 5, start_time, end_time, clusters, aBlackoutStatus)
             self.assertIn(host, result)
             val = result[host]
             self.assertEqual(val["type"], s_type)
@@ -162,14 +168,19 @@ class ebTestSLA(ebTestClucontrol):
         start_time = f"{this_year}-06-01 01:00:00"
         end_time = f"{this_year}-06-01 02:00:00"
         clusters = "C2"
-        # Patch the function in the module where it is looked up (handler_sla_vmCluster)
-        import exabox.jsondispatch.handler_sla_vmCluster as handler_mod
-        # Add a print to confirm if mCellCheck patch is hit and assignment is being made.
-        def fake_mCellCheck(aCell):
+        aBlackoutStatus = 0
+        
+        dummy_node = object()
+
+        def fake_mCellCheck_with_node(node):
+            self.assertIs(node, dummy_node)
             return 1
-        with mock.patch.object(SLAVmClusterHandler, "mCellCheck", side_effect=fake_mCellCheck), \
+
+        with mock.patch("exabox.jsondispatch.handler_sla_vmCluster.connect_to_host") as mock_connect, \
+             mock.patch.object(SLAVmClusterHandler, "mCellCheck_with_node", side_effect=fake_mCellCheck_with_node), \
              mock.patch.object(handler_mod, "mExtractDowntimePeriods_with_node", return_value={"compute":[],"network":[],"storage":[]}):
-            result = SLAVmClusterHandler.mExecuteSLA(host, s_type, freq, start_time, end_time, clusters)
+            mock_connect.return_value.__enter__.return_value = dummy_node
+            result = SLAVmClusterHandler.mExecuteSLA(host, s_type, freq, 5, start_time, end_time, clusters, aBlackoutStatus)
             self.assertIn(host, result)
             val = result[host]
             self.assertEqual(val["type"], s_type)
@@ -177,9 +188,6 @@ class ebTestSLA(ebTestClucontrol):
             self.assertIn("downtime_periods", val)
 
     def test_extractDowntimePeriods_with_node_compute(self):
-        # Mock node to return merged log output for both compute and network events (single call each)
-        from exabox.jsondispatch import handler_sla_vmCluster as handler_mod
-
         # Use this year for all times so _year_aware_strptime matches range filtering
         this_year = datetime.datetime.utcnow().year
 
@@ -216,7 +224,51 @@ class ebTestSLA(ebTestClucontrol):
             n_downtime = result["network"][0]
             self.assertEqual(n_downtime["down"], f"{this_year}-06-24 08:59:00")
             self.assertEqual(n_downtime["up"], f"{this_year}-06-24 09:20:00")
+            
+    def test_executeSLA_blackoutstatus(self):
+        # Test: blackout_status=1 for compute server should short-circuit and return server/network up
+        host = "clu01adm02"
+        s_type = "compute"
+        freq = 300
+        start_time = "2024-07-01 01:00:00"
+        end_time = "2024-07-01 02:00:00"
+        clusters = "C3"
+        blackout_status = 1
+        # When blackout_status is 1, mExecuteSLA should return server_status==1, network_status==1 (for compute)
+        result = SLAVmClusterHandler.mExecuteSLA(
+            host, s_type, freq, 5, start_time, end_time, clusters, blackout_status
+        )
+        self.assertIn(host, result)
+        val = result[host]
+        self.assertEqual(val["blackout_status"], 1)
+        self.assertEqual(val["server_status"], 1)
+        self.assertEqual(val["network_status"], 1)
+        self.assertIsInstance(val["timestamp"], str)
+        self.assertEqual(val["type"], s_type)
+        self.assertEqual(val["start_time"], start_time)
+        self.assertEqual(val["end_time"], end_time)
+        self.assertEqual(val["clusters"], clusters)
+        self.assertEqual(val["errors"], [])
+        # For storage, network_status is not set to 1 on blackout, only server_status==1 should be tested
+        host2 = "clu01cel02"
+        s_type2 = "storage"
+        blackout_status2 = 1
+        result2 = SLAVmClusterHandler.mExecuteSLA(
+            host2, s_type2, freq, 5, start_time, end_time, clusters, blackout_status2
+        )
+        self.assertIn(host2, result2)
+        val2 = result2[host2]
+        self.assertEqual(val2["blackout_status"], 1)
+        self.assertEqual(val2["server_status"], 1)
+        self.assertEqual(val2["type"], s_type2)
+        self.assertEqual(val2["start_time"], start_time)
+        self.assertEqual(val2["end_time"], end_time)
+        self.assertEqual(val2["clusters"], clusters)
+        self.assertIsInstance(val2["timestamp"], str)
+            
+        
 
 if __name__ == '__main__':
     unittest.main(warnings='ignore')
 # end of file
+

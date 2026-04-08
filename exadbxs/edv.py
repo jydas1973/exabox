@@ -1,6 +1,6 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/exadbxs/edv.py /main/11 2025/09/10 15:17:42 scoral Exp $
+# $Header: ecs/exacloud/exabox/exadbxs/edv.py /main/12 2026/01/13 17:55:25 jfsaldan Exp $
 #
 # edv.py
 #
@@ -16,6 +16,11 @@
 #      None.
 #
 #    MODIFIED   (MM/DD/YY)
+#    jfsaldan    12/01/25 - Bug 38694363 - EXADB-XS-PP: VMC PROVISION FAILED AT
+#                           THE TASK OF CREATEVM WITH ERROR OF "NO SUCH FILE OR
+#                           DIRECTORY: DISK_CONFIG.XML" | EXACLOUD UNMOUNTS GCV
+#                           VOLUME FROM OTHER VMS DURING PARALLEL CREATE
+#                           SERVICE
 #    scoral      09/03/25 - Bug 38338038 - Added methods to update the EDVs in
 #                           the cluster XML.
 #    scoral      07/31/25 - Enh 38190209 - Added methods for resizing the guest
@@ -36,6 +41,7 @@
 #    scoral      06/19/23 - Creation
 #
 
+import os
 import stat
 import math
 from enum import Enum
@@ -51,7 +57,7 @@ from exabox.tools.ebTree.ebTreeNode import ebTreeNode
 from exabox.ovm.cludomufilesystems import (GIB, get_node_filesystems,
                                            ebNodeFilesystemInfo)
 from exabox.utils.node import (node_exec_cmd, node_exec_cmd_check,
-                               node_cmd_abs_path_check, connect_to_host)
+    node_cmd_abs_path_check, connect_to_host, node_list_process)
 
 
 ##################
@@ -510,11 +516,27 @@ def unmount_stale_gcv_edv(host: exaBoxNode) -> List[ebNodeFilesystemInfo]:
          if vm.strip() ]
 
     # Calculate the filesystems corresponding to mounted stale EDVs
-    stale_edvs_fs: List[ebNodeFilesystemInfo] = \
-        [ fs for fs in filesystems
-          if fs.device.startswith('/dev/exc/') and \
-            fs.mountpoint.startswith('/EXAVMIMAGES/GuestImages/') and \
-            not any(map(fs.mountpoint.endswith, guests)) ]
+    stale_edvs_fs: List[ebNodeFilesystemInfo] = []
+    for fs in filesystems:
+        if not fs.device.startswith('/dev/exc/'):
+            continue
+        if not fs.mountpoint.startswith('/EXAVMIMAGES/GuestImages/'):
+            continue
+        if any(map(fs.mountpoint.endswith, guests)):
+            continue
+
+        # Check if any vm_maker process is running for the VM using
+        # the filesystem
+        fs_mountpoint_vm_name = os.path.basename(fs.mountpoint)
+        list_proc = node_list_process(
+            host, f"vm_maker.*{fs_mountpoint_vm_name}")
+        if list_proc:
+            ebLogWarn("A vm_maker process was detected in "
+                f"{host.mGetHostname()} for {fs_mountpoint_vm_name}. "
+                f"Skipping undefine/removal for it.")
+            continue
+
+        stale_edvs_fs.append(fs)
 
     # Unmount the stale EDVs
     UMOUNT: str = node_cmd_abs_path_check(host, 'umount')

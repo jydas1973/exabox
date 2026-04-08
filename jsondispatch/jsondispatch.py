@@ -1,10 +1,10 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/jsondispatch/jsondispatch.py /main/26 2025/12/02 08:46:19 jesandov Exp $
+# $Header: ecs/exacloud/exabox/jsondispatch/jsondispatch.py /main/29 2026/02/10 12:18:51 jesandov Exp $
 #
 # jsondispatch.py
 #
-# Copyright (c) 2022, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2022, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      jsondispatch.py - jsondispatch basic functionality
@@ -16,6 +16,9 @@
 #      None
 #
 #    MODIFIED   (MM/DD/YY)
+#    scoral      02/06/26 - 34650120: Implement artifacts_distribution command.
+#    scoral      12/13/25 - 38200446: Implement lockvm & unlockvm commands.
+#    nisrikan    12/11/25 - 38702503: Add Opctl ExaCS endpoint
 #    jepalomi    11/12/25 - 38529119: Manage services on infra hosts
 #    prsshukl    08/20/25 - Enh 38180284 - EXADB-XS -> VALIDATE_VOLUME TO WORK
 #                           AT THE HOST/DOM0 LEVEL
@@ -72,6 +75,7 @@ from exabox.jsondispatch.handler_hostaccesscontrol import ECHostAccessControlHan
 from exabox.jsondispatch.handler_ilom_pwd import IlomPasswordHandler
 from exabox.jsondispatch.handler_manage_service import ManageServiceHandler
 from exabox.jsondispatch.handler_prechecks import ExacomputePrechecks
+from exabox.jsondispatch.handler_opctl import OpctlExaCSHandler
 from exabox.jsondispatch.handler_profiler import ProfilerHandler
 from exabox.jsondispatch.handler_requests import RequestsHandler
 from exabox.jsondispatch.handler_sla_vmCluster import SLAVmClusterHandler
@@ -80,6 +84,9 @@ from exabox.jsondispatch.handler_vmbackup import VMBackupHandler
 from exabox.jsondispatch.handler_stale_resources import StaleResourcesHandler
 from exabox.jsondispatch.handler_validate_volumes import ValidateVolumesHandler
 from exabox.jsondispatch.handler_imagebase_copy_volumes import ImagebaseCopyVolume
+from exabox.jsondispatch.handler_lockvm import LockVM
+from exabox.jsondispatch.handler_storage_utility import StorageUtility
+from exabox.jsondispatch.handler_artifacts_distribution import ArtifactsDistribution
 
 
 class ebJsonDispatcher:
@@ -111,6 +118,7 @@ class ebJsonDispatcher:
             "initialingestion": ExacomputeIngestionHandler,
             "capacity_move_prechecks": ExacomputePrechecks,
             "manage_service": ManageServiceHandler,
+            "opctl_exacs_cmd": OpctlExaCSHandler,
             "profiler": ProfilerHandler,
             "requests" : RequestsHandler,
             "sla" : SLAVmClusterHandler,                        
@@ -118,7 +126,10 @@ class ebJsonDispatcher:
             "userHandler": UserHandler,
             "validate_volumes": ValidateVolumesHandler,
             "vmbackup": VMBackupHandler,
-            "updaterequest": ExaCloudUpdateRequest
+            "updaterequest": ExaCloudUpdateRequest,
+            "lockvm": LockVM,
+            "storage_utility": StorageUtility,
+            "artifact_deliver": ArtifactsDistribution
         }
 
         self.__ctx = aCtx

@@ -1,7 +1,7 @@
 """
 $Header:
 
- Copyright (c) 2014, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     cluelasticstorage - 
@@ -17,6 +17,14 @@ NOTE:
 History:
 
     MODIFIED   (MM/DD/YY)
+    rajsag   04/01/26 - er 38717477 - exacs:25.2.2.2: delete storage with
+                        exascale configure infrastructure fails at
+                        deleteexascalecelltask: "keyerror: 'operation'
+    rajsag   02/17/26 - 38857796 - exacc:bb:exacloud: progress percentage drops
+                        while elastic cell operation is in progress.
+    atgandhi 01/21/26 - Enh 38367755 - UPDATE ADD STORAGE WORKFLOW WITH FETCH
+                        VOTING DISKS
+    aypaul   01/16/26 - ER#38277264 SELinux fleet exacloud implementation
     oespinos 11/25/25 - Bug 38688728: Try to read rack_num from actual rack_num 
     pbellary   11/24/25 - Enh 38685113 - EXASCALE: POST CONFIGURE EXASCALE EXACLOUD SHOULD FETCH STRE0/STE1 FROM DOM0
     prsshukl 09/24/25 - Bug 38466258 - ADBS: ADD CELL Phase 1: support multiple
@@ -222,6 +230,7 @@ from exabox.log.LogMgr import ebLogError, ebLogInfo, ebLogJson, ebLogDebug, ebLo
 from exabox.ovm.adbs_elastic_service import (mCreateGriddiskADBS,mDeleteGriddiskADBS,mAssignKeyToCell,
                                              mCheckASMScopeSecurity,mSetAvailableToOnGriddisk,mAppendCellipOraForDomU,
                                              mRemoveCellipOraForDomU,mRemoveKeyFromCell)
+from exabox.ovm.configmgmt import ebConfigCollector
 from exabox.ovm.cludbaas import ebCluDbaas
 from exabox.ovm.cludiskgroups import ebDiskgroupOpConstants, ebCluManageDiskgroup
 from exabox.ovm.cluelastic import getGridHome, getDiskGroupNames
@@ -238,6 +247,7 @@ from exabox.ovm.adbs_elastic_service import (mCreateGriddiskADBS,mDeleteGriddisk
 from exabox.tools.oedacli import OedacliCmdMgr
 
 from exabox.utils.node import connect_to_host
+from exabox.ovm.selinuxcontrols import ebSelinuxControls
 
 SELINUX_UPDATE_SUCCESS = 0
 MAX_RETRY = 3
@@ -277,6 +287,7 @@ class ebCluElasticCellManager(object):
             self.__update_conf['operation'] = 'CELL_INFO'
         
         self.__clu_utils = ebCluUtils(aExaBoxCluCtrlObj)
+        self.__selinux_controls = self.__eboxobj.mGetSelinuxController()
 
         ebLogInfo("init completed")    
     
@@ -348,14 +359,13 @@ class ebCluElasticCellManager(object):
                 self.__update_conf['cells'].append(self.__update_conf['cell'])
                 del self.__update_conf['cell']
 
-            if not _ebox.mIsXS(): 
-                for _cell in _reshape_config['removed_cells']:
+            for _cell in _reshape_config['removed_cells']:
 
-                    self.__update_conf['operation'] = 'DELETE_CELL'
-                    self.__update_conf['cell'] = {}
-                    self.__update_conf['cell']['hostname'] = _cell['cell_node_hostname']
-                    self.__update_conf['cells'].append(self.__update_conf['cell'])
-                    del self.__update_conf['cell']
+                self.__update_conf['operation'] = 'DELETE_CELL'
+                self.__update_conf['cell'] = {}
+                self.__update_conf['cell']['hostname'] = _cell['cell_node_hostname']
+                self.__update_conf['cells'].append(self.__update_conf['cell'])
+                del self.__update_conf['cell']
 
             if self.__update_conf['operation'] == 'ADD_CELL' and not _ebox.mIsXS():
                 self.__update_conf['full_compute_to_virtualcompute_list'] = _reshape_config['full_compute_to_virtualcompute_list']
@@ -408,53 +418,53 @@ class ebCluElasticCellManager(object):
                         _eBoxCluCtrl.mUpdateErrorObject(gElasticError['INVALID_INPUT_PARAMETER'], _detail_error)
                         return self.mRecordError(gCellUpdateError['MissingArgs'], "*** " + _detail_error)
 
-                if not _cell['network_info']:
-                    _detail_error = "network_info is mandatory"
-                    _eBoxCluCtrl.mUpdateErrorObject(gElasticError['INVALID_INPUT_PARAMETER'], _detail_error)
-                    return self.mRecordError(gCellUpdateError['MissingArgs'], "*** " + _detail_error)
-                
-                if len(_cell['network_info']['cellnetworks']) < 3 or not _cell['network_info']['cellnetworks'][0]['admin'] \
-                        or not _cell['network_info']['cellnetworks'][1]['private'] or not _cell['network_info']['cellnetworks'][2]['ilom']:
-                    ebLogDebug(json.dumps(_cell['network_info'], indent=4, sort_keys=True))
-                    ebLogDebug("*** Elements count %s" %(str(len(_cell['network_info']['cellnetworks']))))
-                    ebLogDebug(json.dumps(_cell['network_info']['cellnetworks'][0]['admin'], indent=4, sort_keys=True))
-                    ebLogDebug(json.dumps(_cell['network_info']['cellnetworks'][1]['private'], indent=4, sort_keys=True))
-                    ebLogDebug(json.dumps(_cell['network_info']['cellnetworks'][2]['ilom'], indent=4, sort_keys=True))
-                    _detail_error = "'admin', 'private' and 'ilom' entries are mandatory as part of network_info"
-                    _eBoxCluCtrl.mUpdateErrorObject(gElasticError['INVALID_INPUT_PARAMETER'], _detail_error)
-                    return self.mRecordError(gCellUpdateError['MissingArgs'], "*** " + _detail_error)
-                
-                if not _cell['network_info']['cellnetworks'][0]['admin'][0]['fqdn'] or not _cell['network_info']['cellnetworks'][0]['admin'][0]['ipaddr']:
-                    _detail_error = "Both ip and name expected for admin networks"
-                    _eBoxCluCtrl.mUpdateErrorObject(gElasticError['INVALID_INPUT_PARAMETER'], _detail_error)
-                    return self.mRecordError(gCellUpdateError['MissingArgs'], "*** " + _detail_error)
-                
-                if len(_cell['network_info']['cellnetworks'][1]['private']) < 2:
-                    _detail_error = "Both ip and name expected for admin networks"
-                    _eBoxCluCtrl.mUpdateErrorObject(gElasticError['INVALID_INPUT_PARAMETER'], _detail_error)
-                    return self.mRecordError(gCellUpdateError['InsufficientArgs'], "*** " + _detail_error)
-                else:
-                    for _net in _cell['network_info']['cellnetworks'][1]['private']:
-                        if not _net['ipaddr'] or not _net['fqdn']:
-                            _detail_error = "Both ip and name expected for private networks"
-                            _eBoxCluCtrl.mUpdateErrorObject(gElasticError['INVALID_INPUT_PARAMETER'], _detail_error)
-                            return self.mRecordError(gCellUpdateError['MissingArgs'], "*** " + _detail_error)
-                
-                if not _cell['network_info']['cellnetworks'][2]['ilom'][0]['fqdn'] or not _cell['network_info']['cellnetworks'][2]['ilom'][0]['ipaddr']:
-                    _detail_error = "Both ip and name expected for ILOM networks"
-                    _eBoxCluCtrl.mUpdateErrorObject(gElasticError['INVALID_INPUT_PARAMETER'], _detail_error)
-                    return self.mRecordError(gCellUpdateError['MissingArgs'], "*** " + _detail_error)
-                
-                if 'rack_info' not in _cell.keys() or 'uloc' not in _cell['rack_info'].keys() or 'uheight' not in _cell['rack_info'].keys():
-                    _detail_error = "Missing value(s) for rack_num(uheight)/uloc as part of rack_info"
-                    _eBoxCluCtrl.mUpdateErrorObject(gElasticError['INVALID_INPUT_PARAMETER'], _detail_error)
-                    return self.mRecordError(gCellUpdateError['MissingArgs'], "*** " + _detail_error)
-               
+                    if not _cell['network_info']:
+                        _detail_error = "network_info is mandatory"
+                        _eBoxCluCtrl.mUpdateErrorObject(gElasticError['INVALID_INPUT_PARAMETER'], _detail_error)
+                        return self.mRecordError(gCellUpdateError['MissingArgs'], "*** " + _detail_error)
+
+                    if len(_cell['network_info']['cellnetworks']) < 3 or not _cell['network_info']['cellnetworks'][0]['admin'] \
+                            or not _cell['network_info']['cellnetworks'][1]['private'] or not _cell['network_info']['cellnetworks'][2]['ilom']:
+                        ebLogDebug(json.dumps(_cell['network_info'], indent=4, sort_keys=True))
+                        ebLogDebug("*** Elements count %s" % (str(len(_cell['network_info']['cellnetworks']))))
+                        ebLogDebug(json.dumps(_cell['network_info']['cellnetworks'][0]['admin'], indent=4, sort_keys=True))
+                        ebLogDebug(json.dumps(_cell['network_info']['cellnetworks'][1]['private'], indent=4, sort_keys=True))
+                        ebLogDebug(json.dumps(_cell['network_info']['cellnetworks'][2]['ilom'], indent=4, sort_keys=True))
+                        _detail_error = "'admin', 'private' and 'ilom' entries are mandatory as part of network_info"
+                        _eBoxCluCtrl.mUpdateErrorObject(gElasticError['INVALID_INPUT_PARAMETER'], _detail_error)
+                        return self.mRecordError(gCellUpdateError['MissingArgs'], "*** " + _detail_error)
+
+                    if not _cell['network_info']['cellnetworks'][0]['admin'][0]['fqdn'] or not _cell['network_info']['cellnetworks'][0]['admin'][0]['ipaddr']:
+                        _detail_error = "Both ip and name expected for admin networks"
+                        _eBoxCluCtrl.mUpdateErrorObject(gElasticError['INVALID_INPUT_PARAMETER'], _detail_error)
+                        return self.mRecordError(gCellUpdateError['MissingArgs'], "*** " + _detail_error)
+
+                    if len(_cell['network_info']['cellnetworks'][1]['private']) < 2:
+                        _detail_error = "Both ip and name expected for admin networks"
+                        _eBoxCluCtrl.mUpdateErrorObject(gElasticError['INVALID_INPUT_PARAMETER'], _detail_error)
+                        return self.mRecordError(gCellUpdateError['InsufficientArgs'], "*** " + _detail_error)
+                    else:
+                        for _net in _cell['network_info']['cellnetworks'][1]['private']:
+                            if not _net['ipaddr'] or not _net['fqdn']:
+                                _detail_error = "Both ip and name expected for private networks"
+                                _eBoxCluCtrl.mUpdateErrorObject(gElasticError['INVALID_INPUT_PARAMETER'], _detail_error)
+                                return self.mRecordError(gCellUpdateError['MissingArgs'], "*** " + _detail_error)
+
+                    if not _cell['network_info']['cellnetworks'][2]['ilom'][0]['fqdn'] or not _cell['network_info']['cellnetworks'][2]['ilom'][0]['ipaddr']:
+                        _detail_error = "Both ip and name expected for ILOM networks"
+                        _eBoxCluCtrl.mUpdateErrorObject(gElasticError['INVALID_INPUT_PARAMETER'], _detail_error)
+                        return self.mRecordError(gCellUpdateError['MissingArgs'], "*** " + _detail_error)
+
+                    if 'rack_info' not in _cell.keys() or 'uloc' not in _cell['rack_info'].keys() or 'uheight' not in _cell['rack_info'].keys():
+                        _detail_error = "Missing value(s) for rack_num(uheight)/uloc as part of rack_info"
+                        _eBoxCluCtrl.mUpdateErrorObject(gElasticError['INVALID_INPUT_PARAMETER'], _detail_error)
+                        return self.mRecordError(gCellUpdateError['MissingArgs'], "*** " + _detail_error)
+
                 if not _eBoxCluCtrl.mIsXS() and 'full_compute_to_virtualcompute_list' not in list(cellParams.keys()):
                     _detail_error = "Missing value(s) for full_compute_to_virtualcompute_list"
                     _eBoxCluCtrl.mUpdateErrorObject(gElasticError['INVALID_INPUT_PARAMETER'], _detail_error)
                     return self.mRecordError(gCellUpdateError['MissingArgs'], "*** " + _detail_error)
-            
+
             if 'removed_cells' in cellParams and len(cellParams['removed_cells']) > 0:
 
                 for _cell in cellParams['removed_cells']:
@@ -614,6 +624,15 @@ class ebCluElasticCellManager(object):
         if _operation == 'UPDATE_RBALPOWER':
             ebLogInfo("Running DiskGroup LCM Step: Update Rebalance Power for all diskgroups")
             _rc = self.mUpdateRebalancePower(_options)
+            
+        try:
+            # Add voting files info in the request data
+            if hasattr(_options, 'steplist') and _options.steplist:
+                _step_list = str(_options.steplist).split(",")
+                if 'POST_ADDCELL_CHECK' in _step_list or 'CONFIG_CELL' in _step_list:
+                    self._add_voting_files_info(_cellOperationData)
+        except Exception as e:
+            ebLogError(f"There was an error in adding voting files during post_add_cell_check step: {e}")
 
         # For delete cell, data will be updated as part of secure erase call
         # If the mCellSecureShredding did not return True, the request data would not be updated in mysql
@@ -776,44 +795,49 @@ class ebCluElasticCellManager(object):
         _ebox = self.mGetEbox()
         _cellConf = self.mGetUpdateConf()
         _cluster = _ebox.mGetClusters().mGetCluster()
-
+        _oedaCliMgr = self.mGetOedaCliMgr()
         _rc = 0
-        _step_list = ["CREATE_GRIDDISKS", "DELETE_CELL_CHECK"]
+        if not ebCluCmdCheckOptions(_ebox.mGetCmd(), ['nooeda']):
+            ebLogInfo(f"Restore Keys to OEDA WorkDir")
+            _ebox.mRestoreOEDASSHKeys(aOptions)
 
-        if aOptions.steplist:
-            _step_list = str(aOptions.steplist).split(",")
-            _stepwise = True
-
-        if 'undo' not in aOptions:
-            _undo = False
-        elif aOptions.undo == "true":
-            _undo = True
+        _cellParams = aOptions.jsonconf['reshaped_node_subset']
+        _power = None
+        if 'rebalance_power' in list(aOptions.jsonconf.keys()):
+            _power = int(aOptions.jsonconf['rebalance_power'])
         else:
-            _undo = False
+            _power = _ebox.mCheckConfigOption('rebal_power')
+        _uuid = _ebox.mGetUUID()
+        _oedaXmlPath = self.mGetOedaXmlPath() + "/" + "delCell_" + _uuid + ".xml"
 
-        _do = not _undo
 
-        for _step in _step_list:
-            if _step in ["CREATE_GRIDDISKS"] and _do:
+        try:
+            _ebox.mAcquireRemoteLock()
+            _configxml = _ebox.mGetOedaPath() + '/exacloud.conf/elastic_cell_' + _uuid + '.xml'
+            _ebox.mExecuteLocal("/bin/cp {} {}".format(_ebox.mGetPatchConfig(), _configxml))
+            _ebox.mExecuteLocal("/bin/cp {} {}".format(_ebox.mGetPatchConfig(), _oedaXmlPath))
+            _config = exaBoxClusterConfig(_ebox.mGetCtx(), _configxml)
+            _ebox.mSetConfig(_config)
 
-                _message = "Initiating delete cell through OEDACLI"
-                ebLogInfo("*** " + _message)
-                _ebox.mUpdateStatusOEDA(True, _step, _step_list, _message)
-                _rc = self.mDelCell(aOptions, _step)
+            ebLogDebug("*** Using source XML : %s and savexml : %s" %(_configxml, _oedaXmlPath))
 
-            elif _step == "DELETE_CELL_CHECK" and _do:
-
-                _message = "Post Cell Deletion Checks."
-                ebLogInfo("*** " + _message)
-                _ebox.mUpdateStatusOEDA(True, "DELETE_CELL_CHECK", _step_list, _message)
-                #post validation step to be added
-
-            else:
-                ebLogInfo("No-OP: Nothing to be performed as part of this operation.")
+            _celllist = []
+            for _cellinfo in _cellConf['cells']:
+                _celllist.append(_cellinfo['hostname'])
+            _user_data = { "exascale": {"pool_name": "hcpool"} }
+            _oedaCliMgr.mDropCell(_configxml, _oedaXmlPath, _celllist, True, _power, _ebox.mIsKVM(), _ebox.mGetClusters().mGetCluster().mGetCluName(), False, 'false', "CONFIG_CELL", aUserData=_user_data)
+        except ExacloudRuntimeError as e:
+            ebLogDebug("*** Exception Stack Trace: %s" %(str(e)))
+            _detail_error = "Could not delete cell through Oedacli"
+            _ebox.mUpdateErrorObject(gElasticError['CELL_OEDA_DEL_CMD_FAILED'], _detail_error)
+            return self.mRecordError(gCellUpdateError['OedaError'], "*** " + _detail_error)
+        
+        finally:
+            _ebox.mReleaseRemoteLock() 
             
         ebLogInfo("*** ebCluElasticCellManager:mDeleteExascaleCell <<<")
         return _rc
-
+    
 
     def mClusterCellInfo(self, aOptions=None):
         ebLogInfo("*** ebCluElasticCellManager:mClusterCellInfo >>>")
@@ -1219,8 +1243,6 @@ class ebCluElasticCellManager(object):
                 for _cellinfo in _cellConf['cells']:
                     self.mCellOperationCheck(_cellinfo['hostname'], "ADD_CELL")
                 
-                _stepSpecificDetails = self.mGetCluUtils().mStepSpecificDetails("elasticAddDetails", 'ONGOING', "Elastic Cell Post Cell Addition Check Reshape Validation in progress", _step)
-                self.mGetCluUtils().mUpdateTaskProgressStatus([], 25, _step, "In Progress", _stepSpecificDetails)
                 self.mPostReshapeValidation(_options)
 
                 if not _eBoxCluCtrl.IsZdlraProv():
@@ -1235,8 +1257,6 @@ class ebCluElasticCellManager(object):
 
                     # Save Diskgroup sizes
                     dg_size_dict = {}
-                    _stepSpecificDetails = self.mGetCluUtils().mStepSpecificDetails("elasticAddDetails", 'ONGOING', "Elastic Cell Post Cell Addition Fetch and save DG sizes in progress", _step)
-                    self.mGetCluUtils().mUpdateTaskProgressStatus([], 50, _step, "In Progress", _stepSpecificDetails)
                     _rc = self.mFetchAndSaveDGSizes(cludgroups, dg_size_dict)
                     if _rc:
                         _detail_error = "Diskgroup metadata fetch and save failed"
@@ -1247,7 +1267,7 @@ class ebCluElasticCellManager(object):
                         _sum = _sum + v['totalgb']
 
                     _cellOperationData['storageGB'] = (_sum / 3) #factor out HIGH REDUNDANCY
-                self.mGetCluUtils().mUpdateTaskProgressStatus([], 75, _step, "In Progress", _stepSpecificDetails,_cellOperationData)
+                    self._mUpdateRequestData(aOptions, _cellOperationData, _eBoxCluCtrl)
 
                 _cell_list = []
                 for _cellinfo in _cellConf['cells']:
@@ -1276,10 +1296,10 @@ class ebCluElasticCellManager(object):
                                 _csu.mWhitelistCidr(_eBoxCluCtrl, _node)
 
 
-                _selinux_status = _eBoxCluCtrl.mGetSELinuxMode("cell")
+                _selinux_status = self.__selinux_controls.mGetSELinuxMode("cell")
                 if _selinux_status:
                     try:
-                        _return_code = _eBoxCluCtrl.mProcessSELinuxUpdate(aOptions)
+                        _return_code = self.__selinux_controls.mProcessSELinuxUpdate(aOptions)
                         if _return_code == SELINUX_UPDATE_SUCCESS:
                             ebLogInfo("SE Linux mode/policy update succeeded for elastic cell update.")
                     except ExacloudRuntimeError as ere:
@@ -1439,7 +1459,7 @@ class ebCluElasticCellManager(object):
                 _message = f"Initiating clone operation sub step {_step} on the cell through OEDACLI"
                 ebLogInfo("*** " + _message)
                 _stepSpecificDetails = self.mGetCluUtils().mStepSpecificDetails("elasticDeleteDetails", 'ONGOING', f"Elastic Delete Cell step {_step} in progress", _step)
-                self.mGetCluUtils().mUpdateTaskProgressStatus([], 0, _step, "In Progress", _stepSpecificDetails) 
+                self.mGetCluUtils().mUpdateTaskProgressStatus([], 0, _step, "In Progress", _stepSpecificDetails)
                 _ebox.mUpdateStatusOEDA(True, _step, _step_list, _message)
                 _rc = self.mExecuteCellCloneAndSaveXml(_step, _power)
                 if _rc:
@@ -2722,6 +2742,29 @@ class ebCluElasticCellManager(object):
         elif aOptions.jsonmode:
             ebLogJson(json.dumps(_data_d, indent = 4, sort_keys = True))
     # end _mUpdateRequestData
+    
+    def _add_voting_files_info(self, _data_d):
+        """
+        Adds voting disk info to the request data dictionary for POST_ADDCELL_CHECK step.
+        """
+        try:
+            """
+            The voting disk information is shared and consistent across all healthy
+            nodes in the cluster. Running the command on any single node should
+            give complete, accurate list of all voting disks for the whole cluster.
+            """
+            _domU_list = [_domU for _, _domU in self.mGetEbox().mReturnDom0DomUPair()]
+            if _domU_list:
+                _first_domU = _domU_list[0]
+                with connect_to_host(_first_domU, get_gcontext(), username="grid") as _node:
+                    _cell_list = self.mGetEbox().mReturnCellNodes()
+                    _dpairs = self.mGetEbox().mReturnDom0DomUPair()
+                    ovm_configmgmt = ebConfigCollector(_dpairs, _cell_list, self.mGetEbox())
+                    _data_d['voting_files'] = ovm_configmgmt.mGetVotingDiskConfig(_node, _first_domU)
+            else:
+                ebLogWarn("No connectable DomU found, skipping fetch voting disk information.")
+        except Exception as e:
+            ebLogError(f"There was an error in adding voting files: {e}")
     
     # Common method to log error code and error message
     def mRecordError(self, aErrorObject, aString=None):

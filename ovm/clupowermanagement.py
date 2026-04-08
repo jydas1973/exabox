@@ -1,6 +1,6 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/ovm/clupowermanagement.py /main/1 2025/11/21 16:11:42 abysebas Exp $
+# $Header: ecs/exacloud/exabox/ovm/clupowermanagement.py /main/2 2025/12/23 09:35:23 abysebas Exp $
 #
 # clupowermanagement.py
 #
@@ -20,12 +20,15 @@
 #                           EXACLOUD CHANGES
 #    abysebas    11/13/25 - Creation
 #
+from datetime import datetime, timezone
+
 from exabox.core.Node import exaBoxNode
 from exabox.core.Context import get_gcontext
 from exabox.log.LogMgr import ebLogInfo, ebLogError, ebLogWarn, ebLogTrace
 from exabox.core.Error import ExacloudRuntimeError
 from exabox.BaseServer.AsyncProcessing import ProcessManager, ProcessStructure
 from exabox.utils.node import connect_to_host
+import copy
 import getpass
 import time
 
@@ -36,6 +39,46 @@ class ebCluStartStopHostFromIlom(object):
     def __init__(self, aExaBoxCluCtrl):
         self.__ebox = aExaBoxCluCtrl
         
+    @staticmethod
+    def _extract_host_payload(raw_payload):
+        if not raw_payload:
+            return None, {}
+        if isinstance(raw_payload, dict) and "host_ilom_pair" in raw_payload:
+            host_map = raw_payload.get("host_ilom_pair")
+            extras = {k: v for k, v in raw_payload.items() if k != "host_ilom_pair"}
+        else:
+            host_map = raw_payload
+            extras = {}
+        if host_map and not isinstance(host_map, dict):
+            raise ExacloudRuntimeError(0x0208, 0xA, "host_ilom_pair must be an object of host to ilom mapping")
+        return host_map or None, extras
+
+    def mRunSingleOperation(self, op_name, host_payload, aOptions, base_payload):
+        host_map, extras = self._extract_host_payload(host_payload)
+        if not host_map:
+            return None, None
+
+        single_payload = {
+            "operation": op_name,
+            "host_ilom_pair": host_map,
+        }
+        single_payload.update({k: v for k, v in extras.items() if k not in ("operation", "host_ilom_pair")})
+
+        if "parallel_process" not in single_payload and isinstance(base_payload, dict) and "parallel_process" in base_payload:
+            single_payload["parallel_process"] = base_payload["parallel_process"]
+
+        saved_payload = aOptions.jsonconf if aOptions else None
+        if aOptions is None:
+            raise ExacloudRuntimeError(0x0208, 0xA, "Options object is required for power operation")
+
+        aOptions.jsonconf = single_payload
+        try:
+            result = self.mStopStartHostViaIlom(aOptions)
+        finally:
+            aOptions.jsonconf = saved_payload
+
+        return result, copy.deepcopy(host_map)
+
     def mExecuteIlomCmd(self, _cmds, IlomName):
         """
         This function executes the commands formulated on the iloms 
@@ -104,7 +147,7 @@ class ebCluStartStopHostFromIlom(object):
 
         if _operation not in ("start", "stop"):
             msg = f"Failed: Invalid operation '{_operation}' for host {_host}"
-            _results_dict[_host] = msg
+            _results_dict[_host] = {"status": msg}
             ebLogError(msg)
             raise ExacloudRuntimeError(0x0208, 0xA, msg)
 
@@ -137,7 +180,10 @@ class ebCluStartStopHostFromIlom(object):
             _elapsed = time.time() - _start_ts
 
             if _is_desired_state():
-                _results_dict[_host] = "Success"
+                _results_dict[_host] = {
+                    "status": "Success",
+                    "completed_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+                }
                 if _operation == "stop":
                     ebLogInfo(
                         f"Host {_host} not pingeable after {_operation} from ilom and {_elapsed} seconds wait time")
@@ -148,7 +194,7 @@ class ebCluStartStopHostFromIlom(object):
             if _elapsed > _timeout:
                 msg = (f"Failed: Timeout while waiting for host {_host} to be "
                        f"{'stopped' if _operation == 'stop' else 'started'}.")
-                _results_dict[_host] = msg
+                _results_dict[_host] = {"status": msg}
                 ebLogError(msg)
                 break
 
@@ -178,7 +224,7 @@ class ebCluStartStopHostFromIlom(object):
             raise ExacloudRuntimeError(0x0207, 0xA, _err_str)
 
         _sleep_time = STOP_SLEEP_TIME_FROM_ILOM if _operation == "stop" else START_SLEEP_TIME_FROM_ILOM
-        _rc_final_result = {}
+        _rc_final_result = {"operation": _operation, "nodes": {}}
 
         if _parallelprocess:
             _items = list(_host_ilom_pair.items())
@@ -205,8 +251,9 @@ class ebCluStartStopHostFromIlom(object):
                 _rc_result = dict(_rc_result)
 
                 for _host, _rcs in _rc_result.items():
-                    ebLogInfo(f"{_operation.capitalize()} status for {_host} : {_rcs}")
-                _rc_final_result.update(_rc_result)
+                    _status = _rcs if isinstance(_rcs, str) else _rcs.get("status", "")
+                    ebLogInfo(f"{_operation.capitalize()} status for {_host} : {_status}")
+                _rc_final_result["nodes"].update(_rc_result)
 
         else:
             _rc_result = {}
@@ -221,8 +268,9 @@ class ebCluStartStopHostFromIlom(object):
                 self.mProcessHostLifecycle(ctx)
 
             for _host, _rcs in _rc_result.items():
-                ebLogInfo(f"{_operation.capitalize()} status for {_host} : {_rcs}")
-            _rc_final_result.update(_rc_result)
+                _status = _rcs if isinstance(_rcs, str) else _rcs.get("status", "")
+                ebLogInfo(f"{_operation.capitalize()} status for {_host} : {_status}")
+            _rc_final_result["nodes"].update(_rc_result)
 
         return _rc_final_result
 
@@ -405,4 +453,3 @@ class ebCluStartStopHostFromIlom(object):
             msg = f"Failed: Exception while applying low power mode on {_host}: {str(e)}"
             ebLogError(msg)
             _results_dict[_host] = msg
-

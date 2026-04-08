@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     KVM - Functionality implementation layer for the HVMMgr
@@ -64,74 +64,78 @@ class ebKvmVmMgr(HVMgr):
         _freeMem = 0
         _node = exaBoxNode(get_gcontext())
         _node.mConnect(self.hostname)
-
-        if aVirshMode:
-            _cmdstr = "/usr/bin/virsh nodememstats | /bin/grep -E 'free|cached'"
-        else:
-            _cmdstr = '''/usr/sbin/vm_maker --list --memory | /bin/grep "all 'autostart enabled domains' restart)" '''
-        _i, _o, _ = _node.mExecuteCmd(_cmdstr)
-        if _o:
-            _out = _o.readlines()
-            if not _out:
-                self.mLogDebug('*** Error can not retrieve free memory from host: %s' % (self.hostname))
-                _node.mDisconnect()
-                return 0
-            _freeMem = 0
-            _cached  = 0
-            _total_freeMem = 0
-            try:
-                if aVirshMode:
-                    _freeMem = int(_out[0].split()[2]) / 1024
-                    _cached  = int(_out[1].split()[2]) / 1024
-                    _total_freeMem = _freeMem + _cached
-                else:
-                    _total_freeMem = int(_out[0].split(':')[1].split()[0])
-            except:
-                pass
+        try:
+            if aVirshMode:
+                _cmdstr = "/usr/bin/virsh nodememstats | /bin/grep -E 'free|cached'"
+            else:
+                _cmdstr = '''/usr/sbin/vm_maker --list --memory | /bin/grep "all 'autostart enabled domains' restart)" '''
+            _i, _o, _ = _node.mExecuteCmd(_cmdstr)
+            if _o:
+                _out = _o.readlines()
+                if not _out:
+                    self.mLogDebug('*** Error can not retrieve free memory from host: %s' % (self.hostname))
+                    return 0
+                _freeMem = 0
+                _cached  = 0
+                _total_freeMem = 0
+                try:
+                    if aVirshMode:
+                        _freeMem = int(_out[0].split()[2]) / 1024
+                        _cached  = int(_out[1].split()[2]) / 1024
+                        _total_freeMem = _freeMem + _cached
+                    else:
+                        _total_freeMem = int(_out[0].split(':')[1].split()[0])
+                except:
+                    pass
+            self.mLogDebug("Dom0: %s, freemem: %sMb" % (self.hostname, _total_freeMem))
+            return _total_freeMem
+        finally:
             _node.mDisconnect()
-        self.mLogDebug("Dom0: %s, freemem: %sMb" % (self.hostname, _total_freeMem))
-        return _total_freeMem
 
     def getDom0TotalMem(self, aVirshMode=False):
         _totalMem = 0
         _node = exaBoxNode(get_gcontext())
         _node.mConnect(self.hostname)
-        if aVirshMode:
-            _cmdstr = '/usr/bin/virsh nodememstats | /bin/grep total'
-        else:
-            _cmdstr = '/usr/sbin/vm_maker --list --memory | /bin/grep "Total OS memory"'
-        _i, _o, _ = _node.mExecuteCmd(_cmdstr)
-        if _o:
-            _out = _o.readlines()
-            if not _out:
-                self.mLogDebug('*** Error can not retrieve total memory from host: %s' % (self.hostname))
-                _node.mDisconnect()
-                return 0
-            _totalMem = 0
-            try:
-                if aVirshMode:
-                    _totalMem = int(_out[0].split()[2]) / 1024
-                else:
-                    _totalMem = int(_out[0].split()[4])
-            except:
-                pass
+        try:
+            if aVirshMode:
+                _cmdstr = '/usr/bin/virsh nodememstats | /bin/grep total'
+            else:
+                _cmdstr = '/usr/sbin/vm_maker --list --memory | /bin/grep "Total OS memory"'
+            _i, _o, _ = _node.mExecuteCmd(_cmdstr)
+            if _o:
+                _out = _o.readlines()
+                if not _out:
+                    self.mLogDebug('*** Error can not retrieve total memory from host: %s' % (self.hostname))
+                    return 0
+                _totalMem = 0
+                try:
+                    if aVirshMode:
+                        _totalMem = int(_out[0].split()[2]) / 1024
+                    else:
+                        _totalMem = int(_out[0].split()[4])
+                except:
+                    pass
+            self.mLogInfo("Dom0: %s, totalmem: %sMb" % (self.hostname, _totalMem))
+            return _totalMem
+        finally:
             _node.mDisconnect()
-        self.mLogInfo("Dom0: %s, totalmem: %sMb" % (self.hostname, _totalMem))
-        return _totalMem
 
     def getTotalVMs(self, aVirshMode=False):
         _total_vms = 0
         _node = exaBoxNode(get_gcontext())
         _node.mConnect(self.hostname)
-        if aVirshMode:
-            _cmdstr = '/usr/bin/virsh list | /bin/grep running | wc -l'
-        else:
-            _cmdstr = '/usr/sbin/vm_maker --list-domains | /bin/grep running | wc -l'
-        _i, _o, _ = _node.mExecuteCmd(_cmdstr)
-        if _o:
-            _out = _o.readlines()
-            _total_vms = _out[0]
-        return _total_vms
+        try:
+            if aVirshMode:
+                _cmdstr = '/usr/bin/virsh list | /bin/grep running | wc -l'
+            else:
+                _cmdstr = '/usr/sbin/vm_maker --list-domains | /bin/grep running | wc -l'
+            _i, _o, _ = _node.mExecuteCmd(_cmdstr)
+            if _o:
+                _out = _o.readlines()
+                _total_vms = _out[0]
+            return _total_vms
+        finally:
+            _node.mDisconnect()
 
     # Local Execute Command api
     def mExecuteCmdOedaCli(self, _cmdstr, _hostId):

@@ -4,7 +4,7 @@
 #
 # ExaKmsEndpoint.py
 #
-# Copyright (c) 2021, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      ExaKmsEndpoint.py - <one-line expansion of the name>
@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    illamas     03/18/26 - Enh 39058830 add exakms create_key
 #    jesandov    01/06/25 - Add PKCS8 and TraditionalOpenSSL Format export
 #    jfsaldan    11/08/24 - Bug 37239457 - EXACLOUD EXACC FEDRAMP ; FS
 #                           ENCRYPTION PASSPHRASE ARE NOT SYNCED PROPERLY
@@ -81,6 +82,8 @@ class ExaKmsEndpoint:
         if _cmd == "list-old-format":
             self.mListOldFormat()
             return 0
+        if _cmd == "create_key":
+            return self.mCreateKey()
 
         if _cmd == "migrate-old-format":
             self.mMigrateOldFormat()
@@ -388,6 +391,82 @@ class ExaKmsEndpoint:
 
         ebLogInfo(f"Total entries found: {_count}")
         return _count
+
+    def mCreateKey(self):
+
+        if "hostname" not in self.__options or not self.__options["hostname"]:
+            ebLogError("'hostname' not found on options")
+            return 1
+
+        _hostname = self.__options["hostname"]
+        _user = self.__options.get("user", "root") or "root"
+        _hostType = ExaKmsHostType.UNKNOWN
+        _algorithm = self.__options.get("algorithm")
+
+        _hostTypeOpt = self.__options.get("hosttype")
+        if _hostTypeOpt:
+            _hostTypeStr = str(_hostTypeOpt).strip().upper()
+            _hostTypeMap = {
+                "DOM0": ExaKmsHostType.DOM0,
+                "DOMU": ExaKmsHostType.DOMU,
+                "COMPUTE": ExaKmsHostType.DOM0,
+                "CELL": ExaKmsHostType.CELL,
+                "CELLS": ExaKmsHostType.CELL,
+                "ROCESW": ExaKmsHostType.SWITCH,
+                "IBSW": ExaKmsHostType.SWITCH,
+                "PDU": ExaKmsHostType.SWITCH,
+                "SWITCH": ExaKmsHostType.SWITCH,
+                "SWITCHES": ExaKmsHostType.SWITCH,
+                "ILOM": ExaKmsHostType.ILOM,
+                "UNKNOWN": ExaKmsHostType.UNKNOWN
+            }
+            _hostType = _hostTypeMap.get(_hostTypeStr, ExaKmsHostType.UNKNOWN)
+
+        try:
+            _exakms = self.mGetExaKms()
+            _className = _algorithm.strip() if isinstance(_algorithm, str) and _algorithm.strip() else _exakms.mGetDefaultKeyAlgorithm()
+            _privateKey = _exakms.mGetEntryClass(_className).mGeneratePrivateKey()
+
+            _existing = _exakms.mSearchExaKmsEntries({"FQDN": _hostname}, aRefreshKey=True)
+            _entriesToRemove = []
+            for _entry in _existing:
+                if _entry.mGetUser() == _user:
+                    _entriesToRemove.append(_entry)
+
+            _newEntry = _exakms.mBuildExaKmsEntry(
+                _hostname,
+                _user,
+                _privateKey,
+                _hostType,
+                aClassName=_className
+            )
+
+            with connect_to_host(_hostname, get_gcontext()) as _node:
+
+                _cmd = f'/bin/echo "{_newEntry.mGetPublicKey()}"'
+                if _newEntry.mGetUser() == "root":
+                    _cmd = f'{_cmd} >> /root/.ssh/authorized_keys'
+                else:
+                    _cmd = f'{_cmd} >> /home/{_newEntry.mGetUser()}/.ssh/authorized_keys'
+                node_exec_cmd(_node, _cmd)
+
+                for _entry in _entriesToRemove:
+                    ebLogInfo(f"Removing existing key for {_user}@{_hostname}")
+                    _delCmd = f"/bin/sed -i 's@{_entry.mGetPublicKey().strip()}@@g'"
+                    if _entry.mGetUser() == "root":
+                        _delCmd = f'{_delCmd} /root/.ssh/authorized_keys'
+                    else:
+                        _delCmd = f'{_delCmd} /home/{_entry.mGetUser()}/.ssh/authorized_keys'
+                    node_exec_cmd(_node, _delCmd)
+                    _exakms.mDeleteExaKmsEntry(_entry)
+
+            _exakms.mInsertExaKmsEntry(_newEntry)
+            ebLogInfo(f"Created ExaKMS key for {_user}@{_hostname}")
+            return 0
+
+        except Exception as ex:
+            ebLogError(f"Failed to create ExaKMS key for {_user}@{_hostname}: {ex}")
+            return 1
 
     def mDeleteKey(self):
 

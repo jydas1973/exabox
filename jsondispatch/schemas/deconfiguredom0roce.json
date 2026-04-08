@@ -1,11 +1,11 @@
 {
     "properties": {
-        "roce_config_dom0_name": {
-            "type": "string"
-        }
+        "roce_config_dom0_name": { "type": "string" },
+        "roce_config_dom0_list": { "type": "array", "items": { "type": "string" } }
     },
-    "required": [
-        "roce_config_dom0_name"
+    "oneOf": [
+        { "required": ["roce_config_dom0_name"] },
+        { "required": ["roce_config_dom0_list"] }
     ],
     "type": "object"
 }

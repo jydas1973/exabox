@@ -4,7 +4,7 @@
 #
 # ResourceConnector.py
 #
-# Copyright (c) 2022, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2022, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      ResourceConnector.py - <one-line expansion of the name>
@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    prsshukl    03/12/26 - Bug 38900158 - EXACLOUD: ISSUES FOUND BY VOXIO
+#                           CODEV AGENT IN DIR EXABOX/EXAOCI
 #    asrigiri    07/15/25 - Bug 38156507 - OCI: CREATEEXACCCONSOLEHIS FAILED AS PROXY IS SET TO NULL.
 #    pbellary    05/03/25 - Bug 36909657 - EXACC GEN2: CREATE CONSOLE FAILS DUE TO WRONG REFERENCE OF PROXY FROM JSON FILE 
 #    pbellary    22/12/23 - Bug 36124951 - CREATE CONSOLE HISTORY WF FAILED WHILE TRYING TO CONNECT PROXY ON NO PROXY INFRA
@@ -65,6 +67,8 @@ class ResourceConnector(OCIConnector):
             _realm = self.__config_bundle.get("realmName")
             if _realm == "region1":
                 return "r1"
+            else:
+                return _realm
         else:
             _exaOcid = self.__config_bundle.get("exaccInfrastructureOcid")
             _ocidComponents = _exaOcid.split(".")

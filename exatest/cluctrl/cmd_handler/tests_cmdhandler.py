@@ -1,10 +1,10 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/exatest/cluctrl/cmd_handler/tests_cmdhandler.py /main/6 2025/10/31 21:59:23 aararora Exp $
+# $Header: ecs/exacloud/exabox/exatest/cluctrl/cmd_handler/tests_cmdhandler.py /main/8 2026/01/23 08:30:48 jesandov Exp $
 #
 # tests_cmdhandler.py
 #
-# Copyright (c) 2025, Oracle and/or its affiliates.
+# Copyright (c) 2025, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_cmdhandler.py - <one-line expansion of the name>
@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    pbellary    12/09/25 - Bug 38740441 - EXACLOUD: ADD COMPUTE WF DID NOT ENABLE QINQ IN ELASTIC NODE 
 #    aararora    10/31/25 - Bug 38595677: Python 3.8 compatability issue
 #    prsshukl    10/10/25 - Bug 38180284 - Unittest for mHandlerValidateVolumes
 #                           method
@@ -35,6 +36,84 @@ from exabox.agent.ebJobRequest import ebJobRequest
 from exabox.core.Error import ebError, gSubError, ExacloudRuntimeError, gNodeElasticError 
 
 KEY="LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQpNSUlFb3dJQkFBS0NBUUVBdU1iZHNraHdEZE05cDc2dmZyQnNrdjByM09UTElBYkJ5bzByNmFxajFMczdEbkdHCmFtVUZvTlpwWGdGRkFwM2pLcU9PN0JZc09JbWpKVklDdlY3VEtEUStMRk5lQUx2MHJGaHJtWERVY3BxQUtKYjQKNXVMZHlpS2lNZzRna251OW9iNDVDbjNHV2Q3RVhadzVDK1BHNEdpVXpjbncydVhaTnhTY3NkL1FXVlV4Y3NGRApLbHpzcEFZeFpyMVNvM2wyVGFYN0RkQzRNYlF5V1NMQTg2QW03RlM1aUVKK3h5Q05WbHh6YTVEd0xnUWxjVXgwCnRiWUxaT2tPWmZkMmdZM2g5MG45bEM4aGRHSlR2TytSZWl1TnQvampBa1ZXRGRVUEJkTFlVTzZJMjUxVDlaLzEKSXN4clBqR1FYbms2WWNjOFVkam0wZHlKYTVzZWViWU8vVXIxZVFJREFRQUJBb0lCQURBZHlSbGw5NWdDRENvawpZN3JQNGxZY2kxR0lXc1RLUGFpclBtWW93MlRnSks3TUxUNkRkQVhBRDh3azlIMkw4OTNrblpFbzdQY0VFSEhsCmUwVW83aituNnhETDNNekFKU1RFR2JEcFNzbFZKazVya2dFOXpwZVdrVG9McDd1OWNWSXZJTmQwalRSVjZEaWcKTjlLNnk4MGdMcSt3Q0lKWUhFcFZtY0JRRWdkUTBMcHdoNjJYK1VFMFkxZDlSdkt1dFpGNHRwZ1cybWMydlZwTApQTzZ0MFhwZlZFbnVpVzBvbVZQODZKSVhQd3l4TUtIc09WTzhvVzR0N09xcGJ0WjEwU05lOGdDS05qaHVZcHQ4CjF0SnJNNThGc09ndWx4QUNyRjU5bzdKUENUdzV4ZFBTbWxQNTIwaHZ3UDJxWGxLY2J5RlA3THZWNXVreTFaRWgKRllJVXV5RUNnWUVBMjVkRXVQbXYxNjdRcXoxc082Mkd4V3V6endxYjZjL1FlcDBiOHEzeHRPMitzYkxTaUlvLwp0NUx3aVFIc3VHVEQ0QzV3OHUwd3ovMXVHT3d2Tno1S2RZZERzTWlkcW9rcFJoc3NvTFpJcHB2WGtnN054OFd4CmNLTlZYZGtUQTMxNGJsVVdoT1hsQjhQcGZ4VDZYUTdOS2x6OW1KYWdTR3N4NFpUOTdGU0xhZjBDZ1lFQTEybmkKRjQzR1k5K051Q1VxMU9ZVklPZDk4a2M2SzBQWFdVWjVIeS9FOFozWnBMRGlMNXJJRTZXZ2VDYzR2SkorelptTQpTUDNjOTh5blozaXF1OFRyS29tR1BBQ1R1N091ZmdTblZiTkQ3UXY0UnBLU0hqK1h2MTVaa0c0SlArVm5mN0J1CldGa3BoYlJnMDd1LzZFS0dYQWg5MmV1aCtnaEdkSHgwbDlzMDVDMENnWUVBbGl3ZUNHNWhUaHcwZ2xjd05LUFkKWGh6b3kvZlNacFVEVzBja2ZOTnVVRENpei8yZU0xaHdlTWVaamVqdURiQ0RzRVd5WXIvSk9RUjFEY0JBRGdTZwpnVDJ2RWpBd2V4YndUZ3g1ZWJNUGZqbG50SEJCVkpTalk0ZWY4dDFvUG1QSlA1TWJJbW5pTm14SnUrb0p5aWc4Ck1QT0ZUcHY4STJxRG8yVDBQbklYSWJVQ2dZQTB6UDllUnFJYVdQR2o4WGhPTnhkMnVVZGwyNCttaXpwOTU0aEkKM0t5cGpNZU1WczhhWEJZdXVxcGF5VUplOW9tZVc4VEhIM0xLU3ArOS9SWGNjS2cwQlFHaU00SUN3RWhGRzE3bwo0c2dEa3F1SW9PU3dCV1pzd2ZPeU0wYVJJdW43b29OcHBIRkpGSzJuT0o0UmtEemUwallHOUhyL2pvZTJoY3NPCmJlekpBUUtCZ0VqL3ZFaDI3QWx1Y01GRXc2aXFZc2syaG40ZUU2SkNPRVZDUFlJYkx0eDNxaFMvcDhJMmk1cFEKUHFtcjE5NTh2eGErQ0tzVkQyVkxxMUtXYnB4MFNEVkF3Q2dTS01kcEc3R2lRK0prV2pCVG9tajVRbUtMTi9JZwo2eWkwUHRsQjJuQlpIUkh4aXhxNVR6M1RZS2pPYkJlQlZXMmYySlFLQjA0SjErSm5MMCtVCi0tLS0tRU5EIFJTQSBQUklWQVRFIEtFWS0tLS0t"
+
+ENABLE_QINQ_PAYLOAD = """ 
+{
+    "Overall Status: ": "True",
+    "exa_ocid": "ocid1.exadatainfrastructure.region1.sea.anzwkljsjajnm5iada6x2mbtvrnfywyzvif6ocrz6orfw64kl6zgkbq7vvna",
+    "exascale": {
+        "cell_list": [
+            "scaqau11celadm01.oracle.local",
+            "scaqau11celadm02.oracle.local",
+            "scaqau11celadm03.oracle.local"
+        ],
+        "ctrl_network": {
+            "ip": "10.106.65.163",
+            "name": "scaqau11ers01.oracle.local",
+            "port": "5052"
+        },
+        "db_vault": {
+            "gb_size": 4096,
+            "name": "xsvlt-65841-02"
+        },
+        "exascale_cluster_name": "sea119487exddbaasscaqau11XXXclu01ers",
+        "host_nodes": [
+            {
+                "compute_hostname": "scaqau11adm01.oracle.local",
+                "interface1": "stre0",
+                "interface2": "stre1",
+                "netmask": "255.255.240.0",
+                "priv1": "scaqau11adm01-priv1",
+                "priv2": "scaqau11adm01-priv2",
+                "storage_ip1": "192.168.64.1",
+                "storage_ip2": "192.168.64.2"
+            },
+            {
+                "compute_hostname": "scaqau11adm02.oracle.local",
+                "interface1": "stre0",
+                "interface2": "stre1",
+                "netmask": "255.255.240.0",
+                "priv1": "scaqau11adm02-priv1",
+                "priv2": "scaqau11adm02-priv2",
+                "storage_ip1": "192.168.64.3",
+                "storage_ip2": "192.168.64.4"
+            },
+            {
+                "compute_hostname": "scaqau11adm03.oracle.local",
+                "interface1": "stre0",
+                "interface2": "stre1",
+                "netmask": "255.255.240.0",
+                "priv1": "scaqau11adm03-priv1",
+                "priv2": "scaqau11adm03-priv2",
+                "storage_ip1": "192.168.64.79",
+                "storage_ip2": "192.168.64.80"
+            }
+        ],
+        "storage_pool": {
+            "gb_size": "51189",
+            "name": "hcpool"
+        },
+        "storage_vlan_id": "2900"
+    },
+    "newComputes": [
+        "scaqau11adm03"
+    ],
+    "node_type": "compute",
+    "operation": "activate-new-computes",
+    "requestId": "b71273bd-a223-481a-b6e7-d4851154cf68",
+    "validationResponse": [
+        {
+            "TotOnlineMem": "1.5T",
+            "model": "X10M-2",
+            "nodeStatus": "PASS",
+            "node_name": "scaqau11adm03",
+            "server": "scaqau11adm03",
+            "testsFailed": [],
+            "testsPassed": []
+        }
+    ]
+}
+"""
 
 class ebTestCmdHandler(ebTestClucontrol):
    
@@ -76,14 +155,24 @@ class ebTestCmdHandler(ebTestClucontrol):
                         exaMockCommand("/sbin/lvs --noheading *", aRc=0, aStdout="" ,aPersist=True),
                         exaMockCommand("/sbin/vgs --noheading *", aRc=0, aStdout="" ,aPersist=True),
                         exaMockCommand("/sbin/pvs --noheading *", aRc=0, aStdout="" ,aPersist=True),
-                        exaMockCommand("/bin/df --output=target *", aRc=0, aStdout="" ,aPersist=True)
-                    ],
-                    [
+                        exaMockCommand("/bin/df --output=target *", aRc=0, aStdout="" ,aPersist=True),
                         exaMockCommand("/bin/test -e *", aRc=0, aStdout="" ,aPersist=True),
                         exaMockCommand("/bin/df --output=target,source,fstype,size,avail --block-size=1 *", aRc=0, aStdout="" ,aPersist=True),
                         exaMockCommand("/sbin/lvs --noheading -o lv_name,lv_dm_path,vg_name,lv_size *", aRc=0, aStdout="" ,aPersist=True),
                         exaMockCommand("/sbin/vgs --noheading -o vg_name,vg_size,vg_free,vg_extent_size *", aRc=0, aStdout="" ,aPersist=True),
                         exaMockCommand("/sbin/pvs --noheading -o pv_name,vg_name,pv_size --units B *", aRc=0, aStdout="" ,aPersist=True),
+                        exaMockCommand("/bin/test -e *", aRc=0, aStdout="" ,aPersist=True),
+                        exaMockCommand("/bin/df --output=target,source,fstype,size,avail --block-size=1 | /bin/grep -v 'nfs' *", aRc=0, aStdout="" ,aPersist=True),
+                        exaMockCommand("/sbin/lvs --noheading -o lv_name,lv_dm_path,vg_name,lv_size --units B *", aRc=0, aStdout="" ,aPersist=True),
+                        exaMockCommand("/sbin/vgs --noheading -o vg_name,vg_size,vg_free,vg_extent_size --units B*", aRc=0, aStdout="" ,aPersist=True),
+                        exaMockCommand("/sbin/pvs --noheading -o pv_name,vg_name,pv_size --units B*", aRc=0, aStdout="" ,aPersist=True),
+                    ],
+                    [
+                        exaMockCommand("/bin/test -e *", aRc=0, aStdout="" ,aPersist=True),
+                        exaMockCommand("/bin/df --output=target,source,fstype,size,avail --block-size=1 | /bin/grep -v 'nfs' *", aRc=0, aStdout="" ,aPersist=True),
+                        exaMockCommand("/sbin/lvs --noheading -o lv_name,lv_dm_path,vg_name,lv_size --units B *", aRc=0, aStdout="" ,aPersist=True),
+                        exaMockCommand("/sbin/vgs --noheading -o vg_name,vg_size,vg_free,vg_extent_size --units B*", aRc=0, aStdout="" ,aPersist=True),
+                        exaMockCommand("/sbin/pvs --noheading -o pv_name,vg_name,pv_size --units B*", aRc=0, aStdout="" ,aPersist=True),
                     ],
                     [
                         exaMockCommand("/bin/test -e *", aRc=0, aStdout="" ,aPersist=True),
@@ -113,28 +202,23 @@ class ebTestCmdHandler(ebTestClucontrol):
 
         self.mPrepareMockCommands(_cmds)
         _obj = CommandHandler(self.mGetClubox())
-        with self.assertRaises(AttributeError):
-            _obj.mHandlerAddVmExtraSize()
+        _obj.mHandlerAddVmExtraSize()
            
         self.mGetClubox().mGetArgsOptions().jsonconf = json.loads('{"filesystem" : "root"}')
         with self.assertRaises(ExacloudRuntimeError):
             _obj.mHandlerAddVmExtraSize()
 
         self.mGetClubox().mGetArgsOptions().jsonconf = json.loads('{"filesystem" : "rootfs"}')
-        with self.assertRaises(AttributeError):
-            _obj.mHandlerAddVmExtraSize()
+        _obj.mHandlerAddVmExtraSize()
         
         self.mGetClubox().mGetArgsOptions().jsonconf = json.loads('{"extra_size" : "512"}')
-        with self.assertRaises(AttributeError):
-            _obj.mHandlerAddVmExtraSize()
+        _obj.mHandlerAddVmExtraSize()
         
         self.mGetClubox().mGetArgsOptions().jsonconf["validate_max_size"] = False
-        with self.assertRaises(AttributeError):
-            _obj.mHandlerAddVmExtraSize()
+        _obj.mHandlerAddVmExtraSize()
         
         self.mGetClubox().mGetArgsOptions().jsonconf = json.loads('{"resize_mode" : "normal"}')
-        with self.assertRaises(AttributeError):
-            _obj.mHandlerAddVmExtraSize()
+        _obj.mHandlerAddVmExtraSize()
          
 
 
@@ -966,7 +1050,6 @@ class ebTestCmdHandler(ebTestClucontrol):
         self.mGetClubox().mGetArgsOptions().jsonconf["target_device"] = 'ilom'
         _obj.mHandlerCaviumReset()
 
-
     def test_mHandlerValidateVolumes(self):
         fname = "mHandlerValidateVolumes"
         ebLogInfo(f"Running unit test on clucommandhandler.py: {fname}")
@@ -981,8 +1064,67 @@ class ebTestCmdHandler(ebTestClucontrol):
         with self.assertRaises(ExacloudRuntimeError):
             _obj.mHandlerValidateVolumes()
 
-       
+    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mSetupNatNfTablesOnDom0v2')
+    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mRebootNode')
+    def test_mHandlerEnableQinQ01(self, mock_mRebootNode, mock_mSetupNatNfTablesOnDom0v2):
+        fname = "mHandlerEnableQinQ"
+        ebLogInfo(f"Running unit test on clucommandhandler.py: {fname}")
+        _options = copy.deepcopy(self.mGetClubox().mGetArgsOptions())
+        _options.jsonconf = json.loads(ENABLE_QINQ_PAYLOAD)
 
+        _cmds = { 
+            self.mGetRegexDom0(): [ 
+            [
+               exaMockCommand("/usr/sbin/vm_maker --check", aRc=1),
+               exaMockCommand("/bin/virsh list --all --name"),
+               exaMockCommand("/opt/oracle.SupportTools/switch_to_ovm.sh --qinq")
+            ],
+            [
+                exaMockCommand("/usr/sbin/ip a s stre0 | /bin/grep inet | grep 192.168.64.79", aRc=0),
+                exaMockCommand("/usr/sbin/ip a s stre1 | /bin/grep inet | grep 192.168.64.80", aRc=0)
+
+            ]
+          ]
+        }
+        self.mPrepareMockCommands(_cmds)
+
+        _obj = CommandHandler(self.mGetClubox())
+        _obj.mHandlerEnableQinQ(_options)
+
+    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mSetupNatNfTablesOnDom0v2')
+    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mRebootNode')
+    def test_mHandlerEnableQinQ02(self, mock_mRebootNode, mock_mSetupNatNfTablesOnDom0v2):
+        fname = "mHandlerEnableQinQ"
+        ebLogInfo(f"Running unit test on clucommandhandler.py: {fname}")
+        _options = copy.deepcopy(self.mGetClubox().mGetArgsOptions())
+        _options.jsonconf = json.loads(ENABLE_QINQ_PAYLOAD)
+
+        _cmds = { 
+            self.mGetRegexDom0(): [ 
+            [
+               exaMockCommand("/usr/sbin/vm_maker --check", aRc=1),
+               exaMockCommand("/bin/virsh list --all --name"),
+               exaMockCommand("/opt/oracle.SupportTools/switch_to_ovm.sh --qinq")
+            ],
+            [
+                exaMockCommand("/usr/sbin/ip a s stre0 | /bin/grep inet | grep 192.168.64.79", aRc=1),
+                exaMockCommand("/usr/sbin/ip a s stre1 | /bin/grep inet | grep 192.168.64.80", aRc=1)
+            ],
+            [
+                exaMockCommand("/bin/virsh list --name"),
+                exaMockCommand("/usr/sbin/vm_maker --set --storage-vlan 2900 --ip 192.168.64.79 --netmask 255.255.240.0"),
+                exaMockCommand("/usr/sbin/ip a s re*", aRc=0, aStdout="")
+            ],
+            [
+                exaMockCommand("/usr/sbin/ip a s stre0 | /bin/grep inet", aRc=0),
+                exaMockCommand("/usr/sbin/ip a s stre1 | /bin/grep inet", aRc=0)
+            ]
+          ]
+        }
+        self.mPrepareMockCommands(_cmds)
+
+        _obj = CommandHandler(self.mGetClubox())
+        _obj.mHandlerEnableQinQ(_options)
 
 #if __name__ == "__main__":
 #    unittest.main()
@@ -1042,6 +1184,8 @@ def suite():
     suite.addTest(ebTestCmdHandler('test_mHandlerCaviumReset_test1'))
     suite.addTest(ebTestCmdHandler('test_mHandlerCaviumReset_test2'))
     suite.addTest(ebTestCmdHandler('test_mHandlerValidateVolumes'))
+    suite.addTest(ebTestCmdHandler('test_mHandlerEnableQinQ01'))
+    suite.addTest(ebTestCmdHandler('test_mHandlerEnableQinQ02'))
     
     return suite
 

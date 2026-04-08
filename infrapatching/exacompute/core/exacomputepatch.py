@@ -1,10 +1,10 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/infrapatching/exacompute/core/exacomputepatch.py /main/8 2025/05/07 04:51:45 araghave Exp $
+# $Header: ecs/exacloud/exabox/infrapatching/exacompute/core/exacomputepatch.py /main/9 2026/02/03 03:49:54 sdevasek Exp $
 #
 # exacomputepatch.py
 #
-# Copyright (c) 2022, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2022, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      exacomputepatch.py -
@@ -16,6 +16,9 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    sdevasek    01/16/26 - Enh 38821433 - EXACOMPUTE FREE POOL NODE
+#                           PATCHING: USE ONE OF THE TARGET NODE AS LAUNCH
+#                           NODE
 #    araghave    03/17/25 - Enh 37713042 - CONSUME ERROR HANDLING DETAILS FROM
 #                           INFRAPATCHERROR.PY DURING EXACOMPUTE PATCHING
 #    araghave    01/27/25 - Enh 37132175 - EXACOMPUTE MUST REUSE INFRA PATCHING
@@ -317,7 +320,11 @@ class ebCluExaComputePatch(LogHandler):
                     for _nd in _launch_nodes:
                         self.mPatchLogInfo(f"Launch Nodes are {_nd} ")
                 else:
-                    self.mPatchLogError("'LaunchNodes' field is Empty.")
+                    _launch_nodes = []
+                    self.mPatchLogInfo("LaunchNodes not provided; initiating auto selection")
+            else:
+                _launch_nodes = []
+
 
             if 'exasplice' in _jconf:
                 _is_exasplice = _jconf['exasplice']
@@ -345,7 +352,7 @@ class ebCluExaComputePatch(LogHandler):
                 if _errObj:
                     mUpdateErrorObjectToDB(self.__eboxCluCtrl, _errObj)
                     _ret = _errObj[0]
-                ebCluExaComputePatch.mUpdateRequestData(self.__eboxCluCtrl.mGetRequestObj(), aData=_data, aOptions=self.__options, aStatusObj= _errObj)
+                ebCluExaComputePatch.mUpdateRequestData(self.__eboxCluCtrl.mGetRequestObj(), aData=_data, aOptions=self.__options, aStatusObj=_errObj)
                 return _ret
 
             _patch_args_dict = {
@@ -366,11 +373,20 @@ class ebCluExaComputePatch(LogHandler):
                 "RackName": _rack_name
             }
 
+            _exaHandlerInstance = getExaComputeHandlerInstance(_patch_args_dict)
+
+            if not _launch_nodes:
+                self.mPatchLogInfo("Attempting to compute launch nodes from targets")
+                _computed_status, _computed_launch_nodes = _exaHandlerInstance.mComputeLaunchNodesFromTargetNodes(_node_list)
+                if _computed_status != PATCH_SUCCESS_EXIT_CODE:
+                    self.mPatchLogError("Failed to compute launch nodes from targets")
+                    ebCluExaComputePatch.mUpdateRequestData(self.__eboxCluCtrl.mGetRequestObj(), aData=_data, aOptions=self.__options, aStatusObj=None)
+                    return _computed_status
+
             _reqObjStatusUpdate = f"ExaCompute Node Patching Started for Nodes {str(_node_list)} with TargetVersion {_target_version} "
 
             _patch_mgr_return_val = PATCH_SUCCESS_EXIT_CODE
             self.__eboxCluCtrl.mUpdateStatus(_reqObjStatusUpdate, False)
-            _exaHandlerInstance = getExaComputeHandlerInstance(_patch_args_dict)
             _patch_mgr_return_val = _exaHandlerInstance.mExecuteTask()
             return _patch_mgr_return_val
 

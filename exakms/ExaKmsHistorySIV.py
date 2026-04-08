@@ -4,7 +4,7 @@
 #
 # ExaKmsHistorySIV.py
 #
-# Copyright (c) 2022, 2024, Oracle and/or its affiliates.
+# Copyright (c) 2022, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      ExaKmsHistorySIV.py - Historical operations for ExaKmsSIV entries
@@ -16,6 +16,8 @@
 #      None
 #
 #    MODIFIED   (MM/DD/YY)
+#    gsundara    03/21/26 - Bug 38900137 - EXACLOUD: ISSUES FOUND BY VOXIO
+#                           CODEV AGENT IN DIR EXABOX/EXAKMS  (Fix vault client usage)
 #    ririgoye    09/25/24 - Bug 36390923 - REMOVE EXAKMS HISTORY VALIDATION
 #                           ACROSS HOSTS
 #    jesandov    04/27/23 - 35141575: Add support of ECDSA key type
@@ -159,7 +161,8 @@ class ExaKmsHistorySIV(ExaKmsHistory):
 
         # Push secret to OCI Vault
         try:
-            _vault_client = oci.vault.VaultsClientCompositeOperations(_vault)
+            _vault_client = oci.vault.VaultsClientCompositeOperations(
+                            self.__exakms.mGetVaultClient())
             _vault_client.create_secret_and_wait_for_state(
                create_secret_details=_secret_details,
                wait_for_states=[oci.vault.models.Secret.LIFECYCLE_STATE_ACTIVE])

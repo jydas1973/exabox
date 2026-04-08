@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     HTTPSHelper - Functionality for HTTPS and TLS Certificate support
@@ -36,7 +36,6 @@ from six.moves import urllib
 from six.moves.urllib.parse import urlencode
 from six.moves.urllib.request import HTTPSHandler
 from typing import Any, ClassVar, Dict, List, Optional, Tuple
-from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
 
 from exabox.config.ebCertificateConfig import ebCertificateConfig
@@ -57,8 +56,11 @@ def use_oci_certificates() -> bool:
         _cfg = json.load(fd)
 
     if "use_ocicerts_https" in _cfg:
-        if isinstance(_cfg["use_ocicerts_https"], str):
-            _mode = _cfg["use_ocicerts_https"].lower() == "true"
+        _value = _cfg["use_ocicerts_https"]
+        if isinstance(_value, str):
+            _mode = _value.lower() == "true"
+        elif isinstance(_value, bool):
+            _mode = _value
 
     return _mode
 
@@ -108,8 +110,11 @@ def is_https_enabled() -> bool:
         _cfg = json.load(fd)
 
     if "https_enabled" in _cfg:
-        if isinstance(_cfg["https_enabled"], str):
-            _mode = _cfg["https_enabled"].lower() == "true"
+        _value = _cfg["https_enabled"]
+        if isinstance(_value, str):
+            _mode = _value.lower() == "true"
+        elif isinstance(_value, bool):
+            _mode = _value
 
     return _mode
 
@@ -167,19 +172,26 @@ def _get_secret() -> str:
 
 
 def is_secret_required(aCertificateConfig: ebCertificateConfig) -> bool:
-    _required = False
+    if "client_certificate_key_file" not in aCertificateConfig:
+        return False
+    _key_path = aCertificateConfig["client_certificate_key_file"]
+    if not _key_path:
+        return False
+    with open(_key_path, "rb") as fd:
+        _key_data = fd.read()
+
     try:
-        _key: rsa.RSAPrivateKey = None
-        with open(
-            aCertificateConfig["client_certificate_key_file"], "rb") as fd:
-            load_pem_private_key(
-                fd.read(), 
-                password=_get_secret)
-        _required = True
-    except TypeError:
-        _required = False
-    
-    return _required
+        load_pem_private_key(_key_data, password=None)
+        return False
+    except (TypeError, ValueError):
+        _secret = _get_secret()
+        if _secret is None:
+            return True
+        try:
+            load_pem_private_key(_key_data, password=_secret)
+            return True
+        except (TypeError, ValueError) as exc:
+            raise RuntimeError(f"Unable to load encrypted key {_key_path} with provided secret") from exc
 
 def get_socket_timeout():
     _cfg: str = ""
@@ -304,10 +316,11 @@ def build_opener(aHost: str, aPort: int, aUrl: str, \
         _client_cert = None
         _client_key = None
         _secret_required = True
+        app_cfg: Optional[ebCertificateConfig] = None
         if use_oci_certificates():
             _rootca_cert, _client_cert, _client_key, _https_protocol = get_oci_certificates(isClient=True)
         else:
-            app_cfg: ebCertificateConfig = ebCertificateConfig(
+            app_cfg = ebCertificateConfig(
                 "exacloud", get_tls_config_path())
             _rootca_cert = app_cfg["local_certificate_file"]
             _client_cert = app_cfg["client_certificate_file"]

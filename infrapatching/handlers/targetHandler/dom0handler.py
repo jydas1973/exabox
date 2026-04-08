@@ -1,9 +1,9 @@
 #
-# $Header: ecs/exacloud/exabox/infrapatching/handlers/targetHandler/dom0handler.py /main/182 2025/11/26 06:43:03 araghave Exp $#
+# $Header: ecs/exacloud/exabox/infrapatching/handlers/targetHandler/dom0handler.py jyotdas_bug-38824997/5 2026/02/13 11:52:09 jyotdas Exp $#
 #
 # dom0handler.py
 #
-# Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      dom0handler.py - Patch - Dom0 Basic Functionality
@@ -16,8 +16,25 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
-#    jyotdas     02/06/26 - Enh - Allow LATEST targetVersion for DOM0
-#                           exasplice patching
+#    avimonda    03/16/26 - Bug 38969712 - AIM4ECS:0X03030021 - UNABLE TO
+#                           STARTUP GUEST VMS AS PART OF UPGRADE/ROLLBACK
+#                           OPERATION
+#    rbhandar    03/12/26 - Bug 38516242 - ADD CLEAR LOG MESSAGE ABOUT LAUNCH
+#                           NODE AND MILE STONES IN CASE OF NON ROLLING
+#                           PATCHING OPERATION
+#    bhpati      03/02/26 - Bug 38932171 - AIM4ECS:0X03030006 - DB SERVICES
+#                           WERE NOT UP ON DOM0
+#    rbhandar    02/22/26 - Bug 38453227 - AIM4ECS:0X03030012 - INDIVIDUAL
+#                           PATCH REQUEST EXCEPTION DETECTED
+#    araghave    02/12/26 - Bug 38891325 - OCI: EXACS | SMR | SMR APPLY IS
+#                           SHOWING INCORRECT TARGET VERSION , WHILE APPLYING
+#                           CORRECT VERSION
+#    jyotdas     02/09/26 - ENH 38824997 - Support target version for dom0 and
+#                           kvm host elu
+#    nelango     02/01/26 - Bug 38901967: No ilom service state disabling
+#    nelango     01/09/26 - Bug 38676078 - Add IPMI servicestate for exacs
+#    kdas        12/17/25 - Enh 38735511 - Exacloud layer enhancements for 
+#                           SMR patching of Clusterless free nodes 
 #    jyotdas     10/31/25 - Bug 38575316 - Parallelise the dom0 shutdown across
 #                           all nodes while non-rolling qmr patching.
 #    bhpati      10/23/25 - Display an Exadata Live Update (ELU) specific error
@@ -567,6 +584,7 @@ History:
 """
 import datetime
 import os, sys
+import re
 import time
 import json
 import traceback
@@ -732,7 +750,7 @@ class Dom0Handler(TargetHandler):
             if mExaspliceVersionPatternMatch(self.mGetTargetVersion()) \
                     or (self.mGetTargetVersion().upper() == 'LATEST' and self.mIsExaSplice()):
                 if self.mGetTargetVersion().upper() == 'LATEST':
-                    self.mPatchLogInfo(f"Processing LATEST targetVersion for DOM0 exasplice precheck")
+                    self.mPatchLogInfo(f"Handling LATEST targetVersion for DOM0 exasplice precheck")
                 _list_of_nodes = self.mGetListOfDom0sWhereExasplicePatchCanBeApplied(_launch_nodes, _list_of_nodes)
 
             # Set initial Patch Status Json.
@@ -863,9 +881,9 @@ class Dom0Handler(TargetHandler):
             _callbacks = self.mGetCallBacks()
 
             self.mPatchLogInfo(
-                f'_node_to_patch_nodes = {str(_node_to_patch_nodes)}, _node_to_patch_initial_node = {str(_node_to_patch_initial_node)}')
+                f'Launch node to patch nodes = {str(_node_to_patch_nodes)}, Launch node to patch initial node = {str(_node_to_patch_initial_node)}')
             self.mPatchLogInfo(
-                f'_nodes_to_patch_except_initial = {str(_nodes_to_patch_except_initial)}, _initial_node_list= {str(_initial_node_list)}')
+                f'Nodes selected for second patch iteration = {str(_nodes_to_patch_except_initial)}, Nodes selected for first patch iteration = {str(_initial_node_list)}')
 
             _ec_node_precheck = PATCH_SUCCESS_EXIT_CODE
             _ec_initial_node_precheck = PATCH_SUCCESS_EXIT_CODE
@@ -986,15 +1004,21 @@ class Dom0Handler(TargetHandler):
                 _ret = PATCH_SUCCESS_EXIT_CODE
 
         except Exception as e:
-            self.mPatchLogError(f"Exception in Running DOM0 PreCheck  {str(e)}")
+            _error_msg = str(e)
+            self.mPatchLogError(f"Exception in Running DOM0 PreCheck  {_error_msg}")
             self.mPatchLogTrace(traceback.format_exc())
             _rc, _child_request_error_already_exists_in_db = self.mGetErrorCodeFromChildRequest()
 
             if _child_request_error_already_exists_in_db:
                 _ret = _rc
             else:
-                _suggestion_msg = f"Exception in Running DOM0 Precheck  {str(e)}"
-                _ret = INDIVIDUAL_PATCH_REQUEST_EXCEPTION_ERROR 
+                _is_ssh_error, _ssh_error_code = self.isSSHConnectivityError(_error_msg)
+                if _is_ssh_error:
+                    _ret = _ssh_error_code
+                    _suggestion_msg = self.mBuildSshSuggestion(_ret, _error_msg, "DOM0 Precheck")
+                else:
+                    _suggestion_msg = f"Exception in Running DOM0 Precheck {_error_msg}"
+                    _ret = INDIVIDUAL_PATCH_REQUEST_EXCEPTION_ERROR
                 self.mAddError(_ret, _suggestion_msg)
 
         finally:
@@ -1087,10 +1111,7 @@ class Dom0Handler(TargetHandler):
                     return _ret, _no_action_taken
 
                 # Validate for exasplice patch to be applied on list of dom0s.
-                if mExaspliceVersionPatternMatch(self.mGetTargetVersion()) \
-                        or (self.mGetTargetVersion().upper() == 'LATEST' and self.mIsExaSplice()):
-                    if self.mGetTargetVersion().upper() == 'LATEST':
-                        self.mPatchLogInfo(f"Processing LATEST targetVersion for DOM0 ELU exasplice precheck")
+                if mExaspliceVersionPatternMatch(self.mGetTargetVersion()):
                     _list_of_nodes = self.mGetListOfDom0sWhereExasplicePatchCanBeApplied(_launch_nodes, _list_of_nodes)
 
                 '''
@@ -1158,9 +1179,9 @@ class Dom0Handler(TargetHandler):
                                               " were not provided at initialization")
 
                 self.mPatchLogInfo(
-                    f'_node_to_patch_nodes = {str(_node_to_patch_nodes)}, _node_to_patch_initial_node = {str(_node_to_patch_initial_node)}')
+                    f'Launch node to patch nodes = {str(_node_to_patch_nodes)}, Launch node to patch initial node = {str(_node_to_patch_initial_node)}')
                 self.mPatchLogInfo(
-                    f'_nodes_to_patch_except_initial = {str(_nodes_to_patch_except_initial)}, _initial_node_list= {str(_initial_node_list)}')
+                    f'Nodes selected for second patch iteration = {str(_nodes_to_patch_except_initial)}, Nodes selected for first patch iteration = {str(_initial_node_list)}')
 
                 _ec_node_precheck = PATCH_SUCCESS_EXIT_CODE
                 _ec_initial_node_precheck = PATCH_SUCCESS_EXIT_CODE
@@ -1533,7 +1554,83 @@ class Dom0Handler(TargetHandler):
         # Log location is updated in mUpdateNodePatcherLogDir for proper collection of final CNS notification
         self.mUpdateNodePatcherLogDir(aNode, aCnsString)
 
-    def mPatch(self):
+    
+    def mPerformEluClusterlessPatch(self):
+        '''
+        It is possible for clusterless nodes part of the same cabinet to be at different
+        target versions. This method handles ELU patching per target version sequentially,
+        batching all the nodes with the same target version into a single mPatch invocation.
+        Note that the patch operation will return error if ELU patching of any nodes gets
+        skipped due to their target version getting mapped to INVALID_REGISTERED_PATCH_VERSIONS
+        '''
+
+        _ret = PATCH_SUCCESS_EXIT_CODE
+        _no_action_taken = 0
+        _elu_target_mappings = self.mGetEluTargetVersiontoNodeMappings() or {}
+
+        self.mPatchLogInfo("Starting clusterless ELU batch patching across target versions.")
+
+        _all_elu_nodes = []
+        for _node_list in _elu_target_mappings.values():
+            _nodes_for_version = [node.strip() for node in _node_list] if isinstance(_node_list, list) else [node.strip() for node in str(_node_list).split(',') if node.strip()]
+            for _node in _nodes_for_version:
+                if _node not in _all_elu_nodes:
+                    _all_elu_nodes.append(_node)
+
+        if len(_all_elu_nodes) > 0:
+            self.mSetCurrentTargetType(PATCH_DOM0)
+            self.mUpdatePatchProgressStatus(aNodeList=_all_elu_nodes, aDiscardedNodeList=[])
+
+        for _target_version, _node_list in _elu_target_mappings.items():
+            _nodes_for_version = [node.strip() for node in _node_list] if isinstance(_node_list, list)                                  else [node.strip() for node in str(_node_list).split(',') if node.strip()]
+            if not _nodes_for_version:
+                continue
+
+            self.mPatchLogInfo(f"Processing ELU target version {_target_version} for nodes {_nodes_for_version}")
+
+            if _target_version in INVALID_REGISTERED_PATCH_VERSIONS:
+                '''
+                We will fail the nodes for which we donot have target version available
+                and also the overall patch operation will return with a failure code
+                '''
+                self.mPatchLogError(f"Exadata Live Update input image version - {_target_version} is invalid and this might be because image series was not registered for the QMR version for the Dom0 nodes: {str(self.mGetCustomizedDom0List())}. Patch will be skipped on these nodes, and the final error code for patch will be marked as failure.")
+                _failure_code = INFRA_PATCHING_ELU_IMAGE_VERSION_NOT_FOUND
+                _ret = _failure_code
+                _details = f"Exadata Live Update input image version - {_target_version} is invalid"
+                self.mUpdatePatchProgressStatusForNodes(aNodeList=_nodes_for_version,
+                                                        aStatus="Failed",
+                                                        aStatusDetails=_details)
+                for _node in _nodes_for_version:
+                    self.mPatchLogError("Exadata Live Update skipped")
+                continue
+
+            self.mSetTargetVersion(_target_version)
+            try:
+                '''
+                We submit patching of all nodes with the same target version for clusterless ELU
+                in a batch
+                '''
+                _patch_ret, _ = self.mPatch(aEluNodes=_nodes_for_version)
+            except Exception as ex:
+                self.mPatchLogError(f"Clusterless ELU patching failed for nodes {_nodes_for_version}: {str(ex)}")
+                self.mPatchLogTrace(traceback.format_exc())
+                _patch_ret = INDIVIDUAL_PATCH_REQUEST_EXCEPTION_ERROR
+
+            if _ret == PATCH_SUCCESS_EXIT_CODE and _patch_ret != PATCH_SUCCESS_EXIT_CODE:
+                _ret = _patch_ret
+
+        
+        if _ret != PATCH_SUCCESS_EXIT_CODE:
+            _suggestion_msg = "Clusterless ELU patching failed on one or more dom0 nodes"
+            self.mAddError(_ret, _suggestion_msg)
+
+        return _ret, _no_action_taken
+
+    '''
+    When invoked without aEluNodes the method may enter the clusterless ELU
+    batch flow; nested invocations pass aEluNodes to avoid re-entry.
+    '''
+    def mPatch(self, aEluNodes=None):
 
         """
        Does the setup, filter the nodes to patch, idempotency check
@@ -1551,6 +1648,11 @@ class Dom0Handler(TargetHandler):
         _list_of_nodes = []
 
         try:
+            if aEluNodes is None and self.mIsClusterLessUpgrade() and self.mIsExaSplice() and \
+                    self.mGetEluTargetVersiontoNodeMappings():
+                _ret, _no_action_taken = self.mPerformEluClusterlessPatch()
+                return _ret, _no_action_taken
+
             self.mPatchLogInfo(f"\n\n---------------> Starting {TASK_PATCH} on {PATCH_DOM0}s <---------------\n\n")
 
             '''
@@ -1608,16 +1710,13 @@ class Dom0Handler(TargetHandler):
 
             # Get customized list of nodes
             _ret, _suggestion_msg, _list_of_nodes, _discarded = self.mFilterNodesToPatch(
-                self.mGetCustomizedDom0List(), PATCH_DOM0, TASK_PATCH)
+                aEluNodes if aEluNodes is not None else self.mGetCustomizedDom0List(), PATCH_DOM0, TASK_PATCH)
             if _ret != PATCH_SUCCESS_EXIT_CODE:
                 self.mAddError(_ret, _suggestion_msg)
                 return _ret, _no_action_taken
 
             # Validate for exasplice patch to be applied on list of dom0s.
-            if mExaspliceVersionPatternMatch(self.mGetTargetVersion()) \
-                    or (self.mGetTargetVersion().upper() == 'LATEST' and self.mIsExaSplice()):
-                if self.mGetTargetVersion().upper() == 'LATEST':
-                    self.mPatchLogInfo(f"Processing LATEST targetVersion for DOM0 exasplice patching")
+            if mExaspliceVersionPatternMatch(self.mGetTargetVersion()):
                 _list_of_nodes = self.mGetListOfDom0sWhereExasplicePatchCanBeApplied(_launch_nodes, _list_of_nodes)
 
             # Set initial Patch Status Json.
@@ -1735,9 +1834,9 @@ class Dom0Handler(TargetHandler):
                                           " were not provided at initialization")
 
             self.mPatchLogInfo(
-                f'_node_to_patch_nodes = {str(_node_to_patch_nodes)}, _node_to_patch_initial_node = {str(_node_to_patch_initial_node)}')
+                f'Launch node to patch nodes = {str(_node_to_patch_nodes)}, Launch node to patch initial node = {str(_node_to_patch_initial_node)}')
             self.mPatchLogInfo(
-                f'_nodes_to_patch_except_initial = {str(_nodes_to_patch_except_initial)}, _initial_node_list= {str(_initial_node_list)}')
+                f'Nodes selected for second patch iteration = {str(_nodes_to_patch_except_initial)}, Nodes selected for first patch iteration = {str(_initial_node_list)}')
 
             # Update status
             self.mUpdatePatchStatus(True, STEP_FILTER_NODES + '_' + PATCH_DOM0)
@@ -1745,7 +1844,7 @@ class Dom0Handler(TargetHandler):
             _dont_rollback = False
             # get the list of the dom0s that actually require patching
             _nodes_that_require_patching = _list_of_nodes[:]
-            self.mPatchLogInfo("_nodes_that_require_patching" +str(_nodes_that_require_patching))
+            self.mPatchLogInfo("The list of nodes that require patching = " + str(_nodes_that_require_patching))
             if len(_nodes_that_require_patching) == 0:
                 _no_action_taken += 1
                 return NO_ACTION_REQUIRED, _no_action_taken
@@ -1769,7 +1868,7 @@ class Dom0Handler(TargetHandler):
                     if _nodes_that_require_patching:
                         _node_patcher_and_node_patch_list.append(
                             (_node_to_patch_nodes, _nodes_that_require_patching))
-                self.mPatchLogInfo(f"_node_patcher_and_node_patch_list: {str(_node_patcher_and_node_patch_list)}")
+                self.mPatchLogInfo(f"Launch nodes and target nodes: {str(_node_patcher_and_node_patch_list)}")
                 _operationStyle = self.mGetOpStyle()
                 if _operationStyle == OP_STYLE_ROLLING:
                     _ret = self.mPatchRollbackDom0sRolling(
@@ -1800,23 +1899,27 @@ class Dom0Handler(TargetHandler):
             self.mCreateInfrapatchingTimeStatsEntry(str(self.mGetDom0List()), "POST_PATCH")
 
         except Exception as e:
-            self.mPatchLogError(f"Exception in Running Dom0 Patch {str(e)}")
+            _error_msg = str(e)
+            self.mPatchLogError(f"Exception in Running DOM0 Patch {_error_msg}")
             self.mPatchLogTrace(traceback.format_exc())
             _rc, _child_request_error_already_exists_in_db = self.mGetErrorCodeFromChildRequest()
 
             if _child_request_error_already_exists_in_db:
                 _ret = _rc
             else:
-                _suggestion_msg = f"Exception in Running DOM0 Patch {str(e)}"
-                _ret = INDIVIDUAL_PATCH_REQUEST_EXCEPTION_ERROR
+                _is_ssh_error, _ssh_error_code = self.isSSHConnectivityError(_error_msg)
+                if _is_ssh_error:
+                    _ret = _ssh_error_code
+                    _suggestion_msg = self.mBuildSshSuggestion(_ret, _error_msg, "DOM0 Patch")
+                else:
+                    _suggestion_msg = f"Exception in Running DOM0 Patch {_error_msg}"
+                    _ret = INDIVIDUAL_PATCH_REQUEST_EXCEPTION_ERROR
                 self.mAddError(_ret, _suggestion_msg)
 
         finally:
             # Start VMs for non-rolling patch failure
             if _ret != PATCH_SUCCESS_EXIT_CODE:
-                self.mStartupVMsUponNonRollingPatchFailure()
-            # Disable ServiceState on ilom post upgrade.
-            self.mUpdateServiceStateOnIlom(_list_of_nodes, "postpatch")
+                self.mStartupVMsUponNonRollingPatchFailure(aStatus = _ret)
 
             self.mPatchLogInfo("Cleanup Environment")
             self.mCleanSSHEnvSetUp()
@@ -2024,9 +2127,9 @@ class Dom0Handler(TargetHandler):
                                           " were not provided at initialization")
 
             self.mPatchLogInfo(
-                f'_node_to_patch_nodes = {str(_node_to_patch_nodes)}, _node_to_patch_initial_node = {str(_node_to_patch_initial_node)}')
+                f'Launch node to patch nodes = {str(_node_to_patch_nodes)}, Launch node to patch initial node = {str(_node_to_patch_initial_node)}')
             self.mPatchLogInfo(
-                f'_nodes_to_patch_except_initial = {str(_nodes_to_patch_except_initial)}, _initial_node_list= {str(_initial_node_list)}')
+                f'Nodes selected for second patch iteration = {str(_nodes_to_patch_except_initial)}, Nodes selected for first patch iteration = {str(_initial_node_list)}')
 
             # Update status
             self.mUpdatePatchStatus(True, STEP_FILTER_NODES + '_' + PATCH_DOM0)
@@ -2073,8 +2176,7 @@ class Dom0Handler(TargetHandler):
                         _dom0_node = exaBoxNode(get_gcontext())
                         _dom0_node.mConnect(aHost=_node)
 
-                        if mExaspliceVersionPatternMatch(self.mGetTargetVersion()) \
-                                or (self.mGetTargetVersion().upper() == 'LATEST' and self.mIsExaSplice()):
+                        if mExaspliceVersionPatternMatch(self.mGetTargetVersion()):
                             _i, _o, _e = _dom0_node.mExecuteCmd("date '+%s' -d \"`imageinfo -activatedexasplice`\"")
                         else:
                             _i, _o, _e = _dom0_node.mExecuteCmd("date '+%s' -d \"`imageinfo -activated`\"")
@@ -2139,7 +2241,7 @@ class Dom0Handler(TargetHandler):
                 if _nodes_that_require_patching:
                     _node_patcher_and_node_patch_list.append(
                         (_node_to_patch_nodes, _nodes_that_require_patching))
-            self.mPatchLogInfo(f"_node_patcher_and_node_patch_list:\n {str(_node_patcher_and_node_patch_list)}")
+            self.mPatchLogInfo(f"Launch nodes and target nodes:\n {str(_node_patcher_and_node_patch_list)}")
 
             _operationStyle = self.mGetOpStyle()
             if _operationStyle == OP_STYLE_ROLLING:
@@ -2295,9 +2397,9 @@ class Dom0Handler(TargetHandler):
             _cns_string = CNS_DOM0_PATCHER
             _callbacks = self.mGetCallBacks()
             self.mPatchLogInfo(
-                f'_node_to_patch_nodes = {str(_node_to_patch_nodes)}, _node_to_patch_initial_node = {str(_node_to_patch_initial_node)}')
+                f'Launch node to patch nodes = {str(_node_to_patch_nodes)}, Launch node to patch initial node = {str(_node_to_patch_initial_node)}')
             self.mPatchLogInfo(
-                f'_nodes_to_patch_except_initial = {str(_nodes_to_patch_except_initial)}, _initial_node_list= {str(_initial_node_list)}')
+                f'Nodes selected for second patch iteration = {str(_nodes_to_patch_except_initial)}, Nodes selected for first patch iteration = {str(_initial_node_list)}')
 
             _ec_node_backup = PATCH_SUCCESS_EXIT_CODE
             _ec_initial_node_backup = PATCH_SUCCESS_EXIT_CODE
@@ -2646,252 +2748,318 @@ class Dom0Handler(TargetHandler):
                                                                    aRemoteNodesList,
                                                                    _auth_keys_remove_patterns)
     
-    # Sets the common envrionment for all tasks in dom0
+    def mComputeEluPatchPaths(self, aTargetVersion, aPatchBaseDir):
+        """
+        Computes ELU-specific patch file paths from standardized directory structure.
+
+        For ELU patching, the patch artifacts are organized in a standardized structure:
+        PATCH_BASE/<targetVersion>/DBPatchFile/dbserver.patch.zip
+        PATCH_BASE/<targetVersion>/Dom0YumRepository/<vm_type>_<version>.zip
+
+        This method locates both files and returns their full paths.
+
+        FUNCTION:
+            - Constructs path to DBPatchFile subdirectory
+            - Locates dbserver.patch.zip file
+            - Constructs path to Dom0YumRepository subdirectory
+            - Scans for appropriate patch file based on environment type:
+              * KVM: Files containing '_ol8_' (exclude '_ovs_')
+              * OVM: Files containing '_ovs_'
+            - Validates file existence
+            - Returns full paths for both files
+
+        Args:
+            aTargetVersion (str): The ELU target version (e.g., '25.2.6.0.0.260117')
+            aPatchBaseDir (str): The base directory for patches (e.g., '/EXAVMIMAGES/')
+
+        Returns:
+            tuple: (_dom0_local_patch_zip, _dom0_local_patch_zip2)
+                - _dom0_local_patch_zip (str): Full path to dbserver.patch.zip
+                - _dom0_local_patch_zip2 (str): Full path to Dom0 YUM repository file
+
+        Raises:
+            Exception: If targetVersion format is invalid
+            Exception: If required files are not found or directories don't exist
+
+        NOTE:
+            This method is specifically for ELU patching scenarios only.
+            It should only be called when mIsElu() returns True.
+
+        """
+        _dom0_local_patch_zip = None
+        _dom0_local_patch_zip2 = None
+
+        # Validate target version format (e.g., 25.2.6.0.0.260117 or 25.2.6.0.0.260117.1)
+        if not re.match(r'^\d{1,2}(\.\d{1,2}){4}\.\d{6}(\.\d+)?$', aTargetVersion):
+            _error_msg = f"Invalid target version format: {aTargetVersion}. Expected format: XX.X.X.X.X.YYMMDD[.N]"
+            self.mPatchLogError(_error_msg)
+            raise Exception(_error_msg)
+
+        self.mPatchLogInfo(f"Computing ELU patch paths for target version: {aTargetVersion}")
+        self.mPatchLogInfo(f"Using patch base directory: {aPatchBaseDir}")
+
+        # Build path to DBPatchFile directory
+        _dbpatch_dir = os.path.join(aPatchBaseDir, aTargetVersion, 'DBPatchFile')
+        _dom0_local_patch_zip = os.path.join(_dbpatch_dir, 'dbserver.patch.zip')
+
+        self.mPatchLogInfo(f"DBPatchFile path: {_dom0_local_patch_zip}")
+
+        if not os.path.exists(_dom0_local_patch_zip):
+            _error_msg = f"DBPatchFile not found at expected location: {_dom0_local_patch_zip}"
+            self.mPatchLogError(_error_msg)
+            raise Exception(_error_msg)
+
+        # Build path to Dom0YumRepository directory
+        _dom0_repo_dir = os.path.join(aPatchBaseDir, aTargetVersion, 'Dom0YumRepository')
+
+        self.mPatchLogInfo(f"Dom0YumRepository path: {_dom0_repo_dir}")
+
+        if not os.path.exists(_dom0_repo_dir):
+            _error_msg = f"Dom0YumRepository directory not found: {_dom0_repo_dir}"
+            self.mPatchLogError(_error_msg)
+            raise Exception(_error_msg)
+
+        # List all files in the Dom0YumRepository directory
+        _repo_files = os.listdir(_dom0_repo_dir)
+        self.mPatchLogInfo(f"Found {len(_repo_files)} files in Dom0YumRepository: {_repo_files}")
+
+        # Select the appropriate patch file based on environment type
+        _file_selected = False
+        for _patch_file in _repo_files:
+            if self.mIsKvmEnv():
+                # KVM: Select files containing _ol8_ (exclude _ovs_)
+                if "_ol8_" in _patch_file and "_ovs_" not in _patch_file:
+                    _dom0_local_patch_zip2 = os.path.join(_dom0_repo_dir, _patch_file)
+                    self.mPatchLogInfo(f"Selected KVM patch file: {_patch_file}")
+                    _file_selected = True
+                    break
+            else:
+                # OVM: Select files containing _ovs_
+                if "_ovs_" in _patch_file:
+                    _dom0_local_patch_zip2 = os.path.join(_dom0_repo_dir, _patch_file)
+                    self.mPatchLogInfo(f"Selected OVM patch file: {_patch_file}")
+                    _file_selected = True
+                    break
+
+        if not _file_selected or _dom0_local_patch_zip2 is None:
+            _env_type = "KVM" if self.mIsKvmEnv() else "OVM"
+            _error_msg = f"No appropriate {_env_type} patch file found in {_dom0_repo_dir}. Available files: {_repo_files}"
+            self.mPatchLogError(_error_msg)
+            raise Exception(_error_msg)
+
+        self.mPatchLogInfo(f"Successfully computed ELU patch paths:")
+        self.mPatchLogInfo(f"  dbserver.patch.zip: {_dom0_local_patch_zip}")
+        self.mPatchLogInfo(f"  Dom0 repository:    {_dom0_local_patch_zip2}")
+
+        return _dom0_local_patch_zip, _dom0_local_patch_zip2
+
     def mSetEnvironment(self, aListOfEluNodes=[]):
+        '''     
+         Sets the common envrionment for all tasks in dom0
+        '''
+
+        #Sets all the variables used to select the dom0 that will run the patchmgr.
+        _ret = PATCH_SUCCESS_EXIT_CODE
 
         # self.__dom0_patch_zip2_name: is of the format shown below
         # domains/exacloud/PatchPayloads/19.3.6.0.0.200317/Dom0YumRepository/exadata_ol7_19.3.6.0.0.200317_Linux-x86-64.zip,
         # domains/exacloud/PatchPayloads/19.3.6.0.0.200317/Dom0YumRepository/exadata_ovs_19.3.6.0.0.200317_Linux-x86-64.zip
         # if _target in [PATCH_ALL, PATCH_DOM0] and self.__dom0_local_patch_zip and self.__dom0_local_patch_zip2:
 
-        #"DBPatchFile": "/scratch/jyotdas/ecra_installs/octecra/mw_home/user_projects/domains/exacloud/PatchPayloads/LATEST/DBPatchFile",
-        # "Dom0YumRepository": "/scratch/jyotdas/ecra_installs/octecra/mw_home/user_projects/domains/exacloud/PatchPayloads/LATEST/ExaspliceRepository",
-
-        #DBPatchFile": "/u02/svmmvmmigr/admin/exacloud/PatchPayloads/22.1.13.0.0.230712/DBPatchFile/dbserver.patch.zip",
-        # "Dom0YumRepository": "/u02/svmmvmmigr/admin/exacloud/PatchPayloads/22.1.13.0.0.230712/Dom0YumRepository/exadata_ol7_22.1.13.0.0.230712_Linux-x86-64.zip,/u02/svmmvmmigr/admin/exacloud/PatchPayloads/22.1.13.0.0.230712/Dom0YumRepository/exadata_ovs_22.1.13.0.0.230712_Linux-x86-64.zip",
-        if self.__dom0_local_patch_zip and self.__dom0_local_patch_zip2:
-            # Select the appropriate zip file based on KVM (e.g exadata_ol7_19.3.6.0.0.200317_Linux-x86-64.zip ) or  OVM (e.g exadata_ovs_19.3.6.0.0.200317_Linux-x86-64.zip)
-            dom0zip2File = self.__dom0_local_patch_zip2
-            if dom0zip2File.find(',') > -1:
-                patchFiles = dom0zip2File.strip().split(',')
-                for _file in (patchFiles):
-                    if self.mIsKvmEnv() and (any(substring in _file for substring in KVM_FILE_IDENTIFIER_LIST)):
-                        self.mPatchLogInfo(f"Dom0Repository KVM file is {_file} ")
-                        self.__dom0_local_patch_zip2 = _file
-                        break
-                    elif not self.mIsKvmEnv() and ((any(substring in _file for substring in KVM_FILE_IDENTIFIER_LIST)) == False):
-                        self.mPatchLogInfo(f"Dom0Repository NON KVM file is {_file} ")
-                        self.__dom0_local_patch_zip2 = _file
-                        break
-
-            if self.mIsElu():
-                '''
-                 Patch directory need to be modified below to reflect the current payload
-                 passed as part of self.__elu_target_version_to_node_mappings json
-                 For Example - if the patch path passed is /scratch/araghave/ecra_installs/abhi/mw_home/user_projects/domains/exacloud/PatchPayloads/231103/ExaspliceRepository/exadata_exasplice_update_231103_Linux-x86-64.zip
-                 and the ELU version is - 24.1.14.0.0.250706 
-                 It has to be modified to /scratch/araghave/ecra_installs/abhi/mw_home/user_projects/domains/exacloud/PatchPayloads/24.1.14.0.0.250706/Dom0YumRepository/exadata_ovs_24.1.14.0.0.250706_Linux-x86-64.zip
-                 to pick the current ELU patch path.
-                '''
-                _patch_stage_path = os.path.dirname(os.path.dirname(os.path.dirname(self.__dom0_local_patch_zip2)))
-                _parent_patch_path = None
-                _exasplice_patch_pattern = r'^\d{6}(\.\d+)?$'
-                _elu_patch_pattern = r'^\d{1,2}(\.\d{1,2}){4}\.\d{6}(\.\d+)?$'
-                try:
-                    '''
-                     Case 1 -
-                     In case of registered patch version is ELU registered
-                     version is ELU, patch path need to be modified 
-                     to reflect ELU. 
-                    '''
-                    if re.match(_elu_patch_pattern, self.mGetTargetVersion()):
-                        self.mPatchLogInfo(f"Elu patch version pattern matched - {self.mGetTargetVersion()} and Patch path will be formed.")
-                        _parent_patch_path = os.path.join(_patch_stage_path, self.mGetTargetVersion() + '/Dom0YumRepository')
-                        if os.path.exists(_parent_patch_path):
-                            _list_of_all_patch_files = os.listdir(_parent_patch_path)
-                            for _patch_file in _list_of_all_patch_files:
-                                if self.mIsKvmEnv():
-                                    if "ovs" not in _patch_file:
-                                        self.__dom0_local_patch_zip2 = os.path.join(_parent_patch_path, _patch_file)
-                                        break
-                                else:
-                                    if "ovs" in _patch_file:
-                                        self.__dom0_local_patch_zip2 = os.path.join(_parent_patch_path, _patch_file)
-                                        break
-                    '''
-                     Case 2 -
-                     In case of registered version is 6 digit date format, patch 
-                     path need to be modified to reflect the same.
-                    '''
-                    if re.match(_exasplice_patch_pattern, self.mGetTargetVersion()):
-                        self.mPatchLogInfo(f"Exasplice patch version pattern matched - {self.mGetTargetVersion()} and Patch path will be formed.")
-                        _parent_patch_path = os.path.join(_patch_stage_path, self.mGetTargetVersion() + '/ExaspliceRepository')
-                        if os.path.exists(_parent_patch_path):
-                            _list_of_all_patch_files = os.listdir(_parent_patch_path)
-                            '''
-                             In case of SRE as part of their testing has added
-                             some other test files, only the relevant exasplice
-                             bundle need to be picked up for patching from the
-                             ExaspliceRepository directory.
-                            '''
-                            _exasplice_patch_zip_pattern = r'exadata_exasplice_update_\d{6}(\.\d+)?_Linux-x86-64\.zip'
-                            for _patch_file in _list_of_all_patch_files:
-                                _match_for_the_exasplice_file = re.search(_exasplice_patch_zip_pattern, _patch_file)
-                                if _match_for_the_exasplice_file:
-                                    self.__dom0_local_patch_zip2 = os.path.join(_parent_patch_path, _match_for_the_exasplice_file.group())
-                                    break
-
-                    if  not os.path.exists(_parent_patch_path):
-                        _ret = MISSING_PATCH_FILES
-                        if self.mGetTask() in [ TASK_PATCH, TASK_ROLLBACK ]:
-                            _suggestion_msg = f"Patch files missing on th exacloud host and ELU patching cannot continue for the current patch version - {self.mGetTargetVersion()} as patch directory {_parent_patch_path} does not exist."
-                            self.mAddError(_ret, _suggestion_msg)
-                        else:
-                            self.mPatchLogInfo(f"Patch files missing on th exacloud host and ELU patching will be skipped for the current precheck version - {self.mGetTargetVersion()} as patch directory {_parent_patch_path} does not exist.")
-                        return _ret
-
-                except Exception as e:
-                    self.mPatchLogTrace(traceback.format_exc())
-                    self.mPatchLogError(f"Exception in getting the Patch details - {str(e)}")
-                    _ret = MISSING_PATCH_FILES
-                    if self.mGetTask() in [ TASK_PATCH, TASK_ROLLBACK ]:
-                        _suggestion_msg = f"Patch files missing on th exacloud host and ELU patching cannot continue for the current patch version - {self.mGetTargetVersion()} as patch directory {_parent_patch_path} does not exist."
-                        self.mAddError(_ret, _suggestion_msg)
-                    else:
-                        self.mPatchLogInfo(f"Patch files missing on th exacloud host and ELU patching will be skipped for the current precheck version - {self.mGetTargetVersion()} as patch directory {_parent_patch_path} does not exist.")
-                    return _ret
-
-            # Set collect time stats flag
-            self.mSetCollectTimeStatsFlag(self.mGetCollectTimeStatsParam(PATCH_DOM0))
-
-            self.mPatchLogInfo(f"Dom0 local patch zip file name {self.__dom0_local_patch_zip}")
-            self.mPatchLogInfo(f"Dom0 local patch zip-2 file name {self.__dom0_local_patch_zip2}")
-
-            if not self.mIsElu() and not os.path.exists(self.__dom0_local_patch_zip2):
-                self.mPatchLogError("Dom0 Patch Zip file not found")
-                raise Exception("Dom0 Patch Zip file not found")
-
-            _no_action_taken = 0
-
-            _ret = PATCH_SUCCESS_EXIT_CODE
-            # Dom0 patching needs 2 zip files. first one has the patchmgr, second one is the actual patch
-            self.__dom0_patch_zip_name = self.__dom0_local_patch_zip.split("/")[-1]
-            self.__dom0_patch_zip2_name = self.__dom0_local_patch_zip2.split("/")[-1]
-            # self.__dom0_patch_base = PATCH_BASE + self.__dom0_patch_zip_name + "_" + self.__dom0_patch_zip2_name + "/"
-            self.__dom0_patch_base = self.mGetDom0PatchBaseDir() + self.mGetDom0PatchZipName() + "_" + self.mGetDom0PatchZip2Name() + "/"
-            self.__dom0_patch_zip = self.mGetDom0PatchBase() + self.mGetDom0PatchZipName()
-            self.__dom0_patch_base_after_unzip = (self.mGetDom0PatchBase() +
-                                                  mGetFirstDirInZip(self.__dom0_local_patch_zip))
-            self.__dom0_patchmgr = self.mGetDom0PatchBaseAfterUnzip() + "patchmgr"
-            self.__dom0_patch_zip_size_mb = int(os.path.getsize(self.__dom0_local_patch_zip)) >> 20
-            self.__dom0_patch_zip2_size_mb = int(os.path.getsize(self.__dom0_local_patch_zip2.strip())) >> 20
-            self.__dom0_patch_necessary_space_mb = (
-                        self.mGetDom0PatchZipSizeMB() + self.mGetDom0PatchZip2SizeMB() + int(self.mGetExadataPatchWorkingSpaceMB()))
-            # Set current patch. Information necessary to update status in db
-            self.mSetCurrentTargetType(PATCH_DOM0)
-
-            _ret, _launchNodes = self.mSetLaunchNodeToPatchOtherDom0Nodes(aListOfEluNodes=aListOfEluNodes)
-            if _ret != PATCH_SUCCESS_EXIT_CODE:
-                return _ret
+        if self.mIsElu():
+            # ELU: Compute paths from new standardized directory structure
             try:
-                self.__dom0_to_patch_dom0s = _launchNodes[0]
-                self.mSetDom0ToPatchInitialDom0(_launchNodes[1])
-            except IndexError:
-                pass
+                _target_version = self.mGetTargetVersion()
+                _patch_base_dir = self.mGetPatchPayLoadDirectory()
 
-            self.mSetPatchmgrLogPathOnLaunchNode(
-                self.mGetDom0PatchBaseAfterUnzip() + "patchmgr_log_" + self.mGetMasterReqId())
-            self.mPatchLogInfo(f"Patch manager Log Path on Launch Node is {self.mGetPatchmgrLogPathOnLaunchNode()}")
+                self.mPatchLogInfo(f"ELU patching detected. Computing paths from standardized structure.")
 
-            # def mPatchDom0sOrDomus(self, aTargetType, aTaskType):
-            # List of launch nodes to update patch state metadata
-            _launch_nodes = []
+                # Compute ELU-specific patch paths (handles KVM/OVM selection internally)
+                _dom0_zip, _dom0_zip2 = self.mComputeEluPatchPaths(_target_version, _patch_base_dir)
 
-            '''
-            # Set target version based on the patch tar file version name.
-             - Quarterly:
-                 ./PatchPayloads/19.3.2.0.0.191119/Dom0YumRepository/exadata_ovs_19.3.2.0.0.191119_Linux-x86-64.zip
-             - Monthly:
-                 ./PatchPayloads/201015/ExaspliceRepository/exadata_exasplice_update_201015_Linux-x86-64.zip
+                # Assign computed paths to instance variables
+                self.__dom0_local_patch_zip = _dom0_zip
+                self.__dom0_local_patch_zip2 = _dom0_zip2
 
-             - Since target version is already set at the start of elu patch and precheck
-               operation, below section can be skipped in case of ELU operations.
-            '''
-            if not self.mIsElu():
-                if "ExaspliceRepository" in self.mGetDom0LocalPatchZip2():
-                    self.mSetTargetVersion(self.mGetDom0LocalPatchZip2().split("/")[-1].split("_")[3])
-                else: 
-                    self.mSetTargetVersion(self.mGetDom0LocalPatchZip2().split("/")[-1].split("_")[2])
+                self.mPatchLogInfo(f"ELU patch paths computed successfully.")
 
-            # Add to executed targets
-            self.mGetExecutedTargets().append(PATCH_DOM0)
+            except Exception as e:
+                self.mPatchLogError(f"Failed to compute ELU patch paths: {str(e)}")
+                _ret = MISSING_PATCH_FILES
+                _suggestion_msg = f"ELU patch files not found or inaccessible: {str(e)}"
+                if self.mGetTask() in [TASK_PATCH, TASK_ROLLBACK]:
+                    self.mAddError(_ret, _suggestion_msg)
+                return _ret
 
-            # Update status
-            self.mUpdatePatchStatus(True, STEP_PREP_ENV)
+        else:
+            # Non-ELU: Check if paths exist first, then process
+            if self.__dom0_local_patch_zip and self.__dom0_local_patch_zip2:
 
-            '''
-             In this case, for _nodes_to_patch_except_initial All nodes from
-             xml need to be considered as passwdless ssh is required to be setup 
-             on all nodes and are used during ssh validation, patchmgr existence 
-             check and for performing a few config changes during CNS monitor start.
+                # Select the appropriate zip file based on KVM (e.g exadata_ol7_19.3.6.0.0.200317_Linux-x86-64.zip) or OVM (e.g exadata_ovs_19.3.6.0.0.200317_Linux-x86-64.zip)
+                dom0zip2File = self.__dom0_local_patch_zip2
+                if dom0zip2File.find(',') > -1:
+                    patchFiles = dom0zip2File.strip().split(',')
+                    for _file in (patchFiles):
+                        if self.mIsKvmEnv() and (any(substring in _file for substring in KVM_FILE_IDENTIFIER_LIST)):
+                            self.mPatchLogInfo(f"Dom0Repository KVM file is {_file} ")
+                            self.__dom0_local_patch_zip2 = _file
+                            break
+                        elif not self.mIsKvmEnv() and ((any(substring in _file for substring in KVM_FILE_IDENTIFIER_LIST)) == False):
+                            self.mPatchLogInfo(f"Dom0Repository NON KVM file is {_file} ")
+                            self.__dom0_local_patch_zip2 = _file
+                            break
 
-             - aListOfEluNodes is used in case of ELU patching.
-             - self.mGetCustomizedDom0List() is used in case of regular patching.
-            '''
-            if len(aListOfEluNodes) > 0:
-                _nodes_to_patch_except_initial = list(set(aListOfEluNodes) - set([self.mGetDom0ToPatchDom0()]))
-            else:
-                _nodes_to_patch_except_initial = list(set(self.mGetCustomizedDom0List()) - set([self.mGetDom0ToPatchDom0()]))
-            _initial_node_list = [self.mGetDom0ToPatchDom0()]
-            _initial_node = self.mGetDom0ToPatchDom0() 
-            _next_node = self.mGetDom0ToPatchInitialDom0()
-            _launch_nodes = [self.mGetDom0ToPatchDom0(), _next_node]
+        # Picks the latest dbserver patch zip from the available patches under PatchPayloads.
+        _dbzip_file, _msg = self.mResolveDbserverPatchZip()
+        if _dbzip_file and self.mGetDom0DomUPatchZipFile():
+            _patch_list = list(self.mGetDom0DomUPatchZipFile())
+            if len(_patch_list) >= 1:
+                _patch_list[0] = _dbzip_file
+                self.mPatchLogInfo("Dom0 dbserver.patch.zip resolved during mSetEnvironment: " + str(_dbzip_file) + " (" + str(_msg) + ")")
+                self.__dom0_local_patch_zip = _patch_list[0]
 
-            # These variables are defined , but files are created during operation only
-            self.mSetPatchStatesBaseDir(os.path.join(self.mGetDom0PatchBaseAfterUnzip(), "patch_states_data"))
-            self.mSetMetadataJsonFile(os.path.join(self.mGetPatchStatesBaseDir(),
-                                                   self.mGetMasterReqId() + "_patch_progress_report.json"))
-            self.mPatchLogInfo(f"Patch metadata file = {self.mGetMetadataJsonFile()}")
+        # Set collect time stats flag
+        self.mSetCollectTimeStatsFlag(self.mGetCollectTimeStatsParam(PATCH_DOM0))
 
-            # Exacloud Plugin already initialized at this stage
-            if self.mIsExacloudPluginEnabled():
-                self.mGetPluginHandler().mSetPluginsLogPathOnLaunchNode(
-                    self.mGetDom0PatchBaseAfterUnzip() + "plugins_log_" + self.mGetMasterReqId())
-                self.mPatchLogInfo("Exacloud Plugin Enabled to run")
-            
-            # Rotate SSH Keys
-            _all_nodes = _initial_node_list + _nodes_to_patch_except_initial
-            _exakmsEndpoint = ExaKmsEndpoint(None)
-            for _node in _all_nodes:
-                if _node:
-                    _exakmsEndpoint.mSingleRotateKey(_node)
+        self.mPatchLogInfo(f"Dom0 local patch zip file name {self.__dom0_local_patch_zip}")
+        self.mPatchLogInfo(f"Dom0 local patch zip-2 file name {self.__dom0_local_patch_zip2}")
 
-            # In case of single launch node, _next_node will be None, because only one launch node
-            # has been passed
-            # set ssh keys from node patchers to the nodes they will be patching
-            _ssh_env_setup = ebCluSshSetup(self.mGetCluControl())
-            _ssh_env_setup.mSetSSHPasswordlessForInfraPatching(_initial_node, _nodes_to_patch_except_initial)
+        if not self.mIsElu() and not os.path.exists(self.__dom0_local_patch_zip2):
+            self.mPatchLogError("Dom0 Patch Zip file not found")
+            raise Exception("Dom0 Patch Zip file not found")
 
-            # Remove Obsolete ssh keys emrtires from authorised_keys file
-            self.mRemoveObsoleteSshKeysfromAuthKeysFile(_initial_node,
-                                                        _nodes_to_patch_except_initial,
+        _no_action_taken = 0
+
+        _ret = PATCH_SUCCESS_EXIT_CODE
+        # Dom0 patching needs 2 zip files. first one has the patchmgr, second one is the actual patch
+        self.__dom0_patch_zip_name = self.__dom0_local_patch_zip.split("/")[-1]
+        self.__dom0_patch_zip2_name = self.__dom0_local_patch_zip2.split("/")[-1]
+        # self.__dom0_patch_base = PATCH_BASE + self.__dom0_patch_zip_name + "_" + self.__dom0_patch_zip2_name + "/"
+        self.__dom0_patch_base = self.mGetDom0PatchBaseDir() + self.mGetDom0PatchZipName() + "_" + self.mGetDom0PatchZip2Name() + "/"
+        self.__dom0_patch_zip = self.mGetDom0PatchBase() + self.mGetDom0PatchZipName()
+        self.__dom0_patch_base_after_unzip = (self.mGetDom0PatchBase() +
+                                                  mGetFirstDirInZip(self.__dom0_local_patch_zip))
+        self.__dom0_patchmgr = self.mGetDom0PatchBaseAfterUnzip() + "patchmgr"
+        self.__dom0_patch_zip_size_mb = int(os.path.getsize(self.__dom0_local_patch_zip)) >> 20
+        self.__dom0_patch_zip2_size_mb = int(os.path.getsize(self.__dom0_local_patch_zip2.strip())) >> 20
+        self.__dom0_patch_necessary_space_mb = (
+                    self.mGetDom0PatchZipSizeMB() + self.mGetDom0PatchZip2SizeMB() + int(self.mGetExadataPatchWorkingSpaceMB()))
+        # Set current patch. Information necessary to update status in db
+        self.mSetCurrentTargetType(PATCH_DOM0)
+
+        _ret, _launchNodes = self.mSetLaunchNodeToPatchOtherDom0Nodes(aListOfEluNodes=aListOfEluNodes)
+        if _ret != PATCH_SUCCESS_EXIT_CODE:
+            return _ret
+        try:
+            self.__dom0_to_patch_dom0s = _launchNodes[0]
+            self.mSetDom0ToPatchInitialDom0(_launchNodes[1])
+        except IndexError:
+            pass
+
+        self.mSetPatchmgrLogPathOnLaunchNode(
+            self.mGetDom0PatchBaseAfterUnzip() + "patchmgr_log_" + self.mGetMasterReqId())
+        self.mPatchLogInfo(f"Patch manager Log Path on Launch Node is {self.mGetPatchmgrLogPathOnLaunchNode()}")
+
+        # def mPatchDom0sOrDomus(self, aTargetType, aTaskType):
+        # List of launch nodes to update patch state metadata
+        _launch_nodes = []
+
+        '''
+        # Set target version based on the patch tar file version name.
+         - Quarterly:
+             ./PatchPayloads/19.3.2.0.0.191119/Dom0YumRepository/exadata_ovs_19.3.2.0.0.191119_Linux-x86-64.zip
+         - Monthly:
+             ./PatchPayloads/201015/ExaspliceRepository/exadata_exasplice_update_201015_Linux-x86-64.zip
+
+         - Since target version is already set at the start of elu patch and precheck
+           operation, below section can be skipped in case of ELU operations.
+        '''
+        if not self.mIsElu():
+            if "ExaspliceRepository" in self.mGetDom0LocalPatchZip2():
+                self.mSetTargetVersion(self.mGetDom0LocalPatchZip2().split("/")[-1].split("_")[3])
+            else: 
+                self.mSetTargetVersion(self.mGetDom0LocalPatchZip2().split("/")[-1].split("_")[2])
+
+        # Add to executed targets
+        self.mGetExecutedTargets().append(PATCH_DOM0)
+
+        # Update status
+        self.mUpdatePatchStatus(True, STEP_PREP_ENV)
+
+        '''
+         In this case, for _nodes_to_patch_except_initial All nodes from
+         xml need to be considered as passwdless ssh is required to be setup 
+         on all nodes and are used during ssh validation, patchmgr existence 
+         check and for performing a few config changes during CNS monitor start.
+
+         - aListOfEluNodes is used in case of ELU patching.
+         - self.mGetCustomizedDom0List() is used in case of regular patching.
+        '''
+        if len(aListOfEluNodes) > 0:
+            _nodes_to_patch_except_initial = list(set(aListOfEluNodes) - set([self.mGetDom0ToPatchDom0()]))
+        else:
+            _nodes_to_patch_except_initial = list(set(self.mGetCustomizedDom0List()) - set([self.mGetDom0ToPatchDom0()]))
+        _initial_node_list = [self.mGetDom0ToPatchDom0()]
+        _initial_node = self.mGetDom0ToPatchDom0() 
+        _next_node = self.mGetDom0ToPatchInitialDom0()
+        _launch_nodes = [self.mGetDom0ToPatchDom0(), _next_node]
+
+        # These variables are defined , but files are created during operation only
+        self.mSetPatchStatesBaseDir(os.path.join(self.mGetDom0PatchBaseAfterUnzip(), "patch_states_data"))
+        self.mSetMetadataJsonFile(os.path.join(self.mGetPatchStatesBaseDir(),
+                                               self.mGetMasterReqId() + "_patch_progress_report.json"))
+        self.mPatchLogInfo(f"Patch metadata file = {self.mGetMetadataJsonFile()}")
+
+        # Exacloud Plugin already initialized at this stage
+        if self.mIsExacloudPluginEnabled():
+            self.mGetPluginHandler().mSetPluginsLogPathOnLaunchNode(
+                self.mGetDom0PatchBaseAfterUnzip() + "plugins_log_" + self.mGetMasterReqId())
+            self.mPatchLogInfo("Exacloud Plugin Enabled to run")
+        
+        # Rotate SSH Keys
+        _all_nodes = _initial_node_list + _nodes_to_patch_except_initial
+        _exakmsEndpoint = ExaKmsEndpoint(None)
+        for _node in _all_nodes:
+            if _node:
+                _exakmsEndpoint.mSingleRotateKey(_node)
+
+        # In case of single launch node, _next_node will be None, because only one launch node
+        # has been passed
+        # set ssh keys from node patchers to the nodes they will be patching
+        _ssh_env_setup = ebCluSshSetup(self.mGetCluControl())
+        _ssh_env_setup.mSetSSHPasswordlessForInfraPatching(_initial_node, _nodes_to_patch_except_initial)
+
+        # Remove Obsolete ssh keys emrtires from authorised_keys file
+        self.mRemoveObsoleteSshKeysfromAuthKeysFile(_initial_node,
+                                                    _nodes_to_patch_except_initial,
+                                                    _ssh_env_setup)
+              
+
+        # Store these in memory for clearing after each operation
+
+        _src_node_list = [_initial_node]
+        _remote_node_list = [_nodes_to_patch_except_initial]
+        #
+        # Configure ssh only if the second launch node is being selected or passed
+        #
+        if _next_node:
+            _ssh_env_setup.mSetSSHPasswordlessForInfraPatching(_next_node, _initial_node_list)
+            self.mRemoveObsoleteSshKeysfromAuthKeysFile(_next_node,
+                                                        _initial_node_list,
                                                         _ssh_env_setup)
-                  
+            _src_node_list.append(_next_node)
+            _remote_node_list.append(_initial_node_list)
 
-            # Store these in memory for clearing after each operation
+        _sshEnvDict = {
+            "sshEnv": _ssh_env_setup,
+            "fromHost": _src_node_list,
+            "remoteHostLists": _remote_node_list
+        }
+        self.mSetSSHEnvSetUp(_sshEnvDict)
 
-            _src_node_list = [_initial_node]
-            _remote_node_list = [_nodes_to_patch_except_initial]
-            #
-            # Configure ssh only if the second launch node is being selected or passed
-            #
-            if _next_node:
-                _ssh_env_setup.mSetSSHPasswordlessForInfraPatching(_next_node, _initial_node_list)
-                self.mRemoveObsoleteSshKeysfromAuthKeysFile(_next_node,
-                                                            _initial_node_list,
-                                                            _ssh_env_setup)
-                _src_node_list.append(_next_node)
-                _remote_node_list.append(_initial_node_list)
-            _sshEnvDict = {
-                "sshEnv": _ssh_env_setup,
-                "fromHost": _src_node_list,
-                "remoteHostLists": _remote_node_list
-            }
-            self.mSetSSHEnvSetUp(_sshEnvDict)
-
-            # Fetch user specified exadata env type (like, ecs (is default), adw, atp, fa, higgs, etc).
-            if self.mGetAdditionalOptions() and 'EnvType' in self.mGetAdditionalOptions()[0]:
-                self.mSetExadataEnvType(self.mGetAdditionalOptions()[0]['EnvType'].lower())
+        # Fetch user specified exadata env type (like, ecs (is default), adw, atp, fa, higgs, etc).
+        if self.mGetAdditionalOptions() and 'EnvType' in self.mGetAdditionalOptions()[0]:
+            self.mSetExadataEnvType(self.mGetAdditionalOptions()[0]['EnvType'].lower())
 
         self.__crs_helper = CrsHelper(aHandler=self)
         self.mPatchLogInfo("Finished Setting up Environment for Dom0")
@@ -3550,12 +3718,16 @@ class Dom0Handler(TargetHandler):
         if ret != PATCH_SUCCESS_EXIT_CODE:
             return ret
 
-        # check that db services are up
-        if not self.mGetCluPatchCheck().mCheckDBServices(aDBNode=aDom0, aCheckRunning=True):
-            ret = DB_SERVER_SERVICE_DOWN
-            _suggestion_msg = f"dbserverd service was not up on dom0 {aDom0} "
-            self.mAddError(ret, _suggestion_msg)
-            return ret
+        #Skipping dbserverd services validation if its ELU patching.
+        if not self.mIsExaSplice():            
+            # check that dbserverd services are up
+            if not self.mGetCluPatchCheck().mCheckDBServices(aDBNode=aDom0, aCheckRunning=True):
+                ret = DB_SERVER_SERVICE_DOWN
+                _suggestion_msg = f"dbserverd services was not up on dom0 {aDom0} "
+                self.mAddError(ret, _suggestion_msg)
+                return ret
+        else:
+            self.mPatchLogInfo(f"Skipping dom0 dbserverd services validation for ELU patching on {aDom0}.")
 
         '''
          Check for VMs to be online and startup VMs
@@ -3716,7 +3888,7 @@ class Dom0Handler(TargetHandler):
                 _node.mDisconnect()
             return _list_of_vm_with_auto_startup_enabled
 
-    def mStartupVMsIfAutoStartEnabled(self, aDom0):
+    def mStartupVMsIfAutoStartEnabled(self, aDom0, aSupressError = False):
         """
          This method starts up VMs in case they are down
          post dom0 reboot.
@@ -3785,17 +3957,19 @@ class Dom0Handler(TargetHandler):
                 if not _rc_all:
                     _suggestion_msg = f"Unable to startup VMs on Dom0 : {aDom0}"
                     _ret = UNABLE_TO_STARTUP_VM_ON_DOM0
-                    self.mAddError(_ret, _suggestion_msg)
+                    if aSupressError == False:
+                        self.mAddError(_ret, _suggestion_msg)
 
         except Exception as e:
             _suggestion_msg = f'Exception encountered while starting up VMs on Dom0 : {aDom0}. Error : {str(e)}'
             _ret = UNABLE_TO_STARTUP_VM_ON_DOM0
-            self.mAddError(_ret, _suggestion_msg)
+            if aSupressError == False:
+                self.mAddError(_ret, _suggestion_msg)
             self.mPatchLogTrace(traceback.format_exc())
         finally:
             return _ret
 
-    def mStartupVMsUponNonRollingPatchFailure(self):
+    def mStartupVMsUponNonRollingPatchFailure(self, aStatus = PATCH_SUCCESS_EXIT_CODE):
         """
         Wrapper function around mStartupVMsIfAutoStartEnabled()
         upon non-rolling patch failure before invoking patchmgr
@@ -3813,9 +3987,14 @@ class Dom0Handler(TargetHandler):
                     _compute_node_list = self.mGetComputeNodeListFromPayload()
                     self.mPatchLogInfo(
                         f"Launch Node candidates are fetched from ComputeNodeListFromPayload from ECRA payload {json.dumps(_compute_node_list, indent=4)}.")
+
                 for _dom0 in _compute_node_list:
                     if self.mGetCluPatchCheck().mCheckImageSuccess(_dom0):
-                        self.mStartupVMsIfAutoStartEnabled(_dom0)
+                        ret = self.mStartupVMsIfAutoStartEnabled(_dom0, aSupressError = True)
+                        if ret != PATCH_SUCCESS_EXIT_CODE and aStatus != PATCH_SUCCESS_EXIT_CODE:
+                            self.mPatchLogWarn(f"VM startup on {_dom0} failed with {ret}")
+                            _code, _msg, _ = ebPatchFormatBuildError(aStatus)
+                            self.mAddError(aStatus, _msg)
                     else:
                         self.mPatchLogInfo(f"{_dom0} image status not SUCCESS, skipping VM start")
         except Exception as e:
@@ -5050,3 +5229,23 @@ class Dom0Handler(TargetHandler):
             self.mPatchLogInfo(f"Error calling mRestartVmExacsService {str(e)}")
         return
 
+    def mGetPatchPayLoadDirectory(self):
+        """
+        In case of OCI EXACC environemnts, PatchPayload details are fetched
+        from ociexacc_exadata_patch_download_loc parameter as per details from
+        the exabox.conf file.
+        """
+
+        patch_payloads_directory = 'PatchPayloads/'
+        isEXACC = self.mGetCluControl().mCheckConfigOption('ociexacc')
+        if isEXACC == "True":
+            exacc_payload_loc = self.mGetCluControl().mCheckConfigOption('ociexacc_exadata_patch_download_loc').strip()
+            if exacc_payload_loc:
+                patch_payloads_directory = self.OCIEXACC_LOC + 'PatchPayloads/'
+        else:
+            self.mPatchLogInfo('*** ociexacc parameter is set to False. Get Exacloud path for EXACS')
+            # Get Exacloud path for EXACS
+            _exacloudPath = os.getcwd()
+            _exacloudPath = _exacloudPath[0: _exacloudPath.rfind("exacloud") + 8]
+            patch_payloads_directory = _exacloudPath + '/PatchPayloads/'
+        return patch_payloads_directory

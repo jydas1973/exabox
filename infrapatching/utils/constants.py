@@ -2,7 +2,7 @@
 #
 # constants.py
 #
-# Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      constants.py - This module contains all the constant used in each of the modules.
@@ -14,6 +14,17 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    sdevasek    03/18/26 - Bug 39051493 - SMR PATCHING FAILED WITH ERROR :
+#                           "PATCH FILES MISSING ON TH EXACLOUD HOST AND ELU
+#                           PATCHING CANNOT CONTINUE FOR THE CURRENT PATCH
+#                           VERSION - IMAGEVERSION NOT FOUND AS PATCH
+#                           DIRECTORY NONE DOES NOT EXIST."
+#    kdas        03/15/26 - ER 38354388 - EXACC: INCLUDE NETWORK INTERFACE 
+#                           ALERT ON PATCHING PRE-CHECK
+#    araghave    01/12/26 - Enhancement Request 38723348 - EXACLOUD - IMPROVE
+#                           RESILIENCY OF CRS RESTART FOR INFRAPATCHING FLOW
+#    araghave    12/16/25 - Enh 38766076 - CONFIGURE UPDATE-CRYPTO-POLICIES
+#                           BEFORE AND AFTER SWITCH PATCHING
 #    araghave    09/11/25 - Enh 38173247 - EXACLOUD CHANGES TO SUPPORT DOMU ELU
 #                           INFRA PATCH OPERATIONS
 #    araghave    06/24/25 - Enhancement Request 38082882 - HANDLING EXACLOUD
@@ -425,6 +436,9 @@ SHUTDOWN_STARTUP_SLEEP_INTERVAL_IN_SECONDS = 10
 INFRA_PATCHING_KNOWN_ALERTS_EXACC = "infra_patching_known_alerts_exacc"
 INFRA_PATCHING_KNOWN_ALERTS_EXACS = "infra_patching_known_alerts_exacs"
 INFRA_PATCHING_KNOWN_ALERTS_EXACOMPUTE = "infra_patching_known_alerts_exacompute"
+INFRA_PATCHING_KNOWN_SOFTWARE_ALERTS_EXACC = "infra_patching_known_software_alerts_exacc"
+INFRA_PATCHING_KNOWN_SOFTWARE_ALERTS_EXACS = "infra_patching_known_software_alerts_exacs"
+INFRA_PATCHING_KNOWN_SOFTWARE_ALERTS_EXACOMPUTE = "infra_patching_known_software_alerts_exacompute"
 PDB_DEGRADED_STATES_MATRIX_KEY = "pdb_degraded_states_matrix"
 INFRA_PATCHING_CONF_FILE = "infrapatching.conf"
 EXACOMPUTE_PATCH_CONF_FILE = "exacomputepatch.conf"
@@ -448,12 +462,19 @@ EXACOMPUTE_SRV = "exacompute_srv"
 
 RETRY_CRS_SERVICES_SLEEP_IN_SECONDS = 300
 RETRY_CRS_STARTUP_CHECK_MAX_COUNTER_VALUE = 3
+RETRY_CRS_STOP_MAX_ITERATIONS = 2
 WAIT_FOR_CRSCTL_START_COMMAND_TO_COMPLETE_IN_SECONDS = 180
 CRS_AUTO_START_CHECK_CODE = "CRS-4622"
 CRS_AUTO_START_CHECK_STR = "Oracle High Availability Services autostart is enabled"
 
 # Constants used for encryption
 KEY_API = "/usr/lib/dracut/modules.d/99exacrypt/VGExaDbDisk.u02_extra_encrypted.img#LVDBDisk.key-api.sh"
+
+# Crypto policy constants
+CRYPTO_POLICY_DEFAULT_EXADATA = "DEFAULT:EXADATA" # RSA is deprecated in case of crypto policies on Dom0 set to Default : Exadata
+CRYPTO_POLICY_DEFAULT = "DEFAULT" 
+CRYPTO_POLICY_SHOW_CMD = "/usr/bin/update-crypto-policies --show"
+CRYPTO_POLICY_SET_CMD = "/usr/bin/update-crypto-policies --set {}"
 
 # custom plugins
 CUST_PLUGIN_DOM0 = '/opt/exacloud/customs/plugins/custom_dom0.sh'
@@ -536,3 +557,4 @@ ELU_TYPE_STR ="Exadata Live Update Type"
 ELU_APPLIED_REBOOT_MESSAGE = "(Live Update applied. Reboot at any time to finalize outstanding items.)"
 ELU_HAS_OUTSTANDING_WORK_STR = "Exadata Live Update Has Outstanding Work"
 CURRENT_QMR_VERSION_STR = "Image version"
+IMAGE_VER_NOT_FOUND_STR = "ImageVersion not Found"

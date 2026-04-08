@@ -2,7 +2,7 @@
 
  $Header: 
 
- Copyright (c) 2018, 2020, Oracle and/or its affiliates. All rights reserved.
+ Copyright (c) 2018, 2026, Oracle and/or its affiliates.
 
  NAME:
       ebGraph.py - Graph class to ebGraph implementation
@@ -17,8 +17,8 @@
  History:
 
     MODIFIED   (MM/DD/YY)
-
-        jesandov    17/12/18 - Creation of the file
+       aararora 04/01/26 - Bug 38900321: Fix issues identified by codev
+       jesandov 17/12/18 - Creation of the file
 """
 
 from __future__ import print_function
@@ -166,8 +166,8 @@ class ebGraph(object):
                     break
 
         # In case of not leaves, there is a circular graph
-        if not _leaves:
-            _leaves = self.__nodes[0]
+        if not _leaves and self.__nodes:
+            _leaves = [self.__nodes[0]]
 
         # Do the iteration from the leaves
         _visit = []

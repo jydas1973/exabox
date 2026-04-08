@@ -1,5 +1,5 @@
 """ 
- Copyright (c) 2014, 2024, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     Patch Metadata - Store and operate patching states via json object.
@@ -104,6 +104,7 @@ class ebCluPatchSateInfo:
          aFilePath     --> File to read patch states
          aTargetNode   --> Target node where the file is read from (typically the launch node)
         """
+        _node = None
         try:
             ebLogDebug("Reading patch state JSON file: %s" % aFilePath)
             _node = exaBoxNode(get_gcontext())
@@ -124,7 +125,8 @@ class ebCluPatchSateInfo:
         except Exception as e:
             raise Exception('Error: {str(e)} occurred while trying to read the patch states JSON file: {aFilePath} from the target node: {aTargetNode}.')
         finally:
-            _node.mDisconnect()
+            if _node is not None:
+                _node.mDisconnect()
 
         _patchStatesObj = json.loads(_patchStateJsonData, object_hook=lambda d: Namespace(**d))
         pss = ebCluPatchSateInfo.mBuildObjFromJson(_patchStatesObj)
@@ -137,6 +139,7 @@ class ebCluPatchSateInfo:
         Writes the patchmetadata states json to the file
         """
         patchStateJsonData = json.dumps(self, indent=4, cls=ebCluPatchStatesEncoder)
+        _node = None
         try:
             ebLogDebug("Writing patch states JSON to file : %s" % self.filePath)
             _node = exaBoxNode(get_gcontext())
@@ -149,7 +152,8 @@ class ebCluPatchSateInfo:
                 'Error in Writing patch states to file in launchNode. LaunchNode = %s, file = %s. Error: %s' % (
                     self.targetNode, self.filePath, str(e)))
         finally:
-            _node.mDisconnect()
+            if _node is not None:
+                _node.mDisconnect()
 
 
     def mGetPatchStatesAsDictforNode(self, nodeName):

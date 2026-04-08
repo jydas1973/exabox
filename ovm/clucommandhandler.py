@@ -1,10 +1,10 @@
 ﻿#!/bin/python
 #
-# $Header: ecs/exacloud/exabox/ovm/clucommandhandler.py /main/9 2025/10/24 17:07:44 ravirr Exp $
+# $Header: ecs/exacloud/exabox/ovm/clucommandhandler.py dekuckre_bug-38900279/2 2026/03/03 16:03:41 dekuckre Exp $
 #
 # clucommandhandler.py
 #
-# Copyright (c) 2025, Oracle and/or its affiliates.
+# Copyright (c) 2025, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      clucommandhandler.py - Exacloud endpoint handlers
@@ -16,6 +16,12 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    scoral      01/29/26 - Bug 38904592: Add EDV volumes to response payload
+#                           of add_vm_extra_size endpoint.
+#    jesandov    01/13/26 - 38841087: Add support of u02 resize
+#    scoral      01/03/26 - Bug 38577205 - Support /u02 resize on ExaDB-XS using
+#                           regular FS resize endpoint.
+#    pbellary    12/09/25 - Bug 38740441 - EXACLOUD: ADD COMPUTE WF DID NOT ENABLE QINQ IN ELASTIC NODE 
 #    ravirr      10/17/25 - Bug 38553893 - EXADB-XS: VM FILESYSTEM RESIZE FEATURE
 #	                    FOR EXADB-XS - RESHAPE-EXACOMPUTE - KEYERROR: 'U01' 
 #    rajsag      09/17/25 - enh 38389132 - exacloud: autoencryption support for
@@ -43,7 +49,7 @@ from exabox.ovm.cluexascale import ebCluExaScale
 from exabox.ovm.cluelasticcells import ebCluElasticCellManager
 from exabox.exakms.ExaKmsEntry import ExaKmsEntry, ExaKmsHostType
 from exabox.log.LogMgr import ebLogError, ebLogInfo, ebLogWarn, ebLogDebug, ebLogTrace, ebLogVerbose
-from exabox.ovm.cludomufilesystems import expand_domu_filesystem, ebDomUFilesystem, parse_size, ebDomUFSResizeMode, ebDiskImageInfo, attach_dom0_disk_image, create_new_lvm_disk_image, fill_disk_with_lvm_partition, get_max_domu_filesystem_sizes, shutdown_domu, start_domu, GIB, TIB
+from exabox.ovm.cludomufilesystems import expand_domu_filesystem, ebDomUFilesystem, parse_size, ebDomUFSResizeMode, ebDiskImageInfo, attach_dom0_disk_image, create_new_lvm_disk_image, fill_disk_with_lvm_partition, get_max_domu_filesystem_sizes, shutdown_domu, start_domu, GIB, TIB, get_edvdisk_path_from_domblklist
 from exabox.core.Error import ebError, ExacloudRuntimeError, gReshapeError, gPartialError, gProvError, gNodeElasticError
 from exabox.core.DBStore import ebGetDefaultDB
 from exabox.ovm.clumisc import (ebCluPreChecks, ebCluFetchSshKeys, 
@@ -113,6 +119,7 @@ class CommandHandler:
         aCluCtrlObj = self.mGetCluCtrlObj()
         _options = aCluCtrlObj.mGetArgsOptions()
         _exakms = get_gcontext().mGetExaKms()
+        _user = "root"
 
         if _options.jsonconf:
             _user = _options.jsonconf.get('user')
@@ -158,13 +165,14 @@ class CommandHandler:
         aCluCtrlObj = self.mGetCluCtrlObj()
         aOptions = aCluCtrlObj.mGetArgsOptions()
 
-        _jconf: dict                        = aOptions.jsonconf
-        _nodes: Optional[List[List[str]]]   = None
-        _fs: Optional[ebDomUFilesystem]     = None
-        _extra_bytes: Optional[int]         = None
-        _edvs: Dict[str, str]               = {}
-        _validate_max_size: bool            = True
-        _resize_mode: ebDomUFSResizeMode    = ebDomUFSResizeMode.NORMAL
+        _jconf: dict                             = aOptions.jsonconf
+        _nodes: Optional[List[List[str]]]        = None
+        _fs: Optional[ebDomUFilesystem]          = None
+        _extra_bytes: Optional[int]              = None
+        _edvs: Dict[str, str]                    = {}
+        _devicepaths: Dict[str, Dict[str: str]]  = {}
+        _validate_max_size: bool                 = True
+        _resize_mode: ebDomUFSResizeMode         = ebDomUFSResizeMode.NORMAL
 
         _fs_mapping: Dict[str, ebDomUFilesystem] = {
             'rootfs':       ebDomUFilesystem.ROOT,
@@ -189,6 +197,7 @@ class CommandHandler:
 
         _edv_ecra_to_oeda_type: Dict[str, str] = {
             'U01': 'USERVOL',
+            'U02': 'USERVOL',
             'SYSTEM': 'BASEVOL'
         }
 
@@ -216,21 +225,24 @@ class CommandHandler:
 
             if 'volumes' in _jconf:
                 _edvs = _jconf['volumes'].get('volumetypes', {})
-
+                _devicepaths = _jconf['volumes'].get('devicepath', {})
         
         # Resize EDVs first if requested
-        _xmlTree = ebTree(aCluCtrlObj.mGetPatchConfig())
-        _clusterEDVs = get_edvs_from_cluster_xml(_xmlTree)
+        _result_vols = {}
         for _dom0, _domu in aCluCtrlObj.mReturnDom0DomUPair():
-            _domuEDVs = get_guest_edvs_from_cluster_xml(_xmlTree, _clusterEDVs, _domu)
+            _result_vols[_domu] = { 'volumes': {} }
             with connect_to_host(_dom0, get_gcontext()) as _node:
                 for _edv, _size_gb in _edvs.items():
-                    _edvInfo, *_ = ( _domuEDV for _domuEDV in _domuEDVs
-                                    if _domuEDV.vol_type == _edv_ecra_to_oeda_type[_edv] )
+                    _device = _devicepaths[_dom0][_edv]
+                    _edvPath = f"/dev/exc/{_device}"
                     _size_bytes = parse_size(_size_gb)
-                    _cmd = f"/bin/virsh blockresize {_domu} {_edvInfo.device_path} {_size_bytes}B"
+                    _cmd = f"/bin/virsh blockresize {_domu} {_edvPath} {_size_bytes}B"
                     node_exec_cmd_check(_node, _cmd)
-
+                    # Add to result payload
+                    _result_vols[_domu]['volumes'][_edv] = {
+                        'size_bytes': _size_bytes,
+                        'device': _edvPath
+                    }
 
         _fs_size_payload: Dict[str, str] = \
             _jconf.get('filesystems', {}).get('mountpoints', {}) \
@@ -270,6 +282,10 @@ class CommandHandler:
                         ebLogWarn(f"Luks Resize steps on {_domu} for {mountpoint} "
                             f"failed, error is {e}")
                         _domu_errors.append(_domu)
+
+            # Append the result of EDV volumes resize
+            _result[_domu]['volumes'] = _result_vols[_domu]['volumes']
+
 
         _result_str: str = json.dumps(_result, indent=4)
         ebLogInfo(f"DomU filesystem resize completed. Result: {_result_str}")
@@ -1331,6 +1347,32 @@ class CommandHandler:
 
         _utils = _ebox.mGetExascaleUtils()
         _utils.mEnableAutoFileEncryption(aOptions)
+        return 0
+
+    def mHandlerEnableQinQ(self, aOptions=None):
+        _ebox = self.__cluctrlobj
+        if not aOptions:
+            aOptions = _ebox.mGetArgsOptions()
+
+        _newdom0List, _failedList = [], []
+        if aOptions and aOptions.jsonconf and 'newComputes' in list(aOptions.jsonconf.keys()) and aOptions.jsonconf['newComputes']:
+            _newdom0List = aOptions.jsonconf['newComputes']
+
+        ebLogInfo(f"New Compute List: {_newdom0List}")
+        if not _newdom0List:
+            _err_str = f"New Compute List is empty."
+            ebLogError(_err_str)
+            raise ExacloudRuntimeError(aErrorMsg=_err_str)
+
+        if _newdom0List:
+            _utils = _ebox.mGetExascaleUtils()
+            _utils.mEnableQinQIfNeeded(aOptions, aDom0List=_newdom0List)
+            #perform check to deduce if QinQ is enabled
+            if not _utils.mCheckRoCEIPs(aOptions, _failedList, aDom0List=_newdom0List):
+                # execute command to enable QinQ
+                ebLogInfo(f" *** Enabling QinQ on the Host Nodes {_failedList}. Host node will be restarted serially to handle that")
+                _utils.mSetupRoCEIPs(aOptions, _failedList, aDom0List=_newdom0List)
+
         return 0
 
 

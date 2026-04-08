@@ -4,7 +4,7 @@
 #
 # profiler.py
 #
-# Copyright (c) 2021, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      profiler.py - Common profiling utilities with no business logic.
@@ -54,6 +54,7 @@
 #      None.
 #
 #    MODIFIED   (MM/DD/YY)
+#    aararora    04/01/26 - Bug 38900321: Fix issues identified by codev
 #    aararora    03/06/24 - Bug 36369329: Profiler having issues when
 #                           dictionary data is changed
 #    scoral      05/26/21 - Creation
@@ -158,9 +159,11 @@ def measure_exec_time(
             ret: Optional[Any] = None
             t0: float = time.time()
             profiling_data[thread][func][t0] = {}
+            success = False
 
             try:
                 ret = func(*args, **kwargs)
+                success = True
                 return ret
             except Exception as ex:
                 profiling_data[thread][func][t0]['exception'] = ex
@@ -171,7 +174,7 @@ def measure_exec_time(
                 if args_stealer:
                     profiling_data[thread][func][t0]['args'] = \
                         args_stealer(*args, **kwargs)
-                if ret_stealer:
+                if ret_stealer and success:
                     profiling_data[thread][func][t0]['return'] = \
                         ret_stealer(ret)
 

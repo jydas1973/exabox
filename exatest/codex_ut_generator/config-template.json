@@ -1,0 +1,15 @@
+{
+  "view_name": "<ADE_VIEW_NAME>",
+  "targets": [
+    {
+      "code": "<REL_OR_ABS_PATH_TO_CODE>",
+      "tests": {
+        "primary": "<REL_OR_ABS_PATH_TO_PRIMARY_TEST>",
+        "additional": [
+          "<OPTIONAL_SUPPORTING_TEST_1>",
+          "<OPTIONAL_SUPPORTING_TEST_2>"
+        ]
+      }
+    }
+  ]
+}

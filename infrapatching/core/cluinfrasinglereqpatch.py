@@ -1,10 +1,10 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/infrapatching/core/cluinfrasinglereqpatch.py /main/6 2025/08/20 05:15:38 apotluri Exp $
+# $Header: ecs/exacloud/exabox/infrapatching/core/cluinfrasinglereqpatch.py jyotdas_bug-38824997/1 2026/02/11 15:48:06 jyotdas Exp $
 #
 # cluinfrasinglereqpatch.py
 #
-# Copyright (c) 2024, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2024, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      cluinfrasinglereqpatch.py - Executes infrapatching operation in a single thread
@@ -16,8 +16,11 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
-#    jyotdas     02/11/26 - Enh - Allow LATEST targetVersion for DOM0
-#                           exasplice patching
+#    araghave    02/12/26 - Bug 38891325 - OCI: EXACS | SMR | SMR APPLY IS
+#                           SHOWING INCORRECT TARGET VERSION , WHILE APPLYING
+#                           CORRECT VERSION
+#    jyotdas     02/11/26 - ENH 38824997 - Support target version for dom0/kvm
+#                           host elu
 #    apotluri    07/25/25 - Bug 38096654 - PRECHECK OF SMR FAILED WITH
 #                           'DIRECTORY FOR EXADATA_RELEASE HAS MORE THAN ONE
 #                           PATCH'
@@ -475,14 +478,8 @@ class ebCluInfraSingeRequestPatch(ebCluInfraPatch):
         if _DBPatchFileDir:
             if self.OCIEXACC == "True":
                 aPatchFile = os.path.join(aPatchFile, "dbserver.patch.zip")
-            if os.path.exists(aPatchFile):
-                _version_common_directory = os.path.join((Path(os.path.dirname(aPatchFile))).parent.parent, "DBPatchFile/dbserver.patch.zip")
-                if _version_common_directory and os.path.exists(_version_common_directory) is True:
-                    self.mPatchLogInfo(f"Checking for the latest dbserver.patch.zip between {str(_version_common_directory)} and {str(aPatchFile)}")
-                    aPatchFile = self.mCompareDbserverPatchFiles(aPatchFile, _version_common_directory)
             self.mPatchLogInfo("dbserver.patch.zip from %s is used for patching" % aPatchFile)
             aPatchFile = os.path.dirname(aPatchFile)
-
 
         if os.path.isdir(aPatchFile) is True:
             aPatchFile = os.path.abspath(aPatchFile)
@@ -516,8 +513,6 @@ class ebCluInfraSingeRequestPatch(ebCluInfraPatch):
                 aPatchFile = os.path.join(aPatchFile, aVersion + ".patch.zip")
             elif _switchPatchFileDir is True:
                 aPatchFile = os.path.join(aPatchFile, aVersion + ".switch.patch.zip")
-            elif _DBPatchFileDir is True:
-                aPatchFile = os.path.join(aPatchFile, "dbserver.patch.zip")
             # if there is a single file under PatchPayloads/19.3.5.0.0.200228/<any directory> , proceed as before
             elif len(_listfile) == 1:
                 aPatchFile = os.path.join(aPatchFile, _listfile[0])
@@ -1007,94 +1002,6 @@ class ebCluInfraSingeRequestPatch(ebCluInfraPatch):
                 self.mPatchLogInfo("   - Disk space expected on exacloud area for thread and request logs: %sGB(Disk space required to store logs per cluster)  \n" % ((int(self.EXACLOUD_PATCH_WORKING_SPACE_MB)/1024)))
                 _rc = False
         return _rc
-
-    def mGetDbserverPatchVersionDetails(self, aDbPatchFileDir):
-        """
-         This method returns the db patch file along with version based
-         on the input DB patch file path provided.
-
-         -bash-4.4$ /bin/unzip -l /scratch/araghave/ecra_installs/abhi/mw_home/user_projects/
-         domains/exacloud/PatchPayloads/DBPatchFile/dbserver.patch.zip | /bin/grep dbserver_ |
-         /bin/head -1 | /bin/awk '{print $4}' | /bin/tr -d "/"
-         dbserver_patch_250119
-         -bash-4.4$
-
-         -bash-4.2$ unzip -l PatchPayloads/DBPatchFile/dbserver.patch.zip | head -4
-         Archive:  PatchPayloads/DBPatchFile/dbserver.patch.zip
-          Length      Date    Time    Name
-         ---------  ---------- -----   ----
-               0  09-18-2024 23:46   dbserver_patch_240915.1/
-         -bash-4.2$
-
-        """
-        _version = None
-        _db_patch_file = None
-        try:
-            _cmd_list = []
-            _out = []
-            # Get Dbserver patch version details.
-            _db_patch_file = os.path.join(aDbPatchFileDir)
-            _cmd_list.append(["/bin/unzip", "-l", _db_patch_file])
-            _cmd_list.append(["/bin/grep", "dbserver_"])
-            _cmd_list.append(["/bin/head", "-1"])
-            _cmd_list.append(["/bin/awk", '{print $4}'])
-            _cmd_list.append(["/bin/tr", "-d", '/'])
-            _cmd_list.append(["/bin/cut", "-d.", "-f1"])
-            _rc, _o = runInfraPatchCommandsLocally(_cmd_list)
-            if _o:
-                _version = ((_o.split("\n"))[0]).split("_")[2]
-        except Exception as e:
-            self.mPatchLogWarn("Error in generating dbserver patch version. Error: %s" % str(e))
-            self.mPatchLogTrace(traceback.format_exc())
-        return _version
-
-    def mCompareDbserverPatchFiles(self, aOldDbPatchFile, aNewDbPatchFile):
-        """
-         This method checks for the dbserver patch files staged at common
-         and the exadata version stage locations and return the LATEST
-         based on the date format details in the file naming convention.
-
-         In the below example, 2 dbserver patch zip locations are provided
-         as input for comparison to return the LATEST patch.
-
-          [ araghave_dbserver ] bash-4.2$  unzip -l
-          PatchPayloads/DBPatchFile/dbserver.patch.zip | grep 'dbserver_patch_' | head -1
-            0  10-18-2023 00:09   dbserver_patch_231017/
-          [ araghave_dbserver ] bash-4.2$
-
-          [ araghave_dbserver ] bash-4.2$ unzip -l
-          PatchPayloads/23.1.24.0.0.250306.1/DBPatchFile/dbserver.patch.zip | grep
-          'dbserver_patch_' | head -1
-            0  03-14-2025 00:00   dbserver_patch_250313/
-          [ araghave_dbserver ] bash-4.2$
-
-          Here dbserver_patch_250313 is LATEST compared to dbserver_patch_231017 and
-          will be consumed for patching.
-        """
-        _old_db_patch_file_date_format = None
-        _new_db_patch_file_date_format = None
-        try:
-            _old_db_patch_file_date_format = self.mGetDbserverPatchVersionDetails(aOldDbPatchFile)
-            _new_db_patch_file_date_format = self.mGetDbserverPatchVersionDetails(aNewDbPatchFile)
-
-            if _old_db_patch_file_date_format and _new_db_patch_file_date_format:
-                if int(_old_db_patch_file_date_format) > int(_new_db_patch_file_date_format):
-                    self.mPatchLogInfo(f"{aOldDbPatchFile} is the LATEST dbserver patch file available based on the date.")
-                    return aOldDbPatchFile
-                elif int(_old_db_patch_file_date_format) < int(_new_db_patch_file_date_format):
-                    self.mPatchLogInfo(f"{aNewDbPatchFile} is the LATEST dbserver patch file available based on the date.")
-                    return aNewDbPatchFile
-                else:
-                    self.mPatchLogInfo(f"Both the dbserver patch files have the same date: {_new_db_patch_file_date_format} and either of them can be used for patching.")
-                    return aNewDbPatchFile
-            else:
-                self.mPatchLogInfo("DBPatch file not found in either of the Patch Stage locations.")
-                return None
-        except Exception as e:
-            self.mPatchLogWarn("Error in generating dbserver patch version file for patching. Error: %s" % str(e))
-            self.mPatchLogTrace(traceback.format_exc())
-            return None
-
     def mCheckPatchFileExistInFileSystem(self):
         """
         Check the existance of required exadata patch files in local file system.
@@ -1102,6 +1009,7 @@ class ebCluInfraSingeRequestPatch(ebCluInfraPatch):
         _rc = PATCH_SUCCESS_EXIT_CODE
         _version_common_directory = None
         for _version in self.__object_store.keys():
+            
             # Skip validation for LATEST - it's for DOM0 exasplice and will be resolved by handlers
             if _version and _version.upper() == 'LATEST':
                 self.mPatchLogInfo(f"Skipping filesystem validation for version '{_version}' - will be resolved by handlers")
@@ -1109,21 +1017,6 @@ class ebCluInfraSingeRequestPatch(ebCluInfraPatch):
 
             for _file in set(self.__object_store[_version]['files']):
                 _version_directory = os.path.join(self.PATCH_PAYLOADS_DIRECTORY, _version, _file)
-
-                """
-                If dbserver.patch.zip from PatchPayloads/DBPatchFile exists, use this for patching 
-                otherwise check for dbserver.patch.zip from PatchPayloads/version/DBPatchFile directory
-                """
-                if _file == KEY_NAME_DBPatchFile:
-                    _version_directory = os.path.join(_version_directory, "dbserver.patch.zip")
-                    if os.path.exists(_version_directory):
-                        _version_common_directory = os.path.join(self.PATCH_PAYLOADS_DIRECTORY, _file, "dbserver.patch.zip")
-                        if _version_common_directory and os.path.exists(_version_common_directory) is True:
-                            self.mPatchLogInfo(f"Checking for the latest dbserver.patch.zip between {str(_version_common_directory)} and {str(_version_directory)}")
-                            _version_directory = self.mCompareDbserverPatchFiles(_version_directory, _version_common_directory)
-                    self.mPatchLogInfo("dbserver.patch.zip from %s is used for patching" % _version_directory)
-                    _version_directory = os.path.dirname(_version_directory)
-
                 if _version_directory and os.path.isdir(_version_directory) is True:
                     _version_directory = os.path.abspath(_version_directory)
                     _listfile = os.listdir(_version_directory)
@@ -1183,7 +1076,6 @@ class ebCluInfraSingeRequestPatch(ebCluInfraPatch):
         format of patching CNS payload so that it can be read uniformly
         in ecra side.
         """
-
         # fill up the payload json for notificaiton
         _patch_report_json = {}
         _patch_report_json['httpRequestId'] = self.__cluctrl.mGetRequestObj().mGetUUID()

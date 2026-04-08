@@ -4,7 +4,7 @@
 #
 # cluzdlra.py
 #
-# Copyright (c) 2021, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      cluzdlra.py - <one-line expansion of the name>
@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    naps        02/23/26 - Bug 38984665 - Handle cases where cell server is
+#                           down.
 #    naps        09/01/25 - Bug 38343791 - remove quorum disk dependency with
 #                           asm scope security.
 #    aararora    04/15/25 - Bug 37737222: Skip check for zdlra diskgroups for
@@ -80,7 +82,7 @@ from exabox.ovm.hypervisorutils import getHVInstance, ebVgCompRegistry
 from exabox.ovm.bmc import XMLProcessor
 from exabox.BaseServer.AsyncProcessing import ProcessManager, ProcessStructure
 from exabox.utils.common import mCompareModel
-from exabox.config.Config import ebVmCmdCheckOptions
+from exabox.config.Config import ebVmCmdCheckOptions, ebCluCmdCheckOptions
 from exabox.core.Error import ExacloudRuntimeError
 import random, string
 import json
@@ -784,6 +786,7 @@ class exaBoxZdlra(object):
         _zdlra_flag = False
         _options = _eBox.mGetArgsOptions()
 
+        #For zdlra type envs, the xml rack description will always be patched with the zdlra attr
         racks = _eBox.mGetEsracks()
         if racks:
             ebLogInfo('*** mCheckZdlraInEnv: rackDescription is {}'.format(racks.mDumpEsRackDesc()))
@@ -791,8 +794,14 @@ class exaBoxZdlra(object):
                 ebLogInfo('*** mCheckZdlraInEnv: xml patched for zdlra. Enabling zdlra config !')
                 return True
 
-        # If it is a zdlra environment - we would know it is a zdlra environment from xml check above
-        # For ExaCS - we can skip the below check on cells for zdlra
+        #xml will already be patched, and above detection would have worked for zdlra env.
+        #i.e if we are here, its a non-zdlra env, especially, if its a vm_cmd operation
+        #Hence the below check.
+        if ebCluCmdCheckOptions(_eBox.mGetCmd(), ['skip_zdlra_detection_using_cellnodes']):
+            return False
+
+        #Below is a granular option, if for some reason we want to disable skip_zdlra_detection_using_cellnodes.
+        #We can then individually enable/disable skip_zdlra_cell_check for each vm_cmd individually
         if _options and _eBox.mGetCmd() == "vm_cmd" and _options.vmcmd and \
             ebVmCmdCheckOptions(_options.vmcmd, ['skip_zdlra_cell_check']):
             return False
@@ -802,11 +811,15 @@ class exaBoxZdlra(object):
             ebLogWarn('mCheckZdlraInEnv: Cell list is empty!')
             return False
 
+        _timeout = int(_eBox.mCheckConfigOption('zdlra_cell_connect_timeout_in_seconds'))
+        if not _timeout:
+            _timeout = 20
+
         _cell_name = list(_cell_list.keys())[0]
         _node = exaBoxNode(get_gcontext())
         # Below condition is to reduce the number of retries to connect to the cell node
         # and fail early
-        if not _node.mIsConnectable(aHost=_cell_name):
+        if not _node.mIsConnectable(aHost=_cell_name, aTimeout=_timeout):
             raise ExacloudRuntimeError(aErrorMsg=f"The cell node {_cell_name} is not connectable. Please correct "\
                 " connectivity to the cell and try again.")
         _node.mConnect(aHost=_cell_name)

@@ -1,9 +1,9 @@
 #
-# $Header: ecs/exacloud/exabox/infrapatching/handlers/targetHandler/roceswitchhandler.py /main/37 2025/09/02 17:58:33 ajayasin Exp $
+# $Header: ecs/exacloud/exabox/infrapatching/handlers/targetHandler/roceswitchhandler.py /main/38 2026/01/15 05:47:57 araghave Exp $
 #
 # roceswitchhandler.py
 #
-# Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      roceswitchhandler.py - Patch - RoCE Switch Basic Functionality.
@@ -15,6 +15,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    araghave    12/16/25 - Enh 38766076 - CONFIGURE UPDATE-CRYPTO-POLICIES
+#                           BEFORE AND AFTER SWITCH PATCHING
 #    ajayasin    08/05/25 - moving handler function from clucontrol.py
 #                           clucommandhandler.py to reduce the clucontrol.py
 #                           size
@@ -585,9 +587,14 @@ class RoceSwitchHandler(TargetHandler):
         _list_of_roceswitches = []
         _discarded = []
         _patchMgrObj = None
+
+        _task_type = self.mGetTask()
+        _dom0_candidates, _dom0_crypto_host, _crypto_setup_result = self.mPrepareDom0CryptoPolicy((TASK_PATCH, TASK_PREREQ_CHECK), _no_action_taken)
+        if _crypto_setup_result:
+            return _crypto_setup_result, _no_action_taken
+
         _list_of_nodes_for_node_progress_details = []
 
-        self.mSetDom0ToPatchcellSwitches()
         '''
          Switch are not filtered on the infra patching
          based on the version as there could be missing
@@ -617,6 +624,7 @@ class RoceSwitchHandler(TargetHandler):
                 _suggestion_msg = f"Launch node is either down or patches are not staged, unable to proceed with {self.mGetCurrentTargetType()} operation on {_task_type} target."
                 _ret = SWITCH_PATCH_FILES_MISSING
                 self.mAddError(_ret, _suggestion_msg)
+                _ret = self.mFinalizeDom0CryptoPolicy(_task_type, _dom0_crypto_host, _ret)
                 return _ret, _no_action_taken
 
             # create patchmgr object with bare minimum arguments
@@ -629,6 +637,7 @@ class RoceSwitchHandler(TargetHandler):
             _ret, _patchmgr_active_node = _patchMgrObj.mCheckForPatchMgrSessionExistence()
 
             if _ret == PATCHMGR_SESSION_ALREADY_EXIST:
+                _ret = self.mFinalizeDom0CryptoPolicy(_task_type, _dom0_crypto_host, _ret)
                 return _ret, _no_action_taken
 
             # create patchmgr nodes file
@@ -648,7 +657,8 @@ class RoceSwitchHandler(TargetHandler):
                         _suggestion_msg = f"Switch ping check failed : {_roce}"
                         _ret = SWITCH_PING_CHECK_FAILED
                         self.mAddError(_ret, _suggestion_msg)
-                        return _ret
+                        _ret = self.mFinalizeDom0CryptoPolicy(_task_type, _dom0_crypto_host, _ret)
+                        return _ret, _no_action_taken
 
             # Clean the environment: Delete passwordless, delete input file
             self.mCleanEnvironment(self.mGetDom0ToPatchcellSwitches(), _list_of_roceswitches, _input_file,
@@ -664,6 +674,7 @@ class RoceSwitchHandler(TargetHandler):
             _ret = PATCH_SUCCESS_EXIT_CODE
             self.mAddError(_ret, _suggestion_msg)
 
+        _ret = self.mFinalizeDom0CryptoPolicy(_task_type, _dom0_crypto_host, _ret)
         return _ret, _no_action_taken
 
     def mPatchRoceswitchesRolling(self, aListOfNodes, aPatchMgrObj):

@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     OVM - Basic functionality
@@ -37,6 +37,7 @@ from exabox.core.Node import exaBoxNode
 from exabox.core.Context import get_gcontext
 from exabox.log.LogMgr import ebLogError, ebLogDebug, ebLogInfo, ebLogWarn
 from exabox.ovm.vmconfig import exaBoxVMConfig, exaBoxClusterConfig, ebVMCfg
+from exabox.ovm.remotelock import RemoteLock
 from tempfile import NamedTemporaryFile
 from multiprocessing import Process, Manager
 from exabox.BaseServer.AsyncProcessing import ProcessManager, ProcessStructure, ExitCodeBehavior, TimeoutBehavior
@@ -625,10 +626,12 @@ class ebVgLifeCycle(ebVgBase):
             if not _vmid:
                 return _rc
             _mAutostartSettingErr = None 
-            if aCluCtrlObj:   
-                aCluCtrlObj.mAcquireRemoteLock()
 
             try:
+                _dom0_lock = RemoteLock(aCluCtrlObj, force_host_list=[self.__vmctrl.mGetDom0()])
+                if _dom0_lock:
+                    _dom0_lock.acquire()
+
                 _remote_dir = f"/EXAVMIMAGES/GuestImages/{_vmid}/console/write-qemu/"
                 _file = _remote_dir + f"lcm_exacloud"
                 with connect_to_host(self.__vmctrl.mGetDom0(), get_gcontext()) as _node:
@@ -652,8 +655,8 @@ class ebVgLifeCycle(ebVgBase):
                         _consoleobj.mStopContainer(self.__vmctrl.mGetDom0(), _vmid)
 
             finally:
-                if aCluCtrlObj:
-                    aCluCtrlObj.mReleaseRemoteLock() 
+                if _dom0_lock:
+                    _dom0_lock.release()
 
             if _rc == 0 and _mAutostartSettingErr == 0x0454:
                 return _mAutostartSettingErr 

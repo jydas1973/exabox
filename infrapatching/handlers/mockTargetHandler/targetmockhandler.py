@@ -1,5 +1,5 @@
 #
-# $Header: ecs/exacloud/exabox/infrapatching/handlers/mockTargetHandler/targetmockhandler.py /main/8 2025/01/17 05:22:26 emekala Exp $
+# $Header: ecs/exacloud/exabox/infrapatching/handlers/mockTargetHandler/targetmockhandler.py /main/9 2025/12/23 14:45:08 vikasras Exp $
 #
 # targetmockhandler.py
 #
@@ -17,6 +17,9 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    vikasras    11/28/25 - OCI: VALIDATE CONTENT OF DOC ID 2829056.1 & REPLACE
+#                           IT WITH KB123625 IN ALL OS PATCHING WFS FOR
+#                           EXACC/DB-D/XS
 #    emekala     12/13/24 - ENH 37374442 - SUPPORT INFRA PATCH MOCK FWK TO
 #                           ACCEPT MOCK RESPONSE IN JSON FORMAT VIA REST API
 #    diguma      12/06/24 - bug 37365122 - EXACS:24.4.2.1:X11M: ROLLING DOM0
@@ -1000,7 +1003,7 @@ class TargetMockHandler(GenericMockHandler):
                 if _js["StaleMount"]:
                     _return_msg += ",StaleMount:" + _js["StaleMount"]+"; "
 
-        _return_msg = _return_msg + ". Refer MOS Note 2829056.1 for more details." 
+        _return_msg = _return_msg + ". Refer KB123625 for more details." 
         self.mPatchLogInfo(f'*** Final return msg {_return_msg} ***')
         self.mPatchLogInfo(f"Total time taken to determine Stale Mounts in seconds : {str(time.time() - _starttime)} ")
         return True, _return_msg
@@ -1156,7 +1159,7 @@ class TargetMockHandler(GenericMockHandler):
 
         # Update MOS Doc also if any issues found on any of the domUs.
         if _node_error_msg:
-            _node_error_msg ["MOS_NOTE"] = "Refer MOS Note 2829056.1 for more details."
+            _node_error_msg ["MOS_NOTE"] = "Refer KB123625 for more details."
 
         self.mPatchLogInfo("***System consistency check completed.***\n")
         return _is_system_valid_state, _node_error_msg

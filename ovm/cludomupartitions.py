@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     OVM - Local Disk Partition Management on cluster nodes
@@ -565,10 +565,7 @@ class ebCluManageDomUPartition(object):
         _eBoxCluCtrl = self.mGetEbox()
         ebLogInfo("*** Current Size = %s and New Size= %s"%(currentSize, newSize))
         ret = False
-        if _eBoxCluCtrl.mCheckConfigOption('disable_lvm_snapshot_space','True'):
-            size_diff = abs(int(currentSize) - int(newSize))
-        else:
-            size_diff = abs(int(currentSize) + 2 - int(newSize))
+        size_diff = abs(int(currentSize) - int(newSize))
         percentageChange = float(size_diff * 100) / int(currentSize)
         if percentageChange > 0:
             ebLogInfo("*** ebCluManageDomUPartition:mClusterPartitionTargetDiff:Resize needed on this")
@@ -580,8 +577,6 @@ class ebCluManageDomUPartition(object):
         ebLogInfo("*** ebCluManageDomUPartition:mClusterPartitionTargetDiff <<<")
         return ret
 
-
-    
     """
     Fetches the partition information from all nodes of a cluster
     """

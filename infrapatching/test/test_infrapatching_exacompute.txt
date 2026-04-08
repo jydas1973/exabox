@@ -1,9 +1,9 @@
 # 
-# $Header: ecs/exacloud/exabox/infrapatching/test/test_infrapatching_exacompute.txt /main/16 2025/12/04 04:10:46 araghave Exp $
+# $Header: ecs/exacloud/exabox/infrapatching/test/test_infrapatching_exacompute.txt /main/17 2026/02/03 03:49:54 sdevasek Exp $
 #
 # test_infrapatching_exacompute.py
 #
-# Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      test_infrapatching_exacompute.py - Unit test case script for all
@@ -17,6 +17,8 @@
 #
 #
 #    MODIFIED   (MM/DD/YY)
+#    sdevasek    01/13/26 - Enh 38821433 - EXACOMPUTE FREE POOL NODE PATCHING:
+#                           USE ONE OF THE TARGET NODE AS LAUNCH NODE
 #    araghave    10/03/25 - Enhancement Request 38444755 - INFRAPATCHING TEST
 #                           AUTOMATION - TEST ADDITION TO PERFORM DOMU ELU
 #                           PATCH OPERATIONS
@@ -56,6 +58,7 @@
 #                           AUTOMATION TO COVER EXACOMPUTE PATCHING FLOW
 #    antamil    11/15/22 - ENH 34513424 Test addition for exacompute patch
 
+import json
 import pytest
 import unittest
 from utils import *
@@ -284,7 +287,7 @@ class Test_exacompute_class(unittest.TestCase):
         if _status_json and "status" in _status_json and "errorCode" in _status_json:
             _status = _status_json['status']
             _error_code = _status_json['errorCode']
-            if _status == 500 and _error_code == '0x0301005E':
+            if _status == 500 and _error_code == '0x03010045':
                 _patch_failed = True
         self.assertTrue(_patch_failed, "Patch failure is not found in status output.")
 
@@ -350,6 +353,47 @@ class Test_exacompute_class(unittest.TestCase):
             self.__infra_patch_operation_status_result, self.__infra_patch_operation_status_output =  \
                 mExecuteInfraPatchCommandWithRetry(self.__operation, Test_exacompute_class.__target_name, self.__operation_style)
             self.assertTrue(self.__infra_patch_operation_status_result, "Exacompute ELU %s operation failed." % self.__operation)
+
+    @pytest.mark.exacompute_auto_launch_nodes
+    def test_exacompute_auto_launch_nodes(self):
+        """Validate workflow derives launch nodes when payload omits them."""
+
+        _target_node = Test_exacompute_class.__dom0s[:]
+        #shutdown the vms on all the nodes
+        mShutdownVMsOnDom0(_target_node)
+
+        mUpdateParamInPayload("LaunchNodes", [])
+        mUpdateParamInPayload("NodeList", Test_exacompute_class.__dom0s[:3])
+
+        self.__operation = TASK_PREREQ_CHECK
+        if self.__ssh_equivalence_configured:
+            self.__infra_patch_operation_status_result, self.__infra_patch_operation_status_output =  \
+                mExecuteInfraPatchCommandWithRetry(self.__operation, Test_exacompute_class.__target_name, self.__operation_style)
+            self.assertTrue(self.__infra_patch_operation_status_result,
+                            "Exacompute precheck should pass with auto-selected launch nodes")
+
+            status_json = json.loads(self.__infra_patch_operation_status_output)
+            details = status_json.get("exacompute_patching_details", {})
+            self.assertTrue(details.get("launch_node"),
+                            "Derived launch node missing from status output")
+
+    @pytest.mark.exacompute_single_node_without_launch
+    def test_exacompute_single_node_without_launch(self):
+        """Ensure single-node payload without launch node fails validation."""
+
+        mUpdateParamInPayload("LaunchNodes", [])
+        mUpdateParamInPayload("NodeList", [Test_exacompute_class.__dom0s[0]])
+
+        self.__operation = TASK_PREREQ_CHECK
+        if self.__ssh_equivalence_configured:
+            self.__infra_patch_operation_status_result, self.__infra_patch_operation_status_output =  \
+                mExecuteInfraPatchCommand(self.__operation, Test_exacompute_class.__target_name, self.__operation_style)
+            self.assertFalse(self.__infra_patch_operation_status_result,
+                             "Single-node payload without launch node should fail")
+
+            status_json = json.loads(self.__infra_patch_operation_status_output)
+            self.assertEqual(status_json.get("errorCode"), "0x030D001B",
+                             "Expected EXACOMPUTE_INSUFFICIENT_NODES_FOR_LAUNCH error code")
 
     @pytest.mark.exacompute_precheck_failure_then_patch
     def test_exacompute_precheck_failure_then_patch(self):

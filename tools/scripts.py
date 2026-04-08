@@ -1,5 +1,5 @@
 """
- Copyright (c) 2015, 2023, Oracle and/or its affiliates.
+ Copyright (c) 2015, 2026, Oracle and/or its affiliates.
 
 NAME:
     Execute Scripts
@@ -11,6 +11,7 @@ NOTE:
     None
 
 History:
+    aararora    04/01/2026 - Bug 38900321: Fix issues identified by codev
     aararora    06/11/2023 - Bug 35926574: Correction of fortify reported issues for xml.
     jesandov    18/01/2022 - Remove exabox/os folder
     ndesanto    10/02/2019 - Enh 30374491: EXACC PYTHON 3 MIGRATION BATCH 02
@@ -122,7 +123,7 @@ class ebScripts(object):
         if 'script_paths' in list(_config.keys()):
             self.__paths = _config['script_paths']
         else:
-            self.__path = ['.']
+            self.__paths = ['.']
 
         self.__fileio = ebIOFile(self.__script_name, self.__paths)
         self.__fileio.mOpenFile()

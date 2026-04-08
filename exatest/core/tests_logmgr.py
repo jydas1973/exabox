@@ -4,7 +4,7 @@
 #
 # tests_logmgr.py
 #
-# Copyright (c) 2020, 2022, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_logmgr.py - <one-line expansion of the name>
@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    aararora    03/03/26 - Bug 38902170: Correct resource leak issues
 #    jejegonz    10/28/20 - Creation of Tests for exabox/log/LogMgr.py
 #    jejegonz    10/28/20 - Creation
 #
@@ -26,13 +27,17 @@ import subprocess
 import pdb
 import re
  
-from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
-from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
-from exabox.log.LogMgr import (ebLogInfo, ebLogError, ebLogVerbose,
-                                ebLogWarn, ebLogHealth, ebLogCrit,
-                                ebSetLogLvl, ebLogDB, ebLogAgent,
-                                ebLogDiag, ebLogAddDestinationToLoggers,
-                                ebGetDefaultLoggerName, ebLogDeleteLoggerDestination, ebFormattersEnum)
+from unittest.mock import MagicMock, patch
+
+with patch('multiprocessing.Lock', return_value=MagicMock()):
+    from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
+    from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
+    from exabox.log.LogMgr import (ebLogInfo, ebLogError, ebLogVerbose,
+                                    ebLogWarn, ebLogHealth, ebLogCrit,
+                                    ebSetLogLvl, ebLogDB, ebLogAgent,
+                                    ebLogDiag, ebLogAddDestinationToLoggers,
+                                    ebGetDefaultLoggerName, ebLogDeleteLoggerDestination,
+                                    ebFormattersEnum, ebThreadLoggingClose)
 import logging
  
 class ebTestLogMgr(ebTestClucontrol):
@@ -198,6 +203,20 @@ class ebTestLogMgr(ebTestClucontrol):
         self._find_match(log_msg, 2, path.join(self._log_dir, 'agent.trc'))
         self._find_match(log_msg, 0, path.join(self._log_dir, 'agent.log'))
         self._find_match(log_msg, 0, path.join(self._log_dir, 'agent.err'))
+
+    def test_thread_logging_close(self):
+        import types
+
+        class _DummyBuffer:
+            def __init__(self):
+                self.closed = False
+            def close(self):
+                self.closed = True
+
+        dummy_local = types.SimpleNamespace(output_buffer=_DummyBuffer())
+        with patch('exabox.log.LogMgr.ebThreadLocalLog', return_value=dummy_local):
+            ebThreadLoggingClose()
+        self.assertIsNone(dummy_local.output_buffer)
 
     def test_log_agent_info(self):
         lvl = 'NFO'

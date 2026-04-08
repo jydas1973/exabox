@@ -1,7 +1,7 @@
 """
 $Header:
 
- Copyright (c) 2014, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     OVM - Basic functionality
@@ -756,8 +756,7 @@ class ebCluElastic(object):
     def mBuildClusterPath(self, aDom0DomUPair=None):
         _ebox = self.__eboxobj
 
-        if aDom0DomUPair:
-            _ddp = aDom0DomUPair
+        _ddp = aDom0DomUPair if aDom0DomUPair else list(_ebox.mReturnDom0DomUPair())
 
         _dir  = ''
         _dir2 = ''

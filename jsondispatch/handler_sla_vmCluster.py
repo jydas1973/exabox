@@ -1,10 +1,10 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/jsondispatch/handler_sla_vmCluster.py /main/4 2025/11/05 06:12:56 atgandhi Exp $
+# $Header: ecs/exacloud/exabox/jsondispatch/handler_sla_vmCluster.py /main/6 2026/02/09 06:20:21 atgandhi Exp $
 #
 # handler_sla_vmCluster.py
 #
-# Copyright (c) 2023, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2023, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      handler_sla_vmCluster.py - <one-line expansion of the name>
@@ -16,6 +16,10 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    atgandhi    02/01/26 - Bug 38910261 - EXACS:SLA NOT SET TO 0 AFTER
+#                           SLA_SERVER_MAX_TIMEOUT EXPIRY WHEN ADMIN NETWORK
+#                           (ETH0) IS DOWN
+#    atgandhi    11/26/25 - 38675169: No SLA collection during blackout
 #    atgandhi    10/01/25 - Enh 38459507 - LOG BASED SLA COLLECTION AND STORE
 #                           DOWNTIMES IN DB
 #    jiacpeng    02/29/24 - exacs-127809: When server is not connectable,
@@ -30,6 +34,7 @@ import time
 import os
 import datetime
 import re
+import random
 from concurrent.futures import ProcessPoolExecutor
 import concurrent.futures
 from exabox.core.Context import get_gcontext
@@ -180,8 +185,8 @@ class SLAVmClusterHandler(JDHandler):
         def _getTimeoutResponse(aName, aType, aStartTime, aEndTime, aClusters):
             return {
                 "type": aType,
-                "server_status": 0,
-                "network_status": 0,
+                "server_status": -1,
+                "network_status": -1,
                 "timestamp": time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime()),
                 "errors": [
                     (f"Timeout for {aType} server {aName}.")
@@ -197,30 +202,75 @@ class SLAVmClusterHandler(JDHandler):
         _frequency = _endpointPayload["scheduler_frequency"]
         _max_exec_time = _frequency - 30
         _servers = _endpointPayload.get("servers")
+        if _servers:
+            _servers = random.sample(_servers, len(_servers))
         _max_concurrency = _endpointPayload.get("max_concurrency", len(_servers))
+        _max_ssh_timeout = _endpointPayload.get("max_ssh_timeout", 10)
         _max_concurrency = min(_max_concurrency, len(_servers))
         with ProcessPoolExecutor(max_workers=_max_concurrency) as _executor:
             _start_time = time.time()
             ebLogInfo("Started SLA measurements collection.")
-            _pool = [
-                _executor.submit(
+            _pool = []
+            _future_to_server = {}
+            for server in _servers:
+                _future = _executor.submit(
                     self.mExecuteSLA,
                     server["hostname"],
                     server["server_type"],
                     _frequency,
+                    _max_ssh_timeout,
                     server["start_time"],
                     server["end_time"],
-                    server["clusters"]
-                ) for server in _servers
-            ]
+                    server["clusters"],
+                    server["blackout_status"]
+                )
+                _pool.append(_future)
+                _future_to_server[_future] = server
+
+            _completed_futures = set()
+            _wait_time = _max_exec_time - (time.time() - _start_time)
+            _timeout_occurred = False
             try:
-                _wait_time = _max_exec_time - (time.time() - _start_time)
-                for _res in concurrent.futures.as_completed(_pool, timeout=_wait_time):
-                    _response.update(_res.result())
-            except TimeoutError:
-                ebLogWarn("Timeout Error.")
-            except Exception as e:
-                ebLogWarn('Exception in handling request[%s]' % (e,))
+                for _res in concurrent.futures.as_completed(
+                        _pool,
+                        timeout=max(_wait_time, 0)):
+                    _completed_futures.add(_res)
+                    try:
+                        _result = _res.result()
+                        _response.update(_result)
+                    except Exception as e:
+                        _rc = 1
+                        ebLogWarn('Exception in handling request[%s]' % (e,))
+            except concurrent.futures.TimeoutError as e:
+                _timeout_occurred = True
+                _rc = 1
+                _unfinished = [
+                    _future_to_server[_f]["hostname"]
+                    for _f in _pool if not _f.done()
+                ]
+                _unfinished_count = len(_unfinished)
+                ebLogWarn(
+                    "Timeout while waiting for SLA futures. "
+                    f"{_unfinished_count} futures unfinished: {_unfinished}"
+                )
+            finally:
+                for _future in _pool:
+                    if _future.done() and _future not in _completed_futures:
+                        try:
+                            _result = _future.result()
+                            _response.update(_result)
+                            _completed_futures.add(_future)
+                        except Exception as e:
+                            _rc = 1
+                            ebLogWarn('Exception in handling request[%s]' % (e,))
+                    elif not _future.done():
+                        _future.cancel()
+
+            if _timeout_occurred:
+                ebLogWarn(
+                    "Timeout Error. Outstanding futures were cancelled; "
+                    "using fallback timeout responses."
+                )
         for server in _servers:
             _name = server["hostname"]
             _type = server["server_type"]
@@ -236,7 +286,7 @@ class SLAVmClusterHandler(JDHandler):
         return (_rc, _response)
 
     @staticmethod
-    def mExecuteSLA(aHostname: str, aType: str, aFrequency: int, aStartTime: str, aEndTime: str, aClusters: str) -> dict:
+    def mExecuteSLA(aHostname: str, aType: str, aFrequency: int, aMaxSshTimeout: int, aStartTime: str, aEndTime: str, aClusters: str, aBlackoutStatus: int) -> dict:
         ebLogTrace(f"Running SLA measurement for {aType} server with hostname: {aHostname}")
         _resp_dict = {}
         _resp_dict['type'] = aType
@@ -248,24 +298,43 @@ class SLAVmClusterHandler(JDHandler):
         _resp_dict["start_time"] = aStartTime
         _resp_dict["end_time"] = aEndTime
         _resp_dict["clusters"] = aClusters
+        _resp_dict["blackout_status"] = aBlackoutStatus
         _errors = _resp_dict["errors"]
 
         try:
+            # check if the host is currently in blackout
+            if _resp_dict["blackout_status"] == 1:
+                _resp_dict["server_status"] = 1
+                if aType == 'compute':
+                    _resp_dict["network_status"] = 1
+                _resp_dict["timestamp"] = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())
+                return {aHostname: _resp_dict}
+
             server_status = -1
             network_status = -1
             if aType == 'compute':
                 # Only connect to host ONCE and pass the SSH connection to both checks
-                with connect_to_host(aHostname, get_gcontext(), timeout=10) as node:
-                    server_status, network_status = SLAVmClusterHandler.mComputeCheck_with_node(
-                        node, aHostname, aFrequency, aStartTime
-                    )
-                    _resp_dict["downtime_periods"] = mExtractDowntimePeriods_with_node(
-                        node, aHostname, aType, aStartTime, aEndTime
-                    )
+                _node = exaBoxNode(get_gcontext())
+                if _node.mIsConnectable(aHost=aHostname, aTimeout=aMaxSshTimeout):
+                    with connect_to_host(aHostname, get_gcontext(), timeout=aMaxSshTimeout) as node:
+                        server_status, network_status = SLAVmClusterHandler.mComputeCheck_with_node(
+                            node, aHostname, aFrequency, aStartTime
+                        )
+                        _resp_dict["downtime_periods"] = mExtractDowntimePeriods_with_node(
+                            node, aHostname, aType, aStartTime, aEndTime
+                        )
+                else:
+                    ebLogInfo(f"Host {aHostname} is not connectable. Setting server_status and network_status to -1.")
             elif aType == 'storage':
-                with connect_to_host(aHostname, get_gcontext(), timeout=10) as node:
-                    server_status = SLAVmClusterHandler.mCellCheck(aHostname)
-                    _resp_dict["downtime_periods"] = mExtractDowntimePeriods_with_node(node, aHostname, aType, aStartTime, aEndTime)
+                _node = exaBoxNode(get_gcontext())
+                if _node.mIsConnectable(aHost=aHostname, aTimeout=aMaxSshTimeout):
+                    with connect_to_host(aHostname, get_gcontext(), timeout=aMaxSshTimeout) as node:
+                        server_status = SLAVmClusterHandler.mCellCheck_with_node(node)
+                        _resp_dict["downtime_periods"] = mExtractDowntimePeriods_with_node(
+                            node, aHostname, aType, aStartTime, aEndTime
+                        )
+                else:
+                    ebLogInfo(f"Host {aHostname} is not connectable. Setting server_status and network_status to -1.")
             else:
                 ebLogWarn(f"Unknown type of server {aType}, allowed server type: compute, cell. Skip SLA status check for {aHostname}")
                 _errors.append(f'Unknown type {aType} for server {aHostname} ')
@@ -294,7 +363,6 @@ class SLAVmClusterHandler(JDHandler):
             _cmd = f"{_bin_systemctl} is-active libvirtd"
             _, _stdout, _ = node_exec_cmd(node, _cmd, timeout=5)
             server_status = 1 if _stdout and _stdout.strip() == "active" else 0
-            ebLogInfo(f"Here is the output of check is-active libvirtd {_stdout[0].strip() if _stdout and hasattr(_stdout, '__getitem__') else _stdout}")
         else:
             # Fallback method
             _bin_ps = node_cmd_abs_path_check(node, "ps")
@@ -317,6 +385,17 @@ class SLAVmClusterHandler(JDHandler):
             _, _stdout, _ = node_exec_cmd(node, _cmd, timeout=5)
             network_status = 1 if _stdout else 0
         return (server_status, network_status)
+
+    @staticmethod
+    def mCellCheck_with_node(node) -> int:
+        _bin_grep = node_cmd_abs_path_check(node, "grep")
+        _cmd = ("/opt/oracle/cell/cellsrv/bin/cellcli -e list cell detail"
+               f" | {_bin_grep} cellsrvStatus")
+        _, _stdout, _ = node_exec_cmd(node, _cmd, timeout=10)
+        if not _stdout:
+            return 0
+        _status = _stdout.split(':')[-1]
+        return 1 if _status.strip() == 'running' else 0
 
     @staticmethod
     def mCellCheck(aCell: str) -> int:

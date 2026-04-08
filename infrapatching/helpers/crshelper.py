@@ -1,7 +1,7 @@
 #
 # crshelper.py
 #
-# Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      crshelper.py - Place holder for common methods of crs and heartbeatcheck
@@ -13,6 +13,11 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    remamid     01/21/26 - Bug 38707554 Handle all cases for start crs
+#    araghave    01/12/26 - Enhancement Request 38723348 - EXACLOUD - IMPROVE
+#                           RESILIENCY OF CRS RESTART FOR INFRAPATCHING FLOW
+#    bhpati      12/12/25 - Bug 38671457 - Errormessage Improvement if CRS is
+#                           disabled on Domu
 #    araghave    09/27/25 - Enhancement Request 38457501 - EXACC GEN2
 #                           | INFRA PATCHING |ERFORM HEARTBEAT CHECKS AND
 #                           CRS AUTOSTARTUP IN PARALLEL FOR NON-ROLLING
@@ -618,14 +623,32 @@ class CrsHelper(LogHandler):
                         _stop_args = "stop crs -f"
                         _ret, _cmd_crs_stop = self.mGenCrsctlCmd(_node, _stop_args, _domu_customer_hostname)
                         if _ret == PATCH_SUCCESS_EXIT_CODE:
-                            self.mPatchLogInfo(f"Stopping CRS on {_domu_customer_hostname}")
-                            _in, _out, _err = _node.mExecuteCmd(_cmd_crs_stop)
-                            if _out:
-                                self.mPatchLogInfo(f"CRS is stopped on {_domu_customer_hostname}")
-                            else:                            
-                                if _err:
-                                    _errors = _err.readlines()
-                                self.mPatchLogWarn(f"Could not stop CRS on {_domu_customer_hostname} Error: {str(_errors)}")
+                            _stop_success = False
+                            for _stop_iteration in range(1, RETRY_CRS_STOP_MAX_ITERATIONS + 1):
+                                self.mPatchLogInfo(
+                                    f"Stopping CRS on {_domu_customer_hostname} (iteration {_stop_iteration}/{RETRY_CRS_STOP_MAX_ITERATIONS})")
+                                _in, _out, _err = _node.mExecuteCmd(_cmd_crs_stop)
+                                _stop_output = _out.readlines() if _out else []
+                                _stop_errors = _err.readlines() if _err else []
+                                if _stop_output:
+                                    _stop_success = True
+                                    self.mPatchLogInfo(f"CRS is stopped on {_domu_customer_hostname}")
+                                    break
+                                if _stop_errors:
+                                    self.mPatchLogWarn(
+                                        f"Could not stop CRS on {_domu_customer_hostname} in iteration {_stop_iteration}. Error: {str(_stop_errors)}")
+                                else:
+                                    self.mPatchLogWarn(
+                                        f"Could not stop CRS on {_domu_customer_hostname} in iteration {_stop_iteration}. No output returned.")
+                            if not _stop_success:
+                                self.mPatchLogError(
+                                    f"Could not stop CRS on {_domu_customer_hostname} after {RETRY_CRS_STOP_MAX_ITERATIONS} iterations.")
+                                _ret = CRS_COMMAND_EXCEPTION_ENCOUNTERED
+                                '''
+                                 Fail this flow in case of crsctl stop command is unable
+                                 to stop crs services in multiple iterations.
+                                '''
+                                return _ret
 
                         _ret = self.mStartupCrsOnDomU(aDomU, _node)
                         if _ret != PATCH_SUCCESS_EXIT_CODE:
@@ -722,26 +745,12 @@ class CrsHelper(LogHandler):
                 sleep(WAIT_FOR_CRSCTL_START_COMMAND_TO_COMPLETE_IN_SECONDS)
                 if _out:
                     _output = _out.readlines()
-
+                if _err:
+                    _errors = _err.readlines()
                 """
-                  crsctl start cluster sample output :
-                  root@test-host-slcs27 opc]#  /u01/app/19.0.0.0/grid/bin/crsctl start cluster
-                  CRS-2672: Attempting to start 'ora.cssdmonitor' on 'test-host-slcs27'
-                  CRS-2672: Attempting to start 'ora.evmd' on 'test-host-slcs27'
-                  CRS-2676: Start of 'ora.cssdmonitor' on 'test-host-slcs27' succeeded
-                  CRS-2672: Attempting to start 'ora.cssd' on 'test-host-slcs27'
-                  CRS-2672: Attempting to start 'ora.diskmon' on 'test-host-slcs27'
-                  CRS-2676: Start of 'ora.evmd' on 'test-host-slcs27' succeeded
-                  CRS-2676: Start of 'ora.diskmon' on 'test-host-slcs27' succeeded
-                  CRS-2676: Start of 'ora.cssd' on 'test-host-slcs27' succeeded
-                  CRS-2672: Attempting to start 'ora.ctssd' on 'test-host-slcs27'
-                  CRS-2676: Start of 'ora.ctssd' on 'test-host-slcs27' succeeded
-                  CRS-2672: Attempting to start 'ora.asm' on 'test-host-slcs27'
-                  CRS-2676: Start of 'ora.asm' on 'test-host-slcs27' succeeded
-                  CRS-2672: Attempting to start 'ora.storage' on 'test-host-slcs27'
-                  CRS-2676: Start of 'ora.storage' on 'test-host-slcs27' succeeded
-                  CRS-2672: Attempting to start 'ora.crsd' on 'test-host-slcs27'
-                  CRS-2676: Start of 'ora.crsd' on 'test-host-slcs27' succeeded
+                  crsctl start crs sample output :
+                  root@test-host-slcs27 opc]#  /u01/app/19.0.0.0/grid/bin/crsctl start crs
+                  CRS-4123: Oracle High Availability Services has been started.
                   [root@test-host-slcs27 opc]#
                 """
                 if len(_output) > 0:
@@ -765,9 +774,11 @@ class CrsHelper(LogHandler):
                             if _crsinit_output:
                                 self.mPatchLogInfo(f"crs Init resources status on {_domu_customer_hostname}: \n  {_crsinit_output}")
                     else:                      
-                        if _err:
-                            _errors = _err.readlines()
                         self.mPatchLogWarn(f"CRS is down on {_domu_customer_hostname}.\n Output : {str(_errors)}")
+                #If crsctl start crs didnt generate any output, then we mark crs startup failed.
+                else:
+                    _ret = DOMU_CRS_SERVICES_DOWN
+                    self.mPatchLogWarn(f"CRS is down on {_domu_customer_hostname}.\n Output : {str(_errors)}")
         except Exception as e:
             _suggestion_msg = f'Failed to startup crs on domu : {_domu_customer_hostname}. Error : {str(e)}'
             _ret = DOMU_CRS_VALIDATION_EXCEPTION_ENCOUNTERED
@@ -1153,11 +1164,13 @@ class CrsHelper(LogHandler):
             '''
             if len(_list_of_vms_where_crs_did_not_start) > 0:
                 _suggestion_msg = f"CRS services were supposed to be running on at least 2 VMs.It is currently down on {str(_list_of_vms_where_crs_did_not_start)} for the current cluster."
+                _ret = DOMU_CRS_SERVICES_DOWN
+                self.mGetHandlerInstance().mAddError(_ret, _suggestion_msg)
+                return _ret
             elif len(_list_of_vms_where_auto_startup_is_disabled) > 0:
-                _suggestion_msg = f"CRS services were supposed to be running on at least 2 VMs.CRS auto startup is currently disabled on {str(_list_of_vms_where_auto_startup_is_disabled)} for the current cluster."
-            self.mPatchLogError(_suggestion_msg)
-            _ret = DOMU_CRS_SERVICES_DOWN
-            self.mGetHandlerInstance().mAddError(_ret, _suggestion_msg)
+                _suggestion_msg = f"CRS auto startup is currently disabled on {str(_list_of_vms_where_auto_startup_is_disabled)} for the current cluster. Enable CRS auto startup on VM and retry the operation"
+                _ret = DOMU_CRS_AUTOSTARTUP_DISABLED
+                self.mGetHandlerInstance().mAddError(_ret, _suggestion_msg)
         else:
             if len(_list_of_vms_where_crs_did_not_start) > 0:
                 self.mPatchLogWarn(

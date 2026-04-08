@@ -1,0 +1,1629 @@
+{
+  "cli-output": {
+    "context": {
+      "cell": "sea201831exdcl04"
+    },
+    "griddisk": [
+      {
+        "name": "DATAC1_CD_00_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC1",
+        "asmDiskName": "DATAC1_CD_00_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "933450743808",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC1_CD_01_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC1",
+        "asmDiskName": "DATAC1_CD_01_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "933450743808",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC1_CD_02_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC1",
+        "asmDiskName": "DATAC1_CD_02_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "933450743808",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC1_CD_03_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC1",
+        "asmDiskName": "DATAC1_CD_03_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "933450743808",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC1_CD_04_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC1",
+        "asmDiskName": "DATAC1_CD_04_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "933450743808",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC1_CD_05_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC1",
+        "asmDiskName": "DATAC1_CD_05_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "933450743808",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC1_CD_06_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC1",
+        "asmDiskName": "DATAC1_CD_06_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "933450743808",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC1_CD_07_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC1",
+        "asmDiskName": "DATAC1_CD_07_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "933450743808",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC1_CD_08_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC1",
+        "asmDiskName": "DATAC1_CD_08_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "933450743808",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC1_CD_09_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC1",
+        "asmDiskName": "DATAC1_CD_09_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "933450743808",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC1_CD_10_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC1",
+        "asmDiskName": "DATAC1_CD_10_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "933450743808",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC1_CD_11_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC1",
+        "asmDiskName": "DATAC1_CD_11_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "933450743808",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC2_CD_00_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC2",
+        "asmDiskName": "DATAC2_CD_00_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "393559932928",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC2_CD_01_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC2",
+        "asmDiskName": "DATAC2_CD_01_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "393559932928",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC2_CD_02_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC2",
+        "asmDiskName": "DATAC2_CD_02_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "393559932928",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC2_CD_03_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC2",
+        "asmDiskName": "DATAC2_CD_03_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "393559932928",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC2_CD_04_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC2",
+        "asmDiskName": "DATAC2_CD_04_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "393559932928",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC2_CD_05_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC2",
+        "asmDiskName": "DATAC2_CD_05_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "393559932928",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC2_CD_06_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC2",
+        "asmDiskName": "DATAC2_CD_06_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "393559932928",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC2_CD_07_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC2",
+        "asmDiskName": "DATAC2_CD_07_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "393559932928",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC2_CD_08_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC2",
+        "asmDiskName": "DATAC2_CD_08_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "393559932928",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC2_CD_09_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC2",
+        "asmDiskName": "DATAC2_CD_09_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "393559932928",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC2_CD_10_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC2",
+        "asmDiskName": "DATAC2_CD_10_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "393559932928",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC2_CD_11_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC2",
+        "asmDiskName": "DATAC2_CD_11_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "393559932928",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC3_CD_00_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC3",
+        "asmDiskName": "DATAC3_CD_00_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "82460016640",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC3_CD_01_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC3",
+        "asmDiskName": "DATAC3_CD_01_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "82460016640",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC3_CD_02_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC3",
+        "asmDiskName": "DATAC3_CD_02_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "82460016640",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC3_CD_03_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC3",
+        "asmDiskName": "DATAC3_CD_03_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "82460016640",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC3_CD_04_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC3",
+        "asmDiskName": "DATAC3_CD_04_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "82460016640",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC3_CD_05_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC3",
+        "asmDiskName": "DATAC3_CD_05_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "82460016640",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC3_CD_06_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC3",
+        "asmDiskName": "DATAC3_CD_06_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "82460016640",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC3_CD_07_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC3",
+        "asmDiskName": "DATAC3_CD_07_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "82460016640",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC3_CD_08_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC3",
+        "asmDiskName": "DATAC3_CD_08_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "82460016640",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC3_CD_09_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC3",
+        "asmDiskName": "DATAC3_CD_09_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "82460016640",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC3_CD_10_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC3",
+        "asmDiskName": "DATAC3_CD_10_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "82460016640",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC3_CD_11_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC3",
+        "asmDiskName": "DATAC3_CD_11_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "82460016640",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC4_CD_00_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC4",
+        "asmDiskName": "DATAC4_CD_00_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "54978936832",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC4_CD_01_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC4",
+        "asmDiskName": "DATAC4_CD_01_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "54978936832",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC4_CD_02_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC4",
+        "asmDiskName": "DATAC4_CD_02_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "54978936832",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC4_CD_03_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC4",
+        "asmDiskName": "DATAC4_CD_03_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "54978936832",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC4_CD_04_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC4",
+        "asmDiskName": "DATAC4_CD_04_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "54978936832",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC4_CD_05_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC4",
+        "asmDiskName": "DATAC4_CD_05_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "54978936832",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC4_CD_06_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC4",
+        "asmDiskName": "DATAC4_CD_06_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "54978936832",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC4_CD_07_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC4",
+        "asmDiskName": "DATAC4_CD_07_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "54978936832",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC4_CD_08_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC4",
+        "asmDiskName": "DATAC4_CD_08_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "54978936832",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC4_CD_09_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC4",
+        "asmDiskName": "DATAC4_CD_09_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "54978936832",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC4_CD_10_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC4",
+        "asmDiskName": "DATAC4_CD_10_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "54978936832",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC4_CD_11_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC4",
+        "asmDiskName": "DATAC4_CD_11_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "54978936832",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC5_CD_00_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC5",
+        "asmDiskName": "DATAC5_CD_00_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "47244640256",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC5_CD_01_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC5",
+        "asmDiskName": "DATAC5_CD_01_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "47244640256",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC5_CD_02_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC5",
+        "asmDiskName": "DATAC5_CD_02_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "47244640256",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC5_CD_03_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC5",
+        "asmDiskName": "DATAC5_CD_03_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "47244640256",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC5_CD_04_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC5",
+        "asmDiskName": "DATAC5_CD_04_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "47244640256",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC5_CD_05_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC5",
+        "asmDiskName": "DATAC5_CD_05_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "47244640256",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC5_CD_06_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC5",
+        "asmDiskName": "DATAC5_CD_06_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "47244640256",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC5_CD_07_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC5",
+        "asmDiskName": "DATAC5_CD_07_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "47244640256",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC5_CD_08_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC5",
+        "asmDiskName": "DATAC5_CD_08_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "47244640256",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC5_CD_09_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC5",
+        "asmDiskName": "DATAC5_CD_09_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "47244640256",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC5_CD_10_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC5",
+        "asmDiskName": "DATAC5_CD_10_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "47244640256",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC5_CD_11_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC5",
+        "asmDiskName": "DATAC5_CD_11_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "47244640256",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC6_CD_00_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC6",
+        "asmDiskName": "DATAC6_CD_00_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "109941096448",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC6_CD_01_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC6",
+        "asmDiskName": "DATAC6_CD_01_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "109941096448",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC6_CD_02_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC6",
+        "asmDiskName": "DATAC6_CD_02_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "109941096448",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC6_CD_03_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC6",
+        "asmDiskName": "DATAC6_CD_03_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "109941096448",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC6_CD_04_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC6",
+        "asmDiskName": "DATAC6_CD_04_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "109941096448",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC6_CD_05_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC6",
+        "asmDiskName": "DATAC6_CD_05_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "109941096448",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC6_CD_06_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC6",
+        "asmDiskName": "DATAC6_CD_06_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "109941096448",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC6_CD_07_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC6",
+        "asmDiskName": "DATAC6_CD_07_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "109941096448",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC6_CD_08_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC6",
+        "asmDiskName": "DATAC6_CD_08_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "109941096448",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC6_CD_09_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC6",
+        "asmDiskName": "DATAC6_CD_09_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "109941096448",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC6_CD_10_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC6",
+        "asmDiskName": "DATAC6_CD_10_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "109941096448",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "DATAC6_CD_11_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "DATAC6",
+        "asmDiskName": "DATAC6_CD_11_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "109941096448",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC1_CD_00_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC1",
+        "asmDiskName": "RECOC1_CD_00_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "233354297344",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC1_CD_01_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC1",
+        "asmDiskName": "RECOC1_CD_01_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "233354297344",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC1_CD_02_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC1",
+        "asmDiskName": "RECOC1_CD_02_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "233354297344",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC1_CD_03_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC1",
+        "asmDiskName": "RECOC1_CD_03_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "233354297344",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC1_CD_04_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC1",
+        "asmDiskName": "RECOC1_CD_04_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "233354297344",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC1_CD_05_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC1",
+        "asmDiskName": "RECOC1_CD_05_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "233354297344",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC1_CD_06_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC1",
+        "asmDiskName": "RECOC1_CD_06_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "233354297344",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC1_CD_07_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC1",
+        "asmDiskName": "RECOC1_CD_07_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "233354297344",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC1_CD_08_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC1",
+        "asmDiskName": "RECOC1_CD_08_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "233354297344",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC1_CD_09_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC1",
+        "asmDiskName": "RECOC1_CD_09_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "233354297344",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC1_CD_10_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC1",
+        "asmDiskName": "RECOC1_CD_10_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "233354297344",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC1_CD_11_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC1",
+        "asmDiskName": "RECOC1_CD_11_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "233354297344",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC2_CD_00_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC2",
+        "asmDiskName": "RECOC2_CD_00_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "98398371840",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC2_CD_01_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC2",
+        "asmDiskName": "RECOC2_CD_01_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "98398371840",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC2_CD_02_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC2",
+        "asmDiskName": "RECOC2_CD_02_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "98398371840",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC2_CD_03_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC2",
+        "asmDiskName": "RECOC2_CD_03_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "98398371840",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC2_CD_04_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC2",
+        "asmDiskName": "RECOC2_CD_04_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "98398371840",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC2_CD_05_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC2",
+        "asmDiskName": "RECOC2_CD_05_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "98398371840",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC2_CD_06_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC2",
+        "asmDiskName": "RECOC2_CD_06_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "98398371840",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC2_CD_07_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC2",
+        "asmDiskName": "RECOC2_CD_07_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "98398371840",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC2_CD_08_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC2",
+        "asmDiskName": "RECOC2_CD_08_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "98398371840",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC2_CD_09_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC2",
+        "asmDiskName": "RECOC2_CD_09_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "98398371840",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC2_CD_10_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC2",
+        "asmDiskName": "RECOC2_CD_10_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "98398371840",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC2_CD_11_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC2",
+        "asmDiskName": "RECOC2_CD_11_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "98398371840",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC3_CD_00_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC3",
+        "asmDiskName": "RECOC3_CD_00_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "28856811520",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC3_CD_01_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC3",
+        "asmDiskName": "RECOC3_CD_01_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "28856811520",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC3_CD_02_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC3",
+        "asmDiskName": "RECOC3_CD_02_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "28856811520",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC3_CD_03_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC3",
+        "asmDiskName": "RECOC3_CD_03_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "28856811520",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC3_CD_04_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC3",
+        "asmDiskName": "RECOC3_CD_04_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "28856811520",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC3_CD_05_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC3",
+        "asmDiskName": "RECOC3_CD_05_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "28856811520",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC3_CD_06_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC3",
+        "asmDiskName": "RECOC3_CD_06_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "28856811520",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC3_CD_07_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC3",
+        "asmDiskName": "RECOC3_CD_07_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "28856811520",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC3_CD_08_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC3",
+        "asmDiskName": "RECOC3_CD_08_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "28856811520",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC3_CD_09_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC3",
+        "asmDiskName": "RECOC3_CD_09_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "28856811520",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC3_CD_10_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC3",
+        "asmDiskName": "RECOC3_CD_10_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "28856811520",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC3_CD_11_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC3",
+        "asmDiskName": "RECOC3_CD_11_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "28856811520",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC4_CD_00_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC4",
+        "asmDiskName": "RECOC4_CD_00_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "494760099840",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC4_CD_01_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC4",
+        "asmDiskName": "RECOC4_CD_01_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "494760099840",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC4_CD_02_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC4",
+        "asmDiskName": "RECOC4_CD_02_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "494760099840",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC4_CD_03_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC4",
+        "asmDiskName": "RECOC4_CD_03_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "494760099840",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC4_CD_04_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC4",
+        "asmDiskName": "RECOC4_CD_04_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "494760099840",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC4_CD_05_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC4",
+        "asmDiskName": "RECOC4_CD_05_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "494760099840",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC4_CD_06_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC4",
+        "asmDiskName": "RECOC4_CD_06_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "494760099840",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC4_CD_07_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC4",
+        "asmDiskName": "RECOC4_CD_07_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "494760099840",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC4_CD_08_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC4",
+        "asmDiskName": "RECOC4_CD_08_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "494760099840",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC4_CD_09_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC4",
+        "asmDiskName": "RECOC4_CD_09_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "494760099840",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC4_CD_10_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC4",
+        "asmDiskName": "RECOC4_CD_10_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "494760099840",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC4_CD_11_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC4",
+        "asmDiskName": "RECOC4_CD_11_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "494760099840",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC5_CD_00_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC5",
+        "asmDiskName": "RECOC5_CD_00_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "68719476736",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC5_CD_01_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC5",
+        "asmDiskName": "RECOC5_CD_01_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "68719476736",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC5_CD_02_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC5",
+        "asmDiskName": "RECOC5_CD_02_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "68719476736",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC5_CD_03_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC5",
+        "asmDiskName": "RECOC5_CD_03_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "68719476736",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC5_CD_04_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC5",
+        "asmDiskName": "RECOC5_CD_04_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "68719476736",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC5_CD_05_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC5",
+        "asmDiskName": "RECOC5_CD_05_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "68719476736",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC5_CD_06_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC5",
+        "asmDiskName": "RECOC5_CD_06_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "68719476736",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC5_CD_07_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC5",
+        "asmDiskName": "RECOC5_CD_07_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "68719476736",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC5_CD_08_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC5",
+        "asmDiskName": "RECOC5_CD_08_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "68719476736",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC5_CD_09_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC5",
+        "asmDiskName": "RECOC5_CD_09_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "68719476736",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC5_CD_10_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC5",
+        "asmDiskName": "RECOC5_CD_10_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "68719476736",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC5_CD_11_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC5",
+        "asmDiskName": "RECOC5_CD_11_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "68719476736",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC6_CD_00_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC6",
+        "asmDiskName": "RECOC6_CD_00_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "109941096448",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC6_CD_01_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC6",
+        "asmDiskName": "RECOC6_CD_01_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "109941096448",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC6_CD_02_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC6",
+        "asmDiskName": "RECOC6_CD_02_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "109941096448",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC6_CD_03_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC6",
+        "asmDiskName": "RECOC6_CD_03_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "109941096448",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC6_CD_04_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC6",
+        "asmDiskName": "RECOC6_CD_04_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "109941096448",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC6_CD_05_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC6",
+        "asmDiskName": "RECOC6_CD_05_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "109941096448",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC6_CD_06_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC6",
+        "asmDiskName": "RECOC6_CD_06_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "109941096448",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC6_CD_07_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC6",
+        "asmDiskName": "RECOC6_CD_07_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "109941096448",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC6_CD_08_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC6",
+        "asmDiskName": "RECOC6_CD_08_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "109941096448",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC6_CD_09_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC6",
+        "asmDiskName": "RECOC6_CD_09_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "109941096448",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC6_CD_10_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC6",
+        "asmDiskName": "RECOC6_CD_10_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "109941096448",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "RECOC6_CD_11_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "RECOC6",
+        "asmDiskName": "RECOC6_CD_11_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "109941096448",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "SPRC3_CD_00_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "SPRC3",
+        "asmDiskName": "SPRC3_CD_00_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "26105348096",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "SPRC3_CD_01_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "SPRC3",
+        "asmDiskName": "SPRC3_CD_01_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "26105348096",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "SPRC3_CD_02_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "SPRC3",
+        "asmDiskName": "SPRC3_CD_02_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "26105348096",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "SPRC3_CD_03_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "SPRC3",
+        "asmDiskName": "SPRC3_CD_03_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "26105348096",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "SPRC3_CD_04_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "SPRC3",
+        "asmDiskName": "SPRC3_CD_04_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "26105348096",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "SPRC3_CD_05_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "SPRC3",
+        "asmDiskName": "SPRC3_CD_05_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "26105348096",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "SPRC3_CD_06_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "SPRC3",
+        "asmDiskName": "SPRC3_CD_06_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "26105348096",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "SPRC3_CD_07_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "SPRC3",
+        "asmDiskName": "SPRC3_CD_07_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "26105348096",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "SPRC3_CD_08_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "SPRC3",
+        "asmDiskName": "SPRC3_CD_08_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "26105348096",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "SPRC3_CD_09_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "SPRC3",
+        "asmDiskName": "SPRC3_CD_09_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "26105348096",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "SPRC3_CD_10_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "SPRC3",
+        "asmDiskName": "SPRC3_CD_10_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "26105348096",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "SPRC3_CD_11_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "SPRC3",
+        "asmDiskName": "SPRC3_CD_11_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "26105348096",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "SPRC5_CD_00_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "SPRC5",
+        "asmDiskName": "SPRC5_CD_00_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "20401094656",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "SPRC5_CD_01_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "SPRC5",
+        "asmDiskName": "SPRC5_CD_01_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "20401094656",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "SPRC5_CD_02_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "SPRC5",
+        "asmDiskName": "SPRC5_CD_02_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "20401094656",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "SPRC5_CD_03_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "SPRC5",
+        "asmDiskName": "SPRC5_CD_03_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "20401094656",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "SPRC5_CD_04_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "SPRC5",
+        "asmDiskName": "SPRC5_CD_04_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "20401094656",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "SPRC5_CD_05_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "SPRC5",
+        "asmDiskName": "SPRC5_CD_05_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "20401094656",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "SPRC5_CD_06_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "SPRC5",
+        "asmDiskName": "SPRC5_CD_06_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "20401094656",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "SPRC5_CD_07_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "SPRC5",
+        "asmDiskName": "SPRC5_CD_07_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "20401094656",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "SPRC5_CD_08_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "SPRC5",
+        "asmDiskName": "SPRC5_CD_08_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "20401094656",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "SPRC5_CD_09_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "SPRC5",
+        "asmDiskName": "SPRC5_CD_09_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "20401094656",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "SPRC5_CD_10_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "SPRC5",
+        "asmDiskName": "SPRC5_CD_10_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "20401094656",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "SPRC5_CD_11_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "SPRC5",
+        "asmDiskName": "SPRC5_CD_11_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "20401094656",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "SPRC6_CD_00_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "SPRC6",
+        "asmDiskName": "SPRC6_CD_00_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "879612657664",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "SPRC6_CD_01_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "SPRC6",
+        "asmDiskName": "SPRC6_CD_01_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "879612657664",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "SPRC6_CD_02_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "SPRC6",
+        "asmDiskName": "SPRC6_CD_02_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "879612657664",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "SPRC6_CD_03_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "SPRC6",
+        "asmDiskName": "SPRC6_CD_03_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "879612657664",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "SPRC6_CD_04_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "SPRC6",
+        "asmDiskName": "SPRC6_CD_04_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "879612657664",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "SPRC6_CD_05_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "SPRC6",
+        "asmDiskName": "SPRC6_CD_05_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "879612657664",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "SPRC6_CD_06_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "SPRC6",
+        "asmDiskName": "SPRC6_CD_06_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "879612657664",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "SPRC6_CD_07_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "SPRC6",
+        "asmDiskName": "SPRC6_CD_07_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "879612657664",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "SPRC6_CD_08_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "SPRC6",
+        "asmDiskName": "SPRC6_CD_08_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "879612657664",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "SPRC6_CD_09_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "SPRC6",
+        "asmDiskName": "SPRC6_CD_09_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "879612657664",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "SPRC6_CD_10_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "SPRC6",
+        "asmDiskName": "SPRC6_CD_10_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "879612657664",
+        "asmDeactivationOutcome": "Yes"
+      },
+      {
+        "name": "SPRC6_CD_11_sea201831exdcl04",
+        "status": "active",
+        "asmDiskGroupName": "SPRC6",
+        "asmDiskName": "SPRC6_CD_11_SEA201831EXDCL04",
+        "asmModeStatus": "ONLINE",
+        "size": "879612657664",
+        "asmDeactivationOutcome": "Yes"
+      }
+    ]
+  }
+}

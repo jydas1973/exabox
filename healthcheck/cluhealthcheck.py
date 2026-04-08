@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     OVM - Healthcheck functionality
@@ -13,6 +13,9 @@ NOTE:
 History:
 
     MODIFIED   (MM/DD/YY)
+    aararora    02/27/26   - Bug 38902170: Correct resource leak issues
+    nispaul     12/23/25   - 38730371 - Enable network reconfiguration on running domUs
+                             only
     rkhemcha    04/15/25   - 37819843, 37812793 - Add precheck for received
                              network info, send dummy report to ECRA for
                              internal errors
@@ -478,7 +481,8 @@ class ebCluHealth(object):
     def mReadHcConfig(self):
         _cf = None
         try:
-            _cf = json.load(open(self.__confpath))
+            with open(self.__confpath) as _fh:
+                _cf = json.load(_fh)
         except:
             ebLogError('*** Could not access/read healthcheck.conf file')
             return {}
@@ -526,7 +530,9 @@ class ebCluHealth(object):
                 __dom0domUpairs = _eBox.mReturnDom0DomUPair()
                 for pair in __dom0domUpairs:
                     _dom0s.append(pair[0])
-                    _domUs.append(pair[1])
+
+                if 'clusterGuests' in _jconf['updateNetwork']:
+                    _domUs = _jconf['updateNetwork']['clusterGuests']
 
                 # Set default value for reconfiguration of all networkServices to False
                 self.mSetUpdateNetworkServices()

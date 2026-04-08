@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     ExaHTTPSServer - Functionality for HTTPS and TLS Certificate support
@@ -51,10 +51,11 @@ class ExaHTTPSServer(BaseHTTPServer.HTTPServer):
             # TODO : Once python 3.11 becomes default - we will have to change the tls implementation below
             # default protocol - this supports both tls 1.2 and 1.3
             _protocol = "PROTOCOL_TLS"
+            app_cfg = None
             if use_oci_certificates():
                 _rootca_certificate, _client_certificate, _client_privatekey, _protocol = get_oci_certificates()
             else:
-                app_cfg = ebCertificateConfig('exacloud', \
+                app_cfg = ebCertificateConfig('exacloud',
                     get_tls_config_path())
                 _rootca_certificate = app_cfg['client_certificate_file']
                 _client_certificate = app_cfg['local_certificate_file']
@@ -99,10 +100,11 @@ class ExaHTTPRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                 _client_privatekey = None
                 # default protocol
                 _protocol = "PROTOCOL_TLS"
+                app_cfg = None
                 if use_oci_certificates():
                     _rootca_certificate, _client_certificate, _client_privatekey, _protocol = get_oci_certificates()
                 else:
-                    app_cfg = ebCertificateConfig('exacloud', \
+                    app_cfg = ebCertificateConfig('exacloud',
                         get_tls_config_path())
                     _rootca_certificate = app_cfg['client_certificate_file']
                     _client_certificate = app_cfg['local_certificate_file']

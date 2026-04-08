@@ -1,9 +1,9 @@
 #
-# $Header: ecs/exacloud/exabox/exatest/cluctrl/shared_methods/tests_scan_ips.py /main/1 2021/06/14 12:47:49 jlombera Exp $
+# $Header: ecs/exacloud/exabox/exatest/cluctrl/shared_methods/tests_scan_ips.py /main/2 2026/02/16 17:28:04 ririgoye Exp $
 #
 # tests_scan_ips.py
 #
-# Copyright (c) 2021, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_scan_ips.py - Scan IPs tests
@@ -17,6 +17,9 @@
 #        with all the default checks enabled.
 #
 #    MODIFIED   (MM/DD/YY)
+#    ririgoye    02/11/26 - Enh 38337110 - CLUSTERLESS PATCHING SHOULD CONNECT
+#                           TO FREE NODES FROM PAYLOAD FOR EXACS SERVICE FOR
+#                           EXACLOUD VALIDATION
 #    jlombera    06/11/21 - Bug 32992276: test exaBoxCluCtrl.mGetScanIps()
 #    jlombera    06/11/21 - Creation
 #

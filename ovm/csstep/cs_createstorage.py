@@ -1,5 +1,5 @@
 """
- Copyright (c) 2019, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2019, 2026, Oracle and/or its affiliates.
 
 NAME:
     cs_createstorage.py - Create Service CREATE STORAGE
@@ -52,6 +52,8 @@ class csCreateStorage(CSBase):
         ebox.mUpdateStatus('createservice step '+self.step)
         csu = csUtil()
         _csConstants = csu.mGetConstants(ebox, aOptions)
+        #Validate CELL Server services.
+        ebox.mCheckCellsServicesUp()
         _clu_utils = ebCluUtils(ebox)
         _stepSpecificDetails = _clu_utils.mStepSpecificDetails("createServiceDetails", 'ONGOING', "Create Storage in progress", 'ESTP_CREATE_STORAGE')
         _clu_utils.mUpdateTaskProgressStatus([], 0, "Create Storage", "In Progress", _stepSpecificDetails)

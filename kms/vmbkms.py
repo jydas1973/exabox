@@ -1,7 +1,7 @@
 """
 $Header: ecs/exacloud/exabox/kms/vmbkms.py /main/4 2022/08/12 03:58:12 ndesanto Exp $
 
- Copyright (c) 2021, 2022, Oracle and/or its affiliates.
+ Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 
 NAME:
     vmbkms.py - vmbackup to oss - Basic KMS and Object Store functionality
@@ -15,6 +15,8 @@ NOTE:
 History:
 
     MODIFIED   (MM/DD/YY)
+    prsshukl    03/05/26 - Bug 38900258 - EXACLOUD: ISSUES FOUND BY VOXIO CODEV
+                           AGENT IN DIR EXABOX/KMS
     ndesanto    04/12/22 - OCI region to come on all ECRA call and be stored on
                            a DB cache.
     ndesanto    01/14/22 - Load the OCI regions configuration file if any.
@@ -117,8 +119,12 @@ class ebKmsVmbObjectStore(object):
 
     # Pagination is needed for 1000+ objects in a bucket
     def mSearchAllObjectsByName(self, aObjname):
-        for obj in self.mListObjects():
-            if obj['name'] == aObjname:
+        _rc, _objects = self.mListObjects()
+        if _rc:
+            ebLogError('*** Failed to list objects from objectstore: {}'.format(_objects))
+            return False
+        for obj in _objects:
+            if obj.get('name') == aObjname:
                 return True
         return False
 
@@ -191,6 +197,9 @@ class ebKmsVmbObjectStore(object):
 
         startTime = datetime.now()
         _rc, _resp = self.mGetObject(aObjectName)
+        if _rc:
+            ebLogError('*** Failed to download {} from Objectstore: {}'.format(aObjectName, _resp))
+            ebExit(-1)
         with open(aFile + '.enc_dw', 'wb') as f:
             for chunk in _resp.data.raw.stream(1024 * 1024, decode_content=False):
                 f.write(chunk)

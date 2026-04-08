@@ -1,10 +1,10 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/exatest/ovm/csstep/tests_cs_createstorage.py /main/2 2025/08/25 06:17:10 pbellary Exp $
+# $Header: ecs/exacloud/exabox/exatest/ovm/csstep/tests_cs_createstorage.py /main/3 2026/01/27 15:48:57 bhpati Exp $
 #
 # tests_cs_createstorage.py
 #
-# Copyright (c) 2025, Oracle and/or its affiliates.
+# Copyright (c) 2025, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_cs_createstorage.py - <one-line expansion of the name>
@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    bhpati      01/13/26 - Bug 38734450 - Added CELL services validation
+#                           before createstorage step
 #    aararora    03/19/25 - Bug 37508799: Optimize call to mValidateGridDisks -
 #                           parallel execution on cells
 #    aararora    03/19/25 - Creation
@@ -50,6 +52,26 @@ class ebTestCSCreateStorage(ebTestClucontrol):
     @patch('exabox.ovm.csstep.cs_util.csUtil.mExecuteOEDAStep')
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mDeleteCloudUser')
     def test_doExecute(self, mock_mDeleteCloudUser, mock_mExecuteOEDAStep, mock_mCheckCellsServicesUp, mock_mAcquireRemoteLock,
+                         mock_mReleaseRemoteLock, mock_mUpdateStatusCS, mock_mCellAssertNormalStatus, mock_mCheckCellConfig,
+                         mock_mFetchOedaStep, mock_mValidateGridDisks):
+      _ebox = self.mGetClubox()
+      _options = copy.deepcopy(self.mGetClubox().mGetArgsOptions())
+      _step_list = ["ESTP_CREATE_STORAGE"]
+
+      _handler = csCreateStorage()
+      _handler.doExecute(_ebox, _options, _step_list)
+    
+    @patch("exabox.ovm.clucontrol.exaBoxCluCtrl.mValidateGridDisks", return_value=0)
+    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mFetchOedaStep')
+    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mCheckCellConfig')
+    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mCellAssertNormalStatus')
+    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mUpdateStatusCS')
+    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mReleaseRemoteLock')
+    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mAcquireRemoteLock')
+    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mCheckCellsServicesUp', return_value=True)
+    @patch('exabox.ovm.csstep.cs_util.csUtil.mExecuteOEDAStep')
+    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mDeleteCloudUser')
+    def test_doExecute_success(self, mock_mDeleteCloudUser, mock_mExecuteOEDAStep, mock_mCheckCellsServicesUp, mock_mAcquireRemoteLock,
                          mock_mReleaseRemoteLock, mock_mUpdateStatusCS, mock_mCellAssertNormalStatus, mock_mCheckCellConfig,
                          mock_mFetchOedaStep, mock_mValidateGridDisks):
       _ebox = self.mGetClubox()

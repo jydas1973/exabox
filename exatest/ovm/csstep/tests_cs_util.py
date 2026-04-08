@@ -4,7 +4,7 @@
 #
 # tests_cs_util.py
 #
-# Copyright (c) 2025, Oracle and/or its affiliates.
+# Copyright (c) 2025, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_cs_util.py - <one-line expansion of the name>
@@ -16,16 +16,23 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    jfsaldan    03/13/26 - Bug 39002144 - EXADB-XS-PP: VMC PROVISION GOT STUCK
+#                           AT THE STEP OF AWAIT_ADD_SSH_KEYS | EXACLOUD DOES
+#                           NOT ENSURE AGENT SYSTEMD SERVICE IS UP AFTER
+#                           PROVISIONING
 #    rajsag      07/21/25 - Creation
 #
 import json
 import copy
 import unittest
 from unittest.mock import Mock, patch
+from exabox.core.MockCommand import exaMockCommand
 from exabox.ovm.csstep.cs_util import csUtil
 from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
 from exabox.ovm.csstep.exascale.exascaleutils import ebExascaleUtils
 from exabox.ovm.csstep.cs_constants import csConstants, csXSConstants, csXSEighthConstants, csBaseDBXSConstants, csAsmEDVConstants
+from exabox.utils.node import connect_to_host
+from exabox.core.Context import get_gcontext
 
 CREATE_SERVICE_PAYLOAD = """ 
 {
@@ -195,6 +202,88 @@ class TestCsUtil(ebTestClucontrol):
         cs_util = csUtil()
         cs_util.mUpdateOEDAConfiguration(_ebox, self.mGetClubox().mGetArgsOptions())
 
+    @patch('exabox.ovm.csstep.cs_util.time.sleep')
+    def test_mStartServiceInNode_restarts_service(self, aMockSleep):
+        cs_util = csUtil()
+        service_name = "unit-test-service"
+
+        _cmds = {
+            self.mGetRegexVm(): [
+                [
+                    exaMockCommand("/bin/test -e /sbin/systemctl", aPersist=True),
+                    exaMockCommand(f"systemctl stop {service_name}", aPersist=True),
+                    exaMockCommand(f"systemctl start {service_name}", aPersist=True),
+                    exaMockCommand(f"systemctl is-active {service_name}", aPersist=True),
+                ],
+            ],
+        }
+
+
+        self.mPrepareMockCommands(_cmds)
+        _ebox = self.mGetClubox()
+        _domU = _ebox.mReturnDom0DomUPair()[0][1]
+
+        with connect_to_host(_domU, get_gcontext()) as _node:
+            _res = cs_util.mStartServiceInNode(_node, service_name)
+
+        self.assertTrue(aMockSleep.called)
+        self.assertIsNone(_res)
+
+    def test_mSetupDBCSAgentAuth(self):
+        cs_util = csUtil()
+
+        _cmds = {
+            self.mGetRegexVm(): [
+                [
+                    exaMockCommand("/opt/oracle/dcs/bin/setupAuthDcs.py"),
+                    exaMockCommand("/bin/test -e /sbin/systemctl", aPersist=True),
+                    exaMockCommand(f"systemctl stop dbcsagent", aPersist=True),
+                    exaMockCommand(f"systemctl start dbcsagent", aPersist=True),
+                    exaMockCommand(f"systemctl is-active dbcsagent", aPersist=True),
+                    exaMockCommand(f"systemctl stop dbcsadmin", aPersist=True),
+                    exaMockCommand(f"systemctl start dbcsadmin", aPersist=True),
+                    exaMockCommand(f"systemctl is-active dbcsadmin", aPersist=True),
+                ],
+            ],
+        }
+
+
+        self.mPrepareMockCommands(_cmds)
+        _ebox = self.mGetClubox()
+        _dom0_domU_pairs = _ebox.mReturnDom0DomUPair()
+
+        _res = cs_util.mSetupDBCSAgentAuth(_dom0_domU_pairs)
+
+        self.assertIsNone(_res)
+
+    def test_mSetupDBCSAgentAuth_first_start_fails(self):
+        cs_util = csUtil()
+
+        _cmds = {
+            self.mGetRegexVm(): [
+                [
+                    exaMockCommand("/opt/oracle/dcs/bin/setupAuthDcs.py"),
+                    exaMockCommand("/bin/test -e /sbin/systemctl", aPersist=True),
+                    exaMockCommand(f"systemctl stop dbcsagent", aPersist=True),
+                    exaMockCommand(f"systemctl start dbcsagent", aPersist=True),
+                    exaMockCommand(f"systemctl is-active dbcsagent", aPersist=True),
+
+                    exaMockCommand(f"systemctl stop dbcsadmin", aPersist=True),
+                    exaMockCommand(f"systemctl start dbcsadmin", aPersist=True),
+                    exaMockCommand(f"systemctl is-active dbcsadmin", aRc=1),## Here we mock an error
+                    exaMockCommand(f"systemctl is-active dbcsadmin", aRc=0), ## Here we mock a subsequent success
+                ],
+            ],
+        }
+
+
+        self.mPrepareMockCommands(_cmds)
+        _ebox = self.mGetClubox()
+        _dom0_domU_pairs = _ebox.mReturnDom0DomUPair()
+
+        _res = cs_util.mSetupDBCSAgentAuth(_dom0_domU_pairs)
+
+        self.assertIsNone(_res)
 
 if __name__ == '__main__':
     unittest.main()

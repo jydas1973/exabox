@@ -4,7 +4,7 @@
 #
 # CpsExaccUtils.py
 #
-# Copyright (c) 2022, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2022, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      CpsExaccUtils.py - <one-line expansion of the name>
@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    shapatna    02/09/26 - Bug: 38900266 - Fix for issues pointed by Codev
+#                             in exabox/management directory
 #    hgaldame    09/11/25 - enh 38036854 - exacc gen 2| infra patching |
 #                           enhance ecra remoteec command
 #    hgaldame    02/12/25 - 37587401 - oci/exacc: oel 8 migration fails on cps
@@ -79,7 +81,8 @@ def get_cps_return_code(aReturnCode, aProccesDict, aProcessIsAlive=False):
     _success_message = error_fwk.mBuildDefaultSuccessMessage()
     if isinstance(aReturnCode, dict) and CpsResultProcessKeys.TYPE_RESULT.value in aReturnCode and \
         aReturnCode[CpsResultProcessKeys.TYPE_RESULT.value] == CpsTypeReturnCode.CPS_SW_RETURN_CODE.value:
-        aProccesDict["rc"]  = aReturnCode.get(CpsResultProcessKeys.RETURN_CODE.value, None) or 1
+        _rc = aReturnCode.get(CpsResultProcessKeys.RETURN_CODE.value, None)
+        aProccesDict["rc"]  = 1 if _rc is None else _rc
         if aProccesDict["rc"] is None or aProccesDict["rc"] != 0 :
             _error_tuple = error_fwk.mCpsFormatBuildError(aReturnCode.get(CpsResultProcessKeys.ERROR_CODE.value))
             error_message = {

@@ -1,10 +1,10 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/exatest/ovm/tests_clumisc.py /main/41 2025/11/15 11:40:54 joysjose Exp $
+# $Header: ecs/exacloud/exabox/exatest/ovm/tests_clumisc.py /main/42 2025/12/08 14:57:52 bhpati Exp $
 #
 # tests_clumisc.py
 #
-# Copyright (c) 2023, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2023, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_clumisc.py - Unit Tests for ovm/clumisc.py
@@ -15,6 +15,8 @@
 #    NOTES
 #
 #    MODIFIED   (MM/DD/YY)
+#    bhpati      11/14/25   - Bug 38467261 - Remove vm operation failed - ssh
+#                             test to the vm failed during pre-check.
 #    joysjose    10/23/25   - Bug 38417178 Refactoring cell connections before
 #                             create VM
 #    nelango     10/10/25   - Bug 38524837: unittest correction for 38261183
@@ -85,11 +87,11 @@ from exabox.log.LogMgr import ebLogInfo
 from exabox.ovm.clumisc import ebCluPreChecks,ebCluSshSetup,OracleVersion,ebCluStorageReshapePrecheck,ebCluStartStopHostFromIlom, ebCluNodeSubsetPrecheck, ebCluRestartVmExacsService, ebCluFaultInjection, ebMigrateUsersUtil, mGetGridListSupportedByOeda, ebCluCellSanityTests, ebCluEthernetConfig, ebCluCellValidate
 from exabox.ovm.monitor import ebClusterNode
 import warnings
-from unittest.mock import patch, Mock, mock_open, call
+from unittest.mock import patch, Mock, mock_open, call, MagicMock
 from exabox.core.Error import ExacloudRuntimeError
 from exabox.utils.node import  connect_to_host
 from exabox.ovm.adbs_elastic_service import mCreateADBSSiteGroupConfig
-from exabox.ovm.clumisc import mWaitForSystemBoot, ebMiscFx, mGetAlertHistoryOptions, ebADBSUtil, ebCluEthernetConfig
+from exabox.ovm.clumisc import mWaitForSystemBoot, ebMiscFx, mGetAlertHistoryOptions, ebADBSUtil, ebCluEthernetConfig, ebCluServerSshConnectionCheck
 from exabox.ovm.kvmvmmgr import ebKvmVmMgr
 from exabox.agent.ebJobRequest import ebJobRequest
 from exabox.utils.common import mCompareModel
@@ -431,7 +433,7 @@ class ebTestMigrateUsersUtil(ebTestClucontrol):
                 ]
             }
         self.mPrepareMockCommands(_cmds)
-        _status = mGetGridListSupportedByOeda(self.mGetClubox(), "19.25.0.0.240315")
+        _status,_list = mGetGridListSupportedByOeda(self.mGetClubox(), "19.25.0.0.240315")
         self.assertEqual(True, _status)
         
     def test_mGetGridListSupportedByOeda_missing(self):
@@ -452,8 +454,31 @@ class ebTestMigrateUsersUtil(ebTestClucontrol):
                 ]
             }
         self.mPrepareMockCommands(_cmds)
-        _status = mGetGridListSupportedByOeda(self.mGetClubox(), "23.7.0.0.240315")
+        _status,_list = mGetGridListSupportedByOeda(self.mGetClubox(), "23.7.0.0.240315")
         self.assertEqual(False, _status)
+
+    def test_mGetGridListSupportedByOeda_missing_26ai(self):
+        _oeda_path  = self.mGetClubox().mGetOedaPath()
+        _oedacli_bin = os.path.join(_oeda_path, 'oedacli')
+        grid_list = """ GI Versions for x10m
+        19.25.0.0.241015, 19.24.0.0.240716, 19.23.0.0.240416, 19.22.0.0.240116, 19.21.0.0.231017, 19.20.0.0.230718, 19.19.0.0.230418, 19.18.0.0.230117, 19.17.0.0.221018, 19.16.0.0.220719, 19.15.0.0.220419
+        21.16.0.0.241015, 21.15.0.0.240716, 21.14.0.0.240416, 21.13.0.0.240116, 21.12.0.0.231017, 21.11.0.0.230718, 21.10.0.0.230418, 21.9.0.0.230117, 21.8.0.0.221018, 21.7.0.0.220719, 21.6.0.0.220419
+        23.6.0.24.10, 23.5.0.24.07,23.26.0.0.0
+        Recommended GI version: 23.26.0.0.0
+        """
+        _cmds = {
+            self.mGetRegexLocal():
+                [
+                    [
+                        exaMockCommand(f'{_oedacli_bin} -e "list softwareversions grid"', aRc=0, aStdout=grid_list, aPersist=True),
+                    ]
+                ]
+            }
+        self.mPrepareMockCommands(_cmds)
+        _status,_list = mGetGridListSupportedByOeda(self.mGetClubox(), "23.26.1.0.0",aGrid26aiSupport=True)
+        self.assertEqual(False, _status)
+
+
 
     @patch('exabox.ovm.clucontrol.exaBoxNode.mSetUser', return_value="admin")
     @patch('exabox.ovm.clumisc.ebCluSshSetup.mConnectandExecuteonCiscoSwitches', return_value="")
@@ -703,6 +728,27 @@ class TestEthernetSpeed(ebTestClucontrol):
 
         self.assertEqual(rc, -1)
         _node.mExecuteCmd.assert_called_once_with("/usr/sbin/ethtool -s eth10 speed 25000 autoneg on")
+
+class TestebCluServerSshConnectionCheck(ebTestClucontrol):
+    @classmethod
+    def setUpClass(self):
+        super(TestebCluServerSshConnectionCheck, self).setUpClass(True, True)
+        warnings.filterwarnings("ignore")
+    
+    @patch("exabox.core.Node.exaBoxNode.mIsConnectable", return_value=True)
+    @patch("exabox.ovm.clumisc.ebCluServerSshConnectionCheck.mUpdateRequestData")
+    @patch("exabox.ovm.clucontrol.exaBoxCluCtrl.mIsOciEXACC", return_value=True)
+    def test_mNodeSubsetSshConnectionCheck_success(self, mock_mIsConnectable, mock_mUpdateRequestData, mock_mIsOciEXACC):
+
+        _ebox_local = copy.deepcopy(self.mGetClubox())        
+        sshconnectioncheck = ebCluServerSshConnectionCheck(_ebox_local)
+        domUs = ['scaqab10client01vm08.us.oracle.com','scaqab10client02vm08.us.oracle.com']
+
+        # Call the method
+        return_code = sshconnectioncheck.mNodeSubsetSshConnectionCheck(_ebox_local._exaBoxCluCtrl__options, domUs)
+
+        # Assert the results
+        self.assertEqual(return_code, 0)
 
 if __name__ == "__main__":
     unittest.main()

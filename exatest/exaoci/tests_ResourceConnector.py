@@ -4,7 +4,7 @@
 #
 # tests_ResourceConnector.py
 #
-# Copyright (c) 2025, Oracle and/or its affiliates.
+# Copyright (c) 2025, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_ResourceConnector.py - <one-line expansion of the name>
@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    prsshukl    03/12/26 - Codex UT enhancement
 #    asrigiri    07/29/25 - Bug 38156507 - OCI: CREATEEXACCCONSOLEHIS FAILED AS
 #                           PROXY IS SET TO NULL
 #    pbellary    03/10/25 - Test cases for Resource Principals creation
@@ -31,6 +32,8 @@ from unittest.mock import MagicMock, Mock, patch
 from unittest import TestCase
 
 from tempfile import NamedTemporaryFile
+from exabox.core.Error import ExacloudRuntimeError
+from oci._vendor.requests.exceptions import HTTPError as OCIHTTPError
 from exabox.exaoci.connectors.ResourceConnector import ResourceConnector
 from exabox.exaoci.connectors.OCIConnector import OCIConnector
 from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
@@ -515,6 +518,536 @@ class ebTestResourceConnector(ebTestClucontrol):
                 # Always clean up the env variable after subTest
                 if "HTTPS_PROXY" in os.environ:
                     del os.environ["HTTPS_PROXY"]
+
+    def test_mSetEndpoint_r1_object_storage_template(self):
+        # Auto-generated test for mSetEndpoint
+        connector = ResourceConnector.__new__(ResourceConnector)
+        connector._ResourceConnector__region = "r1"
+        connector._ResourceConnector__realm = "r1"
+        connector._ResourceConnector__config_bundle = {"databaseUrl": None}
+
+        with patch('exabox.exaoci.connectors.ResourceConnector.regions.endpoint_for', return_value="endpoint-r1") as mocked_endpoint:
+            endpoint = connector.mSetEndpoint("object_storage")
+
+        mocked_endpoint.assert_called_once_with(
+            "object_storage",
+            service_endpoint_template="https://objectstorage.r1.oracleiaas.com",
+            region="r1",
+            endpoint=None,
+            endpoint_service_name="object_storage"
+        )
+        self.assertEqual(endpoint, "endpoint-r1")
+
+    def test_mSetEndpoint_database_url_variants(self):
+        # Auto-generated test for mSetEndpoint
+        scenarios = [
+            ("prod-db.example.com", "base-db-endpoint"),
+            ("preprod-db.example.com", "https://preprod-db.example.com"),
+            ("https://preprod-db.example.com", "https://preprod-db.example.com"),
+            (None, "base-db-endpoint"),
+        ]
+
+        for database_url, expected_endpoint in scenarios:
+            with self.subTest(database_url=database_url):
+                connector = ResourceConnector.__new__(ResourceConnector)
+                connector._ResourceConnector__region = "eu-zurich-1"
+                connector._ResourceConnector__realm = "oc1"
+                connector._ResourceConnector__config_bundle = {"databaseUrl": database_url}
+
+                with patch('exabox.exaoci.connectors.ResourceConnector.regions.endpoint_for', return_value="base-db-endpoint") as mocked_endpoint:
+                    endpoint = connector.mSetEndpoint("database")
+
+                self.assertEqual(endpoint, expected_endpoint)
+                args, kwargs = mocked_endpoint.call_args
+                self.assertEqual(args[0], "database")
+                self.assertIsNone(kwargs["service_endpoint_template"])
+                self.assertEqual(kwargs["region"], "eu-zurich-1")
+
+    def test_get_auth_principal_token_raises_on_oci_http_error(self):
+        # Auto-generated test for get_auth_principal_token
+        connector = ResourceConnector.__new__(ResourceConnector)
+        connector._ResourceConnector__retries = 3
+
+        with patch.object(ResourceConnector, "mGetRPAuthEnv", side_effect=OCIHTTPError("http failure")):
+            with self.assertRaises(OCIHTTPError):
+                connector.get_auth_principal_token()
+
+    def test_get_auth_principal_token_exhausts_retries(self):
+        # Auto-generated test for get_auth_principal_token
+        connector = ResourceConnector.__new__(ResourceConnector)
+        connector._ResourceConnector__retries = 2
+
+        with patch.object(ResourceConnector, "mGetRPAuthEnv", side_effect=Exception("auth failure")) as mocked_env, \
+             patch('exabox.exaoci.connectors.ResourceConnector.sleep', return_value=None) as mocked_sleep:
+            with self.assertRaises(ExacloudRuntimeError) as ctx:
+                connector.get_auth_principal_token()
+
+        self.assertEqual(mocked_env.call_count, 2)
+        self.assertEqual(mocked_sleep.call_count, 2)
+        self.assertIn("Please retry operation", str(ctx.exception))
+        self.assertIsInstance(ctx.exception.__cause__, Exception)
+
+    def test_mObtainRealm_branches(self):
+        # Auto-generated test for mObtainRealm
+        connector = ResourceConnector.__new__(ResourceConnector)
+
+        connector._ResourceConnector__config_bundle = {"realmName": "region1"}
+        self.assertEqual(connector.mObtainRealm(), "r1")
+
+        connector._ResourceConnector__config_bundle = {"realmName": "oc4"}
+        self.assertEqual(connector.mObtainRealm(), "oc4")
+
+        connector._ResourceConnector__config_bundle = {
+            "exaccInfrastructureOcid": "ocid1.exadatainfrastructure.region1.sea.example"
+        }
+        self.assertEqual(connector.mObtainRealm(), "r1")
+
+        connector._ResourceConnector__config_bundle = {
+            "exaccInfrastructureOcid": "ocid1.exadatainfrastructure.oc3.eu-frankfurt-1"
+        }
+        self.assertEqual(connector.mObtainRealm(), "oc3")
+
+    def test_mObtainRegion_variants(self):
+        # Auto-generated test for mObtainRegion
+        connector = ResourceConnector.__new__(ResourceConnector)
+
+        connector._ResourceConnector__realm = "r1"
+        connector._ResourceConnector__config_bundle = {}
+        self.assertEqual(connector.mObtainRegion(), "r1")
+
+        connector._ResourceConnector__realm = "oc1"
+        connector._ResourceConnector__config_bundle = {
+            "exaccInfrastructureOcid": "ocid1.exadatainfrastructure.oc1.eu-zurich-1.extra"
+        }
+        with patch('exabox.exaoci.connectors.ResourceConnector.regions.get_region_from_short_name', return_value="eu-zurich-1") as mock_region:
+            self.assertEqual(connector.mObtainRegion(), "eu-zurich-1")
+            mock_region.assert_called_once_with("eu-zurich-1")
+
+        connector._ResourceConnector__realm = "oc1"
+        connector._ResourceConnector__config_bundle = {
+            "exaccInfrastructureOcid": "ocid1.exadatainfrastructure.oc1"
+        }
+        with patch('exabox.exaoci.connectors.ResourceConnector.ebLogError') as mock_log:
+            with self.assertRaises(ExacloudRuntimeError):
+                connector.mObtainRegion()
+            mock_log.assert_called_once()
+
+    def test_mObtainDnsSuffix_fallbacks(self):
+        # Auto-generated test for mObtainDnsSuffix
+        connector = ResourceConnector.__new__(ResourceConnector)
+
+        connector._ResourceConnector__config_bundle = {"dnsSuffix": "custom.domain"}
+        self.assertEqual(connector.mObtainDnsSuffix(), "custom.domain")
+
+        connector._ResourceConnector__config_bundle = {}
+        connector._ResourceConnector__realm = "r1"
+        self.assertEqual(connector.mObtainDnsSuffix(), "r1.oracleiaas.com")
+
+        connector._ResourceConnector__realm = "oc4"
+        connector._ResourceConnector__region = "uk-london-1"
+        self.assertEqual(connector.mObtainDnsSuffix(), "uk-london-1.oraclegovcloud.uk")
+
+        connector._ResourceConnector__realm = "oc8"
+        connector._ResourceConnector__region = "us-ashburn-1"
+        self.assertEqual(connector.mObtainDnsSuffix(), "us-ashburn-1.oci.oraclecloud.com")
+
+    def test_mGetConfigOption_uses_exabox_conf(self):
+        # Auto-generated test for mGetConfigOption
+        connector = ResourceConnector.__new__(ResourceConnector)
+        connector._ResourceConnector__basepath = "/base/path"
+
+        with patch('exabox.exaoci.connectors.ResourceConnector.get_value_from_exabox_config', return_value="option-value") as mock_get:
+            result = connector.mGetConfigOption("resource_principals_version")
+
+        self.assertEqual(result, "option-value")
+        mock_get.assert_called_once_with("resource_principals_version", "/base/path/config/exabox.conf")
+
+    def test_mGetRPKey_reads_from_configured_path(self):
+        # Auto-generated test for mGetRPKey
+        connector = ResourceConnector.__new__(ResourceConnector)
+
+        with patch.object(ResourceConnector, "mGetConfigOption", return_value="/tmp/key.pem") as mock_option, \
+             patch('exabox.exaoci.connectors.ResourceConnector.read_file_into_string', return_value="key-data") as mock_read:
+            result = connector.mGetRPKey()
+
+        self.assertEqual(result, "key-data")
+        mock_option.assert_called_once_with("resource_principals_key")
+        mock_read.assert_called_once_with("/tmp/key.pem")
+
+    def test_mGetRPAuthEnv_populates_environment_and_config(self):
+        # Auto-generated test for mGetRPAuthEnv
+        connector = ResourceConnector.__new__(ResourceConnector)
+        connector._ResourceConnector__basepath = "/ade/view"
+        connector._ResourceConnector__realm = "r1"
+        connector._ResourceConnector__region = "us-phoenix-1"
+        connector._ResourceConnector__casper_endpoint = "casper-endpoint"
+        connector._ResourceConnector__dbaas_endpoint = "dbaas-endpoint"
+        connector._ResourceConnector__auth_endpoint = "auth-endpoint"
+        connector._ResourceConnector__config_bundle = {}
+
+        oxpa_payload = {"OciExaCapacityParam": {"tenantOcid": "tenant-ocid", "exaOcid": "exa-ocid"}}
+        ocps_payload = {"proxy": " http://proxy.example.com "}
+
+        with patch('exabox.exaoci.connectors.ResourceConnector.read_json_into_string', side_effect=[oxpa_payload, ocps_payload]), \
+             patch.object(ResourceConnector, "mObtainOxpaFile", return_value="/tmp/oxpa.json"), \
+             patch.object(ResourceConnector, "mObtainOcpsSetupFile", return_value="/tmp/ocps.json"), \
+             patch.object(ResourceConnector, "mGetRPKey", return_value="key-data"), \
+             patch.object(ResourceConnector, "mGetConfigOption", return_value="rp-version"), \
+             patch('exabox.exaoci.connectors.ResourceConnector.get_resource_principals_signer', return_value="signer"), \
+             patch.dict(os.environ, {}, clear=True):
+            signer = connector.mGetRPAuthEnv()
+            self.assertEqual(signer, "signer")
+            self.assertEqual(os.environ["HTTPS_PROXY"], "http://proxy.example.com")
+            self.assertEqual(os.environ["OCI_RESOURCE_PRINCIPAL_VERSION"], "rp-version")
+            self.assertEqual(os.environ["OCI_RESOURCE_PRINCIPAL_RPT_ENDPOINT"], "dbaas-endpoint")
+            self.assertEqual(os.environ["OCI_RESOURCE_PRINCIPAL_RPST_ENDPOINT"], "auth-endpoint")
+            self.assertEqual(os.environ["OCI_RESOURCE_PRINCIPAL_RESOURCE_ID"], "exa-ocid")
+            self.assertEqual(os.environ["OCI_RESOURCE_PRINCIPAL_TENANCY_ID"], "tenant-ocid")
+            self.assertEqual(os.environ["OCI_RESOURCE_PRINCIPAL_PRIVATE_PEM"], "key-data")
+            self.assertEqual(os.environ["OCI_RESOURCE_PRINCIPAL_PRIVATE_PEM_PASSPHRASE"], "")
+            self.assertEqual(os.environ["OCI_RESOURCE_PRINCIPAL_REGION"], "us-phoenix-1")
+            self.assertEqual(os.environ["REQUESTS_CA_BUNDLE"], "/ade/view/exabox/kms/combined_r1.crt")
+
+        self.assertEqual(connector.get_oci_config(), {
+            "tenancy": "tenant-ocid",
+            "casper_endpoint": "casper-endpoint",
+            "ca_bundle_path": "/ade/view/exabox/kms/combined_r1.crt",
+            "realm": "r1"
+        })
+
+    def test_mGetRPAuthEnv_skips_proxy_when_value_not_string(self):
+        # Auto-generated test for mGetRPAuthEnv
+        connector = ResourceConnector.__new__(ResourceConnector)
+        connector._ResourceConnector__basepath = "/ade/view"
+        connector._ResourceConnector__realm = "oc1"
+        connector._ResourceConnector__region = "eu-frankfurt-1"
+        connector._ResourceConnector__casper_endpoint = "casper-endpoint"
+        connector._ResourceConnector__dbaas_endpoint = "dbaas-endpoint"
+        connector._ResourceConnector__auth_endpoint = "auth-endpoint"
+        connector._ResourceConnector__config_bundle = {}
+
+        oxpa_payload = {"OciExaCapacityParam": {"tenantOcid": "tenant-ocid", "exaOcid": "exa-ocid"}}
+        ocps_payload = {"proxy": 12345}
+
+        with patch('exabox.exaoci.connectors.ResourceConnector.read_json_into_string', side_effect=[oxpa_payload, ocps_payload]), \
+             patch.object(ResourceConnector, "mObtainOxpaFile", return_value="/tmp/oxpa.json"), \
+             patch.object(ResourceConnector, "mObtainOcpsSetupFile", return_value="/tmp/ocps.json"), \
+             patch.object(ResourceConnector, "mGetRPKey", return_value="key-data"), \
+             patch.object(ResourceConnector, "mGetConfigOption", return_value="rp-version"), \
+             patch('exabox.exaoci.connectors.ResourceConnector.get_resource_principals_signer', return_value="signer"), \
+             patch.dict(os.environ, {}, clear=True):
+            connector.mGetRPAuthEnv()
+            self.assertNotIn("HTTPS_PROXY", os.environ)
+            config = connector.get_oci_config()
+
+        self.assertEqual(config["realm"], "oc1")
+
+    def test_mGetRPAuthEnv_ignores_case_insensitive_null_values(self):
+        # Auto-generated test for mGetRPAuthEnv
+        proxy_variants = ["  NULL  ", "  NONE  "]
+
+        for proxy_value in proxy_variants:
+            with self.subTest(proxy_value=proxy_value):
+                connector = ResourceConnector.__new__(ResourceConnector)
+                connector._ResourceConnector__basepath = "/ade/view"
+                connector._ResourceConnector__realm = "r1"
+                connector._ResourceConnector__region = "us-phoenix-1"
+                connector._ResourceConnector__casper_endpoint = "casper-endpoint"
+                connector._ResourceConnector__dbaas_endpoint = "dbaas-endpoint"
+                connector._ResourceConnector__auth_endpoint = "auth-endpoint"
+                connector._ResourceConnector__config_bundle = {}
+
+                oxpa_payload = {"OciExaCapacityParam": {"tenantOcid": "tenant-ocid", "exaOcid": "exa-ocid"}}
+                ocps_payload = {"proxy": proxy_value}
+
+                with patch('exabox.exaoci.connectors.ResourceConnector.read_json_into_string', side_effect=[oxpa_payload, ocps_payload]), \
+                     patch.object(ResourceConnector, "mObtainOxpaFile", return_value="/tmp/oxpa.json"), \
+                     patch.object(ResourceConnector, "mObtainOcpsSetupFile", return_value="/tmp/ocps.json"), \
+                     patch.object(ResourceConnector, "mGetRPKey", return_value="key-data"), \
+                     patch.object(ResourceConnector, "mGetConfigOption", return_value="rp-version"), \
+                     patch('exabox.exaoci.connectors.ResourceConnector.get_resource_principals_signer', return_value="signer"), \
+                     patch.dict(os.environ, {}, clear=True):
+                    signer = connector.mGetRPAuthEnv()
+                    self.assertEqual(signer, "signer")
+                    self.assertNotIn("HTTPS_PROXY", os.environ)
+                    self.assertEqual(os.environ["REQUESTS_CA_BUNDLE"], "/ade/view/exabox/kms/combined_r1.crt")
+                    config = connector.get_oci_config()
+
+                self.assertEqual(config["realm"], "r1")
+
+    def test_mObtainOxpaFile_success_and_failure(self):
+        # Auto-generated test for mObtainOxpaFile
+        connector = ResourceConnector.__new__(ResourceConnector)
+
+        with patch('exabox.exaoci.connectors.ResourceConnector.glob.glob', return_value=["/tmp/file.oxpaInput.json"]):
+            self.assertEqual(connector.mObtainOxpaFile(), "/tmp/file.oxpaInput.json")
+
+        with patch('exabox.exaoci.connectors.ResourceConnector.glob.glob', return_value=[]), \
+             patch('exabox.exaoci.connectors.ResourceConnector.ebLogError') as mock_log:
+            with self.assertRaises(ExacloudRuntimeError):
+                connector.mObtainOxpaFile()
+            mock_log.assert_called_once()
+
+    def test_mObtainOcpsSetupFile_success_and_failure(self):
+        # Auto-generated test for mObtainOcpsSetupFile
+        connector = ResourceConnector.__new__(ResourceConnector)
+
+        with patch('exabox.exaoci.connectors.ResourceConnector.glob.glob', return_value=["/tmp/file.ocpsSetup.json"]):
+            self.assertEqual(connector.mObtainOcpsSetupFile(), "/tmp/file.ocpsSetup.json")
+
+        with patch('exabox.exaoci.connectors.ResourceConnector.glob.glob', return_value=[]), \
+             patch('exabox.exaoci.connectors.ResourceConnector.ebLogError') as mock_log:
+            with self.assertRaises(ExacloudRuntimeError):
+                connector.mObtainOcpsSetupFile()
+            mock_log.assert_called_once()
+
+    def test_get_auth_principal_token_success(self):
+        # Auto-generated test for get_auth_principal_token
+        connector = ResourceConnector.__new__(ResourceConnector)
+        connector._ResourceConnector__retries = 3
+
+        with patch.object(ResourceConnector, "mGetRPAuthEnv", return_value="token") as mock_env:
+            token = connector.get_auth_principal_token()
+
+        self.assertEqual(token, "token")
+        mock_env.assert_called_once()
+
+    def test_get_auth_principal_token_succeeds_after_retry(self):
+        # Auto-generated test for get_auth_principal_token
+        connector = ResourceConnector.__new__(ResourceConnector)
+        connector._ResourceConnector__retries = 3
+
+        with patch.object(ResourceConnector, "mGetRPAuthEnv", side_effect=[Exception("first failure"), "token"]) as mock_env, \
+             patch('exabox.exaoci.connectors.ResourceConnector.sleep', return_value=None) as mock_sleep, \
+             patch('exabox.exaoci.connectors.ResourceConnector.ebLogTrace') as mock_trace:
+            token = connector.get_auth_principal_token()
+
+        self.assertEqual(token, "token")
+        self.assertEqual(mock_env.call_count, 2)
+        mock_sleep.assert_called_once_with(1)
+        mock_trace.assert_called_once()
+
+    def test_autogen_mObtainRealm_handles_realmName(self):
+        # Auto-generated test for mObtainRealm
+        connector = ResourceConnector.__new__(ResourceConnector)
+        connector._ResourceConnector__config_bundle = {"realmName": "region1"}
+        self.assertEqual(connector.mObtainRealm(), "r1")
+
+        connector._ResourceConnector__config_bundle = {"realmName": "oc4"}
+        self.assertEqual(connector.mObtainRealm(), "oc4")
+
+    def test_autogen_mObtainRealm_extracts_from_ocid(self):
+        # Auto-generated test for mObtainRealm
+        connector = ResourceConnector.__new__(ResourceConnector)
+
+        connector._ResourceConnector__config_bundle = {
+            "exaccInfrastructureOcid": "ocid1.exadatainfrastructure.region1.sea.instance"
+        }
+        self.assertEqual(connector.mObtainRealm(), "r1")
+
+        connector._ResourceConnector__config_bundle = {
+            "exaccInfrastructureOcid": "ocid1.exadatainfrastructure.oc3.eu-frankfurt-1"
+        }
+        self.assertEqual(connector.mObtainRealm(), "oc3")
+
+    def test_autogen_mObtainRegion_paths(self):
+        # Auto-generated test for mObtainRegion
+        connector = ResourceConnector.__new__(ResourceConnector)
+        connector._ResourceConnector__config_bundle = {}
+
+        connector._ResourceConnector__realm = "r1"
+        self.assertEqual(connector.mObtainRegion(), "r1")
+
+        connector._ResourceConnector__realm = "oc1"
+        connector._ResourceConnector__config_bundle = {
+            "exaccInfrastructureOcid": "ocid1.exadatainfrastructure.oc1.eu-zurich-1.extra"
+        }
+        with patch('exabox.exaoci.connectors.ResourceConnector.regions.get_region_from_short_name',
+                   return_value="eu-zurich-1") as mocked_region:
+            self.assertEqual(connector.mObtainRegion(), "eu-zurich-1")
+            mocked_region.assert_called_once_with("eu-zurich-1")
+
+        connector._ResourceConnector__config_bundle = {
+            "exaccInfrastructureOcid": "ocid1.exadatainfrastructure.oc1"
+        }
+        with patch('exabox.exaoci.connectors.ResourceConnector.ebLogError') as mocked_log:
+            with self.assertRaises(ExacloudRuntimeError):
+                connector.mObtainRegion()
+            mocked_log.assert_called_once()
+
+    def test_autogen_mObtainDnsSuffix_modes(self):
+        # Auto-generated test for mObtainDnsSuffix
+        connector = ResourceConnector.__new__(ResourceConnector)
+
+        connector._ResourceConnector__config_bundle = {"dnsSuffix": "custom.domain"}
+        self.assertEqual(connector.mObtainDnsSuffix(), "custom.domain")
+
+        connector._ResourceConnector__config_bundle = {}
+        connector._ResourceConnector__realm = "r1"
+        self.assertEqual(connector.mObtainDnsSuffix(), "r1.oracleiaas.com")
+
+        connector._ResourceConnector__realm = "oc4"
+        connector._ResourceConnector__region = "uk-london-1"
+        self.assertEqual(connector.mObtainDnsSuffix(), "uk-london-1.oraclegovcloud.uk")
+
+        connector._ResourceConnector__realm = "oc3"
+        connector._ResourceConnector__region = "us-ashburn-1"
+        self.assertEqual(connector.mObtainDnsSuffix(), "us-ashburn-1.oci.oraclecloud.com")
+
+    def test_autogen_mSetEndpoint_non_r1_preprod(self):
+        # Auto-generated test for mSetEndpoint
+        connector = ResourceConnector.__new__(ResourceConnector)
+        connector._ResourceConnector__region = "eu-zurich-1"
+        connector._ResourceConnector__config_bundle = {"databaseUrl": "preprod-db.example.com"}
+
+        with patch('exabox.exaoci.connectors.ResourceConnector.regions.endpoint_for',
+                   side_effect=["base-first", "base-second"]) as mocked_endpoint:
+            endpoint = connector.mSetEndpoint("database")
+            self.assertEqual(endpoint, "https://preprod-db.example.com")
+
+            connector._ResourceConnector__config_bundle = {"databaseUrl": "https://preprod-db.example.com"}
+            endpoint_https = connector.mSetEndpoint("database")
+            self.assertEqual(endpoint_https, "https://preprod-db.example.com")
+
+        self.assertEqual(mocked_endpoint.call_count, 2)
+
+    def test_autogen_mGetRPAuthEnv_configures_environment(self):
+        # Auto-generated test for mGetRPAuthEnv
+        connector = ResourceConnector.__new__(ResourceConnector)
+        connector._ResourceConnector__basepath = "/ade/view"
+        connector._ResourceConnector__realm = "r1"
+        connector._ResourceConnector__region = "us-phoenix-1"
+        connector._ResourceConnector__casper_endpoint = "casper"
+        connector._ResourceConnector__dbaas_endpoint = "dbaas"
+        connector._ResourceConnector__auth_endpoint = "auth"
+        connector._ResourceConnector__config_bundle = {}
+
+        oxpa_payload = {"OciExaCapacityParam": {"tenantOcid": "tenant-ocid", "exaOcid": "exa-ocid"}}
+        ocps_payload = {"proxy": " http://proxy.example.com "}
+
+        with patch('exabox.exaoci.connectors.ResourceConnector.read_json_into_string',
+                   side_effect=[oxpa_payload, ocps_payload]), \
+             patch.object(ResourceConnector, "mObtainOxpaFile", return_value="/tmp/oxpa.json"), \
+             patch.object(ResourceConnector, "mObtainOcpsSetupFile", return_value="/tmp/ocps.json"), \
+             patch.object(ResourceConnector, "mGetRPKey", return_value="key-data"), \
+             patch.object(ResourceConnector, "mGetConfigOption", return_value="2.1"), \
+             patch('exabox.exaoci.connectors.ResourceConnector.get_resource_principals_signer',
+                   return_value="signer"), \
+             patch('exabox.exaoci.connectors.ResourceConnector.ebLogInfo'), \
+             patch.dict(os.environ, {}, clear=True):
+            signer = connector.mGetRPAuthEnv()
+            self.assertEqual(signer, "signer")
+            self.assertEqual(os.environ["HTTPS_PROXY"], "http://proxy.example.com")
+            self.assertEqual(os.environ["OCI_RESOURCE_PRINCIPAL_VERSION"], "2.1")
+            self.assertEqual(os.environ["OCI_RESOURCE_PRINCIPAL_RPT_ENDPOINT"], "dbaas")
+            self.assertEqual(os.environ["OCI_RESOURCE_PRINCIPAL_RPST_ENDPOINT"], "auth")
+            self.assertEqual(os.environ["OCI_RESOURCE_PRINCIPAL_RESOURCE_ID"], "exa-ocid")
+            self.assertEqual(os.environ["OCI_RESOURCE_PRINCIPAL_TENANCY_ID"], "tenant-ocid")
+            self.assertEqual(os.environ["REQUESTS_CA_BUNDLE"], "/ade/view/exabox/kms/combined_r1.crt")
+
+        self.assertEqual(connector.get_oci_config(), {
+            "tenancy": "tenant-ocid",
+            "casper_endpoint": "casper",
+            "ca_bundle_path": "/ade/view/exabox/kms/combined_r1.crt",
+            "realm": "r1"
+        })
+        self.assertEqual(connector.get_connector_type(), "ResourceConnector")
+
+    def test_autogen_mGetRPAuthEnv_invalid_proxy_cases(self):
+        # Auto-generated test for mGetRPAuthEnv
+        connector = ResourceConnector.__new__(ResourceConnector)
+        connector._ResourceConnector__basepath = "/ade/view"
+        connector._ResourceConnector__realm = "oc1"
+        connector._ResourceConnector__region = "eu-frankfurt-1"
+        connector._ResourceConnector__casper_endpoint = "casper"
+        connector._ResourceConnector__dbaas_endpoint = "dbaas"
+        connector._ResourceConnector__auth_endpoint = "auth"
+        connector._ResourceConnector__config_bundle = {}
+
+        oxpa_payload = {"OciExaCapacityParam": {"tenantOcid": "tenant", "exaOcid": "exa"}}
+
+        with patch('exabox.exaoci.connectors.ResourceConnector.read_json_into_string',
+                   side_effect=[oxpa_payload, {"proxy": 123}, oxpa_payload, {"proxy": "null"}]), \
+             patch.object(ResourceConnector, "mObtainOxpaFile", return_value="/tmp/oxpa.json"), \
+             patch.object(ResourceConnector, "mObtainOcpsSetupFile", return_value="/tmp/ocps.json"), \
+             patch.object(ResourceConnector, "mGetRPKey", return_value="key"), \
+             patch.object(ResourceConnector, "mGetConfigOption", return_value="2.2"), \
+             patch('exabox.exaoci.connectors.ResourceConnector.get_resource_principals_signer',
+                   return_value="signer"), \
+             patch.dict(os.environ, {}, clear=True):
+            connector.mGetRPAuthEnv()
+            self.assertNotIn("HTTPS_PROXY", os.environ)
+
+            connector.mGetRPAuthEnv()
+            self.assertNotIn("HTTPS_PROXY", os.environ)
+
+    def test_autogen_get_auth_principal_token_error_paths(self):
+        # Auto-generated test for get_auth_principal_token
+        connector = ResourceConnector.__new__(ResourceConnector)
+        connector._ResourceConnector__retries = 2
+
+        with patch.object(ResourceConnector, "mGetRPAuthEnv", side_effect=OCIHTTPError("http failure")):
+            with self.assertRaises(OCIHTTPError):
+                connector.get_auth_principal_token()
+
+        connector._ResourceConnector__retries = 3
+        with patch.object(ResourceConnector, "mGetRPAuthEnv", side_effect=[Exception("boom")] * 3), \
+             patch('exabox.exaoci.connectors.ResourceConnector.sleep', return_value=None) as mocked_sleep, \
+             patch('exabox.exaoci.connectors.ResourceConnector.ebLogTrace') as mocked_trace, \
+             patch('exabox.exaoci.connectors.ResourceConnector.ebLogError') as mocked_error:
+            with self.assertRaises(ExacloudRuntimeError):
+                connector.get_auth_principal_token()
+
+        self.assertEqual(mocked_sleep.call_count, 3)
+        self.assertEqual(mocked_trace.call_count, 3)
+        self.assertEqual(mocked_error.call_count, 1)
+
+    def test_mSetEndpoint_r1_non_object_storage(self):
+        # Auto-generated test for mSetEndpoint
+        connector = ResourceConnector.__new__(ResourceConnector)
+        connector._ResourceConnector__region = "r1"
+        connector._ResourceConnector__realm = "r1"
+        connector._ResourceConnector__config_bundle = {"databaseUrl": None}
+
+        with patch('exabox.exaoci.connectors.ResourceConnector.regions.endpoint_for', return_value="endpoint-r1-auth") as mocked_endpoint:
+            endpoint = connector.mSetEndpoint("auth")
+
+        mocked_endpoint.assert_called_once_with(
+            "auth",
+            service_endpoint_template="https://auth.r1.oracleiaas.com",
+            region="r1",
+            endpoint=None,
+            endpoint_service_name="auth"
+        )
+        self.assertEqual(endpoint, "endpoint-r1-auth")
+
+    def test_mGetRPAuthEnv_no_requests_ca_bundle_for_non_r1(self):
+        # Auto-generated test for mGetRPAuthEnv
+        connector = ResourceConnector.__new__(ResourceConnector)
+        connector._ResourceConnector__basepath = "/ade/view"
+        connector._ResourceConnector__realm = "oc2"
+        connector._ResourceConnector__region = "us-ashburn-1"
+        connector._ResourceConnector__casper_endpoint = "casper"
+        connector._ResourceConnector__dbaas_endpoint = "dbaas"
+        connector._ResourceConnector__auth_endpoint = "auth"
+        connector._ResourceConnector__config_bundle = {}
+
+        oxpa_payload = {"OciExaCapacityParam": {"tenantOcid": "tenant", "exaOcid": "exa"}}
+        ocps_payload = {"proxy": "http://proxy.example.com"}
+
+        with patch('exabox.exaoci.connectors.ResourceConnector.read_json_into_string', side_effect=[oxpa_payload, ocps_payload]), \
+             patch.object(ResourceConnector, "mObtainOxpaFile", return_value="/tmp/oxpa.json"), \
+             patch.object(ResourceConnector, "mObtainOcpsSetupFile", return_value="/tmp/ocps.json"), \
+             patch.object(ResourceConnector, "mGetRPKey", return_value="key-data"), \
+             patch.object(ResourceConnector, "mGetConfigOption", return_value="2.0"), \
+             patch('exabox.exaoci.connectors.ResourceConnector.get_resource_principals_signer', return_value="signer"), \
+             patch.dict(os.environ, {}, clear=True):
+            connector.mGetRPAuthEnv()
+            self.assertEqual(os.environ["HTTPS_PROXY"], "http://proxy.example.com")
+            self.assertNotIn("REQUESTS_CA_BUNDLE", os.environ)
+
+        self.assertEqual(connector.get_oci_config()["realm"], "oc2")
+
 
 if __name__ == '__main__':
     unittest.main()

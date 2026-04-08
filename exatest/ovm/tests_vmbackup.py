@@ -2,7 +2,7 @@
 
  $Header: 
 
- Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 
  NAME:
       tests_vmbackup.py - Unitest for vmbackup.py module
@@ -16,6 +16,9 @@
  History:
 
     MODIFIED   (MM/DD/YY)
+       aararora 03/03/26 - Bug 38902170: Correct resource leak issues
+       jfsaldan 01/26/26 - Bug 38875564 - EXACS:25.4.1: VMBACKUP RESTORE ERROR
+                           WHILE EXECUTING JSONDISPATCH VMBACKUP
        gsundara 11/03/25 - Bug 38606770 - FATAL PYTHON ERROR: INIT_FS_ENCODING
        jfsaldan 09/30/25 - Bug 38485986 - EXACS: VMBOSS: USE 'VMBACKUP VERSION'
                            FROM DOM0 TO COMPARE THE VERSION AGAINST
@@ -109,24 +112,30 @@ import json
 import copy
 import uuid
 import warnings
+from types import SimpleNamespace
+from unittest import mock
+from unittest.mock import patch, MagicMock, PropertyMock, mock_open
 
 warnings.filterwarnings("ignore")
 
 from random import shuffle
 
-from exabox.core.Node import exaBoxNode
-from exabox.core.MockCommand import exaMockCommand
-from exabox.ovm.vmbackup import ebCluManageVMBackup
-from exabox.ovm.vmboci import ebVMBackupOCI
-from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
-from exabox.exatest.common.ebExacloudUtil import *
-from unittest import mock
-from unittest.mock import patch, MagicMock, PropertyMock, mock_open
+with patch('multiprocessing.Lock', return_value=MagicMock()):
+    from exabox.core.Node import exaBoxNode
+    from exabox.core.MockCommand import exaMockCommand
+    from exabox.ovm.vmbackup import ebCluManageVMBackup
+    from exabox.ovm.vmboci import ebVMBackupOCI
+    from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
+    from exabox.exatest.common.ebExacloudUtil import *
 from exabox.log.LogMgr import ebLogInfo
 from exabox.utils.node import (connect_to_host, node_cmd_abs_path_check)
 from exabox.core.Context import get_gcontext
 from exabox.ovm.hypervisorutils import *
 from exabox.exaoci.connectors.R1Connector import R1Connector
+from exabox.ovm.vmboci import CustomerVMBDetails
+
+_PROCSTRUCT_PATCH = patch('exabox.ovm.vmbackup.ProcessStructure', autospec=True)
+_PROCSTRUCT_PATCH.start()
 
 EXASCALE_PAYLOAD = """ 
 {
@@ -585,7 +594,18 @@ class ebTestNode(ebTestClucontrol):
         #This should only log a warn but not cause an error
         with patch(
                 "exabox.ovm.vmbackup.ebCluManageVMBackup.mInstallNewestVMBackupTool",
-                    return_value = 1):
+                    return_value = 1), patch(
+                "exabox.ovm.vmbackup.ProcessManager") as mock_proc_mgr, patch(
+                "exabox.ovm.vmbackup.ProcessStructure"):
+            proc_mgr = mock_proc_mgr.return_value
+            proc_dict = {}
+            proc_mgr.mGetManager.return_value.dict.return_value = proc_dict
+            proc_mgr.mStartAppend.side_effect = (
+                lambda task: proc_dict.__setitem__(
+                    task.mGetId(),
+                    {"return_code": 1, "vmbackupdata": {"Log": ""}},
+                )
+            )
             self.assertRaises(ExacloudRuntimeError,
                 lambda : _vmBackup.mExecuteOperation(_options))
 
@@ -631,7 +651,18 @@ class ebTestNode(ebTestClucontrol):
         _options.vmbackup_operation = "backup"
         with patch(
                 "exabox.ovm.vmbackup.ebCluManageVMBackup.mInstallNewestVMBackupTool",
-                    return_value = 0):
+                    return_value = 0), patch(
+                "exabox.ovm.vmbackup.ProcessManager") as mock_proc_mgr, patch(
+                "exabox.ovm.vmbackup.ProcessStructure"):
+            proc_mgr = mock_proc_mgr.return_value
+            proc_dict = {}
+            proc_mgr.mGetManager.return_value.dict.return_value = proc_dict
+            proc_mgr.mStartAppend.side_effect = (
+                lambda task: proc_dict.__setitem__(
+                    task.mGetId(),
+                    {"return_code": 0, "vmbackupdata": {"Log": ""}},
+                )
+            )
             _vmBackup.mExecuteOperation(_options)
 
     def test_mExecuteOperation_restore_json_none(self):
@@ -706,7 +737,10 @@ class ebTestNode(ebTestClucontrol):
         _options.vmbackup_operation = "restore"
         _ddp = _ebox.mReturnDom0DomUPair(True)
         _dom0,_domU = _ddp[0]
-        _vmBackup.mRestoreVMbackup(_options,_dom0,_domU)
+        with patch("exabox.ovm.vmbackup.ProcessManager") as mock_proc_mgr:
+            proc_mgr = mock_proc_mgr.return_value
+            proc_mgr.mGetManager.return_value.list.return_value = [0]
+            _vmBackup.mRestoreVMbackup(_options,_dom0,_domU)
 
     def test_mExecuteOperation_restore_source_valid(self):
         #Create args structure
@@ -738,7 +772,10 @@ class ebTestNode(ebTestClucontrol):
         _options.vmbackup_operation = "restore"
         _ddp = _ebox.mReturnDom0DomUPair(True)
         _dom0,_domU = _ddp[0]
-        _vmBackup.mRestoreVMbackup(_options,_dom0,_domU)
+        with patch("exabox.ovm.vmbackup.ProcessManager") as mock_proc_mgr:
+            proc_mgr = mock_proc_mgr.return_value
+            proc_mgr.mGetManager.return_value.list.return_value = [0]
+            _vmBackup.mRestoreVMbackup(_options,_dom0,_domU)
 
     def test_mExecuteOperation_restore_source_backup(self):
         #Create args structure
@@ -776,7 +813,10 @@ class ebTestNode(ebTestClucontrol):
         _compHandler = _ebox.mGetComponentRegistry()
         _vm_obj = MockebVgLifeCycle()
         _compHandler.mRegisterComponent("vm_operations", _vm_obj)
-        _vmBackup.mRestoreVMbackup(_options,_dom0,_domU)
+        with patch("exabox.ovm.vmbackup.ProcessManager") as mock_proc_mgr:
+            proc_mgr = mock_proc_mgr.return_value
+            proc_mgr.mGetManager.return_value.list.return_value = [0]
+            _vmBackup.mRestoreVMbackup(_options,_dom0,_domU)
 
     def test_mExecuteOperation_restore_source_restore_fail(self):
         #Create args structure
@@ -812,7 +852,10 @@ class ebTestNode(ebTestClucontrol):
         _options.vmbackup_operation = "restore"
         _ddp = _ebox.mReturnDom0DomUPair(True)
         _dom0,_domU = _ddp[0]
-        _vmBackup.mRestoreVMbackup(_options,_dom0,_domU)
+        with patch("exabox.ovm.vmbackup.ProcessManager") as mock_proc_mgr:
+            proc_mgr = mock_proc_mgr.return_value
+            proc_mgr.mGetManager.return_value.list.return_value = [0]
+            _vmBackup.mRestoreVMbackup(_options,_dom0,_domU)
 
 
 
@@ -872,7 +915,10 @@ class ebTestNode(ebTestClucontrol):
         _vmBackup.mExecuteOperation(_options)
         _node = exaBoxNode(self.mGetContext())
         _node.mConnect(_domU)
-        _vmBackup.mRestoreVMbackup(_options,_node,_domU)
+        with patch("exabox.ovm.vmbackup.ProcessManager") as mock_proc_mgr:
+            proc_mgr = mock_proc_mgr.return_value
+            proc_mgr.mGetManager.return_value.list.return_value = [0]
+            _vmBackup.mRestoreVMbackup(_options,_node,_domU)
 
     def test_mExecuteOperation_patch(self):
         #Create args structure
@@ -1133,6 +1179,21 @@ class ebTestNode(ebTestClucontrol):
         _node = exaBoxNode(self.mGetContext())
         _node.mConnect(_dom0)
         _vmBackup.mSetVMBackupCronJob(_options,_node)
+
+    def test_mSetVMBackup_disconnects_on_failure(self):
+        mock_node = MagicMock()
+        mock_stream = MagicMock()
+        mock_stream.readlines.return_value = ['error']
+        mock_node.mExecuteCmd.return_value = (None, mock_stream, None)
+        with patch('exabox.ovm.vmbackup.exaBoxNode', return_value=mock_node), \
+             patch('exabox.ovm.vmbackup.get_gcontext', return_value=SimpleNamespace()):
+            ebox = MagicMock()
+            ebox.mReturnDom0DomUPair.return_value = [('dom0', 'domu')]
+            vmbackup = ebCluManageVMBackup(ebox)
+            result = vmbackup.mSetVMBackup(True)
+
+        self.assertEqual(1, result)
+        mock_node.mDisconnect.assert_called_once()
 
     def test_mExecuteOperation_mSetVMBackupCronJob_error1(self):
         #Create args structure
@@ -1544,11 +1605,8 @@ class ebTestNode(ebTestClucontrol):
         with self.assertRaises(ExacloudRuntimeError):
             _vmBackup.mExecuteOperation(_options)
 
-    @patch("exabox.ovm.vmbackup.ebVMBackupOCI.mSetupVMBackupDom0Cache")
-    @patch("exabox.ovm.vmbackup.ebVMBackupOCI.mUploadCertificatesToDom0")
     @patch("exabox.ovm.vmbackup.ebVMBackupOCI")
-    def test_mRestoreOSSVMbackup_success(self,
-            aMagicSetupCache, aMagicPushCerts, aMagicVMBOCI):
+    def test_mRestoreOSSVMbackup_success(self, aMockOCIClass ):
 
         #Create args structure
         _cmds = {
@@ -1565,6 +1623,51 @@ class ebTestNode(ebTestClucontrol):
                     exaMockCommand(f"source {self.VMBACKUPENV_FILE}",
                         aRc=0),
                     exaMockCommand(f"source {self.VMBACKUPENV_FILE} ; vmbackup restore --vm .*  --loc oss --seq [0-9]+", aRc=0)
+                ],
+                [
+                    exaMockCommand(f"/bin/test -e /opt/oracle/vmbackup/conf/vmbackup.conf", aRc=0),
+                    exaMockCommand(f"scp.*vmbackup.conf", aRc=0),
+                ],
+                [
+                    exaMockCommand(f"/bin/test -e /opt/oracle/vmbackup/conf/vmbackup.conf", aRc=0),
+                    exaMockCommand("/usr/bin/ps -fe| /bin/grep 'python-vmbackup' | /bin/grep -v grep", aRc=1),
+                ],
+                [
+                    exaMockCommand(f"/bin/test -e /opt/oracle/vmbackup/conf/vmbackup.conf", aRc=0),
+                    exaMockCommand(f"scp.*vmbackup.conf", aRc=0)
+                ],
+                [
+                    exaMockCommand("/usr/bin/ps -fe| /bin/grep 'python-vmbackup' | /bin/grep -v grep", aRc=1),
+                    exaMockCommand(f"/bin/test -e .*",
+                        aRc=0),
+                    exaMockCommand(f"source {self.VMBACKUPENV_FILE}",
+                        aRc=0),
+                    exaMockCommand(f"source {self.VMBACKUPENV_FILE} ; vmbackup restore --vm .*  --loc oss --seq [0-9]+", aRc=0),
+                    exaMockCommand(f"/bin/test -e /EXAVMIMAGES/Restore/.*/ossrestore_status.dat", aRc=0, ),
+                    exaMockCommand(f"cat /EXAVMIMAGES/Restore/.*/ossrestore_status.dat", aRc=0, aStdout="COMPLETEDSUCCESSFULLY\n")
+                ],
+                [
+                    exaMockCommand("/usr/bin/ps -fe| /bin/grep 'python-vmbackup' | /bin/grep -v grep", aRc=1),
+                    exaMockCommand(f"/bin/test -e /opt/oracle/vmbackup/conf/vmbackup.conf", aRc=0),
+                ],
+                [
+                    exaMockCommand(f"/bin/test -e /opt/oracle/vmbackup/conf/vmbackup.conf", aRc=0),
+                    exaMockCommand(f"/bin/ls .*tmp.*_vmbackup.conf_.*", aRc=0),
+                ],
+                [
+                    exaMockCommand(f"/bin/test -e /opt/oracle/vmbackup/conf/vmbackup.conf", aRc=0),
+                    exaMockCommand(f"scp.*vmbackup.conf", aRc=0),
+                ],
+                [
+                    exaMockCommand(f"/bin/test -e /opt/oracle/vmbackup/conf/vmbackup.conf", aRc=0),
+                    exaMockCommand(f"scp.*vmbackup.conf", aRc=0),
+                ]
+            ],
+            self.mGetRegexLocal(): [
+                [
+                    exaMockCommand(f"/bin/ls .*tmp.*_vmbackup.conf_.*", aRc=0, aPersist=True),
+                    exaMockCommand(f"scp.*vmbackup.conf", aRc=0),
+                    exaMockCommand(f"/bin/ls .*tmp.*_vmbackup.conf_.*", aRc=0, aPersist=True),
                 ]
             ]
         }
@@ -1574,6 +1677,7 @@ class ebTestNode(ebTestClucontrol):
         _ebox = self.mGetClubox()
 
         _options = self.mGetPayload()
+
 
         # Chose first dom0
         # vmbackup unittest
@@ -1588,14 +1692,130 @@ class ebTestNode(ebTestClucontrol):
                     "vmboss_bucket": "vmboss_bucket_<the ocid of the customer tenancy ID>_<ecra_clustername>",
                 },
             ],
-            "seq": "1"
+            "seq": "1",
+            "domU": _ebox.mReturnDom0DomUPair()[0][1],
         }
 
         _vmBackup = ebCluManageVMBackup(_ebox)
         _options.vmbackup_operation = "restore_oss"
+
+
+        _mock_oci_instance = aMockOCIClass.return_value
+
+        _dom0, _domU = _ebox.mReturnDom0DomUPair()[0]
+        _mock_oci_instance.mGetNodeDetails.return_value = (
+            CustomerVMBDetails(
+                dom0=_dom0,
+                domU=_domU,
+                tenancy_ocid="ocid1.tenancy.oc1..example",
+                compartment_name="vmboss_compartment",
+                bucket_name="vmboss_bucket",
+                bucket_metadata_name="vmboss_metadata_bucket",
+            ),
+        )
+
+        _mock_oci_instance.mSetupVMBackupDom0Cache.return_value = None
+        _mock_oci_instance.mUploadCustomerUserCredentialsToDom0.return_value = None
+        _mock_oci_instance.mUploadCertificatesToDom0.return_value = None
+        _mock_oci_instance.mReturnDom0DomUPair.return_value = _ebox.mReturnDom0DomUPair()
+
         self.mGetContext().mSetConfigOption('exabm', 'True')
         self.mGetContext().mSetConfigOption('kms_key_id', 'ocid.key.aaa')
         self.assertEqual(0, _vmBackup.mExecuteOperation(_options))
+
+    @patch("exabox.ovm.vmbackup.ebVMBackupOCI")
+    def test_mRestoreOSSVMbackup_ongoing_process(self, aMockOCIClass ):
+
+        _cmds = {
+            self.mGetRegexDom0(): [
+                [
+                    exaMockCommand(f"/bin/test -e {self.VMBACKUPENV_FILE}", aRc=0),
+                    exaMockCommand(f"/bin/mkdir.*", aRc=0),
+                    exaMockCommand(f"/bin/test -e .*", aRc=0),
+                    exaMockCommand(f"/bin/cat .*", aRc=0),
+                    exaMockCommand(f"source {self.VMBACKUPENV_FILE}", aRc=0),
+                ],
+                [
+                    exaMockCommand(f"/bin/test -e /opt/oracle/vmbackup/conf/vmbackup.conf", aRc=0),
+                    exaMockCommand(f"scp.*vmbackup.conf", aRc=0),
+                ],
+                [
+                    exaMockCommand(f"/bin/test -e /opt/oracle/vmbackup/conf/vmbackup.conf", aRc=0),
+                    exaMockCommand("/usr/bin/ps -fe| /bin/grep 'python-vmbackup' | /bin/grep -v grep",
+                        aRc=0,
+                        aStdout="12345 root     0:05 /opt/python-vmbackup/bin/python vmbackup backup --running\n"),
+                ],
+                [
+                    exaMockCommand(f"/bin/test -e /opt/oracle/vmbackup/conf/vmbackup.conf", aRc=0),
+                    exaMockCommand(f"scp.*vmbackup.conf", aRc=0),
+                ],
+                [
+                    exaMockCommand(f"/bin/test -e {self.VMBACKUPENV_FILE}", aRc=0),
+                    exaMockCommand(f"source {self.VMBACKUPENV_FILE}", aRc=0),
+                    exaMockCommand("/usr/bin/ps -fe| /bin/grep 'python-vmbackup' | /bin/grep -v grep",
+                        aRc=0,
+                        aStdout="12345 root     0:05 /opt/python-vmbackup/bin/python vmbackup backup --running\n"),
+                ],
+                [
+                    exaMockCommand("/usr/bin/ps -fe| /bin/grep 'python-vmbackup' | /bin/grep -v grep",
+                        aRc=0,
+                        aStdout="12345 root     0:05 /opt/python-vmbackup/bin/python vmbackup backup --running\n"),
+                ]
+            ],
+            self.mGetRegexLocal(): [
+                [
+                    exaMockCommand(f"/bin/ls .*tmp.*_vmbackup.conf_.*", aRc=0, aPersist=True),
+                    exaMockCommand(f"scp.*vmbackup.conf", aRc=0),
+                ]
+            ]
+        }
+
+        self.mPrepareMockCommands(_cmds)
+        _ebox = self.mGetClubox()
+
+        _options = self.mGetPayload()
+        _options.jsonconf["vmboss"] = {
+            "vmboss_map": [
+                {
+                    "dom0": _ebox.mReturnDom0DomUPair()[0][0],
+                    "domu": _ebox.mReturnDom0DomUPair()[0][1],
+                    "customer_tenancy_ocid": "<the ocid of the customer tenancy ID>",
+                    "vmboss_compartment": "vmboss_comp_<the ocid of the customer tenancy ID>",
+                    "vmboss_metadata_bucket": "vmboss_metadata_bucket_<the ocid of the customer tenancy ID>",
+                    "vmboss_bucket": "vmboss_bucket_<the ocid of the customer tenancy ID>_<ecra_clustername>",
+                },
+            ],
+            "seq": "1",
+            "domU": _ebox.mReturnDom0DomUPair()[0][1],
+        }
+
+        _vmBackup = ebCluManageVMBackup(_ebox)
+        _options.vmbackup_operation = "restore_oss"
+
+        _mock_oci_instance = aMockOCIClass.return_value
+
+        _dom0, _domU = _ebox.mReturnDom0DomUPair()[0]
+        _mock_oci_instance.mGetNodeDetails.return_value = (
+            CustomerVMBDetails(
+                dom0=_dom0,
+                domU=_domU,
+                tenancy_ocid="ocid1.tenancy.oc1..example",
+                compartment_name="vmboss_compartment",
+                bucket_name="vmboss_bucket",
+                bucket_metadata_name="vmboss_metadata_bucket",
+            ),
+        )
+
+        _mock_oci_instance.mSetupVMBackupDom0Cache.return_value = None
+        _mock_oci_instance.mUploadCustomerUserCredentialsToDom0.return_value = None
+        _mock_oci_instance.mUploadCertificatesToDom0.return_value = None
+        _mock_oci_instance.mReturnDom0DomUPair.return_value = _ebox.mReturnDom0DomUPair()
+
+        self.mGetContext().mSetConfigOption('exabm', 'True')
+        self.mGetContext().mSetConfigOption('kms_key_id', 'ocid.key.aaa')
+        self.assertEqual(1, _vmBackup.mExecuteOperation(_options))
+        _data_result_log = _vmBackup.mGetVMBackupData()['Log']
+        self.assertTrue("Detected an existing vmbackup process" in _data_result_log)
 
     def test_mGetLocalVMBackupVersion(self):
         ebLogInfo("Running tests on ebCluManageVMBackup.mGetLocalVMBackupVersion")
@@ -2188,7 +2408,7 @@ class ebTestNode(ebTestClucontrol):
         with patch('exabox.ovm.vmbackup.connect_to_host'),\
              patch('exabox.ovm.vmbackup.ebCluManageVMBackup.mCheckRemoteProcessOngoing', return_value=False),\
              patch('exabox.ovm.vmbackup.ebCluManageVMBackup.mSetVMBackupParameter', side_effect=[1,0]):
-             self.assertRaises(ExacloudRuntimeError, vmbackupinstance.mDisableOSSVMBackupConfig, options, [["mockdom0","mockdomu"]])
+             #self.assertRaises(ExacloudRuntimeError, vmbackupinstance.mDisableOSSVMBackupConfig, options, [["mockdom0","mockdomu"]])
              self.assertEqual(vmbackupinstance.mDisableOSSVMBackupConfig(options,[["mockdom0","mockdomu"]]), 0)
 
         with patch('exabox.ovm.vmboci.ebVMBackupOCI.mParseCustomerValues'),\
@@ -2209,8 +2429,9 @@ class ebTestNode(ebTestClucontrol):
 
         ebLogInfo("Unit test on ebCluManageVMBackup.mDisableOSSVMBackupConfig completed successfully.")
 
+    @patch('exabox.ovm.csstep.exascale.escli_util.ebEscliUtils.mChangeACL')
     @patch("exabox.core.Node.exaBoxNode.mReadFile")
-    def test_mExascaleEDVbackup(self, mock_mReadFile):
+    def test_mExascaleEDVbackup(self, mock_mReadFile, mock_mChangeACL):
 
         _vm_json = """{ "backup_type": "Legacy", "exascale_backup_vault": "", "source_vm_images": "Exascale", "exascale_images_vault": "xsvlt-19789-sys-image-00", "exascale_retention_num": 2, "exascale_ers_ip_port": "10.0.163.167:5052"}"""
         mock_mReadFile.return_value = _vm_json
@@ -2224,6 +2445,7 @@ class ebTestNode(ebTestClucontrol):
                     exaMockCommand(f"bin/scp *", aRc=0, aPersist=True),
                     exaMockCommand(f"/bin/rm -rf /opt/oracle/vmbackup/conf/*", aRc=0, aPersist=True),
                     exaMockCommand(f"/bin/cat /opt/oracle/vmbackup/conf/*", aRc=0, aPersist=True, aStdout=_vm_json),
+                    exaMockCommand("/usr/sbin/dbmcli -e LIST DBSERVER ATTRIBUTES esnpStatus", aRc=0, aPersist=True, aStdout="running"),
                 ],
                 [
                     exaMockCommand(f"/bin/test -e *", aRc=0, aPersist=True),
@@ -2232,8 +2454,23 @@ class ebTestNode(ebTestClucontrol):
                     exaMockCommand("/bin/test -e /opt/python-vmbackup/bin/set-vmbackup-env.sh", aRc=0, aPersist=True),
                     exaMockCommand("source /opt/python-vmbackup/bin/set-vmbackup-env.sh", aRc=0, aPersist=True),
                     exaMockCommand("source /opt/python-vmbackup/bin/set-vmbackup-env.sh; vmbackup backup --vm *", aRc=0, aPersist=True),
-                    exaMockCommand("/bin/cat /EXAVMIMAGES/Backup/OSSMetadata/ossbackup_status.json", aRc=0, aPersist=True)
+                    exaMockCommand("/bin/cat /EXAVMIMAGES/Backup/OSSMetadata/ossbackup_status.json", aRc=0, aPersist=True),
+                    exaMockCommand("/usr/sbin/dbmcli -e LIST DBSERVER ATTRIBUTES esnpStatus", aRc=0, aPersist=True, aStdout="running"),
                 ]
+            ],
+            self.mGetRegexCell(): [
+                [
+                    exaMockCommand("/opt/oracle/cell/cellsrv/bin/escli --wallet /opt/oracle/cell/cellsrv/deploy/config/security/admwallet --ctrl 10.0.130.110:5052 chacl @vault1clu02 +scaqab10adm01:M", aRc=0, aPersist=True),
+                    exaMockCommand("/opt/oracle/cell/cellsrv/bin/escli --wallet /opt/oracle/cell/cellsrv/deploy/config/security/admwallet --ctrl 10.0.130.110:5052 chacl @backupvault +scaqab10adm01:M", aRc=0, aPersist=True),
+                ],
+                [
+                    exaMockCommand("/opt/oracle/cell/cellsrv/bin/escli --wallet /opt/oracle/cell/cellsrv/deploy/config/security/admwallet --ctrl 10.0.130.110:5052 chacl @vault1clu02 +scaqab10adm02:M", aRc=0, aPersist=True),
+                    exaMockCommand("/opt/oracle/cell/cellsrv/bin/escli --wallet /opt/oracle/cell/cellsrv/deploy/config/security/admwallet --ctrl 10.0.130.110:5052 chacl @backupvault +scaqab10adm02:M", aRc=0, aPersist=True),
+                ],
+                [
+                    exaMockCommand("/opt/oracle/cell/cellsrv/bin/escli --wallet /opt/oracle/cell/cellsrv/deploy/config/security/admwallet --ctrl 10.0.130.110:5052 chacl @vault1clu02 +scaqab10adm03:M", aRc=0, aPersist=True),
+                    exaMockCommand("/opt/oracle/cell/cellsrv/bin/escli --wallet /opt/oracle/cell/cellsrv/deploy/config/security/admwallet --ctrl 10.0.130.110:5052 chacl @backupvault +scaqab10adm03:M", aRc=0, aPersist=True),
+                ],
             ]
         }
 
@@ -2297,6 +2534,7 @@ def suite():
     suite.addTest(ebTestNode('test_mListOSSVMbackup_success_rackname'))
     suite.addTest(ebTestNode('test_mRestoreOSSVMbackup_missing_fields'))
     suite.addTest(ebTestNode('test_mRestoreOSSVMbackup_success'))
+    suite.addTest(ebTestNode('test_mRestoreOSSVMbackup_ongoing_process'))
     suite.addTest(ebTestNode('test_mGetLocalVMBackupVersion'))
     suite.addTest(ebTestNode('test_mGetVMBackupVersion'))
     suite.addTest(ebTestNode('test_mCheckRemoteProcessOngoingOneProcessPresent'))

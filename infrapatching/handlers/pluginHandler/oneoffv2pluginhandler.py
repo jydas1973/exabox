@@ -1,10 +1,10 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/infrapatching/handlers/pluginHandler/oneoffv2pluginhandler.py /main/11 2025/10/22 08:33:53 sdevasek Exp $
+# $Header: ecs/exacloud/exabox/infrapatching/handlers/pluginHandler/oneoffv2pluginhandler.py /main/12 2026/01/13 05:44:13 sdevasek Exp $
 #
 # oneoffv2pluginhandler.py
 #
-# Copyright (c) 2024, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2024, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      oneoffv2pluginhandler.py - This module contains methods to run oneoff v2 plugin on all targets.
@@ -17,6 +17,11 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    sdevasek    03/09/26 - Bug 39053714 - INFRAPATCH REGISTERED PLUGINS: REUSE
+#                           CACHED VALIDATION RESULTS ACROSS NODES FOR THE
+#                           SCRIPTBUNDLE VALIDATION
+#    sdevasek    01/08/25 - Enh 38796054 - NEED OPTION TO APPLY REGISTERED 
+#                           ONEOFF AT DOM0 LEVEL
 #    sdevasek    10/10/25 - ENH 38437135 - IMPLEMENT ADDITION OF SCRIPTNAME
 #                           SCRIPTBUNLDENAME AND SCRIPTBUNDLEHASH ATTRIBUTES
 #                           TO ECRA REGISTERED PLUGINS METADATA REGISTRATION
@@ -88,13 +93,25 @@ class OneOffV2PluginHandler(PluginHandler):
 
     def mRunOneOffV2inRolling(self):
         """
-        This method executed oneoff plugins
-        in rolling manner.
-        :return: PATCH_SUCCESS_EXIT_CODE in case of successful patch execution
-                or FailOnError flag was set to false
-            else
-                return error code as per error details returned
-                from below execution flow.
+        Execute OneOffV2 metadata-based plugins in rolling fashion.
+
+        For each OneOffV2 plugin metadata entry and for each node in the given
+        node list:
+          1. Filter to oneoff plugins for the requested phase (aStage).
+          2. If plugin target matches the current target type (e.g. dom0/cell/domu):
+             * Validate the script bundle (once per script alias).
+             * Copy the script bundle to the node.
+             * Execute the plugin on the node.
+             * Cleanup the plugin artifacts on the node.
+          3. Targets that do not match the current target type are skipped here.
+
+        Behavior:
+          - Returns PATCH_SUCCESS_EXIT_CODE if all enabled plugins complete
+            successfully, or if failures occur only for plugins where FailOnError
+            is set to "no".
+          - Returns a non-success error code for the first failing plugin where
+            FailOnError is "yes", and stops further processing of additional
+            nodes/plugins.
         """
         _ret = PATCH_SUCCESS_EXIT_CODE
         _rc = PATCH_SUCCESS_EXIT_CODE
@@ -107,15 +124,21 @@ class OneOffV2PluginHandler(PluginHandler):
             return _ret
 
         _node_list = self.mOffV2NodeList()
-        # Step 1. Copy One-off patches.
-        for _node_name in _node_list:
-            for _oneoff_plugin_data in self.mGetPluginMetadata():
-                _script_alias = mGetScriptAlias(_oneoff_plugin_data)
-                _plugin_target = mGetPluginTargetV2(_oneoff_plugin_data)
-                _fail_on_error = mGetFailonError(_oneoff_plugin_data)
-                
+
+        # Cache validation results per plugin (keyed by script_alias)
+        _validation_cache = {}  # { script_alias: rc }
+
+        # Iterate over each plugin metadata entry first, then over each node.
+        # This means we fully process a given plugin for all nodes before moving
+        # to the next plugin.
+        for _oneoff_plugin_data in self.mGetPluginMetadata():
+            _script_alias = mGetScriptAlias(_oneoff_plugin_data)
+            _plugin_target = mGetPluginTargetV2(_oneoff_plugin_data)
+            _fail_on_error = mGetFailonError(_oneoff_plugin_data)
+
+            for _node_name in _node_list:
                 self.mPatchLogInfo(
-                    f"Current oneoff plugin scripts will be run with the following input : {json.dumps(_oneoff_plugin_data, indent=4)}")
+                    f"oneoff plugin script will be run with the following input : {json.dumps(_oneoff_plugin_data, indent=4)} on node: {_node_name} ")
                 # Validte only for the list of scripts passed as part of ScriptAliasList
                 if self.mGetScriptAliasListToBeExecuted() and len(self.mGetScriptAliasListToBeExecuted()) > 0:
                     if mGetScriptAlias(_oneoff_plugin_data) in  [_script_alias_name.lower() for _script_alias_name in self.mGetScriptAliasListToBeExecuted()]:
@@ -136,16 +159,22 @@ class OneOffV2PluginHandler(PluginHandler):
                     continue
 
                 if str(_plugin_target.lower()) in str(self.mGetTargetTypes()[0].lower()):
-                    # Validate the script bundle on exacloud node only once for the first node
-                    if _node_name == _node_list[0]:
+                    # Validate the script bundle on exacloud node only once for the first node,cache result
+                    if _script_alias not in _validation_cache:
+                        # First time we see this plugin
                         # Step1. Validate the script bundle
                         self.mPatchLogInfo(f"Validating oneoff v2 plugin script bundle for node {_node_name}")
                         _rc = self.mValidateOneoffPluginScriptBundle(_oneoff_plugin_data)
-                        if _rc != PATCH_SUCCESS_EXIT_CODE and _fail_on_error:
-                            self.mAddError(_rc,"")
+                        _validation_cache[_script_alias] = _rc
                     else:
-                        # Assume validation is successful for subsequent nodes
-                        _rc = PATCH_SUCCESS_EXIT_CODE
+                        # Reuse previously cached validation result for this plugin
+                        _rc = _validation_cache[_script_alias]
+
+                    # If validation failed and FailOnError is enabled, record and break.
+                    if _rc != PATCH_SUCCESS_EXIT_CODE and _fail_on_error:
+                        self.mAddError(_rc, "")
+                        _ret = _rc
+                        break
 
                     if _rc == PATCH_SUCCESS_EXIT_CODE:
                         # Step 2. Copy oneoff plugins.
@@ -162,8 +191,18 @@ class OneOffV2PluginHandler(PluginHandler):
                         self.mPatchLogInfo(f"Cleaning up oneoff v2 plugin on node {_node_name}")
                         self.mCleanupOneoffV2PluginScript(_node_name, _oneoff_plugin_data)
 
+
+                    # If this node-level execution returned an error and FailOnError is
+                    # set for this plugin, surface the error and stop processing further
+                    # nodes for this plugin.
                     if _rc != PATCH_SUCCESS_EXIT_CODE and _fail_on_error:
                         _ret = _rc
+
+                # If any plugin-level error was set (_ret != success), stop processing
+                # remaining plugin metadata entries.
+                if _ret != PATCH_SUCCESS_EXIT_CODE:
+                    break
+
         return _ret
 
     def mValidateOneoffPluginScriptBundle(self, aOneoffPluginData):
@@ -281,7 +320,7 @@ class OneOffV2PluginHandler(PluginHandler):
 
         for _oneoff_plugin_data in self.mGetPluginMetadata():
             _fail_on_error = mGetFailonError(_oneoff_plugin_data)
-            _plugin_target = mGetPluginTargetV2(_oneoff_plugin_data)
+            _plugin_target = mGetPluginTargetV2(_oneoff_plugin_data).lower()
             _script_alias = mGetScriptAlias(_oneoff_plugin_data)
 
             self.mPatchLogInfo(
@@ -301,7 +340,7 @@ class OneOffV2PluginHandler(PluginHandler):
 
             for _remote_node in self.mOffV2NodeList():
                 # Currently reboot option supported only on cells.
-                if mGetPluginTargetV2(_plugin_target).lower() in [ PATCH_DOM0, PATCH_CELL, PATCH_DOMU ] and mGetRebootNode(_oneoff_plugin_data):
+                if _plugin_target in [ PATCH_DOM0, PATCH_CELL, PATCH_DOMU ] and mGetRebootNode(_oneoff_plugin_data):
                     self.mPatchLogInfo("Currently reboot option post oneoff v2 plugin execution is supported only in case of cells. Current plugin will not be run.")
                     continue
    

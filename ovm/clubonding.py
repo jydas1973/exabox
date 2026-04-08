@@ -1,5 +1,5 @@
 """
- Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 
 NAME:
     clubonding.py - Excloud  OCI Bonding implementation
@@ -64,6 +64,13 @@ NOTES:
 History:
 
     MODIFIED   (MM/DD/YY)
+    mpedapro    02/03/26 - Enh::38914367 update MTU of PF interfaces to 9000
+    aararora    01/16/26 - Bug 38842120: Fix monitor_admin json - regression
+                           from 38452359
+    scoral      12/16/25 - Bug 38770136 - Make sure monitor_adming.json is
+                           updated for BaseDB environments.
+                           Make sure add_remove_entry_monitor_admin_conf
+                           updated the IP/VLAN if either of those changes.
     scoral      11/26/25 - Bug 38699734 - Fixed json indent in
                            add_remove_entry_monitor_admin_conf.
     mpedapro    11/20/25 - Enh::38602758 bonding changes for accelerated
@@ -545,10 +552,9 @@ def patch_bond_bridge_ifcfg(
     :returns: Nothing
     :raises ExacloudRuntimeError: if an error occurred.
     """
-    bond_interface = BOND_INTERFACE_FMT.format(bond_iface_conf.bond_id)
-    primary_interface = get_slave_name(node, bond_interface, bond_iface_conf.primary_interface)
-    secondary_interface = get_slave_name(node, bond_interface, bond_iface_conf.secondary_interface)
-    
+    ebCluAcceleratedNetwork.setMtuForPhysicalFunction(node, bond_iface_conf.primary_interface)
+    ebCluAcceleratedNetwork.setMtuForPhysicalFunction(node, bond_iface_conf.secondary_interface)
+ 
     if is_cleanup:
         bond_vals = {
             "mode": "active-backup",
@@ -583,7 +589,7 @@ def patch_bond_bridge_ifcfg(
             "primary_reselect": "failure",
             "arp_allslaves": "1",
             "arp_ip_target": str(bond_iface_conf.gateway),
-            "primary": primary_interface
+            "primary": bond_iface_conf.primary_interface
         }
 
         bridge_key_vals = {
@@ -660,25 +666,9 @@ def patch_bond_bridge_ifcfg(
 
     # ensure slaves are up for setup only
     if not is_cleanup:
-        node_interface_up(node, primary_interface)
-        node_interface_up(node, secondary_interface)
+        node_interface_up(node, bond_iface_conf.primary_interface)
+        node_interface_up(node, bond_iface_conf.secondary_interface)
 
-
-def get_slave_name(node, bond_interface_name, interface_name):
-    '''
-        Checks if dom0 physical function(i.e eth1, eth2 etc) is enabled with switch dev mode.
-        If enabled, bond will be present on VF's of those interfaces. So, returns actual vf slave name in this case. Otherwise returns same value.
-    '''
-    if ebCluAcceleratedNetwork.isDom0InterfaceEnabledWithSwitchDevMode(node, interface_name):
-        vf_slave = ebCluAcceleratedNetwork.getVirtualFnSlaveForPhysicalFnSlave(node, bond_interface_name, interface_name)
-        if vf_slave is None:
-            msg = f'Unable to update get the virtual function name associated with physical interface : {interface_name}'
-            ebLogError(msg)
-            raise ExacloudRuntimeError(0x804, 0xA, msg)
-        ebLogInfo(f'Virtual function name associated with physical interface : {interface_name} enabled with switch dev mode is ::  + {vf_slave}')
-        return vf_slave
-    #If dom0 is not enabled with switch dev then just returns the same name.
-    return interface_name
 
 def filter_nodes_by_cluctrl(cluctrl: exaBoxCluCtrl, nodes_confs: Payload) -> Payload:
     """Filter the nodes in the payload with the information of the XML
@@ -781,6 +771,10 @@ def create_bonded_bridge(
         ebLogError(msg)
         raise ExacloudRuntimeError(0x804, 0xA, msg)
 
+    #Set MTU for PF's if primary and standby slaves are VF's. Otherwise do nothing.
+    ebCluAcceleratedNetwork.setMtuForPhysicalFunction(node, primary_interface)
+    ebCluAcceleratedNetwork.setMtuForPhysicalFunction(node, secondary_interface)
+
 
 def create_static_bonded_bridge(
         node: exaBoxNode,
@@ -813,6 +807,11 @@ def create_static_bonded_bridge(
         # create the bridge
         cmd = f"{REMOTE_IPCONF_CMD} -conf-add {remote_xml_path}"
         node_exec_cmd_check(node, cmd, log_stdout_on_error=True)
+
+        #Set MTU for PF's if primary and standby slaves are VF's. Otherwise do nothing.
+        ebCluAcceleratedNetwork.setMtuForPhysicalFunction(node, bond_iface_conf.primary_interface)
+        ebCluAcceleratedNetwork.setMtuForPhysicalFunction(node, bond_iface_conf.secondary_interface)
+
     except Exception as exp:
         msg = (f'Failed to create static bonded bridge {bridge_iface}.  '
                f'error="{exp}"')
@@ -1364,6 +1363,10 @@ def configure_bond_monitor(
 
     if bond_conf.monitor_conf_type == MonitorConfType.CUSTOMER and ebCluAcceleratedNetwork.isClusterEnabledWithAcceleratedNetwork(cluctrl):
         ebLogInfo('BONDING: Skipping monitor configuration for customer network of cluster ' + cluctrl.mGetClusterName() + ' as it is enabled with accelerated network')
+        return
+
+    if cluctrl.isBaseDB():
+        ebLogInfo('BONDING: Skipping customer monitor configuration in BaseDB')
         return
 
     ebLogTrace('BONDING: Configuring bonding monitor in Dom0 '
@@ -2083,6 +2086,10 @@ def add_remove_entry_monitor_admin_conf(
     :param vlan: NAT VLAN.
     :param add: Whether add or remove the IP.
     """
+    if not ip:
+        ebLogInfo('BONDING: Admin IP missing; skipping monitor_admin update.')
+        return
+
     json_path: str = REMOTE_MONITOR_ADMIN_CONFIG_FILE
     dom0: str = node.mGetHostname()
     if not node.mFileExists(json_path):
@@ -2093,24 +2100,32 @@ def add_remove_entry_monitor_admin_conf(
     # Parse JSON
     monitor_conf: dict = json.loads(node_read_text_file(node, json_path))
     if add:
-        # Search for requested IP.
-        if any(entry["ip"] == ip for entry in monitor_conf["monitor_admin"]):
-            ebLogInfo(f"BONDING: {ip} already in {json_path} in Dom0 "
-                    f"{dom0}, skipping update.")
-            return
-
-        # Get node's vmbondeth0 MAC and append new entry.
+        vlan_str = str(vlan)
         mac: str = get_interface_mac_address(
             node, BRIDGE_INTERFACE_FMT.format(0))
-        monitor_conf["monitor_admin"].append({
+
+        new_entry = {
             "type": "admin_ip",
             "ip": ip,
             "interface_type": "admin_bondmonitor",
             "mac": mac,
             "standby_vnic_mac": "",
-            "vlantag": str(vlan),
+            "vlantag": vlan_str,
             "floating": False
-        })
+        }
+
+        existing_entry = next(
+            (entry for entry in monitor_conf["monitor_admin"]
+             if entry.get("ip") == ip or entry.get("vlantag") == vlan_str),
+            None)
+        if existing_entry:
+            existing_entry.update(new_entry)
+            ebLogInfo(f"BONDING: Updated monitor_admin entry for ip={ip}, "
+                      f"vlantag={vlan_str} in Dom0 {dom0}.")
+        else:
+            monitor_conf["monitor_admin"].append(new_entry)
+            ebLogInfo(f"BONDING: Added monitor_admin entry for ip={ip}, "
+                      f"vlantag={vlan_str} in Dom0 {dom0}.")
     else:
         # For entry removal...
         new_monitor_admin = [ entry for entry in monitor_conf["monitor_admin"]

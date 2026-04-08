@@ -1,10 +1,10 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/exatest/infrapatching/tests_roceswitchhandler.py /main/7 2024/08/16 10:00:25 araghave Exp $
+# $Header: ecs/exacloud/exabox/exatest/infrapatching/tests_roceswitchhandler.py /main/9 2026/01/22 08:11:12 araghave Exp $
 #
 # tests_roceswitchhandler.py
 #
-# Copyright (c) 2022, 2024, Oracle and/or its affiliates.
+# Copyright (c) 2022, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_roceswitchhandler.py - Class for testing roceswitch precheck, patch and rollback
@@ -16,6 +16,13 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    araghave    01/19/26 - Bug 38861325 - ECS_MAIN ->
+#                           TESTS_ROCESWITCHHANDLER_PY.DIF AND
+#                           TESTS_TARGETHANDLER_PY.DIF IS FAILING IN
+#                           ECS_MAIN_LINUX.X64_260116.0518
+#    araghave    01/14/26 - Inline crypto constants in tests
+#    araghave    12/16/25 - Enh 38766076 - CONFIGURE UPDATE-CRYPTO-POLICIES
+#                           BEFORE AND AFTER SWITCH PATCHING
 #    emekala     07/30/24 - ENH 36794217 - PATCH MANAGER SPECIFIC CHANGES TO
 #                           HANDLE EXACOMPUTE AND DOMU PATCHMGR CMDS
 #    araghave    07/15/24 - Enh 36830077 - CLEANUP KSPLICE CODE FROM
@@ -30,12 +37,75 @@
 #    abherrer    07/05/22 - Enh 34349300 - Creation
 #    abherrer    08/15/22 - Bug 34461211 - Stage 2 implementation
 #
+import io
+import sys
+from pathlib import Path
+
+def _ensure_exacloud_on_path():
+    current = Path(__file__).resolve()
+    for parent in current.parents:
+        package_root = parent / "exacloud"
+        if (package_root / "__init__.py").exists():
+            parent_path = str(parent)
+            if parent_path not in sys.path:
+                sys.path.insert(0, parent_path)
+            package_root_path = str(package_root)
+            if package_root_path not in sys.path:
+                sys.path.insert(0, package_root_path)
+            return
+    raise ModuleNotFoundError("Unable to locate exacloud package root for tests_roceswitchhandler")
+
+_ensure_exacloud_on_path()
+
+CRYPTO_POLICY_DEFAULT_EXADATA = "DEFAULT:EXADATA"
+CRYPTO_POLICY_DEFAULT = "DEFAULT"
+CRYPTO_POLICY_SHOW_CMD = "/usr/bin/update-crypto-policies --show"
+CRYPTO_POLICY_SET_CMD = "/usr/bin/update-crypto-policies --set {}"
 import unittest
 from unittest.mock import patch
+
+from types import MethodType
+
 from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
 from exabox.log.LogMgr import ebLogInfo
 from exabox.infrapatching.handlers.targetHandler.roceswitchhandler import RoceSwitchHandler
 from exabox.core.MockCommand import exaMockCommand
+
+_LOCAL_HOST_STATE = {}
+
+
+def _set_local_host(self, value):
+    _LOCAL_HOST_STATE[id(self)] = value
+
+
+def _get_local_host(self):
+    return _LOCAL_HOST_STATE.get(id(self))
+
+
+def _ensure_local_host_helpers(ctx):
+    if not hasattr(ctx, "mSetLocalHost"):
+        ctx.mSetLocalHost = MethodType(_set_local_host, ctx)
+    if not hasattr(ctx, "mGetLocalHost"):
+        ctx.mGetLocalHost = MethodType(_get_local_host, ctx)
+
+class mockFileHandler():
+
+    def __init__(self, fileoutput=None):
+        self.terminal_op = fileoutput
+
+    def read(self):
+        if self.terminal_op is None:
+            return ""
+        if hasattr(self.terminal_op, "read"):
+            return self.terminal_op.read()
+        return str(self.terminal_op)
+
+    def readlines(self):
+        if self.terminal_op is None:
+            return []
+        if hasattr(self.terminal_op, "readlines"):
+            return self.terminal_op.readlines()
+        return []
 
 class ebTestRoceSwitchHandler(ebTestClucontrol):
     SUCCESS_ERROR_CODE = "0x00000000"
@@ -43,7 +113,7 @@ class ebTestRoceSwitchHandler(ebTestClucontrol):
     @classmethod
     def setUpClass(self):
         ebLogInfo("Starting classSetUp RoceSwitchHandler")
-        super(ebTestRoceSwitchHandler, self).setUpClass(aGenerateDatabase=True)
+        super(ebTestRoceSwitchHandler, self).setUpClass(aGenerateDatabase=False)
         self.mGetClubox(self).mGetCtx().mSetConfigOption("repository_root", self.mGetPath(self))
         _cluCtrl = self.mGetClubox(self)
         _cluCtrl._exaBoxCluCtrl__kvm_enabled = True
@@ -214,6 +284,56 @@ class ebTestRoceSwitchHandler(ebTestClucontrol):
         _roceSwitchHandler = RoceSwitchHandler(self.__patch_args_dict)
         self.assertEqual(_roceSwitchHandler.mRollBack(), (self.SUCCESS_ERROR_CODE, 0))
 
+    @patch("exabox.infrapatching.handlers.generichandler.GenericHandler.mIsCryptoPolicyResetEnabled", return_value=True)
+    @patch("exabox.infrapatching.handlers.generichandler.GenericHandler.mIsExaCC", return_value=True)
+    @patch("exabox.core.Node.exaBoxNode.mDisconnect")
+    @patch("exabox.core.Node.exaBoxNode.mIsConnected", return_value=False)
+    @patch("exabox.core.Node.exaBoxNode.mGetCmdExitStatus", return_value=0)
+    @patch("exabox.infrapatching.handlers.targetHandler.targethandler.TargetHandler.mUpdateCryptoPolicyIfRequired", return_value=True)
+    @patch("exabox.core.Node.exaBoxNode.mExecuteCmd")
+    @patch("exabox.core.Node.exaBoxNode.mConnect")
+    @patch("exabox.infrapatching.handlers.targetHandler.targethandler.TargetHandler.mSetConnectionUser")
+    @patch("exabox.core.Node.exaBoxNode.__init__", return_value=None)
+    @patch("exabox.infrapatching.handlers.targetHandler.roceswitchhandler.RoceSwitchHandler.mRegularPatchRun", return_value=(SUCCESS_ERROR_CODE, 0))
+    @patch("exabox.infrapatching.handlers.targetHandler.roceswitchhandler.RoceSwitchHandler.mPatchRequestRetried", return_value=False)
+    @patch("exabox.infrapatching.handlers.targetHandler.roceswitchhandler.RoceSwitchHandler.mIsSwitchPatchingSkipped", return_value=False)
+    @patch("exabox.infrapatching.handlers.targetHandler.roceswitchhandler.RoceSwitchHandler.mSetEnvironment")
+    def test_mPatch_resets_crypto_policy(self, _mock_set_environment, _mock_is_skipped, _mock_patch_request_retried, _mock_regular_patch_run,
+                                         _mock_node_init, _mock_set_connection_user, _mock_connect, _mock_execute_cmd, _mock_update_crypto, _mock_get_exit_status,
+                                         _mock_is_connected, _mock_disconnect, _mock_is_exacc, _mock_is_enabled):
+        ebLogInfo("")
+        ebLogInfo("Running unit test on RoceSwitchHandler.mPatch crypto policy reset")
+
+        _cmds = {
+            self.mGetRegexDom0(): [
+                [
+                    exaMockCommand("virsh", aStdout="slcs27adm03.us.oracle.com"),
+                ]
+            ]
+        }
+        self.mPrepareMockCommands(_cmds)
+
+        def _execute_side_effect(aCmd, *args, **kwargs):
+            if aCmd == CRYPTO_POLICY_SHOW_CMD:
+                return (None, mockFileHandler(io.StringIO(f"{CRYPTO_POLICY_DEFAULT_EXADATA}\n")), None)
+            if aCmd in [CRYPTO_POLICY_SET_CMD.format(CRYPTO_POLICY_DEFAULT), CRYPTO_POLICY_SET_CMD.format(CRYPTO_POLICY_DEFAULT_EXADATA)]:
+                return (None, mockFileHandler(), None)
+            return (None, mockFileHandler(), None)
+
+        _mock_execute_cmd.side_effect = _execute_side_effect
+
+        _roceSwitchHandler = RoceSwitchHandler(self.__patch_args_dict)
+        _context = _roceSwitchHandler.mGetCluControl().mGetCtx()
+        _ensure_local_host_helpers(_context)
+        _context.mSetLocalHost("slcs27adm03.us.oracle.com")
+
+        _ret, _no_action = _roceSwitchHandler.mPatch()
+
+        self.assertEqual((_ret, _no_action), (self.SUCCESS_ERROR_CODE, 0))
+        _mock_execute_cmd.assert_called()
+
+        ebLogInfo("Unit test on RoceSwitchHandler.mPatch crypto policy reset executed successfully")
+
     @patch("exabox.infrapatching.handlers.generichandler.GenericHandler.mGetMasterReqId", return_value="a7714e6f-c242-4ba9-9ae0-98351caecc5a")
     @patch("exabox.infrapatching.handlers.generichandler.GenericHandler.mGetExadataPatchWorkingSpaceMB", return_value=500)
     @patch("exabox.infrapatching.handlers.targetHandler.targethandler.TargetHandler.mGetCellSwitchesPatchBaseAfterUnzip", return_values="/EXAVMIMAGES/21.2.11.0.0.220414.1.switch.patch.zip/patch_switch_21.2.11.0.0.220414.1/")
@@ -259,4 +379,3 @@ class ebTestRoceSwitchHandler(ebTestClucontrol):
 
 if __name__ == "__main__":
     unittest.main()
-

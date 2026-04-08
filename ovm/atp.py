@@ -7,6 +7,7 @@ from exabox.core.Context import get_gcontext
 from exabox.log.LogMgr import ebLogInfo, ebLogError, ebLogDebug, ebLogWarn
 from exabox.ovm.AtpUtils import ebAtpUtils
 from exabox.utils.node import connect_to_host
+from exabox.ovm.utils.clu_utils import mRunCrsCommandsWithRetry
 
 DB_ROUTE_PATH='/var/opt/oracle/misc/db-route'
 AUTONOMOUS_FLAG='AutonomousDb'
@@ -545,15 +546,40 @@ class AtpSetupASMListener(ebAtpStep):
             _nodeDomU.mSetUser('root')
             _nodeDomU.mConnect(aHost=_domU)
             self.mLogInfo("Stopping cluster on all nodes")
-            _cmd_stop_crs_all = GRID_ORACLE_HOME+"/bin/crsctl stop cluster -all"
-            _i, _o, _e = _nodeDomU.mExecuteCmd(_cmd_stop_crs_all)
-            if _o:
-                self.mLogInfo("Command %s executed successfully"%(_cmd_stop_crs_all))
-                _cmd_start_crs_all = GRID_ORACLE_HOME+"/bin/crsctl start cluster -all"
-                self.mLogInfo("Starting cluster on all nodes")
-                _i, _o, _e = _nodeDomU.mExecuteCmd(_cmd_start_crs_all)
-                if _o:
-                    self.mLogInfo("Command %s executed successfully"%(_cmd_start_crs_all))
+            _stop_cmds = [
+                f"{GRID_ORACLE_HOME}/bin/crsctl stop cluster -all",
+                f"{GRID_ORACLE_HOME}/bin/crsctl stop cluster -all -f"
+            ]
+            # Below method will try to stop the cluster using the first
+            # command initially. If that does not work, it will try to
+            # forcefully stop the cluster in the next 2 retry attempts
+            # using -f flag with a delay of 10 seconds each between retry
+            # attempts. If that also does not work - we will continue
+            # as is being done previously as well (Or should we raise an
+            # exception ?)
+            mRunCrsCommandsWithRetry(
+                _nodeDomU,
+                _stop_cmds,
+                aLabel="CRS stop (ATP listener update)",
+                aRaiseOnFailure=False
+            )
+
+            self.mLogInfo("Starting cluster on all nodes")
+            # There is no -f option for starting the cluster services
+            _start_cmds = [f"{GRID_ORACLE_HOME}/bin/crsctl start cluster -all"]
+            # Below method will try to start the cluster using the first
+            # command initially. If that does not work, it will try to
+            # start the cluster in the next 2 retry attempts again with a delay
+            # of 10 seconds between each retry.
+            # If that also does not work - we will continue
+            # as is being done previously as well (Or should we raise an
+            # exception ?)
+            mRunCrsCommandsWithRetry(
+                _nodeDomU,
+                _start_cmds,
+                aLabel="CRS start (ATP listener update)",
+                aRaiseOnFailure=False
+            )
             _nodeDomU.mDisconnect()
         else:
             self.mLogError("Command %s not executed"%(_cmd_run_as_grid))

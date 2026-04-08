@@ -4,7 +4,7 @@
 #
 # tests_dnsconfig.py
 #
-# Copyright (c) 2022, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2022, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_dnsconfig.py - <one-line expansion of the name>
@@ -55,7 +55,7 @@ class ebTestebDNSConfig(ebTestClucontrol):
 
     DUMMY_ENTRY = "10.31.112.4    \tscaqab10adm01.us.oracle.com                       \tscaqab10adm01"
     APPEND_CMD = ["/usr/bin/sudo", "/usr/bin/sed", "-i", "--follow-symlinks", f"$a {DUMMY_ENTRY}", "/etc/hosts.exacc_infra"]
-    DELETE_CMD = ["/usr/bin/sudo", "/usr/bin/sed", "-i", "--follow-symlinks", "/scaqab10adm01.us.oracle.com/d", "/etc/hosts.exacc_infra"]
+    DELETE_CMD = ["/usr/bin/sudo", "/usr/bin/sed", "-i", "--follow-symlinks", "/(^|[[:space:]])" + "scaqab10adm01.us.oracle.com" + "([[:space:]]|$)/d", "/etc/hosts.exacc_infra"]
 
 
     @classmethod

@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     CpsEndpoint - Basic functionality
@@ -11,6 +11,8 @@ NOTE:
     None    
 
 History:
+    shapatna    02/09/2026 - Bug: 38900266 - Fix for issues pointed by Codev 
+                             in exabox/management directory
     hgaldame    08/26/2025 - 38359085 - oci/exacc: cps sw upgrade enhancement 
                              for report any error after cps deployer completes 
                              successfully
@@ -316,6 +318,8 @@ class CpsEndpoint(AsyncTrackEndpoint):
             self.mAsyncLog(_log, aProcessId, "Performing upgrade with {0}".format(_cpsTar), aDebug=False)
             try:                   
                 _cmdEcList = []
+                _backup_name = None
+                
                 if os.path.isdir(_deployer):
                     _backup_name =  "{0}/backups/deployer{1}".format(_installDir, _timestamp)
                     _cmdEcList.append("mkdir -p {0}/backups".format(_installDir))
@@ -1295,7 +1299,7 @@ class CpsEndpoint(AsyncTrackEndpoint):
             num_last_img_hist = int(last_entry_img_hist.imgvers.split(".")[0])
             num_second_last_img_hist  = int(second_last_img_hist.imgvers.split(".")[0])
         except Exception as ex:
-            _msg = "Can not parse version from : {0} {1}, ex: {3} can not continue with migration".format(last_entry_img_hist, second_last_img_hist, ex)
+            _msg = "Can not parse version from : {0} {1}, ex: {2} can not continue with migration".format(last_entry_img_hist, second_last_img_hist, ex)
             return ResultMigrReq(False, _msg)
         _msg= f'Last entry on image history: {last_entry_img_hist.imgvers} , evaluate : {num_last_img_hist}'
         _msg= _msg + f', Second last entry on image history: {second_last_img_hist.imgvers} , evaluate : {num_second_last_img_hist}'

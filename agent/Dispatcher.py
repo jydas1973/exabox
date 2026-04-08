@@ -1,7 +1,7 @@
 """
 $Header:
 
- Copyright (c) 2017, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2017, 2026, Oracle and/or its affiliates.
 
 NAME:
 
@@ -18,6 +18,7 @@ NOTE:
 History:
 
     MODIFIED   (MM/DD/YY)
+       aypaul   03/03/26 - Bug#38900084 Fix code issues from codev
        shapatna 10/08/25 - Close open sockets caused by initiating Database
                            connection
 """
@@ -119,16 +120,15 @@ class ebDispatcher(object):
                     if _thisWorker.mAcquireSyncLock("Dispatcher"):
                         _worker_lock_acquired = True
                         break
+                    
+                    _thisWorker = None
 
                 if _thisWorker is None:
                     ebLogWarn('Unable to get a worker yet.. Will try again after 1 sec')
-                    if _worker_lock_acquired:
-                        _thisWorker.mReleaseSyncLock("Dispatcher")
-                        _worker_lock_acquired = False
                     time.sleep(1)
                     continue
 
-                ebLogInfo('*** LOADING WORKER')
+                ebLogInfo('*** LOADING WORKER ***')
                 _thisWorker.mSetUUID(_uuid)
                 _thisWorker.mUpdateDB()
                 ebLogInfo(f"Request with UUID: {_uuid} is allocated to worker with port {_port}")

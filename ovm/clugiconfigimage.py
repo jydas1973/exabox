@@ -1,10 +1,10 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/ovm/clugiconfigimage.py /main/11 2025/08/19 08:39:20 akkar Exp $
+# $Header: ecs/exacloud/exabox/ovm/clugiconfigimage.py /main/12 2026/02/16 06:49:10 joysjose Exp $
 #
 # clugiconfigimage.py
 #
-# Copyright (c) 2023, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2023, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      clugiconfigimage.py - Implementation of GI image configuration
@@ -14,6 +14,7 @@
 #
 #
 #    MODIFIED   (MM/DD/YY)
+#    joysjose    02/13/26 - Bug 38922572: Incremental upgrade check fix
 #    akkar       07/23/25 - Bug 38227428: Control ADBD image count
 #    akkar       05/19/25 - Bug 37964965: Fix image name in inventory.json for
 #                           multigi
@@ -244,47 +245,43 @@ class ebCluGiRepoUpdate:
                 _node.mDisconnect()
     
     def mGetOlderVersionFiles(self):
-        # Initialize the smallest version to None
-        ebLogInfo(f"Computing the Oldest Versions from Inventory.json ... ")
+        ebLogInfo("Computing the Oldest Versions from Inventory.json ... ")
         _ebox = self._eboxobj
         ebLogTrace(f'Image count control parameter from exabox.conf : EXACS-{self._max_images_exacs}')
         _max_images = self._max_images_exacs if self.service_type == "EXACS" else self._max_images_adbd
         ebLogInfo(f'Repo will contain maximum {_max_images} image/images as set in config.')
-        
-        # Iterate over the dictionaries to find the smallest version
+
         versions_paths = []
         for _dict in self._inventory_json_data["grid-klones"]:
-            version_str = _dict.get('version')
-            major_ver = version_str.split(".")[0]
-            service_type = _dict.get('service')[0]
+            version_str = _dict.get('version', '')
+            parts = version_str.split('.')
+            if len(parts) < 3:
+                continue  # Skip versions not having at least 3 parts
+            major_ver = parts[0]
+            service_type = _dict.get('service', '')[0]
             if self.major_version == major_ver and self.service_type == service_type:
-                version = _dict['version']
                 file_path = _dict['files'][0]['path']
-                versions_paths.append((version, file_path))
-        
-        # Parse the full version string and return a tuple for sorting
+                versions_paths.append((version_str, file_path))
+
+        # Parsing function: compare using first three numeric parts only
         def parse_version_str(version_str):
             parts = version_str.split('.')
-            major_version = int(parts[0])
-            minor_version = int(parts[1])
-            date_part = parts[4]
-            date = datetime.strptime(date_part, "%y%m%d")
-            return (major_version, minor_version, date)
-        
-        # Sorting the versions by major version, minor version, and date
+            # Use 0 if the part isn't present or isn't a digit
+            major = int(parts[0]) if len(parts) > 0 and parts[0].isdigit() else 0
+            minor = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 0
+            patch = int(parts[2]) if len(parts) > 2 and parts[2].isdigit() else 0
+            return (major, minor, patch)
+
+        # Sort all images with this major version & service type
         versions_paths_sorted = sorted(versions_paths, key=lambda v: parse_version_str(v[0]))
-        
-        # Extracting the file paths of the 'n' oldest versions
+
         _n_images = len(versions_paths_sorted)
-        # remove images if we exceed the capacity only
-        # this avoid deleting all images
         if _n_images <= _max_images:
             return []
 
         _files_to_remove = _n_images - _max_images
         redundant_file_paths = [path for version, path in versions_paths_sorted[:_files_to_remove]]
         ebLogInfo(f"{redundant_file_paths} files will be removed from {versions_paths_sorted} in {self.service_type}")
-        
         return redundant_file_paths
     
     def mAddEntryToInventory(self, incr_image_data):

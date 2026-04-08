@@ -276,7 +276,7 @@ class ebTestCluControlCreateVM(ebTestClucontrol):
                 exaMockCommand("/opt/exadata_ovm/vm_maker --remove-bridge",aRc=0,aPersist=True),
                 exaMockCommand("/usr/sbin/vm_maker --list-domains",aRc=0),
                 exaMockCommand("/bin/ls /etc/sysconfig/network-scripts/ifcfg-*",aRc=0),
-                exaMockCommand("/usr/bin/rm -f /etc/sysconfig/network-scripts/ifcfg-*",aRc=0)
+                exaMockCommand("/usr/bin/rm -f /etc/sysconfig/network-scripts/ifcfg-*",aRc=0),
             ],
             [
                 exaMockCommand("/bin/test -e /bin/grep",aRc=0,aPersist=True),
@@ -329,6 +329,12 @@ nodehostr052-4018.exacp10.jboduvcn.oraclevcn.com
         #bridge not present = no cleanup
         _cmds = {
             self.mGetRegexDom0(): [[
+                exaMockCommand("test.*pgrep", aRc=0,),
+                exaMockCommand("test.*grep", aRc=0,),
+                exaMockCommand("/bin/test -e /sbin/grep", aRc=0, aPersist=True),
+                exaMockCommand("test.*grep", aRc=0,),
+                exaMockCommand("/sbin/pgrep -af 'vm_maker.*' | /sbin/grep -v $$", aRc=0, aStdout="",),
+                exaMockCommand("/sbin/pgrep -af 'vm_maker.*' | /sbin/grep -v $$", aRc=0, aStdout="",),
                 exaMockCommand("/bin/test -e /bin/df"),
                 exaMockCommand("/bin/test -e /bin/lsblk"),
                 exaMockCommand("/bin/df --local --output=target,source,fstype,size,avail --block-size=1", aStdout=_filesystems),
@@ -370,9 +376,12 @@ nodehostr052-4018.exacp10.jboduvcn.oraclevcn.com
                 exaMockCommand("/opt/exadata_ovm/vm_maker --remove-bridge",aRc=0,aPersist=True),
                 exaMockCommand("/usr/sbin/vm_maker --list-domains",aRc=0),
                 exaMockCommand("/bin/ls /etc/sysconfig/network-scripts/ifcfg-*",aRc=0),
-                exaMockCommand("/usr/bin/rm -f /etc/sysconfig/network-scripts/ifcfg-*",aRc=0)
+                exaMockCommand("/usr/bin/rm -f /etc/sysconfig/network-scripts/ifcfg-*",aRc=0),
             ],
             [
+                exaMockCommand("test.*pgrep", aRc=0,),
+                exaMockCommand("test.*grep", aRc=0,),
+                exaMockCommand("/sbin/pgrep -af 'vm_maker.*' | /sbin/grep -v $$", aRc=0, aStdout="",),
                 exaMockCommand("/bin/test -e /bin/grep",aRc=0,aPersist=True),
                 exaMockCommand(re.escape("/opt/exadata_ovm/exadata.img.domu_makers/ipconf -conf-add 2>&1 | /bin/grep -q 'Unknown option: conf-add'"),aRc=0,aPersist=True),
                 exaMockCommand("/sbin/brctl show*",aStdout="bridge name	bridge	id	STP	enabled	interfaces\nvmeth200	8000.e2780d6a24f9	no	eth200\nvmeth201	8000.da8b18988a21	no	eth201\nvmeth202	8000.da8b18988a21	no	eth202\n",aRc=0,aPersist=True),

@@ -1,10 +1,10 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/jsondispatch/handler_exacompute_vault_details.py /main/8 2025/09/20 16:54:53 rbhandar Exp $
+# $Header: ecs/exacloud/exabox/jsondispatch/handler_exacompute_vault_details.py siyarlag_bug-38939248/2 2026/03/02 18:25:14 siyarlag Exp $
 #
 # handler_exacompute_generate_sshkey.py
 #
-# Copyright (c) 2023, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2023, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      handler_exacompute_generate_sshkey.py - <one-line expansion of the name>
@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    siyarlag    02/19/26 - Enable exaComputeHost only on 26.1+
+#    siyarlag    02/19/26 - Modify handler for bug 38939248
 #    rbhandar    09/09/25 - Bug 38338607 - OCI: EXADB-XS: EXACLOUD DOESN'T
 #                           UPDATE /ETC/NFTABLES/EXADATA.NFT
 #    dekuckre    02/12/25 - 37569625: Use dbmcli to update cellinit.ora
@@ -33,8 +35,9 @@ import re
 
 from exabox.core.Context import get_gcontext
 from exabox.core.Node import exaBoxNode
+from exabox.ovm.clucontrol import exaBoxCluCtrl
 from exabox.log.LogMgr import ebLogError, ebLogInfo, ebLogWarn, ebLogTrace
-from exabox.utils.common import mCompareModel
+from exabox.utils.common import mCompareModel, version_compare
 from exabox.utils.node import (connect_to_host, node_cmd_abs_path_check, node_exec_cmd_check,
                                node_exec_cmd, node_read_text_file, node_write_text_file)
 from exabox.jsondispatch.jsonhandler import JDHandler
@@ -123,6 +126,17 @@ class ExaComputeVaultDetails(JDHandler):
         _vaultid = self.mGetOptions().jsonconf.get("vaultid")
         _trustcertificates = self.mGetOptions().jsonconf.get("trustcertificates")
 
+        _image_version = None
+        _is_compute_host_supported = False
+        try:
+            _clucontrol = exaBoxCluCtrl(get_gcontext())
+            if _hostname:
+                _image_version = _clucontrol.mGetImageVersion(_hostname)
+                if _image_version:
+                    _is_compute_host_supported = version_compare(_image_version, "26.1") >= 0
+        except Exception as _exc:
+            ebLogWarn(f"Failed to evaluate image version for {_hostname}: {_exc}")
+
         with connect_to_host(_hostname, get_gcontext(), timeout=5) as _node:
 
             # Check for stre0/stre1 rules - exadb-xs is supported from ol8 onward
@@ -170,11 +184,17 @@ class ExaComputeVaultDetails(JDHandler):
             node_exec_cmd_check(_node, _cmd, log_stdout_on_error=True)
 
             # Ensure MS services are up before updating cellinit.ora below.
-            _cmd = "dbmcli -e alter dbserver startup services ms"
+            _cmd = "/usr/bin/dbmcli -e alter dbserver startup services ms"
             node_exec_cmd_check(_node, _cmd, log_stdout_on_error=True)
 
+            if _is_compute_host_supported:
+                _cmd = "/usr/bin/dbmcli -e alter dbserver exaComputeHost=True"
+                node_exec_cmd_check(_node, _cmd, log_stdout_on_error=True)
+            else:
+                ebLogInfo(f"Skipping exaComputeHost enable; image version {_image_version or 'unknown'} is below 26.1")
+
             # Create/Update /opt/oracle/dbserver/dbms/deploy/config/cellinit.ora
-            _cmd = "dbmcli -e alter dbserver interconnect1=stre0, interconnect2=stre1"
+            _cmd = "/usr/bin/dbmcli -e alter dbserver interconnect1=stre0, interconnect2=stre1"
             node_exec_cmd_check(_node, _cmd, log_stdout_on_error=True)
 
             # Enable EDV

@@ -4,7 +4,7 @@
 #
 # UserConnector.py
 #
-# Copyright (c) 2022, 2023, Oracle and/or its affiliates.
+# Copyright (c) 2022, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      UserConnector.py - <one-line expansion of the name>
@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    prsshukl    03/12/26 - Bug 38900158 - EXACLOUD: ISSUES FOUND BY VOXIO
+#                           CODEV AGENT IN DIR EXABOX/EXAOCI
 #    pbellary    12/08/22 - Creation
 #
 from time import sleep
@@ -64,6 +66,8 @@ class UserConnector(OCIConnector):
             _realm = self.__config_bundle.get("realmName")
             if _realm == "region1":
                 return "r1"
+            else:
+                return _realm
         else:
             _exaOcid = self.__config_bundle.get("exaccInfrastructureOcid")
             _ocidComponents = _exaOcid.split(".")
@@ -113,7 +117,7 @@ class UserConnector(OCIConnector):
         _proxy = self.__config_bundle.get('corporateProxy')
 
         # set proxy if needed
-        if _proxy is not None or _proxy != "" or _proxy != "null":
+        if _proxy not in (None, "", "null"):
             os.environ["HTTPS_PROXY"] = "{}".format(_proxy)
 
         _ca_path = os.path.join(self.__basepath, "exabox/kms/combined_r1.crt")

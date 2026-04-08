@@ -1,10 +1,10 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/exatest/network/payloads.py /main/4 2025/11/03 21:24:24 scoral Exp $
+# $Header: ecs/exacloud/exabox/exatest/network/payloads.py /main/5 2026/01/21 09:00:53 jesandov Exp $
 #
 # payloads.py
 #
-# Copyright (c) 2024, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2024, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      payloads.py - <one-line expansion of the name>
@@ -2135,6 +2135,7 @@ mGetReconfigParams_OUT_IPV6 = {
 }
 
 mFetchNetworkInfo_OUT = {
+    'admin': {},
     'client':
         {
             'fqdn': 'c3716n11c1clientsubnet.devx8melastic.oraclevcn.com',
@@ -2177,6 +2178,7 @@ mFetchNetworkInfo_OUT = {
 }
 
 mFetchNetworkInfo_OUT_IPV6 = {
+    'admin': {},
     'client':
         {
             'fqdn': 'c3716n11c1clientsubnet.devx8melastic.oraclevcn.com',

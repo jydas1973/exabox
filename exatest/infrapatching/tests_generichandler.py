@@ -1,10 +1,10 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/exatest/infrapatching/tests_generichandler.py /main/3 2025/10/09 17:01:05 avimonda Exp $
+# $Header: ecs/exacloud/exabox/exatest/infrapatching/tests_generichandler.py remamid_bug-38945791/2 2026/02/18 01:56:32 remamid Exp $
 #
 # tests_generichandler.py
 #
-# Copyright (c) 2025, Oracle and/or its affiliates.
+# Copyright (c) 2025, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_generichandler.py - <one-line expansion of the name>
@@ -16,6 +16,10 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    sdevasek    04/01/26 - Bug 39149959 - OCI: SMR PATCHING IS
+#                           LOOKING FOR PATCHES IN ECRA WHICH ARE NOT
+#                           REGISTERED VIA IMAGESERIES AND FAILING
+#    remamid     02/18/26 - Bug 38945791 - sticky patchmgr error unit test
 #    avimonda    09/19/25 - Bug 38324744 - EXACC GEN 2 | PATCHING | SSHD
 #                           TIMEOUT ERRORS MISINTERPRETED AS SSHD NOT RUNNING
 #    avimonda    07/12/25 - Bug 37934568 - AIM4ECS:0X0301000A - INDIVIDUAL
@@ -29,6 +33,7 @@
 import unittest
 import io
 import errno
+import json
 from unittest.mock import patch, mock_open, MagicMock
 from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
 from exabox.log.LogMgr import ebLogInfo
@@ -71,8 +76,7 @@ class ebTestGenericHandler(ebTestClucontrol):
     @patch('exabox.infrapatching.handlers.generichandler.GenericHandler.mGetExadataPatchGridHeartBeatTimeoutSec', return_value=300)
     @patch('exabox.infrapatching.handlers.generichandler.GenericHandler.mGetExadataPatchWorkingSpaceMB', return_value=500)
     @patch('exabox.infrapatching.handlers.generichandler.GenericHandler.mIsSingleWorkerRequest', return_value=True)
-    @patch('exabox.infrapatching.handlers.generichandler.GenericHandler.mConvertExasplice')
-    def test_mGetErrorCodeFromChildRequest_True(self, _mock_mConvertExasplice, _mock_mIsSingleWorkerRequest, _mock_mGetExadataPatchWorkingSpaceMB, _mock_mGetExadataPatchGridHeartBeatTimeoutSec, _mock_json_loads):
+    def test_mGetErrorCodeFromChildRequest_True(self, _mock_mIsSingleWorkerRequest, _mock_mGetExadataPatchWorkingSpaceMB, _mock_mGetExadataPatchGridHeartBeatTimeoutSec, _mock_json_loads):
         ebLogInfo("")
         ebLogInfo("Running unit test on GenericHandler.mGetErrorCodeFromChildRequest_True")
 
@@ -90,8 +94,7 @@ class ebTestGenericHandler(ebTestClucontrol):
     @patch('exabox.infrapatching.handlers.generichandler.GenericHandler.mGetExadataPatchGridHeartBeatTimeoutSec', return_value=300)
     @patch('exabox.infrapatching.handlers.generichandler.GenericHandler.mGetExadataPatchWorkingSpaceMB', return_value=500)
     @patch('exabox.infrapatching.handlers.generichandler.GenericHandler.mIsSingleWorkerRequest', return_value=True)
-    @patch('exabox.infrapatching.handlers.generichandler.GenericHandler.mConvertExasplice')
-    def test_mGetErrorCodeFromChildRequest_False(self, _mock_mConvertExasplice, _mock_mIsSingleWorkerRequest, _mock_mGetExadataPatchWorkingSpaceMB, _mock_mGetExadataPatchGridHeartBeatTimeoutSec, _mock_json_loads):
+    def test_mGetErrorCodeFromChildRequest_False(self, _mock_mIsSingleWorkerRequest, _mock_mGetExadataPatchWorkingSpaceMB, _mock_mGetExadataPatchGridHeartBeatTimeoutSec, _mock_json_loads):
         ebLogInfo("")
         ebLogInfo("Running unit test on GenericHandler.mGetErrorCodeFromChildRequest_False")
 
@@ -124,6 +127,67 @@ class ebTestGenericHandler(ebTestClucontrol):
         self.assertCountEqual(_result_nodes, _node_list)
 
         ebLogInfo("Unit test on GenericHandler.mGetSshdNotRunningNodeList executed successfully")
+
+    @patch('exabox.infrapatching.handlers.generichandler.GenericHandler.mIsSingleWorkerRequest', return_value=True)
+    @patch('exabox.infrapatching.handlers.generichandler.GenericHandler.mGetExadataPatchWorkingSpaceMB', return_value=500)
+    @patch('exabox.infrapatching.handlers.generichandler.GenericHandler.mGetExadataPatchGridHeartBeatTimeoutSec', return_value=300)
+    @patch('exabox.infrapatching.handlers.generichandler.GenericHandler.mGetPatchmgrLogPathOnLaunchNode', return_value='/tmp/')
+    @patch('exabox.infrapatching.handlers.generichandler.GenericHandler.mGetInfrapatchExecutionValidator')
+    @patch('exabox.infrapatching.handlers.generichandler.exaBoxNode')
+    @patch('exabox.infrapatching.handlers.generichandler.mCheckFileExists', return_value=True)
+    @patch('exabox.infrapatching.handlers.generichandler.glob.glob')
+    @patch('exabox.infrapatching.handlers.generichandler.ebGetDefaultDB')
+    def test_mGetPatchMgrErrorHandlingDetails_sticky_flag(self, mock_db, mock_glob, mock_check_exists, mock_node_cls,
+                                                          mock_validator, mock_log_path, mock_heartbeat,
+                                                          mock_workspace, mock_single_worker):
+
+        ebLogInfo("")
+        ebLogInfo("Running unit test on GenericHandler.mGetPatchMgrErrorHandlingDetails sticky flag")
+
+        validator = MagicMock()
+        validator.mCheckCondition.return_value = False
+        mock_validator.return_value = validator
+        mock_db.return_value = MagicMock()
+
+        mock_glob.return_value = ['file1.json', 'file2.json']
+
+        node_instance = MagicMock()
+        node_instance.mExecuteCmd.return_value = (None, MagicMock(readlines=lambda: ['file1.json', 'file2.json']), None)
+        node_instance.mReadFile.side_effect = [
+            json.dumps({
+                "Modules": [
+                    {
+                        "driver-node": {
+                            "Node_type": "Driver-Node",
+                            "Check": [
+                                {"Status": "Failed"}
+                            ]
+                        }
+                    }
+                ]
+            }),
+            json.dumps({
+                "Modules": [
+                    {
+                        "driver-node": {
+                            "Node_type": "Driver-Node",
+                            "Check": [
+                                {"Status": "Passed"}
+                            ]
+                        }
+                    }
+                ]
+            })
+        ]
+        node_instance.mIsConnected.return_value = True
+        mock_node_cls.return_value = node_instance
+
+        _gh = GenericHandler(self.__patch_args_dict)
+        _result = _gh.mGetPatchMgrErrorHandlingDetails('iad123456exdd001.oraclecloud.internal')
+
+        self.assertEqual(_result.get("patch_mgr_error_detected"), "yes")
+        self.assertTrue(_result.get("patch_mgr_error_details"))
+        ebLogInfo("Unit test on GenericHandler.mGetPatchMgrErrorHandlingDetails sticky flag executed successfully")
 
     @patch('socket.socket')
     def test_mCheckPortSSH(self, mock_socket):

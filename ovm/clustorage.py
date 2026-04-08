@@ -1,7 +1,7 @@
 """
 $Header:
 
- Copyright (c) 2014, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     OVM - Basic Storage functionality
@@ -15,6 +15,24 @@ NOTE:
 History:
 
     MODIFIED   (MM/DD/YY)
+      ririgoye  02/26/26 - Bug 38993789 - ADB-D: ECRA /EXACLOUD NOT ALLOWING
+                           MINOR INCREMENT/DECREMENTS < 1% FOR AVM UPDATES TO
+                           STORAGE
+      pbellary  02/20/26 - Bug 38986521: CRITICAL EXCEPTION CAUGHT ABORTING REQUEST ['CREATE_SPARSE'] 
+      rajsag    01/29/26 - 38857796 - exacc:bb:exacloud: progress percentage
+                           drops while elastic cell operation is in progress.
+      nelango   01/27/26 - Bug 38883827: Minor correction to griddisks
+                           selection regex
+      avimonda  01/26/26 - Bug 38834741 - AWS: EXACS: PROVISIONING FAILED WITH
+                           EXACLOUD ERROR CODE: 2085 CELLCLI : CELL-02559 :
+                           MEXECUTECMD FAILED ON <CELL NODE>, WITH CMD: CELLCLI
+                           -E LIST CELLDISK ATTRIBUTES NAME, STATUS;
+      jesandov  01/09/25 - Bug 38594895: Add ACFS Size for ATP
+      jfsaldan  12/15/25 - Bug 38755861 - EXACS:25.4.1:CUSTOM
+                           DATA/RECO/SPARSE DISK GROUPS: RESHAPE WITH SPACE
+                           UTILIZATION FAILS: EXACLOUD IS TRYING TO RESHAPE
+                           SPARSE DISK GROUPS EVEN WHEN THE ASSIGNED SPACE HAS
+                           NOT CHANGED
       jfsaldan  10/28/25 - Bug 38550997 - THE SHRINK BACK TO ORIGINAL SIZE STEP
                            WILL FAIL WHILE NO MORE THAN 15% FREESPACE |
                            EXACLOUD TO SUPPORT NEW FLAG IN ASM RESHAPE TO
@@ -336,7 +354,10 @@ class ebCluDiskGroupConfig(object):
         self.__diskGroupType.text = aType
 
     def mGetGridDiskPrefix(self):
-        return self.__gridDiskPrefix.text
+        if self.__gridDiskPrefix is not None:
+            return self.__gridDiskPrefix.text
+        else:
+            return None
 
     def mSetGridDiskPrefix(self, aGdPrefix):
         if self.__gridDiskPrefix is None:
@@ -594,12 +615,33 @@ class ebCluStorageConfig(object):
             'CD_01_scaqab10celadm01': { 'STATUS': 'normal' }
         }
         """
+        _delay = 5
+        _max_delay = 30
+        _retries = 3
+        _cell = aNode.mGetHostname()
+
         _cmdstr = 'cellcli -e LIST CELLDISK ATTRIBUTES NAME, {};'.format(', '.join(aAttributes))
-        _, _o, _e = aNode.mExecuteCmdCellcli(_cmdstr)
-        if aNode.mGetCmdExitStatus():
-            ebLogError(f'*** CMD_OUT: {_o.read()}, _ERR: {_e.read()}')
-            raise ExacloudRuntimeError(0x0825, 0xA, f'mExecuteCmd Failed on {aNode.mGetHostname()}, with cmd: {_cmdstr}', Cluctrl = self.__ebox)
-        
+        for _attempt in range(1, _retries + 1):
+            _, _o, _e = aNode.mExecuteCmdCellcli(_cmdstr)
+            if not aNode.mGetCmdExitStatus():
+                break
+            _stdout = _o.read()
+            _stderr = _e.read()
+            _combined_err = f'{_stdout}{_stderr}'.upper()
+
+            if 'CELL-02559' not in _combined_err and 'MS DETECTED ERROR' not in _combined_err:
+                ebLogError(f'*** CMD_OUT: {_stdout}, _ERR: {_stderr}')
+                raise ExacloudRuntimeError(0x0825, 0xA, f'mExecuteCmd Failed on {_cell}, with cmd: {_cmdstr}', Cluctrl = self.__ebox)
+
+            if _attempt == _retries:
+                ebLogError(f'*** CMD_OUT: {_stdout}, _ERR: {_stderr}')
+                raise ExacloudRuntimeError(0x0825, 0xA, f'mExecuteCmd Failed on {_cell}, with cmd: {_cmdstr}', Cluctrl = self.__ebox)
+
+            ebLogWarn(f'*** mListCellDisksAttributes retry {_attempt}/{_retries} for {_cmdstr} on {_cell} due to CELL-02559')
+            self.__ebox.mCheckCellsServicesUp(aRestart=False, aCellList=[_cell])
+            sleep(_delay)
+            _delay = min(_delay * 2, _max_delay)
+
         _celldisks = {}
         for _line in _o.readlines():
             _celldisk_name, *_celldisk_attrs = _line.split()
@@ -975,7 +1017,7 @@ class ebCluStorageConfig(object):
                 break
             _count -= 1
             if _count:
-                time.sleep(5)
+                sleep(5)
                 ebLogWarn('*** DeleteForce GD re-try count: %d' % (3 - _count))
             else:
                 ebLogError('*** DeleteForce GD FAILED : unable to delete following GDs')
@@ -1601,21 +1643,34 @@ class ebCluStorageConfig(object):
             and mCompareModel(_exadata_cell_model, _cutOff_model) >= 0:
             # calculate the acfs vol size as a factor of disksize
             # for 4TB disk -> 320GB of ACFS size per cell
-            _avsize = _disksize * 40
+            _avsize = 0
 
-            if not _eBox.SharedEnv():
-                _avsize = _disksize * 80
+            _atpAcfsSize = "0"
+            if aOptions is not None:
+                _jconf = aOptions.jsonconf
+                if "atp" in _jconf and "acfs_size_in_gb" in _jconf['atp']:
+                    _atpAcfsSize = str(_jconf['atp']['acfs_size_in_gb'])
 
-            _dataConfig = self.mGetDiskGroupConfig(_data_dg_id)
-            _modified_data_dg_size = _dataConfig.mGetDiskGroupSize()
-            ebLogInfo("Current DATA DG size is: {0}".format(_modified_data_dg_size))
-            _modified_data_dg_size = self.mGetDiskSizeInInt(_modified_data_dg_size)
-            if _modified_data_dg_size is not None:
-                _modified_data_dg_size = int(_modified_data_dg_size)
-                if _avsize > (0.05 * _modified_data_dg_size):#Capping the ACFS volume size to 5% of current DATA DG size.
-                    _avsize = int(0.05 * _modified_data_dg_size)
-                if _avsize < 100:#If resultant ACFS vol. size is less than 100G, set it to a minimum of 100G.
-                    _avsize = 100
+            if _atpAcfsSize == "0":
+
+                _avsize = _disksize * 40
+                if not _eBox.SharedEnv():
+                    _avsize = _disksize * 80
+
+                _dataConfig = self.mGetDiskGroupConfig(_data_dg_id)
+                _modified_data_dg_size = _dataConfig.mGetDiskGroupSize()
+                ebLogInfo("Current DATA DG size is: {0}".format(_modified_data_dg_size))
+                _modified_data_dg_size = self.mGetDiskSizeInInt(_modified_data_dg_size)
+                if _modified_data_dg_size is not None:
+                    _modified_data_dg_size = int(_modified_data_dg_size)
+                    if _avsize > (0.05 * _modified_data_dg_size):#Capping the ACFS volume size to 5% of current DATA DG size.
+                        _avsize = int(0.05 * _modified_data_dg_size)
+                    if _avsize < 100:#If resultant ACFS vol. size is less than 100G, set it to a minimum of 100G.
+                        _avsize = 100
+
+            else:
+                ebLogInfo("Using ATP ACFS Size from payload: {0}".format(_atpAcfsSize))
+                _avsize = _atpAcfsSize
 
             _acfsvolname = 'acfsvol01'
             _acfsmountpath = '/acfs01'
@@ -1786,6 +1841,7 @@ class ebCluManageStorage(object):
     RECO = "RECO" 
     SPARSE = "SPARSE"
     DG_NEWSIZE = "DG_NEWSIZE"
+    DG_CURRSIZE = "DG_CURRSIZE"
     DG_NAME = "DG_NAME"
     REBALANCE_POWER = "rebalance_power"
 
@@ -1888,11 +1944,17 @@ class ebCluManageStorage(object):
         _clu_utils.mUpdateTaskProgressStatus([], 5, "ASM Reshape", "In Progress", _stepSpecificDetails)
         _dgObj = ebCluManageDiskgroup(_eBoxCluCtrl, _options)
         
-        # populate the new sizes of DATA, RECO (and SPARSE) diskgroups in 
+        # populate the current and new sizes of DATA, RECO (and SPARSE) diskgroups in 
         # _dgmap.
         # Note: mGetDiskgroupsNewSizes() does not really need the old storage 
         # value. It just requires the new storage value to estimate the 
         # distribution among different diskgroups (maintaining existing ratios)
+        # Example structure:
+        # _dgmap = {
+        #     'DATA':  {'DG_NAME': 'DATA',  'DG_CURRSIZE': 16384.0, 'DG_NEWSIZE': 12288.0},
+        #     'RECO':  {'DG_NAME': 'RECO',  'DG_CURRSIZE':  8192.0, 'DG_NEWSIZE':  9216.0},
+        #     'SPARSE':{'DG_NAME': 'SPARSE','DG_CURRSIZE':  4096.0, 'DG_NEWSIZE':  4096.0}
+        # }
         _rc = self.mGetDiskgroupsNewSizes(_options, _dgObj, _newsizeGB, _dgmap)
         if _rc != 0:
             _err = "Failed to get new sizes of DATA, RECO (and SPARSE) diskgroups"
@@ -1945,8 +2007,11 @@ class ebCluManageStorage(object):
         _storage_data["Status"] = "Pass"
         _storage_data["ErrorCode"] = "0"
         _storage_data["Log"] = _log
+        
+        
+        _stepSpecificDetails = _clu_utils.mStepSpecificDetails("reshapeDetails", 'DONE', "ASM reshape is completed", "","ASM")
+        _clu_utils.mUpdateTaskProgressStatus([], 100, "ASM Reshape", "DONE", _stepSpecificDetails, _storage_data )
 
-        self.mUpdateRequestData(_storage_data, _options)
         ebLogInfo(json.dumps(_storage_data, indent=4, sort_keys=True))
         return _rc 
 
@@ -2104,8 +2169,10 @@ class ebCluManageStorage(object):
 
         elif 'rack' in list(_jconf.keys()) :  
             # This is Create Service workflow
-            _backup_flag_enabled = _jconf['rack']['backup_disk']
-            _sparse_flag_enabled = _jconf['rack']['create_sparse']
+            if 'backup_disk' in list(_jconf['rack'].keys()):
+                _backup_flag_enabled = _jconf['rack']['backup_disk']
+            if 'create_sparse' in list(_jconf['rack'].keys()):
+                _sparse_flag_enabled = _jconf['rack']['create_sparse']
             if 'storage_distribution' in list(_jconf['rack'].keys()):
                 _storage_distrib = _jconf['rack']['storage_distribution']
                 ebLogInfo(f'DATA:RECO:SPARSE Distribution : {_storage_distrib}')
@@ -2121,6 +2188,8 @@ class ebCluManageStorage(object):
 
         ebLogInfo(f'_backup_flag_enabled (payload): {_backup_flag_enabled}')
         ebLogInfo(f'_sparse_flag_enabled (payload): {_sparse_flag_enabled}')
+        _spr_cursize = 0
+
 
         if _sparse_enabled: # if sparse DOES exist in current diskgroups
         
@@ -2299,22 +2368,32 @@ class ebCluManageStorage(object):
         _dgMap[self.SPARSE] = {}
         _dgMap[self.DATA][self.DG_NAME] = _data_dgname
         _dgMap[self.DATA][self.DG_NEWSIZE] = _new_datasize
+        _dgMap[self.DATA][self.DG_CURRSIZE] = _data_cursize
 
         _dgMap[self.RECO][self.DG_NAME] = _reco_dgname
         _dgMap[self.RECO][self.DG_NEWSIZE] = _new_recosize
+        _dgMap[self.RECO][self.DG_CURRSIZE] = _reco_cursize
         
         _dgMap[self.SPARSE][self.DG_NAME] = _sparse_dgname
         _dgMap[self.SPARSE][self.DG_NEWSIZE] = _new_sprsize
+        _dgMap[self.SPARSE][self.DG_CURRSIZE] = _spr_cursize
 
         # actual disk size is usually little more than input size... 
         # keeping it to 1% for now.
 
+        _domU = _eBoxCluCtrl.mReturnDom0DomUPair()[0][1]
+        _isATP = _eBoxCluCtrl.isATPCluster(_domU)
+        ebLogInfo(f"*** isATP : {_isATP}")
         # previously failed during disk rebalance.
         if (abs(float((_data_cursize - _new_datasize) / _new_datasize)) < 0.01):
-            ebLogInfo("*** Data size is same.. resize not required. "+
-                      "Will attempt a rebalance. !")
             self.__rebalancedata = True
             self.__resizedata = False
+            if _isATP:
+                self.__resizedata = True                                                                                                                                                                                                   
+                ebLogInfo("*** ADBD env: allow resize even for below 1 percent change in DATA size")
+            else:
+                ebLogInfo("*** Data size is same.. resize not required. "+
+                          "Will attempt a rebalance. !")
             # Check if Data grid disks are resized on cells
             if not self.mCheckGridDisksResizedCells(
                     _data_dgname, _new_datasize, _dgObj):
@@ -2322,10 +2401,14 @@ class ebCluManageStorage(object):
 
         # previously failed during reco rebalance.
         if (abs(float((_reco_cursize - _new_recosize) / _new_recosize)) < 0.01):
-            ebLogInfo("*** Reco size is same.. resize not required. " +
-                      "Will attempt a rebalance. !")
             self.__rebalancereco = True
             self.__resizereco = False
+            if _isATP:
+                self.__resizereco = True
+                ebLogInfo("*** ADBD env: allow resize even for below 1 percent change in RECO size")
+            else:
+                ebLogInfo("*** Reco size is same.. resize not required. " +
+                          "Will attempt a rebalance. !")
             # Check if Reco grid disks are resized on cells
             if not self.mCheckGridDisksResizedCells(
                     _reco_dgname, _new_recosize, _dgObj):
@@ -2333,10 +2416,14 @@ class ebCluManageStorage(object):
 
         # previously failed during sparse rebalance.
         if (_sparse_enabled and (abs(float((_spr_cursize - _new_sprsize) / _new_sprsize)) < 0.01)):
-            ebLogInfo("*** Sparse size is same.. resize not required. "+
-                      "Will attempt a rebalance. !")
             self.__rebalancesprs = True
             self.__resizesprs = False
+            if _isATP:
+                self.__resizesprs = True
+                ebLogInfo("*** ADBD env: allow resize even for below 1 percent change in SPARSE size")
+            else:
+                ebLogInfo("*** Sparse size is same.. resize not required. "+
+                          "Will attempt a rebalance. !")
             # Check if Sparse grid disks are resized on cells
             if not self.mCheckGridDisksResizedCells(
                     _sparse_dgname, _new_sprsize, _dgObj):
@@ -2535,39 +2622,54 @@ class ebCluManageStorage(object):
 
         Note: 15% is for 3 or 4 cells, while 9% Free is for
         5 or more cells
+
+        # Example structure of aDGTargeSizeMap
+        # _dgmap = {
+        #     'DATA':  {'DG_NAME': 'DATA',  'DG_CURRSIZE': 16384.0, 'DG_NEWSIZE': 12288.0},
+        #     'RECO':  {'DG_NAME': 'RECO',  'DG_CURRSIZE':  8192.0, 'DG_NEWSIZE':  9216.0},
+        #     'SPARSE':{'DG_NAME': 'SPARSE','DG_CURRSIZE':  4096.0, 'DG_NEWSIZE':  4096.0}
+        # }
         """
 
-        _dgmap = aDGTargeSizeMap
+        _input_dgmap = aDGTargeSizeMap
+        _dgmap = _input_dgmap
 
         # Target sizes to shrink
         # Convert DG_map to
-        _data_dgname = _dgmap[self.DATA][self.DG_NAME] 
-        _new_datasize = _dgmap[self.DATA][self.DG_NEWSIZE] 
+        _data_dgname = _dgmap[self.DATA][self.DG_NAME]
+        _new_datasize = _dgmap[self.DATA][self.DG_NEWSIZE]
+        _curr_datasize = _dgmap[self.DATA].get(self.DG_CURRSIZE)
 
-        _reco_dgname = _dgmap[self.RECO][self.DG_NAME] 
+        _reco_dgname = _dgmap[self.RECO][self.DG_NAME]
         _new_recosize = _dgmap[self.RECO][self.DG_NEWSIZE]
+        _curr_recosize = _dgmap[self.RECO].get(self.DG_CURRSIZE)
 
         _sparse_dgname = None
         _new_sprsize = None
+        _curr_sprsize = None
         if _dgmap.get(self.SPARSE):
             ebLogTrace(f"SPARSE is detected")
-            _sparse_dgname = _dgmap[self.SPARSE][self.DG_NAME] 
-            _new_sprsize = _dgmap[self.SPARSE][self.DG_NEWSIZE] 
+            _sparse_dgname = _dgmap[self.SPARSE][self.DG_NAME]
+            _new_sprsize = _dgmap[self.SPARSE][self.DG_NEWSIZE]
+            _curr_sprsize = _dgmap[self.SPARSE].get(self.DG_CURRSIZE)
 
         _dg_target_sizes = {
             _data_dgname: {
                 "totalgb": _new_datasize,
                 "usedgb": 0,
+                "currentgb": _curr_datasize,
             },
             _reco_dgname: {
                 "totalgb": _new_recosize,
                 "usedgb": 0,
+                "currentgb": _curr_recosize,
             }
         }
         if _sparse_dgname:
             _dg_target_sizes[_sparse_dgname] = {
                 "totalgb": _new_sprsize,
                 "usedgb": 0,
+                "currentgb": _curr_sprsize,
             }
 
         # Get current real dg sizes
@@ -2593,16 +2695,19 @@ class ebCluManageStorage(object):
             if self.DATA in _dg_name:
                 _dgmap[self.DATA][self.DG_NAME] = _dg_name
                 _dgmap[self.DATA][self.DG_NEWSIZE] = _dg_target_sizes[_dg_name]['totalgb']
+                _dgmap[self.DATA][self.DG_CURRSIZE] = _dg_target_sizes[_dg_name].get('currentgb', 0)
 
             elif self.RECO in _dg_name:
                 _dgmap[self.RECO][self.DG_NAME] = _dg_name
                 _dgmap[self.RECO][self.DG_NEWSIZE] = _dg_target_sizes[_dg_name]['totalgb']
+                _dgmap[self.RECO][self.DG_CURRSIZE] = _dg_target_sizes[_dg_name].get('currentgb', 0)
 
             # This needs to check SPRC instead of self.SPARSE because the logic is
             # borrowed from cluelasticcells.py which has different naming conventions
             elif ("SPRC" in _dg_name or self.SPARSE in _dg_name):
                 _dgmap[self.SPARSE][self.DG_NAME] = _dg_name
                 _dgmap[self.SPARSE][self.DG_NEWSIZE] = _dg_target_sizes[_dg_name]['totalgb']
+                _dgmap[self.SPARSE][self.DG_CURRSIZE] = _dg_target_sizes[_dg_name].get('currentgb', 0)
 
         ebLogTrace(f"DG Map is {_dgmap}")
         return _dgmap
@@ -2636,7 +2741,7 @@ class ebCluManageStorage(object):
         _total_current_size_gb = 0.0
         for _cell in _cell_list:
             with connect_to_host(_cell, get_gcontext()) as _node:
-                _cellcli_list_size = "cellcli -e list griddisk attributes size where name like \\'" + aDgName + ".*\\'"
+                _cellcli_list_size = "cellcli -e list griddisk attributes size where name like \\'" + aDgName + "_.*\\'"
                 ebLogInfo("*** Executing the command - %s" % _cellcli_list_size)
                 _out = None
                 _err = None
@@ -2670,7 +2775,15 @@ class ebCluManageStorage(object):
                     return True
         # Set the count of grid disks and cells used for further calculation during resize in cludiskgroups
         aDgObj.mSetGridDiskCountRetryResize(_grid_disk_count, aDgName)
+        _domU = _eBox.mReturnDom0DomUPair()[0][1]
+        _isATP = _eBox.isATPCluster(_domU)
+        ebLogInfo(f"*** mCheckGridDisksResizedCells isATP : {_isATP}")
         if (abs(float((_total_current_size_gb - aNewSize) / aNewSize)) < 0.01):
+            if _isATP:
+                # In ADBD env, 1% variation can and should be done
+                ebLogInfo(f"ADBD env. Resize needed for {aDgName} grid disks on cells. Total current size is: {_total_current_size_gb} and new size is {aNewSize}.")
+                aDgObj.mSetCurrentRetrySizeTotalMB(_total_current_size_gb * 1024, aDgName)
+                return False
             # Resize done at cells - No need for resize operation, only rebalance needed
             ebLogInfo(f"Resize not needed for {aDgName} grid disks on cells. Total current size is: {_total_current_size_gb} and new size is {aNewSize}.")
             return True
@@ -2701,75 +2814,129 @@ class ebCluManageStorage(object):
             ebLogInfo("setting a default value of 16 for rebalance_power")
             _rebalance_power = 16
 
-        _data_dgname = _dgMap[self.DATA][self.DG_NAME] 
-        _new_datasize = _dgMap[self.DATA][self.DG_NEWSIZE] 
+        def _normalize_size(value, fallback):
+            try:
+                if value is None:
+                    raise ValueError
+                return float(value)
+            except (TypeError, ValueError):
+                return float(fallback)
 
-        _reco_dgname = _dgMap[self.RECO][self.DG_NAME] 
-        _new_recosize = _dgMap[self.RECO][self.DG_NEWSIZE]
+        _plan_entries = []
 
-        _sparse_dgname = _dgMap[self.SPARSE][self.DG_NAME] 
-        _new_sprsize = _dgMap[self.SPARSE][self.DG_NEWSIZE] 
-        
-        # populate json to issue resize of DATA diskgroup
-        _data['diskgroup'] = _data_dgname 
-        _data['new_sizeGB'] = int(_new_datasize)
+        def _add_plan_entry(aRole, aResizeFlag, aRebalanceFlag):
+            _info = _dgMap.get(aRole)
+            if not _info:
+                return
+            _dg_name = _info.get(self.DG_NAME)
+            if not _dg_name:
+                return
+            _target = _info.get(self.DG_NEWSIZE)
+            if _target is None:
+                return
+            _current = _info.get(self.DG_CURRSIZE, _target)
+            _target_float = _normalize_size(_target, _current or 0)
+            _current_float = _normalize_size(_current, _target_float)
+            _delta_mb = int(round((_target_float - _current_float) * 1024))
+            _plan_entries.append({
+                'role': aRole,
+                'dg_name': _dg_name,
+                'target_gb': _target_float,
+                'current_gb': _current_float,
+                'delta_mb': _delta_mb,
+                'resize_flag': aResizeFlag,
+                'rebalance_flag': aRebalanceFlag,
+                'executed': False,
+            })
+
+        _add_plan_entry(self.DATA, self.__resizedata, self.__rebalancedata)
+        _add_plan_entry(self.RECO, self.__resizereco, self.__rebalancereco)
+        _add_plan_entry(self.SPARSE, self.__resizesprs, self.__rebalancesprs)
+
+        if _plan_entries:
+            _plan_log = []
+            for _entry in _plan_entries:
+                if _entry['delta_mb'] < 0 and _entry['resize_flag']:
+                    _plan_log.append(f"shrink {_entry['dg_name']} by {abs(_entry['delta_mb'])} MB")
+                elif _entry['delta_mb'] > 0 and _entry['resize_flag']:
+                    _plan_log.append(f"grow {_entry['dg_name']} by {_entry['delta_mb']} MB")
+                elif _entry['rebalance_flag']:
+                    _plan_log.append(f"rebalance {_entry['dg_name']}")
+                else:
+                    _plan_log.append(f"skip {_entry['dg_name']}")
+            ebLogInfo("mUtilStorageResize: Planned actions -> " + ", ".join(_plan_log))
+
+        _shrink_entries = [e for e in _plan_entries if e['resize_flag'] and e['delta_mb'] < 0]
+        _grow_entries = [e for e in _plan_entries if e['resize_flag'] and e['delta_mb'] > 0]
+        _neutral_entries = [e for e in _plan_entries if (not e['resize_flag'] and e['rebalance_flag']) or (e['delta_mb'] == 0 and e['rebalance_flag'])]
+        _skipped_entries = [e for e in _plan_entries if not e['resize_flag'] and not e['rebalance_flag']]
+
+        for _entry in _skipped_entries:
+            ebLogInfo(f"mUtilStorageResize: No action for diskgroup {_entry['dg_name']} (current { _entry['current_gb'] } GB, target { _entry['target_gb'] } GB)")
+            _entry['executed'] = True
+
+        def _execute_entries(aEntries, aPhaseLabel):
+            _rc_local = 0
+            for _entry in aEntries:
+                if _rc_local != 0:
+                    break
+                if _entry['executed']:
+                    continue
+                _dg_name = _entry['dg_name']
+                _target = _entry['target_gb']
+                _current = _entry['current_gb']
+                _delta_mb = _entry['delta_mb']
+                _resize_flag = _entry['resize_flag']
+                _rebalance_flag = _entry['rebalance_flag']
+
+                if _resize_flag:
+                    if _delta_mb < 0:
+                        ebLogInfo(f"mUtilStorageResize: {aPhaseLabel} shrink { _dg_name } from { _current } GB to { _target } GB")
+                    elif _delta_mb > 0:
+                        ebLogInfo(f"mUtilStorageResize: {aPhaseLabel} grow { _dg_name } from { _current } GB to { _target } GB")
+                    else:
+                        ebLogInfo(f"mUtilStorageResize: {aPhaseLabel} resize skipped for { _dg_name } as sizes match")
+                elif _rebalance_flag:
+                    ebLogInfo(f"mUtilStorageResize: {aPhaseLabel} rebalance { _dg_name }")
+
+                _data_payload = {
+                    'diskgroup': _dg_name,
+                    'new_sizeGB': int(round(_target))
+                }
+                _options.jsonconf = _data_payload
+                _dg_op_data = {}
+
+                if _rebalance_flag and (not _resize_flag or _delta_mb == 0):
+                    _dg_op_data["Command"] = "dg_rebalance"
+                    _dgObj.mSetDiskGroupOperationData(_dg_op_data)
+                    _options.jsonconf['rebalance_power'] = _rebalance_power
+                    _rc_local = _dgObj.mClusterDgrpRebalance(_options)
+                elif _resize_flag:
+                    _dg_op_data["Command"] = "dg_resize"
+                    _dgObj.mSetDiskGroupOperationData(_dg_op_data)
+                    _rc_local = _dgObj.mClusterDgrpResize(_options)
+                else:
+                    _entry['executed'] = True
+                    continue
+
+                _storage_data[_dg_name] = _dgObj.mGetDiskGroupOperationData()
+                _entry['executed'] = True
+
+            return _rc_local
 
         _rc = 0
-        _options.jsonconf = _data
-        if self.__rebalancedata:
-            ebLogInfo("mUtilStorageResize: Only Rebalance DATA diskgroup\n")
-            _dg_data["Command"] = "dg_rebalance"
-            _dgObj.mSetDiskGroupOperationData(_dg_data)
-            _options.jsonconf['rebalance_power'] = _rebalance_power
-            _rc = _dgObj.mClusterDgrpRebalance(_options)
-        elif self.__resizedata:
-            ebLogInfo("mUtilStorageResize: Resize DATA diskgroup: %s to %d GB\n" % (_data_dgname, int(_new_datasize)))
-            _dg_data["Command"] = "dg_resize"
-            _dgObj.mSetDiskGroupOperationData(_dg_data)
-            _rc = _dgObj.mClusterDgrpResize(_options)
-        _storage_data[_data_dgname] = _dgObj.mGetDiskGroupOperationData()
+        if _shrink_entries:
+            ebLogInfo("mUtilStorageResize: Executing shrink phase")
+            _rc = _execute_entries(_shrink_entries, "Shrink phase:")
 
-        if _rc == 0: 
-            # populate json to issue resize of RECO diskgroup
-            _data['diskgroup'] = _reco_dgname
-            _data['new_sizeGB'] = int(_new_recosize)
+        if _rc == 0 and _neutral_entries:
+            ebLogInfo("mUtilStorageResize: Executing rebalance phase")
+            _rc = _execute_entries(_neutral_entries, "Rebalance phase:")
 
-            _options.jsonconf = _data
-            _dg_data = {}
+        if _rc == 0 and _grow_entries:
+            ebLogInfo("mUtilStorageResize: Executing grow phase")
+            _rc = _execute_entries(_grow_entries, "Grow phase:")
 
-            if self.__rebalancereco:
-                ebLogInfo("mUtilStorageResize: Only Rebalance RECO diskgroup\n")
-                _dg_data["Command"] = "dg_rebalance"
-                _dgObj.mSetDiskGroupOperationData(_dg_data)
-                _options.jsonconf['rebalance_power'] = _rebalance_power
-                _rc = _dgObj.mClusterDgrpRebalance(_options)
-            elif self.__resizereco:
-                ebLogInfo("mUtilStorageResize: Resize RECO diskgroup: %s to %d GB\n" % (_reco_dgname, int(_new_recosize)))
-                _dg_data["Command"] = "dg_resize"
-                _dgObj.mSetDiskGroupOperationData(_dg_data)
-                _rc = _dgObj.mClusterDgrpResize(_options)
-            _storage_data[_reco_dgname] = _dgObj.mGetDiskGroupOperationData()
-
-        if _rc == 0 and _sparse_dgname is not None and _new_sprsize is not None:
-            # populate json to issue resize of SPARSE diskgroup
-            _data['diskgroup'] = _sparse_dgname
-            _data['new_sizeGB'] = int(_new_sprsize)
-            _options.jsonconf = _data
-            _dg_data = {}
-
-            if self.__rebalancesprs:
-                ebLogInfo("mUtilStorageResize: Only Rebalance SPARSE diskgroup\n")
-                _dg_data["Command"] = "dg_rebalance"
-                _dgObj.mSetDiskGroupOperationData(_dg_data)
-                _options.jsonconf['rebalance_power'] = _rebalance_power
-                _rc = _dgObj.mClusterDgrpRebalance(_options)
-            elif self.__resizesprs:
-                ebLogInfo("mUtilStorageResize: Resize SPARSE diskgroup: %s to %d GB\n" % (_sparse_dgname, int(_new_sprsize)))
-                _dg_data["Command"] = "dg_resize"
-                _dgObj.mSetDiskGroupOperationData(_dg_data)
-                _rc = _dgObj.mClusterDgrpResize(_options)
-            _storage_data[_sparse_dgname] = _dgObj.mGetDiskGroupOperationData()
-      
         return _rc
 
 
@@ -3078,7 +3245,7 @@ class ebCluQuorumManager(object):
             _errorStr = "Remove Quorum Disk : Error deleting Quorum Device"
             _success = self.runCommand(_cmd, _nodeU, True, False, False, _expectedOutput, _errorCode, _errorStr)
             _retryCount = _retryCount - 1
-            time.sleep(_waitTime)
+            sleep(_waitTime)
         if not _success :
             _error_str = "Remove Quorum Disk : Error deleting Quorum Device"
             raise ExacloudRuntimeError(_errorCode, 0xA, _error_str, Cluctrl = self.__cluctrl)
@@ -3282,5 +3449,3 @@ class ebCluQuorumManager(object):
         _nodeU2.mDisconnect()
         _nodeU1Grid.mDisconnect()
         _nodeU2Grid.mDisconnect()
-
-

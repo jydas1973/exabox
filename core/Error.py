@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     Error - Basic Error Mgmt Facility
@@ -11,7 +11,11 @@ NOTE:
     None
 
 History:
-    mpedapro   11/14/25    - Enh::38235082 error codes addition for sriov
+    jesandov    18/03/2026 - 39036804: Add GIP error
+    ajayasin    02/27/2026 - 39018800:n-3,26ai:default gi support from UI
+    scoral      02/04/2026 - Bug 38906210 - Update STALE_VM_FILES error message.
+    pbellary    11/30/25   - Enh 38708130 - EXASCALE: DELETE SERVICE SHOULD DELETE ADDITIONAL ACFS FILESYSTEMS
+    mpedapro    11/14/25   - Enh::38235082 error codes addition for sriov
     scoral      05/06/2025 - Bug 37665235: Added BROKEN_GCV to gExaDbXSError
     aypaul      04/23/2025 - Bug#37535214 Utility function to backup a file.
     aararora    02/25/2025 - Bug 37513962: Raise exception if there is an issue during storage resize
@@ -386,7 +390,9 @@ gSubError = {
     '824' : ['GI Image configuration failed'],
     '825' : ['GPG Keys copy failed'],
     '826' : ['DomU version not compatible with 23ai'],
-    '827' : ['Backup of file failed.']
+    '827' : ['Backup of file failed.'],
+    '828' : ['Given GI ver not supported by OEDA and Could not get supported GI list from OEDA'],
+    '829' : ['Failed on Gold Image Provisioning']
 }
 
 gResError = {
@@ -853,7 +859,18 @@ gExascaleError = {
     'ATTACH_ACFS_VOLUME_FAILED'             : ('0x0206000C', 'Failed to attach ACFS volume', 'CRITICAL_NORETRY_ERR', 0),
     'OCDE_INIT_FAILED'                      : ('0x0206000D', 'Failed to initialize cluster using dbaascli', 'CRITICAL_NORETRY_ERR', 0),
     'STORAGEPOOL_GET_DETAILS_FAILED'        : ('0x0206000E', 'Get Storage pool details failed', 'CRITICAL_NORETRY_ERR', 0),
-    'SET_VLANID_FAILED'                     : ('0x0206000F', 'Failed to set the VLANID on the elastic cell', 'CRITICAL_NORETRY_ERR', 0)
+    'SET_VLANID_FAILED'                     : ('0x0206000F', 'Failed to set the VLANID on the elastic cell', 'CRITICAL_NORETRY_ERR', 0),
+    'CREATE_EDV_VOLUME_FAILED'              : ('0x02060010', 'Failed to create edv volume', 'CRITICAL_NORETRY_ERR', 0),
+    'CREATE_EDV_ATTACH_FAILED'              : ('0x02060011', 'Failed to create edv attachment', 'CRITICAL_NORETRY_ERR', 0),
+    'RESIZE_EDV_VOLUME'                     : ('0x02060012', 'Failed to resize edv volume', 'CRITICAL_NORETRY_ERR', 0),
+    'CREATE_ACFS_FAILED'                    : ('0x02060013', 'Failed to create acfs filesystem', 'CRITICAL_NORETRY_ERR', 0),
+    'MOUNT_ACFS_FAILED'                     : ('0x02060014', 'Failed to mount acfs filesystem', 'CRITICAL_NORETRY_ERR', 0),
+    'UMOUNT_ACFS_FAILED'                    : ('0x02060015', 'Failed to umount acfs filesystem', 'CRITICAL_NORETRY_ERR', 0),
+    'GET_ACFS_FAILED'                       : ('0x02060016', 'Failed to get acfs filesystem', 'CRITICAL_NORETRY_ERR', 0),
+    'UPDATE_EDV_VOLUME_OWNERS'              : ('0x02060017', 'Failed to update edv volume owners list', 'CRITICAL_NORETRY_ERR', 0),
+    'UPDATE_ACL'                            : ('0x02060018', 'Failed to update acl permissions', 'CRITICAL_NORETRY_ERR', 0),
+    'CELLCLI_CMD_FAILED'                    : ('0x02060019', 'Failed to execute cellcli command', 'CRITICAL_NORETRY_ERR', 0),
+    'VAULT_GET_ACL_FAILED'                  : ('0x0206001A', 'Failed to retrieve Exascale Vault ACLs', 'CRITICAL_NORETRY_ERR', 0)
 }
 
 #
@@ -914,7 +931,11 @@ gExaDbXSError = {
     "STALE_VM_FILES": (
         0x08507,
         'Target Dom0 {host} has residual VM files for {stale_vm_files}',
-        'Verify /EXAVMIMAGES/GuestImages directory contains only one '
+        'It is possible that there are other VM move operations running in '
+        'parallel right now that placed these directories, so please wait for '
+        'those to finish before retrying! If you have been seeing this error '
+        'even after all other VM moves are done, then please '
+        'verify /EXAVMIMAGES/GuestImages directory contains only one '
         'directory corresponding to each VM registered in the host shown in '
         '"virsh list --all" If that is not the case, verify that these files '
         'are not stale EDVs or stale mountpoints. Make sure these are removed '
@@ -1284,6 +1305,11 @@ hw_validate_error_messages = {
         "category": "config",
         "hw_type": "dom0"
     },
+    90035: {
+        "message": "DBMCLI service check failed on dom0:{hw_name}",
+        "category": "hw",
+        "hw_type": "dom0"
+    },
     91035: {
         "message": "hw alerts failed on cell:{hw_name}",
         "category": "config",
@@ -1447,5 +1473,4 @@ def retryOnException(max_times: int = 5, sleep_interval: int = 5):
             raise ExacloudRuntimeError(aErrorMsg=_msg)
         return helper_function
     return decorator
-
 

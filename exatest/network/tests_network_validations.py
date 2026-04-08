@@ -1,10 +1,10 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/exatest/network/tests_network_validations.py /main/5 2025/05/19 14:20:00 akkar Exp $
+# $Header: ecs/exacloud/exabox/exatest/network/tests_network_validations.py /main/6 2026/01/12 13:29:49 aararora Exp $
 #
 # tests_network_validations.py
 #
-# Copyright (c) 2023, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2023, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_network_validations.py - <one-line expansion of the name>
@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    aararora    01/08/26 - Bug 38785417: Set the supported flag correctly if
+#                           100 Gbps speed is unsupported
 #    akkar       04/06/25 - 37641178: 100gbs client network support
 #    jfsaldan    02/24/25 - Bug 37570873 - EXADB-D|XS -- EXACLOUD |
 #                           PROVISIONING | REVIEW AND ORGANIZE PREVM_CHECKS AND
@@ -39,7 +41,7 @@ from exabox.core.MockCommand import exaMockCommand
 from exabox.core.Context import get_gcontext
 from exabox.core.Node import exaBoxNode
 from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
-from exabox.ovm.clumisc import ebCluServerSshConnectionCheck
+from exabox.ovm.clumisc import ebCluServerSshConnectionCheck, ebCluEthernetConfig
 from exabox.utils.node import connect_to_host
 from exabox.ovm.clunetworkvalidations import ebNetworkValidations
 from exabox.ovm.clunetworkdetect import ebOEDANetworkConfiguration, ebDiscoverOEDANetwork, ebNetworkType, \
@@ -764,11 +766,64 @@ class TestXTablesExaCCNAT(ebTestClucontrol):
         self.mPrepareMockCommands(_cmds)
         _ebox = self.mGetClubox()
         _dom0 = _ebox.mReturnDom0DomUPair()[0][0]
-        with patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetPhysicalInterfaceList', return_value="eth100"), \
+        with patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetPhysicalInterfaceList', return_value="eth1,eth2"), \
             patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetPCISlot', return_value="1"), \
             patch('exabox.ovm.clumisc.ebCluEthernetConfig.mValidateInterface', return_value=False):
             is_supported = _ebox.Is100GbsSpeedSupported(_dom0, 'client')
             self.assertEqual(is_supported, False)
+
+    def test_Is100GbsSpeedSupported_client_x11_set_custom_speed_failed_update(self):
+        _cmds = {
+            self.mGetRegexDom0(): [
+                [
+                    exaMockCommand("test -e", aRc=0, aPersist=True),
+                    exaMockCommand("/usr/sbin/ethtool -s eth1 speed 50000 autoneg on"),
+                    exaMockCommand("/bin/cat /sys/class/net/eth1/speed", aRc=0, aStdout="50000\n"),
+                    exaMockCommand("/opt/oracle.cellos/exadata.img.hw --get model", aRc=0, aStdout="ORACLE SERVER E6-2L\n")
+                ],
+                [
+                    exaMockCommand("/bin/cat /sys/class/net/eth1/speed", aRc=0, aStdout="2500"),
+                    exaMockCommand("/usr/sbin/ethtool -s eth1 speed 100000 autoneg on", aRc=1)
+                ]
+            ]
+        }
+        self.mPrepareMockCommands(_cmds)
+        _ebox = self.mGetClubox()
+        _dom0 = _ebox.mReturnDom0DomUPair()[0][0]
+        with patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetPhysicalInterfaceList', return_value="eth1,eth2"), \
+            patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetPCISlot', return_value="1"), \
+            patch('exabox.ovm.clumisc.ebCluEthernetConfig.mValidateInterface', side_effect=[False, False]), \
+            patch('exabox.ovm.clumisc.ebCluEthernetConfig.mGetCurrentSpeed', return_value=2500), \
+            patch('exabox.ovm.clumisc.ebCluEthernetConfig.mSetCustomSpeed', return_value=-1):
+            is_supported = _ebox.Is100GbsSpeedSupported(_dom0, 'client')
+            self.assertEqual(is_supported, False)
+
+    def test_mValidateInterface_returns_false_when_link_stays_down(self):
+        _ebox = self.mGetClubox()
+        _config = ebCluEthernetConfig(_ebox, _ebox.mGetArgsOptions())
+
+        class DownNode:
+            def __init__(self):
+                self._hostname = "downhost"
+
+            def mGetHostname(self):
+                return self._hostname
+
+            def mExecuteCmd(self, aCmd):
+                if "/operstate" in aCmd:
+                    return mockStream([]), mockStream(["down\n"]), mockStream([])
+                if "/speed" in aCmd:
+                    return mockStream([]), mockStream(["0\n"]), mockStream([])
+                return mockStream([]), mockStream([""]), mockStream([])
+
+            def mExecuteCmdLog(self, aCmd):
+                return
+
+        _node = DownNode()
+        with patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mIssueSoftWarningOnLinkfailure', return_value=False):
+            _result = _config.mValidateInterface(_node, 'eth1', 100000)
+
+        self.assertIs(_result, False)
     
 
 if __name__ == '__main__':

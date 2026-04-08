@@ -1,9 +1,9 @@
 #
-# $Header: ecs/exacloud/exabox/infrapatching/test/test_infrapatching_single_vm_cluster.txt /main/2 2025/09/26 16:25:32 sdevasek Exp $
+# $Header: ecs/exacloud/exabox/infrapatching/test/test_infrapatching_single_vm_cluster.txt /main/4 2026/02/17 11:32:29 sdevasek Exp $
 #
 # test_infrapatching_single_vm_cluster.py
 #
-# Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      test_infrapatching_domu.py - Unit test case script for all DomU operations.
@@ -15,6 +15,13 @@
 #      Unit test case script for all DomU operations.
 #
 #    MODIFIED   (MM/DD/YY)
+#    sdevasek    02/26/26 - Bug 39008110 - REMOVE ELUOPTIONS FROM ADDITIONAL
+#                           OPTIONS IN DOM0 TEST SETUP
+#    sdevasek    02/12/25 - Enh 38959949 - UPDATE EXISTING SINGLE VM TEST TO
+#                           USE MGMT_HOST AS LAUNCHNODE
+#    mirrodri    11/25/25 - Bug 38690188 - UPDATE CORRECT ERROR CODE FOR 
+#                           DOMU_PATCH_PREREQ_CHECK_ON_SINGLE_NODE_VM_CLUSTER
+#                           _TO_VALIDATE_MULTIPLE_PATCH_SESSIONS TEST
 #    apotluri    08/31/25 - Bug 38301663 - EXACS:25.2.2.1:RAISE AN ERROR WHEN
 #                           THE EXTERNAL LAUNCH NODE IS UNAVAILABLE DUE TO
 #                           REACHING THE MAXIMUM ALLOWED CONCURRENT SESSIONS
@@ -47,6 +54,7 @@ class Test_single_vm_cluster_class(unittest.TestCase):
         mUpdateAdditionalOptionsInPayload("SingleUpgradeNodeName", "none")
         mUpdateAdditionalOptionsInPayload("OneoffCustomPluginFile", "none")
         mUpdateAdditionalOptionsInPayload("OneoffScriptArgs", "none")
+        mDeleteAdditionalOptionsFromPayload("ELUOptions")
         mUpdateInfraPatchingTestConfigParam("node_selection_method", "IncludeNodeList")
         mUpdateInfraPatchingTestConfigParam("single_node_vm_cluster_patching", "False")
         mUpdateParamInPayload("BackupMode", "yes")
@@ -93,7 +101,7 @@ class Test_single_vm_cluster_class(unittest.TestCase):
         _status_json = json.loads(_status_output2)
         _error_code = _status_json["errorCode"]
         # 2nd requests fails with insufficient launchnodes
-        self.assertEqual(_error_code, "0x030E0024", "Correct error code is not returned..")
+        self.assertEqual(_error_code, "0x03010046", "Correct error code is not returned..")
 
     @pytest.mark.domu_cleanup_patches_on_launchnode_for_single_vm_cluster
     def test_domu_cleanup_patches_on_launchnode_for_single_vm_cluster(self):
@@ -175,15 +183,8 @@ class Test_single_vm_cluster_class(unittest.TestCase):
         _single_node_vm_cluster = mGetInfraPatchingTestConfigParam("single_node_vm_cluster")
         _single_vm_domu_nat_host_name = mGetInfraPatchingTestVms("domuNatHostname", _single_node_vm_cluster)
 
-        # get the launch node
-        for _dom0s_list, _domus_list in _dom0_domu_list.items():
-            if _single_vm_domu_nat_host_name[0] in _domus_list:
-                for _domu in _domus_list:
-                    if _domu != _single_vm_domu_nat_host_name[0]:
-                        _launch_node = _domu
-                        mPatchLogInfo("_launch_node : %s" % _launch_node)
-                        break
-                break
+        _launch_node = mGetInfraPatchingTestConfigParam('management_host_name')
+        mPatchLogInfo("_launch_node : %s" % _launch_node)
 
         # update payload and test config
         launch_node_handler = LaunchNodeRegistrationHandler()

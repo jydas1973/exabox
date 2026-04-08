@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 #
-# $Header: ecs/exacloud/exabox/exatest/exatest.py /main/37 2025/12/03 06:22:50 aararora Exp $
+# $Header: ecs/exacloud/exabox/exatest/exatest.py /main/38 2026/02/09 17:00:00 ecejacru Exp $
 #
 # exatest.py
 #
-# Copyright (c) 2021, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      exatest.py - <one-line expansion of the name>
@@ -16,6 +16,10 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    ecejacru    03/13/26 - Enh 38961230 - Pylint configuration improvements
+#    prsshukl    02/26/26 - Bug 39013297 - As python3 is default, replacing
+#                           SimpleHTTPServer with http.server
+#    ecejacru    02/05/26 - Bug 38933106: Added minimal logger
 #    aararora    12/02/25 - Bug 38715125: Fix coverage issue when running with
 #                           --coverage option
 #    ririgoye    11/13/25 - Bug 38606501 - Fix coverage issue
@@ -66,6 +70,122 @@ import subprocess as sp
 import difflib
 import six
 import codecs
+
+
+#Convention, Refactor, Warning, Error, Fatal
+VALID_PYLINT_SEVERITIES = ("C", "R", "W", "E", "F")
+
+
+class ebPylintHelper:
+
+    @staticmethod
+    def mNormalizePylintSeverity(aRawValue, aDefaultValue="E"):
+        """
+        Normalize pylint severity letters ensuring they are within the supported set.
+        Automatically includes 'F' when 'E' is present to match historical -E behavior.
+        """
+        _value = aRawValue if aRawValue else aDefaultValue
+
+        if not _value:
+            _value = aDefaultValue
+
+        _letters = set(_value)
+
+        if "E" in _letters:
+            _letters.add("F")
+
+        _ordered = "".join([_letter for _letter in VALID_PYLINT_SEVERITIES if _letter in _letters])
+        if not _ordered:
+            raise ValueError("At least one valid pylint severity letter is required")
+
+        return _ordered
+
+    @staticmethod
+    def mFormatPylintMessage(aEntry, aLabel, aSeverityLetter):
+        """
+        Produce a stable, human readable message for pylint diagnostics.
+        """
+        _path = aEntry.get("path") or ""
+        _basename = os.path.basename(_path) if _path else ""
+        if not _basename:
+            _basename = aEntry.get("module") or "UNKNOWN"
+
+        _line = aEntry.get("line")
+        try:
+            _line = int(_line)
+        except (TypeError, ValueError):
+            _line = "-"
+        else:
+            _line = str(_line)
+
+        _message = aEntry.get("message") or ""
+        _symbol = aEntry.get("symbol") or ""
+        _messageId = aEntry.get("message-id") or ""
+
+        _symbolInfo = ""
+        if _symbol and _messageId:
+            _symbolInfo = "{0}:{1}".format(_symbol, _messageId)
+        elif _symbol:
+            _symbolInfo = _symbol
+        elif _messageId:
+            _symbolInfo = _messageId
+
+        _suffix = " ({0})".format(_symbolInfo) if _symbolInfo else ""
+        return "[{0}:{1}] {2}:{3} {4}{5}".format(aLabel, aSeverityLetter, _basename, _line, _message, _suffix)
+
+    @staticmethod
+    def mClassifyPylintMessages(aMessages, aSeverityLetters, aTxnLines=None, aTxnWarnOnly=False):
+        """
+        Filter pylint JSON diagnostics by severity and transaction scope.
+        Returns tuples of (errors, warnings, skipped_outside_txn).
+        """
+        _retained = []
+        _downgraded = []
+        _skipped = []
+
+        _severitySet = set(aSeverityLetters)
+
+        for _entry in aMessages:
+            _messageId = _entry.get("message-id") or ""
+            _severityLetter = ""
+            if _messageId:
+                _severityLetter = _messageId[0].upper()
+            else:
+                _type = _entry.get("type") or ""
+                _severityLetter = _type[0].upper() if _type else ""
+
+            if _severityLetter not in _severitySet:
+                continue
+
+            _label = _severityLetter
+
+            if aTxnLines is not None:
+                _line = _entry.get("line")
+                try:
+                    _line = int(_line)
+                except (TypeError, ValueError):
+                    _line = None
+
+                _inTxn = False
+                if aTxnLines and _line is not None:
+                    if _line in aTxnLines:
+                        _inTxn = True
+                elif not aTxnLines:
+                    _inTxn = False
+
+                if not _inTxn:
+                    _skipped.append(ebPylintHelper.mFormatPylintMessage(_entry, "OUTSIDE-TXN", _severityLetter))
+                    continue
+
+                _label = "TXN"
+
+            if aTxnWarnOnly:
+                _warnLabel = "TXN-WARN" if aTxnLines is not None else "WARN"
+                _downgraded.append(ebPylintHelper.mFormatPylintMessage(_entry, _warnLabel, _severityLetter))
+            else:
+                _retained.append(ebPylintHelper.mFormatPylintMessage(_entry, _label, _severityLetter))
+
+        return _retained, _downgraded, _skipped
 
 ############
 # CONSTATS #
@@ -143,6 +263,13 @@ class ebExatestLogger():
             _formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
             _fh.setFormatter(_formatter)
             _logger.addHandler(_fh)
+
+            # Add minimal logger
+            _minFileLog = os.path.join(self.__logLocation, "exatest_minimal.log")
+            _minFh = logging.FileHandler(_minFileLog)
+            _minFormatter = logging.Formatter('%(levelname)s - %(message)s')
+            _minFh.setFormatter(_minFormatter)
+            _logger.addHandler(_minFh)
 
             # Add console handler
             _sh = logging.StreamHandler()
@@ -684,11 +811,29 @@ class ebExatestManager:
         else:
             self.mGenerateTestResult(ebExatestState.PASS, aTag, _msg)
 
-    def mRunPylint(self, aFileList):
+    def mRunPylint(self, aFileList, aExtraArgs=None):
 
         self.mGetLog().info("*** Running Pylint ***")
 
-        self.mRunMultiple(aFileList, self.mRunPylintOne, "Pylint", ebExatestRC.PYLINT_ERROR)
+        _effectiveArgs = dict(aExtraArgs) if aExtraArgs else {}
+        _scriptArgs = self.mGetScriptArgs()
+
+        _baseSeverity = None
+        _txnSeverity = None
+
+        if _scriptArgs:
+            _baseSeverity = _scriptArgs.pylint_severity
+            _txnSeverity = _scriptArgs.txn_pylint_severity
+
+        if not _baseSeverity:
+            _baseSeverity = ebPylintHelper.mNormalizePylintSeverity(None)
+
+        _effectiveArgs["severity"] = _baseSeverity
+
+        if _txnSeverity:
+            _effectiveArgs["txn_severity"] = _txnSeverity
+
+        self.mRunMultiple(aFileList, self.mRunPylintOne, "Pylint", ebExatestRC.PYLINT_ERROR, _effectiveArgs)
 
     def mRunPylintOne(self, aFile, aExtraArgs={}):
 
@@ -700,15 +845,72 @@ class ebExatestManager:
         _testfile = re.sub("[^A-Za-z0-9_-]", "_", aFile)
         _testfile = "pylint_{0}".format(_testfile)
 
-        _cmd = "{0} {1} -j 0 -E {2}".format(_python, _pylint, aFile)
+        _txnChangedLines = None
+        if aExtraArgs and "txn_changed_lines" in aExtraArgs:
+            _txnChangedLines = aExtraArgs["txn_changed_lines"].get(aFile, set())
+            if _txnChangedLines is None:
+                _txnChangedLines = set()
+
+        _useTxnTagging = _txnChangedLines is not None
+        _cmd = [_python, _pylint, "-j", "0", "--output-format", "json", aFile]
+
+        _txnWarnOnly = bool(aExtraArgs and aExtraArgs.get("txn_warn_only"))
+        if _txnWarnOnly and not _useTxnTagging:
+            _useTxnTagging = True
+            _txnChangedLines = set()
+
+        _baseSeverity = ebPylintHelper.mNormalizePylintSeverity(None)
+        if aExtraArgs and aExtraArgs.get("severity"):
+            _baseSeverity = ebPylintHelper.mNormalizePylintSeverity(aExtraArgs.get("severity"))
+
+        _activeSeverity = set(_baseSeverity)
+
+        if _useTxnTagging and aExtraArgs and aExtraArgs.get("txn_severity"):
+            _activeSeverity = set(ebPylintHelper.mNormalizePylintSeverity(aExtraArgs.get("txn_severity")))
+
+        _severityText = "".join([_letter for _letter in VALID_PYLINT_SEVERITIES if _letter in _activeSeverity])
+        self.mGetLog().debug("Pylint severity filter: {0}".format(_severityText))
+
+        if _useTxnTagging:
+            if _txnWarnOnly:
+                self.mGetLog().debug("Running Pylint in txn warnings-only mode")
+            else:
+                self.mGetLog().debug("Running Pylint with txn line attribution")
+            _lineScope = len(_txnChangedLines) if _txnChangedLines else 0
+            self.mGetLog().debug("Txn scope lines: {0}".format(_lineScope))
+            if _lineScope == 0:
+                self.mGetLog().debug("No changed lines detected in transaction scope")
+        else:
+            self.mGetLog().debug("Running Pylint without txn scope")
+
         _rc, _out, _err = self.mExecuteLocal(_cmd)
 
-        if _rc == 0:
+        _jsonPayload = _out.strip()
+        if not _jsonPayload and _err and _err.strip().startswith("["):
+            _jsonPayload = _err.strip()
 
-            self.mGenerateTestResult(ebExatestState.PASS, _testfile, _out)
-            return True
-
+        _messages = []
+        if _jsonPayload:
+            try:
+                _messages = json.loads(_jsonPayload)
+            except ValueError:
+                _messages = None
         else:
+            _messages = []
+
+        if _messages is None:
+
+            _payload = (_out + "\n" + _err).strip()
+
+            if _txnWarnOnly and _useTxnTagging:
+                if _payload:
+                    self.mGetLog().warning(_payload)
+                self.mGenerateTestResult(
+                    ebExatestState.PASS,
+                    _testfile,
+                    f"Pylint output suppressed by --txn-warn-only (RC {_rc})"
+                )
+                return True
 
             if _out:
                 self.mGetLog().info(_out)
@@ -720,6 +922,62 @@ class ebExatestManager:
 
             self.mGenerateTestResult(ebExatestState.FAIL, _testfile, _total)
             return False
+
+        _txnScope = _txnChangedLines if _useTxnTagging else None
+
+        _effectiveMessages = []
+        for _entry in _messages:
+            if _entry.get("symbol") == "protected-access":
+                _memberMatch = re.search(r"member ([A-Za-z_][A-Za-z0-9_]*)", _entry.get("message", ""))
+                if _memberMatch:
+                    _memberName = _memberMatch.group(1)
+                    if _memberName.startswith("_") and not _memberName.startswith("__"):
+                        self.mGetLog().debug(
+                            "Suppressing protected-access diagnostic for single underscore member '{0}'".format(_memberName)
+                        )
+                        continue
+            _effectiveMessages.append(_entry)
+
+        _retained, _downgraded, _skipped = ebPylintHelper.mClassifyPylintMessages(
+            _effectiveMessages,
+            _activeSeverity,
+            _txnScope,
+            _txnWarnOnly
+        )
+
+        for _msg in _skipped:
+            self.mGetLog().debug("Skipping pylint diagnostic outside txn: {0}".format(_msg))
+
+        for _msg in _retained:
+            self.mGetLog().error("{0}".format(_msg))
+
+        for _msg in _downgraded:
+            self.mGetLog().warning("{0}".format(_msg))
+
+        if not _retained and not _downgraded:
+            _detail = "No pylint issues found"
+            if _rc != 0:
+                _detail = f"{_detail} (pylint RC {_rc} filtered)"
+            self.mGenerateTestResult(ebExatestState.PASS, _testfile, _detail)
+            return True
+
+        if not _retained and _downgraded:
+            _payloadLines = ["Diagnostics downgraded to warnings:"]
+            _payloadLines.extend(_downgraded)
+            _payload = "\n".join(_payloadLines)
+            self.mGenerateTestResult(ebExatestState.PASS, _testfile, _payload)
+            return True
+
+        _payloadLines = ["Diagnostics:"]
+        _payloadLines.extend(_retained)
+        if _downgraded:
+            _payloadLines.append("Additional diagnostics downgraded to warnings:")
+            _payloadLines.extend(_downgraded)
+
+        _payload = "\n".join(_payloadLines)
+
+        self.mGenerateTestResult(ebExatestState.FAIL, _testfile, _payload)
+        return False
 
     def mRunUnittest(self, aFileList):
         self.mRunMultiple(aFileList, self.mRunUnittestOne, "Unittest", ebExatestRC.UNITTEST_ERROR)
@@ -876,7 +1134,7 @@ class ebExatestManager:
         self.mExecuteLocal(_cmd)
 
         self.mGetLog().debug("*** To coverage result execute ***")
-        self.mGetLog().debug("(cd {0}/coverage_html; python -m SimpleHTTPServer 8000)".format(self.mGetResultDir()))
+        self.mGetLog().debug("(cd {0}/coverage_html; python -m http.server 8000)".format(self.mGetResultDir()))
 
 
     def mCalculateAdeCoverage(self, aAdeFiles):
@@ -931,7 +1189,7 @@ class ebExatestManager:
 
             if not _html:
                 self.mGetLog().debug("Not HTML file")
-                self.mGetLog().info("ADE Coverage in file: {0}/{1} = {2:.2f}%".format(0, 0, 0))
+                self.mGetLog().info("ADE Coverage in file: {0}/{1} = {2:.2f}%".format(0, 0, 0.0))
                 continue
 
             _totalLinesLocal = 0
@@ -970,6 +1228,42 @@ class ebExatestManager:
 
         self.mGetLog().info("*"*10)
         self.mGetLog().info("ADE Coverage total: {0}/{1} = {2:.2f}%\n".format(_execLines, _totalLines, _div))
+
+    def mGetTxnChangedLines(self, aFileList):
+
+        _result = {}
+
+        for _file in aFileList:
+            _result[_file] = self.mGetTxnChangedLinesForFile(_file)
+
+        return _result
+
+    def mGetTxnChangedLinesForFile(self, aFile):
+
+        _cmd = ["ade", "diff", aFile, "-label"]
+        _rc, _out, _err = self.mExecuteLocal(_cmd)
+
+        if _rc not in (0, 1):
+            self.mGetLog().error("Unable to fetch ADE diff for %s: %s", aFile, _err)
+            raise ExatestRuntimeError(ebExatestRC.GENERAL_ERROR)
+
+        _affectedLines = re.findall("\n[0-9,]{1,}[ac]{0,1}([0-9,]{1,})", _out)
+
+        _lineSet = set()
+
+        for _lines in _affectedLines:
+
+            if _lines:
+                if "," in _lines:
+                    _line = _lines.split(",")
+                    _lineSet.update(range(int(_line[0]), int(_line[1]) + 1))
+                else:
+                    _lineSet.add(int(_lines))
+
+        if not _lineSet:
+            self.mGetLog().debug("No ADE diff lines detected for %s", aFile)
+
+        return _lineSet
 
 
     def mRunFortify(self, aFileList):
@@ -1168,7 +1462,25 @@ class ebExatestScript:
 
     def mSetParser(self, aValue):
         self.__parser = aValue
-    
+
+    def mConfigurePylintSeverity(self, aArgs, aParser):
+        try:
+            aArgs.pylint_severity = ebPylintHelper.mNormalizePylintSeverity(aArgs.pylint_severity)
+        except ValueError as _exc:
+            aParser.error(str(_exc))
+
+        if aArgs.txn_pylint_severity:
+            try:
+                aArgs.txn_pylint_severity = ebPylintHelper.mNormalizePylintSeverity(aArgs.txn_pylint_severity)
+            except ValueError as _exc:
+                aParser.error(str(_exc))
+            aArgs.txn = True
+        else:
+            aArgs.txn_pylint_severity = None
+
+        if aArgs.txn_warn_only and not aArgs.txn:
+            aParser.error("--txn-warn-only requires --txn")
+
     def mArgsParse(self):
 
         _parser = argparse.ArgumentParser(description="Exatest: Exacloud Test Framework")
@@ -1187,6 +1499,20 @@ class ebExatestScript:
         _g2.add_argument(
             '-p', '-s', '--pylint', '--srg', dest='srg',
             action="store_true", help='Pylint + JSON Syntax'
+        )
+        _g2.add_argument(
+            '--txn-warn-only', dest='txn_warn_only',
+            action="store_true", help='Downgrade txn lint errors to warnings when used with --srg --txn.'
+        )
+        _g2.add_argument(
+            '--pylint-severity', dest='pylint_severity',
+            default=None,choices=["C", "R", "W", "E", "F"], nargs='+',
+            help='Specify pylint severity letters (subset of CRWEF). Default is E (errors and fatals).'
+        )
+        _g2.add_argument(
+            '--txn-pylint-severity', dest='txn_pylint_severity',
+            default=None,choices=["C", "R", "W", "E", "F"], nargs='+',
+            help='Override pylint severity letters when running with --txn. Implies --txn.'
         )
         _g2.add_argument(
             '-y', '--fortify', dest='fortify',
@@ -1266,6 +1592,7 @@ class ebExatestScript:
         )
 
         _args = _parser.parse_args()
+        self.mConfigurePylintSeverity(_args, _parser)
         self.mSetScriptArgs(_args)
         self.mSetParser(_parser)
         self.mGetManager().mSetScriptArgs(_args)
@@ -1390,7 +1717,14 @@ class ebExatestScript:
                 _optionSelected = True
                 self.mValidateAdeView()
                 _filesNotTest = self.mGetManager().mFilterNotTestFiles(_files)
-                self.mGetManager().mRunPylint(_filesNotTest)
+                _pylintArgs = {}
+                if self.mGetScriptArgs().txn:
+                    _pythonFiles = list(filter(lambda x: x.endswith(".py"), _filesNotTest))
+                    if _pythonFiles:
+                        _pylintArgs["txn_changed_lines"] = self.mGetManager().mGetTxnChangedLines(_pythonFiles)
+                    if self.mGetScriptArgs().txn_warn_only:
+                        _pylintArgs["txn_warn_only"] = True
+                self.mGetManager().mRunPylint(_filesNotTest, _pylintArgs if _pylintArgs else None)
                 self.mGetManager().mValidateJSON(self.mGetScriptArgs().fix_json_style)
 
             if self.mGetScriptArgs().fortify:

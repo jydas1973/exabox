@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     Local - Basic functionality for Local Node Connection
@@ -32,15 +32,59 @@ ebLocalDisconnected = 1 << 1
 
 import subprocess, shlex, socket, shutil
 import os
+import io
+import tempfile
+
 from exabox.log.LogMgr import ebLogError, ebLogInfo, ebLogWarn, ebLogDebug
 from exabox.tools.AttributeWrapper import wrapStrBytesFunctions
 from exabox.recordreplay.record_replay import ebRecordReplay 
 
 class exaBoxLocal(object):
+    def __mCreateTempStream(self, aData):
+        _stream = tempfile.TemporaryFile(mode='w+b')
+        if aData:
+            _stream.write(aData)
+        _stream.seek(0)
+        return wrapStrBytesFunctions(_stream)
+
+    def __mWrapStream(self, aStream):
+        if aStream in (None, subprocess.DEVNULL):
+            return aStream
+        return wrapStrBytesFunctions(aStream)
+
+    def __mRunLocalProcess(self, aArgs, aCurrDir, aStdIn, aStdOut, aStdErr, aTimeout):
+        _proc = subprocess.Popen(
+            aArgs,
+            stdin=aStdIn,
+            stdout=aStdOut,
+            stderr=aStdErr,
+            cwd=aCurrDir,
+            env=self.__env)
+        _stdout_bytes, _stderr_bytes = _proc.communicate(timeout=aTimeout)
+        self.__rc = _proc.returncode
+        self.__proc = wrapStrBytesFunctions(_proc)
+
+        _stdin_stream = wrapStrBytesFunctions(io.BytesIO())
+
+        if aStdOut == subprocess.PIPE:
+            _stdout_stream = self.__mCreateTempStream(_stdout_bytes)
+        elif aStdOut == subprocess.STDOUT:
+            _stdout_stream = None
+        else:
+            _stdout_stream = self.__mWrapStream(aStdOut)
+
+        if aStdErr == subprocess.PIPE:
+            _stderr_stream = self.__mCreateTempStream(_stderr_bytes)
+        elif aStdErr == subprocess.STDOUT:
+            _stderr_stream = _stdout_stream
+        else:
+            _stderr_stream = self.__mWrapStream(aStdErr)
+
+        return _stdin_stream, _stdout_stream, _stderr_stream
 
     def __init__(self, aHost = None, aOptions=None, env=None):
 
-        self.__host     = aHost.split('.')[0]
+        self.__host     = aHost.split('.')[0] if isinstance(aHost, str) else aHost
         self.__options  = aOptions
         self.__env      = env
         self.__state    = ebLocalInitialized
@@ -102,16 +146,13 @@ class exaBoxLocal(object):
             _timeout = aTimeout
             if _timeout:
                 self.__timeout = _timeout
-            _proc = subprocess.Popen(_args, stdin=_stdin, stdout=_std_out, stderr=_stderr, cwd=_current_dir, env=self.__env)
-            self.__proc = wrapStrBytesFunctions(_proc)
-            return wrapStrBytesFunctions(_proc.stdin), wrapStrBytesFunctions(_proc.stdout), wrapStrBytesFunctions(_proc.stderr)
+            return self.__mRunLocalProcess(_args, _current_dir, _stdin, _std_out, _stderr, _timeout)
 
         self.__rc = None
 
         return None, None, None
 
     def mExecuteCmdLog(self, aCmd, aCurrDir=None, aStdIn=subprocess.PIPE, aStdOut=subprocess.PIPE, aStdErr=subprocess.PIPE, aTimeout=None):
-
         # xxx/MR: Removed stdin PIPE
         if aCmd:
             _args = shlex.split(aCmd)
@@ -122,17 +163,22 @@ class exaBoxLocal(object):
             _timeout = aTimeout
             if _timeout:
                 self.__timeout = _timeout
-            cmd = subprocess.Popen(_args, stdin=_stdin, stdout=_std_out, stderr=_stderr, cwd=_current_dir)
-            return (wrapStrBytesFunctions(stream) for stream in (cmd.stdin, cmd.stdout, cmd.stderr))
+            return self.__mRunLocalProcess(_args, _current_dir, _stdin, _std_out, _stderr, _timeout)
 
     @ebRecordReplay.mRecordReplayWrapper
     def mGetCmdExitStatus(self):
+
+        if self.__proc is None and self.__rc is not None:
+            return self.__rc
 
         if self.__proc is None:
             raise Exception('ebLocal::mGetCmdExitStatus : PROC object is invalid')
 
         self.__proc.wait(timeout=self.__timeout)
-        return self.__proc.returncode
+        _status = self.__proc.returncode if self.__proc.returncode is not None else self.__rc
+        if _status is None:
+            raise Exception('ebLocal::mGetCmdExitStatus : PROC exit status unavailable')
+        return _status
 
     def mFileExists(self, aFilename):
 

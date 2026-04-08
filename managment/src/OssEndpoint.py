@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2022, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     Oss Endpoint - Basic functionality
@@ -11,6 +11,8 @@ NOTE:
     None    
 
 History:
+    shapatna    02/09/2026 - Bug: 38900266 - Fix for issues pointed by Codev 
+                             in exabox/management directory
     jesandov    26/03/2019 - File Creation
 """
 
@@ -181,10 +183,7 @@ class OssEndpoint(AsyncTrackEndpoint):
                 _isCreated = True
             
                 self.mAsyncLog(_log, aProcessId, "Create Zip file since is folder'", aDebug=False)
-                _cmd = ["zip"]
-                _cmd.append("-r")
-                _cmd.append("{0}.zip".format(_ossObjName))
-                _cmd.append(_ossObjPath)
+                _cmd = ["zip", "-r", f"{_ossObjName}.zip", _ossObjPath]
                 self.mBashExecution(_cmd)
 
                 _ossObjPath = "{0}.zip".format(_ossObjPath)

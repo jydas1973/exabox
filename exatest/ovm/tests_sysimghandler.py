@@ -1,10 +1,10 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/exatest/ovm/tests_sysimghandler.py /main/20 2025/12/01 22:37:00 avimonda Exp $
+# $Header: ecs/exacloud/exabox/exatest/ovm/tests_sysimghandler.py jesandov_bug-38358445/1 2026/02/09 13:20:48 jesandov Exp $
 #
 # tests_sysimghandler.py
 #
-# Copyright (c) 2023, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2023, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_sysimghandler.py - <one-line expansion of the name>
@@ -16,6 +16,9 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    jesandov    09/02/26 - Bug 38358445 - Add UEFI support
+#    avimonda    12/06/25 - Bug 38610132 - OCI: DBAAS.CREATEEXACCVMCLUSTER
+#                           HANGS /DOES NOT PROGRESS
 #    avimonda    11/05/25 - Bug 38427813 - OCI: EXACS: PROVISIONING FAILED WITH
 #                           EXACLOUD ERROR CODE: 1877 EXACLOUD : ERROR IN
 #                           MULTIPROCESSING(NON-ZERO EXITCODE(-9) RETURNED
@@ -112,9 +115,12 @@ class ebTestSysImgHandler(ebTestClucontrol):
             return "21.1.2.3"
         return None 
 
-    def mock_mGetConfigOptionsRTG(self):
+    def mock_mGetConfigOptions(self):
         # _config_opts = get_gcontext().mGetConfigOptions()
         _config_opts = {}
+        _config_opts["uefi_enabled_exacc"] = "True"
+        _config_opts["uefi_enabled_exadbxs"] = "True"
+        _config_opts["uefi_enabled_exacs"] = "True"
         _config_opts["rtg_enabled_exacc"] = "True"
         _config_opts["rtg_enabled_exadbxs"] = "True"
         _config_opts["rtg_enabled_exacs"] = "True"
@@ -127,7 +133,7 @@ class ebTestSysImgHandler(ebTestClucontrol):
         _files = [f"{_img_name}.bz2"]
         with patch('os.listdir', return_value = _files),\
             patch('os.path.isfile', return_value = True):
-            img = getVMImageArchiveInRepo("20.1.1.0.0",False,False)
+            img = getVMImageArchiveInRepo("20.1.1.0.0",False,False,False)
             self.assertIsNotNone(img)
             self.assertEqual(img["imgBaseName"],_img_name)
             self.assertEqual(img["imgVersion"],"20.1.1.0.0")
@@ -139,7 +145,7 @@ class ebTestSysImgHandler(ebTestClucontrol):
         _files = ["System.first.boot.20.1.1.0.0.xyz"]
         with patch('os.listdir', return_value = _files),\
             patch('os.path.isfile', return_value = True):
-            img = getVMImageArchiveInRepo("20.1.1.0.0",False,False)            
+            img = getVMImageArchiveInRepo("20.1.1.0.0",False,False,False)            
             self.assertIsNone(img)
 
     def test_getNewestVMImageArchiveInRepo(self):
@@ -296,15 +302,15 @@ class ebTestSysImgHandler(ebTestClucontrol):
         _command01 = [
             exaMockCommand("/bin/ls /EXAVMIMAGES " \
                 "| /bin/grep 'System.first.boot.*.img$'", aRc=0, aStdout= 
-                    "System.first.boot.24.1.0.0.0.240517.1.img\n" \
-                    "System.first.boot.24.1.0.0.0.240517.1.kvm.img\n" \
-                    "System.first.boot.24.1.0.0.0.240517.1.rtg.img"
+                    "System.first.boot.26.1.0.0.0.240517.1.img\n" \
+                    "System.first.boot.26.1.0.0.0.240517.1.kvm.img\n" \
+                    "System.first.boot.26.1.0.0.0.240517.1.rtg.img"
                 )
         ]
         _command02 = [
             exaMockCommand("/bin/ls /EXAVMIMAGES " \
                 "| /bin/grep 'System.first.boot.*.img$'", aRc=0, 
-                aStdout="System.first.boot.24.1.0.0.0.240517.1.img")
+                aStdout="System.first.boot.26.1.0.0.0.240517.1.img")
         ]
 
         _cmds = {
@@ -319,12 +325,12 @@ class ebTestSysImgHandler(ebTestClucontrol):
         _expected_map = {
             "scaqab10adm01.us.oracle.com": 
                 [
-                    "System.first.boot.24.1.0.0.0.240517.1.img",
-                    "System.first.boot.24.1.0.0.0.240517.1.kvm.img",
-                    "System.first.boot.24.1.0.0.0.240517.1.rtg.img",
+                    "System.first.boot.26.1.0.0.0.240517.1.img",
+                    "System.first.boot.26.1.0.0.0.240517.1.kvm.img",
+                    "System.first.boot.26.1.0.0.0.240517.1.rtg.img",
                 ],
             "scaqab10adm02.us.oracle.com": 
-                ["System.first.boot.24.1.0.0.0.240517.1.img"]
+                ["System.first.boot.26.1.0.0.0.240517.1.img"]
         }
 
         self.mPrepareMockCommands(_cmds)
@@ -392,7 +398,9 @@ class ebTestSysImgHandler(ebTestClucontrol):
         _ebox_local = self.mGetClubox()
         _rc_status = {_dom0: -1}
 
-        with patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetOciExacc', return_value=False), \
+        with patch.object(self.mGetClubox(), 'mGetExadataDom0Model', return_value='x8-2'), \
+             patch.object(self.mGetClubox(), 'mIsXS', return_value=False), \
+             patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetOciExacc', return_value=False), \
              patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mCheckConfigOption', return_value=None):
             with self.assertRaisesRegex(ExacloudRuntimeError, "Repository download location is None or empty"):
                 mCleanOldImgsAndEnsureGivenImgInDom0(
@@ -442,18 +450,20 @@ class ebTestSysImgHandler(ebTestClucontrol):
 
         _ebox_local = self.mGetClubox()
         _rc_status={_dom0:-1}        
-        
-        mCleanOldImgsAndEnsureGivenImgInDom0(
-            _ebox_local,
-            _dom0,
-            _expected_img,
-            _rc_status,
-            False,
-            tuple(),
-            "image",
-            {"image/System.first.boot.*":"d2fd86..."})
-        # Img not found or nor copied
-        self.assertEqual(_rc_status[_dom0], 0x0730) 
+
+        with patch.object(self.mGetClubox(), 'mGetExadataDom0Model', return_value='x8-2'), \
+             patch.object(self.mGetClubox(), 'mIsXS', return_value=False):
+            mCleanOldImgsAndEnsureGivenImgInDom0(
+                _ebox_local,
+                _dom0,
+                _expected_img,
+                _rc_status,
+                False,
+                tuple(),
+                "image",
+                {"image/System.first.boot.*":"d2fd86..."})
+            # Img not found or nor copied
+            self.assertEqual(_rc_status[_dom0], 0x0730) 
 
     def test_mCleanOldImgsAndEnsureGivenImgInDom0_positive(self):
         _loc = "/EXAVMIMAGES/"
@@ -500,17 +510,19 @@ class ebTestSysImgHandler(ebTestClucontrol):
         _ebox_local = self.mGetClubox()
         _rc_status={_dom0:-1}        
 
-        mCleanOldImgsAndEnsureGivenImgInDom0(
-            _ebox_local,
-            _dom0,
-            _expected_img,
-            _rc_status,
-            False,
-             tuple(),
-            "image",
-            {"image/System.first.boot.*":"d2fd86..."})
-        # Img file was found or copied
-        self.assertNotEqual(_rc_status[_dom0], 0) 
+        with patch.object(self.mGetClubox(), 'mGetExadataDom0Model', return_value='x8-2'), \
+             patch.object(self.mGetClubox(), 'mIsXS', return_value=False):
+            mCleanOldImgsAndEnsureGivenImgInDom0(
+                _ebox_local,
+                _dom0,
+                _expected_img,
+                _rc_status,
+                False,
+                tuple(),
+                "image",
+                {"image/System.first.boot.*":"d2fd86..."})
+            # Img file was found or copied
+            self.assertNotEqual(_rc_status[_dom0], 0) 
 
     def test_mVerifyImagesMultiProc_negative(self):
         _loc = "/EXAVMIMAGES/"
@@ -558,7 +570,9 @@ class ebTestSysImgHandler(ebTestClucontrol):
         _ebox_local = self.mGetClubox()
         _exp_status={_dom0_01: 0x0730, _dom0_02: 0x0730}
        
-        with patch('exabox.ovm.sysimghandler.mGetLocalFileHash', return_value={"image/System.first.boot.*": "d2fd86..."}):
+        with patch('exabox.ovm.sysimghandler.mGetLocalFileHash', return_value={"image/System.first.boot.*": "d2fd86..."}), \
+             patch.object(self.mGetClubox(), 'mGetExadataDom0Model', return_value='x8-2'), \
+             patch.object(self.mGetClubox(), 'mIsXS', return_value=False):
             _rc_status = mVerifyImagesMultiProc(
                 _ebox_local,
                 _expected_img)
@@ -645,13 +659,13 @@ class ebTestSysImgHandler(ebTestClucontrol):
             self.assertIsNotNone(imgInfo)
             self.assertTrue(imgCopied)
 
-    def test_copyVMImageVersionToDom0IfMissing_001_RTG_is_found(self):
+    def test_copyVMImageVersionToDom0IfMissing_001_UEFI_is_found(self):
         #Create args structure
         _cmds = {
             self.mGetRegexDom0("01"): [
                 [
                     # Next command will simulate the RTG file DOES EXIST (1st attempt to search)
-                    exaMockCommand("/bin/test -e /EXAVMIMAGES/System.first.boot.24.1.2.0.0.240812.rtg.img", aRc=0),
+                    exaMockCommand("/bin/test -e /EXAVMIMAGES/System.first.boot.26.1.2.0.0.240812.uefi.img", aRc=0),
                     exaMockCommand("/bin/test -e /sbin/touch", aRc=0),
                 ]
             ]
@@ -660,38 +674,80 @@ class ebTestSysImgHandler(ebTestClucontrol):
         #Init new Args
         self.mPrepareMockCommands(_cmds)
 
-        _img_name = "System.first.boot.24.1.2.0.0.240812.img"
+        _img_name = "System.first.boot.26.1.2.0.0.240812.img"
         _files = [f"{_img_name}.bz2"]
         _imgInfo = {
-         "filePath": "/EXAVMIMAGES/System.first.boot.24.1.2.0.0.240812.rtg.img",
-         "fileBaseName": "System.first.boot.24.1.2.0.0.240812.rtg.img",
-         "imgBaseName": "System.first.boot.24.1.2.0.0.240812.rtg.img",
-         "imgArchiveBaseName": "System.first.boot.24.1.2.0.0.240812.rtg.img.bz2",
-         "imgVersion": "24.1.2.0.0.240812",
+         "filePath": "/EXAVMIMAGES/System.first.boot.26.1.2.0.0.240812.uefi.img",
+         "fileBaseName": "System.first.boot.26.1.2.0.0.240812.uefi.img",
+         "imgBaseName": "System.first.boot.26.1.2.0.0.240812.uefi.img",
+         "imgArchiveBaseName": "System.first.boot.26.1.2.0.0.240812.uefi.img.bz2",
+         "imgVersion": "26.1.2.0.0.240812",
          "isKvmImg": False,
+         "isUefiImg": True,
+         "isRtgImg": False,
+         "isArchive": False
+        }
+        with patch('exabox.core.Context.GlobalContext.mGetConfigOptions',              
+                   side_effect=self.mock_mGetConfigOptions),\
+             patch ('exabox.ovm.clucontrol.exaBoxCluCtrl.mIsKVM', 
+                   return_value=True, aPersist=True):
+            (remoteImgFoundInDom0, imgInfo, imgCopied) = copyVMImageVersionToDom0IfMissing("scaqab10adm01.us.oracle.com","26.1.2.0.0.240812",True,None)
+            self.assertTrue(remoteImgFoundInDom0)
+            self.assertEqual(imgInfo, _imgInfo)
+            self.assertFalse(imgCopied)
+
+    def test_copyVMImageVersionToDom0IfMissing_001_RTG_is_found(self):
+        #Create args structure
+        _cmds = {
+            self.mGetRegexDom0("01"): [
+                [
+                    # Next command will simulate the RTG file DOES EXIST (1st attempt to search)
+                    exaMockCommand("/bin/test -e /EXAVMIMAGES/System.first.boot.26.1.2.0.0.240812.uefi.img", aRc=1),
+                    exaMockCommand("/bin/test -e /EXAVMIMAGES/System.first.boot.26.1.2.0.0.240812.rtg.img", aRc=0),
+                    exaMockCommand("/bin/test -e /sbin/touch", aRc=0),
+                ]
+            ]
+        }
+
+        #Init new Args
+        self.mPrepareMockCommands(_cmds)
+
+        _img_name = "System.first.boot.26.1.2.0.0.240812.img"
+        _files = [f"{_img_name}.bz2"]
+        _imgInfo = {
+         "filePath": "/EXAVMIMAGES/System.first.boot.26.1.2.0.0.240812.rtg.img",
+         "fileBaseName": "System.first.boot.26.1.2.0.0.240812.rtg.img",
+         "imgBaseName": "System.first.boot.26.1.2.0.0.240812.rtg.img",
+         "imgArchiveBaseName": "System.first.boot.26.1.2.0.0.240812.rtg.img.bz2",
+         "imgVersion": "26.1.2.0.0.240812",
+         "isKvmImg": False,
+         "isUefiImg": False,
          "isRtgImg": True,
          "isArchive": False
         }
         with patch('exabox.core.Context.GlobalContext.mGetConfigOptions',              
-                   side_effect=self.mock_mGetConfigOptionsRTG),\
+                   side_effect=self.mock_mGetConfigOptions),\
              patch ('exabox.ovm.clucontrol.exaBoxCluCtrl.mIsKVM', 
                    return_value=True, aPersist=True):
-            (remoteImgFoundInDom0, imgInfo, imgCopied) = copyVMImageVersionToDom0IfMissing("scaqab10adm01.us.oracle.com","24.1.2.0.0.240812",True,None)
+            (remoteImgFoundInDom0, imgInfo, imgCopied) = copyVMImageVersionToDom0IfMissing("scaqab10adm01.us.oracle.com","26.1.2.0.0.240812",True,None)
             self.assertTrue(remoteImgFoundInDom0)
             self.assertEqual(imgInfo, _imgInfo)
             self.assertFalse(imgCopied)
+
 
     def test_copyVMImageVersionToDom0IfMissing_002_RTG_fallback_to_NONRTG(self):
         #Create args structure
         _cmds = {
             self.mGetRegexDom0("01"): [
                 [                    
-                    # Next command will simulate the RTG file DOES NOT exist (1st attempt to search)
-                    exaMockCommand("/bin/test -e /EXAVMIMAGES/System.first.boot.24.1.2.0.0.240812.rtg.img", aRc=1), 
-                    # Next command will simulate the NON_RTG file DOES NOT exist (2nd attempt to search)
-                    exaMockCommand("/bin/test -e /EXAVMIMAGES/System.first.boot.24.1.2.0.0.240812.kvm.img", aRc=1), 
-                    # Next command will simulate the NON_RTG file DOES EXIST (3rd attempt to search)
-                    exaMockCommand("/bin/test -e /EXAVMIMAGES/System.first.boot.24.1.2.0.0.240812.img", aRc=0), 
+                    # Next command will simulate the UEFI file DOES NOT exist (1st attempt to search)
+                    exaMockCommand("/bin/test -e /EXAVMIMAGES/System.first.boot.26.1.2.0.0.240812.uefi.img", aRc=1), 
+                    # Next command will simulate the RTG file DOES NOT exist (2st attempt to search)
+                    exaMockCommand("/bin/test -e /EXAVMIMAGES/System.first.boot.26.1.2.0.0.240812.rtg.img", aRc=1), 
+                    # Next command will simulate the NON_RTG file DOES NOT exist (3nd attempt to search)
+                    exaMockCommand("/bin/test -e /EXAVMIMAGES/System.first.boot.26.1.2.0.0.240812.kvm.img", aRc=1), 
+                    # Next command will simulate the NON_RTG file DOES EXIST (4rd attempt to search)
+                    exaMockCommand("/bin/test -e /EXAVMIMAGES/System.first.boot.26.1.2.0.0.240812.img", aRc=0), 
 
                 ]
             ]
@@ -700,23 +756,24 @@ class ebTestSysImgHandler(ebTestClucontrol):
         #Init new Args
         self.mPrepareMockCommands(_cmds)
 
-        _img_name = "System.first.boot.24.1.2.0.0.240812.img"
+        _img_name = "System.first.boot.26.1.2.0.0.240812.img"
         _files = [f"{_img_name}.bz2"]
         _imgInfo = {
-         "filePath": "/EXAVMIMAGES/System.first.boot.24.1.2.0.0.240812.img",
-         "fileBaseName": "System.first.boot.24.1.2.0.0.240812.img",
-         "imgBaseName": "System.first.boot.24.1.2.0.0.240812.img",
-         "imgArchiveBaseName": "System.first.boot.24.1.2.0.0.240812.img.bz2",
-         "imgVersion": "24.1.2.0.0.240812",
+         "filePath": "/EXAVMIMAGES/System.first.boot.26.1.2.0.0.240812.img",
+         "fileBaseName": "System.first.boot.26.1.2.0.0.240812.img",
+         "imgBaseName": "System.first.boot.26.1.2.0.0.240812.img",
+         "imgArchiveBaseName": "System.first.boot.26.1.2.0.0.240812.img.bz2",
+         "imgVersion": "26.1.2.0.0.240812",
+         "isUefiImg": False,
          "isKvmImg": False,
          "isRtgImg": False,
          "isArchive": False
         }
         with patch('exabox.core.Context.GlobalContext.mGetConfigOptions', 
-                   side_effect=self.mock_mGetConfigOptionsRTG),\
+                   side_effect=self.mock_mGetConfigOptions),\
              patch ('exabox.ovm.clucontrol.exaBoxCluCtrl.mIsKVM', 
                    return_value=True, aPersist=True):
-            (remoteImgFoundInDom0, imgInfo, imgCopied) = copyVMImageVersionToDom0IfMissing("scaqab10adm01.us.oracle.com","24.1.2.0.0.240812",True,None)
+            (remoteImgFoundInDom0, imgInfo, imgCopied) = copyVMImageVersionToDom0IfMissing("scaqab10adm01.us.oracle.com","26.1.2.0.0.240812",True,None)
             self.assertTrue(remoteImgFoundInDom0)
             self.assertEqual(imgInfo, _imgInfo)
             self.assertFalse(imgCopied)    
@@ -726,21 +783,23 @@ class ebTestSysImgHandler(ebTestClucontrol):
         _cmds = {
             self.mGetRegexDom0("01"): [
                 [                    
-                    # Next command will simulate the RTG file DOES NOT exist (1st attempt to search)
-                    exaMockCommand("/bin/test -e /EXAVMIMAGES/System.first.boot.24.1.2.0.0.240812.rtg.img", aRc=1), 
+                    # Next command will simulate the UEFI file DOES NOT exist (1st attempt to search)
+                    exaMockCommand("/bin/test -e /EXAVMIMAGES/System.first.boot.26.1.2.0.0.240812.uefi.img", aRc=1), 
+                    # Next command will simulate the RTG file DOES NOT exist (2st attempt to search)
+                    exaMockCommand("/bin/test -e /EXAVMIMAGES/System.first.boot.26.1.2.0.0.240812.rtg.img", aRc=1), 
                     # Next command will simulate the NON_RTG file DOES NOT exist (2nd attempt to search)
-                    exaMockCommand("/bin/test -e /EXAVMIMAGES/System.first.boot.24.1.2.0.0.240812.kvm.img", aRc=1), 
+                    exaMockCommand("/bin/test -e /EXAVMIMAGES/System.first.boot.26.1.2.0.0.240812.kvm.img", aRc=1), 
                     # Next command will simulate the NON_RTG file DOES NOT EXIST (3rd attempt to search)
-                    exaMockCommand("/bin/test -e /EXAVMIMAGES/System.first.boot.24.1.2.0.0.240812.img", aRc=1), 
+                    exaMockCommand("/bin/test -e /EXAVMIMAGES/System.first.boot.26.1.2.0.0.240812.img", aRc=1), 
                     # Next command will simulate the BZ2 file EXIST in Local and will be copied
                     exaMockCommand("/bin/scp *", aRc=0, aPersist=True),
                     exaMockCommand("/bin/test -e /sbin/pbunzip2", aRc=0),
                     exaMockCommand("/bin/test -e /sbin/touch", aRc=0),
-                    exaMockCommand("touch /EXAVMIMAGES/System.first.boot.24.1.2.0.0.240812.img", aRc=0),
+                    exaMockCommand("touch /EXAVMIMAGES/System.first.boot.26.1.2.0.0.240812.img", aRc=0),
                     exaMockCommand("/sbin/pbunzip2 *", aRc=0), 
-                    exaMockCommand("/bin/test -e /EXAVMIMAGES/System.first.boot.24.1.2.0.0.240812.rtg.img.bz2", aRc=0), 
-                    exaMockCommand("/bin/test -e /EXAVMIMAGES/System.first.boot.24.1.2.0.0.240812.img", aRc=0), 
-                    exaMockCommand("sha256sum /EXAVMIMAGES/System.first.boot.24.1.2.0.0.240812.rtg.img.bz2", aRc=0, aStdout="SOMEHASH SOMEFILE"), 
+                    exaMockCommand("/bin/test -e /EXAVMIMAGES/System.first.boot.26.1.2.0.0.240812.rtg.img.bz2", aRc=0), 
+                    exaMockCommand("/bin/test -e /EXAVMIMAGES/System.first.boot.26.1.2.0.0.240812.img", aRc=0), 
+                    exaMockCommand("sha256sum /EXAVMIMAGES/System.first.boot.26.1.2.0.0.240812.rtg.img.bz2", aRc=0, aStdout="SOMEHASH SOMEFILE"), 
                 ]
             ]
         }
@@ -749,29 +808,30 @@ class ebTestSysImgHandler(ebTestClucontrol):
         self.mPrepareMockCommands(_cmds)
 
         # We are simulating RTG file will exist in Local Repo
-        _img_name = "System.first.boot.24.1.2.0.0.240812.rtg.img"
+        _img_name = "System.first.boot.26.1.2.0.0.240812.rtg.img"
         _files = [f"{_img_name}.bz2"]
         with patch('os.listdir', return_value = _files),\
             patch('os.path.isfile', return_value = True),\
             patch('exabox.core.Context.GlobalContext.mGetConfigOptions', 
-                   side_effect=self.mock_mGetConfigOptionsRTG),\
+                   side_effect=self.mock_mGetConfigOptions),\
             patch('exabox.core.Node.exaBoxNode.mCompareFiles',
                    return_value = True),\
             patch ('exabox.ovm.clucontrol.exaBoxCluCtrl.mIsKVM', 
                    return_value=True, aPersist=True), \
              patch('exabox.ovm.sysimghandler.mGetVMImageArchiveInfoInLocalRepo', return_value={
-                 'filePath': '/EXAVMIMAGES/System.first.boot.24.1.2.0.0.240812.rtg.img.bz2',
-                 'fileBaseName': 'System.first.boot.24.1.2.0.0.240812.rtg.img.bz2',
-                 'imgBaseName': 'System.first.boot.24.1.2.0.0.240812.rtg.img',
-                 'imgArchiveBaseName': 'System.first.boot.24.1.2.0.0.240812.rtg.img.bz2',
-                 'imgVersion': '24.1.2.0.0.240812',
+                 'filePath': '/EXAVMIMAGES/System.first.boot.26.1.2.0.0.240812.rtg.img.bz2',
+                 'fileBaseName': 'System.first.boot.26.1.2.0.0.240812.rtg.img.bz2',
+                 'imgBaseName': 'System.first.boot.26.1.2.0.0.240812.rtg.img',
+                 'imgArchiveBaseName': 'System.first.boot.26.1.2.0.0.240812.rtg.img.bz2',
+                 'imgVersion': '26.1.2.0.0.240812',
                  'isKvmImg': False,
                  'isRtgImg': True,
+                 'isUefiImg': False,
                  'isArchive': True
              }):
             (remoteImgFoundInDom0, imgInfo, imgCopied) = copyVMImageVersionToDom0IfMissing(
                 aDom0="scaqab10adm01.us.oracle.com",
-                aVersion="24.1.2.0.0.240812",
+                aVersion="26.1.2.0.0.240812",
                 aIsKvm=True,
                 aImageBaseLocation=None,
                 aLocalFileHash={"image/System.first.boot.*":"d2fd86..."})
@@ -784,22 +844,24 @@ class ebTestSysImgHandler(ebTestClucontrol):
         _cmds = {
             self.mGetRegexDom0("01"): [
                 [                    
-                    exaMockCommand("/bin/ls /EXAVMIMAGES/*", aStdout="System.first.boot.24.1.2.0.0.240812.rtg.img", aPersist=True),
-                    # Next command will simulate the RTG file DOES NOT exist (1st attempt to search)
-                    exaMockCommand("/bin/test -e /EXAVMIMAGES/System.first.boot.24.1.2.0.0.240812.rtg.img", aRc=1), 
-                    # Next command will simulate the NON_RTG file DOES NOT exist (2nd attempt to search)
-                    exaMockCommand("/bin/test -e /EXAVMIMAGES/System.first.boot.24.1.2.0.0.240812.kvm.img", aRc=1), 
-                    # Next command will simulate the NON_RTG file DOES NOT EXIST (3rd attempt to search)
-                    exaMockCommand("/bin/test -e /EXAVMIMAGES/System.first.boot.24.1.2.0.0.240812.img", aRc=1), 
+                    exaMockCommand("/bin/ls /EXAVMIMAGES/*", aStdout="System.first.boot.26.1.2.0.0.240812.rtg.img", aPersist=True),
+                    # Next command will simulate the UEFI file DOES NOT exist (1st attempt to search)
+                    exaMockCommand("/bin/test -e /EXAVMIMAGES/System.first.boot.26.1.2.0.0.240812.uefi.img", aRc=1), 
+                    # Next command will simulate the RTG file DOES NOT exist (2st attempt to search)
+                    exaMockCommand("/bin/test -e /EXAVMIMAGES/System.first.boot.26.1.2.0.0.240812.rtg.img", aRc=1), 
+                    # Next command will simulate the NON_RTG file DOES NOT exist (3nd attempt to search)
+                    exaMockCommand("/bin/test -e /EXAVMIMAGES/System.first.boot.26.1.2.0.0.240812.kvm.img", aRc=1), 
+                    # Next command will simulate the NON_RTG file DOES NOT EXIST (4rd attempt to search)
+                    exaMockCommand("/bin/test -e /EXAVMIMAGES/System.first.boot.26.1.2.0.0.240812.img", aRc=1), 
                     # Next command will simulate the BZ2 file EXIST in Local and will be copied
                     exaMockCommand("/bin/scp *", aRc=0, aPersist=True),
                     exaMockCommand("/bin/test -e /sbin/pbunzip2", aRc=0),
                     exaMockCommand("/sbin/pbunzip2 *", aRc=0), 
                     exaMockCommand("/bin/test -e /sbin/touch", aRc=0),
-                    exaMockCommand("touch /EXAVMIMAGES/System.first.boot.24.1.2.0.0.240812.img", aRc=0),
-                    exaMockCommand("/bin/test -e /EXAVMIMAGES/System.first.boot.24.1.2.0.0.240812.img", aRc=0), 
-                    exaMockCommand("/bin/test -e /EXAVMIMAGES/System.first.boot.24.1.2.0.0.240812.img.bz2", aRc=0), 
-                    exaMockCommand("/bin/mv /EXAVMIMAGES/System.first.boot.24.1.2.0.0.240812.kvm.img *", aRc=0)
+                    exaMockCommand("touch /EXAVMIMAGES/System.first.boot.26.1.2.0.0.240812.img", aRc=0),
+                    exaMockCommand("/bin/test -e /EXAVMIMAGES/System.first.boot.26.1.2.0.0.240812.img", aRc=0), 
+                    exaMockCommand("/bin/test -e /EXAVMIMAGES/System.first.boot.26.1.2.0.0.240812.img.bz2", aRc=0), 
+                    exaMockCommand("/bin/mv /EXAVMIMAGES/System.first.boot.26.1.2.0.0.240812.kvm.img *", aRc=0)
                 ]
             ]
         }
@@ -808,30 +870,30 @@ class ebTestSysImgHandler(ebTestClucontrol):
         self.mPrepareMockCommands(_cmds)
 
         # We are simulating RTG file will exist in Local Repo
-        _img_name = "System.first.boot.24.1.2.0.0.240812.kvm.img"
+        _img_name = "System.first.boot.26.1.2.0.0.240812.kvm.img"
         _files = [f"{_img_name}.bz2"]
         with patch('os.listdir', return_value=_files),\
             patch('os.path.isfile', return_value=True),\
             patch('exabox.core.Context.GlobalContext.mGetConfigOptions', 
-                side_effect=self.mock_mGetConfigOptionsRTG),\
+                side_effect=self.mock_mGetConfigOptions),\
             patch('exabox.core.Node.exaBoxNode.mCompareFiles', return_value=True),\
             patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mIsKVM', return_value=True, aPersist=True),\
             patch('exabox.ovm.sysimghandler.mGetVMImageArchiveInfoInLocalRepo', return_value={
-                'filePath': '/EXAVMIMAGES/System.first.boot.24.1.2.0.0.240812.kvm.img.bz2',
-                'fileBaseName': 'System.first.boot.24.1.2.0.0.240812.kvm.img.bz2',
-                'imgBaseName': 'System.first.boot.24.1.2.0.0.240812.kvm.img',
-                'imgArchiveBaseName': 'System.first.boot.24.1.2.0.0.240812.kvm.img.bz2',
-                'imgVersion': '24.1.2.0.0.240812',
+                'filePath': '/EXAVMIMAGES/System.first.boot.26.1.2.0.0.240812.kvm.img.bz2',
+                'fileBaseName': 'System.first.boot.26.1.2.0.0.240812.kvm.img.bz2',
+                'imgBaseName': 'System.first.boot.26.1.2.0.0.240812.kvm.img',
+                'imgArchiveBaseName': 'System.first.boot.26.1.2.0.0.240812.kvm.img.bz2',
+                'imgVersion': '26.1.2.0.0.240812',
                 'isKvmImg': True,
                 'isRtgImg': False,
                 'isArchive': True
             }):
             (remoteImgFoundInDom0, imgInfo, imgCopied) = copyVMImageVersionToDom0IfMissing(
                 aDom0="scaqab10adm01.us.oracle.com",
-                aVersion="24.1.2.0.0.240812",
+                aVersion="26.1.2.0.0.240812",
                 aIsKvm=True,
                 aImageBaseLocation=None,
-                aLocalFileHash={"image/System.first.boot.24.1.2.0.0.240812.kvm.img":"d2fd86..."})
+                aLocalFileHash={"image/System.first.boot.26.1.2.0.0.240812.kvm.img":"d2fd86..."})
             self.assertFalse(remoteImgFoundInDom0)
             self.assertIsNotNone(imgInfo)  # This should now pass
             self.assertTrue(imgCopied)
@@ -865,11 +927,11 @@ class ebTestSysImgHandler(ebTestClucontrol):
         _ebox_local = self.mGetClubox()
 
         # This tests __getVMImagesInRepo() internally
-        _img_name = "System.first.boot.24.1.0.0.0.rtg.img"
+        _img_name = "System.first.boot.26.1.0.0.0.rtg.img"
         _files = [f"{_img_name}.bz2"]
         with patch('os.listdir', return_value = _files),\
             patch('os.path.isfile', return_value = True):
-            _tuple = mIsRtgImgPresent(_ebox_local,"24.1.0.0.0")
+            _tuple = mIsRtgImgPresent(_ebox_local,"26.1.0.0.0")
             self.assertEqual(_tuple, _expected_tuple)
 
     def test_mIsRtgImgPresent_Dom0Only(self):
@@ -877,7 +939,7 @@ class ebTestSysImgHandler(ebTestClucontrol):
         _command01 = [
             exaMockCommand("/bin/ls /EXAVMIMAGES " \
                 "| /bin/grep 'System.first.boot.*.img$'", 
-                aRc=0, aStdout="System.first.boot.24.1.0.0.0.rtg.img")
+                aRc=0, aStdout="System.first.boot.26.1.0.0.0.rtg.img")
         ]
         _command02 = [
             exaMockCommand("/bin/ls /EXAVMIMAGES " \
@@ -901,11 +963,11 @@ class ebTestSysImgHandler(ebTestClucontrol):
         _ebox_local = self.mGetClubox()
 
         # This tests __getVMImagesInRepo() internally
-        _img_name = "System.first.boot.24.1.0.0.0.img"
+        _img_name = "System.first.boot.26.1.0.0.0.img"
         _files = [f"{_img_name}.bz2"]
         with patch('os.listdir', return_value = _files),\
             patch('os.path.isfile', return_value = True):
-            _tuple = mIsRtgImgPresent(_ebox_local,"24.1.0.0.0")
+            _tuple = mIsRtgImgPresent(_ebox_local,"26.1.0.0.0")
             self.assertEqual(_tuple, _expected_tuple)            
 
     def test_mIsRtgImgPresent_Negative(self):
@@ -917,14 +979,14 @@ class ebTestSysImgHandler(ebTestClucontrol):
             # Dom0 MAY have other RTG's 
             exaMockCommand("/bin/ls /EXAVMIMAGES " \
                 "| /bin/grep 'System.first.boot.*.img$'", 
-                aRc=0, aStdout="System.first.boot.24.1.1.0.0.rtg.img\n" \
-                    "System.first.boot.24.1.2.0.0.rtg.img")
+                aRc=0, aStdout="System.first.boot.26.1.1.0.0.rtg.img\n" \
+                    "System.first.boot.26.1.2.0.0.rtg.img")
         ]
         _command02 = [
             exaMockCommand("/bin/ls /EXAVMIMAGES " \
                 "| /bin/grep 'System.first.boot.*.img$'", 
                 aRc=0, aStdout="System.first.boot.23.1.0.0.0.img\n"
-                    "System.first.boot.24.1.2.0.0.rtg.img")
+                    "System.first.boot.26.1.2.0.0.rtg.img")
         ]
 
         _cmds = {
@@ -943,11 +1005,11 @@ class ebTestSysImgHandler(ebTestClucontrol):
         _ebox_local = self.mGetClubox()
 
         # This tests __getVMImagesInRepo() internally
-        _img_name = "System.first.boot.24.1.0.0.0.img"
+        _img_name = "System.first.boot.26.1.0.0.0.img"
         _files = [f"{_img_name}.bz2"]
         with patch('os.listdir', return_value = _files),\
             patch('os.path.isfile', return_value = True):
-            _tuple = mIsRtgImgPresent(_ebox_local,"24.1.0.0.0")
+            _tuple = mIsRtgImgPresent(_ebox_local,"26.1.0.0.0")
             self.assertEqual(_tuple, _expected_tuple)          
 
     @patch('exabox.core.Node.exaBoxNode')
@@ -995,28 +1057,28 @@ class ebTestSysImgHandler(ebTestClucontrol):
     def test_mGetVMImageArchiveInfoInRepo_RTG_ExactMatch(self):
         with patch('exabox.ovm.sysimghandler.getVMImageArchiveInRepo') as mock_get_archive:
             mock_get_archive.side_effect = [
-                {'isArchive': True, 'imgVersion': '24.1.0.0.0', 'isKvmImg': False, 'isRtgImg': True, 'filePath': 'image/System.first.boot.24.1.0.0.0.rtg.img.bz2'},
+                {'isArchive': True, 'imgVersion': '26.1.0.0.0', 'isKvmImg': False, 'isRtgImg': True, 'filePath': 'image/System.first.boot.26.1.0.0.0.rtg.img.bz2'},
                 None,
                 None
             ]
-            result = mGetVMImageArchiveInfoInLocalRepo('24.1.0.0.0', 'image')
+            result = mGetVMImageArchiveInfoInLocalRepo('26.1.0.0.0', 'image')
             self.assertIsNotNone(result)
             self.assertTrue(result['isRtgImg'])
             self.assertFalse(result['isKvmImg'])
-            self.assertEqual(result['filePath'], 'image/System.first.boot.24.1.0.0.0.rtg.img.bz2')
+            self.assertEqual(result['filePath'], 'image/System.first.boot.26.1.0.0.0.rtg.img.bz2')
 
     def test_mGetVMImageArchiveInfoInRepo_RTG_Fallback_NonRTG(self):
         with patch('exabox.ovm.sysimghandler.getVMImageArchiveInRepo') as mock_get_archive:
             mock_get_archive.side_effect = [
                 None,
-                {'isArchive': True, 'imgVersion': '24.1.0.0.0', 'isKvmImg': True, 'isRtgImg': False, 'filePath': 'image/System.first.boot.24.1.0.0.0.kvm.img.bz2'},
+                {'isArchive': True, 'imgVersion': '26.1.0.0.0', 'isKvmImg': True, 'isRtgImg': False, 'filePath': 'image/System.first.boot.26.1.0.0.0.kvm.img.bz2'},
                 None
             ]
-            result = mGetVMImageArchiveInfoInLocalRepo('24.1.0.0.0', 'image')
+            result = mGetVMImageArchiveInfoInLocalRepo('26.1.0.0.0', 'image')
             self.assertIsNotNone(result)
             self.assertFalse(result['isRtgImg'])
             self.assertTrue(result['isKvmImg'])
-            self.assertEqual(result['filePath'], 'image/System.first.boot.24.1.0.0.0.kvm.img.bz2')
+            self.assertEqual(result['filePath'], 'image/System.first.boot.26.1.0.0.0.kvm.img.bz2')
 
     def test_mGetVMImageArchiveInfoInRepo_RTG_Fallback_NonKVM_NonRTG(self):
         with patch('exabox.ovm.sysimghandler.getVMImageArchiveInRepo') as mock_get_archive, \
@@ -1024,18 +1086,18 @@ class ebTestSysImgHandler(ebTestClucontrol):
             
             mock_get_archive.side_effect = [
                 None,
-                {'isArchive': True, 'imgVersion': '24.1.0.0.0', 'isKvmImg': False, 'isRtgImg': False, 'filePath': 'image/System.first.boot.24.1.0.0.0.img.bz2'}
+                {'isArchive': True, 'imgVersion': '26.1.0.0.0', 'isKvmImg': False, 'isRtgImg': False, 'filePath': 'image/System.first.boot.26.1.0.0.0.img.bz2'}
             ]
-            result = mGetVMImageArchiveInfoInLocalRepo('24.1.0.0.0', 'image')
+            result = mGetVMImageArchiveInfoInLocalRepo('26.1.0.0.0', 'image')
             self.assertIsNotNone(result)
             self.assertFalse(result['isRtgImg'])
             self.assertFalse(result['isKvmImg'])
-            self.assertEqual(result['filePath'], 'image/System.first.boot.24.1.0.0.0.img.bz2')
+            self.assertEqual(result['filePath'], 'image/System.first.boot.26.1.0.0.0.img.bz2')
 
     def test_mGetVMImageArchiveInfoInRepo_NoMatch(self):
         with patch('exabox.ovm.sysimghandler.getVMImageArchiveInRepo') as mock_get_archive:
             mock_get_archive.return_value = None
-            result = mGetVMImageArchiveInfoInLocalRepo('24.1.0.0.0', 'image')
+            result = mGetVMImageArchiveInfoInLocalRepo('26.1.0.0.0', 'image')
             self.assertIsNone(result)
 
     def test_mGetVMImageArchiveInfoInRepo_EmptyVersion(self):
@@ -1052,32 +1114,32 @@ class ebTestSysImgHandler(ebTestClucontrol):
              patch('exabox.core.Node.exaBoxNode.mDisconnect') as mock_disconnect:
             # Typical case: successful checksum calculation
             mock_exists.return_value = True
-            mock_execute.return_value = (0, None, b'd2fd86...  image/System.first.boot.24.1.2.0.0.240812.img\n', b'')
-            result = mGetLocalFileHash('image/System.first.boot.24.1.2.0.0.240812.img')
+            mock_execute.return_value = (0, None, b'd2fd86...  image/System.first.boot.26.1.2.0.0.240812.img\n', b'')
+            result = mGetLocalFileHash('image/System.first.boot.26.1.2.0.0.240812.img')
             self.assertIsNotNone(result)
-            self.assertEqual(result, {"image/System.first.boot.24.1.2.0.0.240812.img": "d2fd86..."})
+            self.assertEqual(result, {"image/System.first.boot.26.1.2.0.0.240812.img": "d2fd86..."})
 
             # Edge case: file does not exist
             mock_exists.return_value = False
-            result = mGetLocalFileHash('image/System.first.boot.24.1.2.0.0.240812.img')
+            result = mGetLocalFileHash('image/System.first.boot.26.1.2.0.0.240812.img')
             self.assertIsNone(result)
 
             # Edge case: sha256sum command fails
             mock_exists.return_value = True
             mock_execute.return_value = (1, None, b'', b'error message')
-            result = mGetLocalFileHash('image/System.first.boot.24.1.2.0.0.240812.img')
+            result = mGetLocalFileHash('image/System.first.boot.26.1.2.0.0.240812.img')
             self.assertIsNone(result)
 
             # Edge case: sha256sum produces no output
             mock_execute.return_value = (0, None, b'', b'')
-            result = mGetLocalFileHash('image/System.first.boot.24.1.2.0.0.240812.img')
+            result = mGetLocalFileHash('image/System.first.boot.26.1.2.0.0.240812.img')
             self.assertIsNone(result)
 
 
     def test_mCompareFiles_TypicalMatch(self):
         _dom0 = "scaqab10adm01.us.oracle.com"
-        _local_file = "image/System.first.boot.24.1.2.0.0.240812.img"
-        _remote_file = "/EXAVMIMAGES/System.first.boot.24.1.2.0.0.240812.img"
+        _local_file = "image/System.first.boot.26.1.2.0.0.240812.img"
+        _remote_file = "/EXAVMIMAGES/System.first.boot.26.1.2.0.0.240812.img"
         _hash_value = "d2fd86abc..."
         
         _cmds = {
@@ -1101,8 +1163,8 @@ class ebTestSysImgHandler(ebTestClucontrol):
 
     def test_mCompareFiles_TypicalMismatch(self):
         _dom0 = "scaqab10adm01.us.oracle.com"
-        _local_file = "image/System.first.boot.24.1.2.0.0.240812.img"
-        _remote_file = "/EXAVMIMAGES/System.first.boot.24.1.2.0.0.240812.img"
+        _local_file = "image/System.first.boot.26.1.2.0.0.240812.img"
+        _remote_file = "/EXAVMIMAGES/System.first.boot.26.1.2.0.0.240812.img"
         _local_hash = "d2fd86abc..."
         _remote_hash = "different_hash..."
         
@@ -1127,8 +1189,8 @@ class ebTestSysImgHandler(ebTestClucontrol):
 
     def test_mCompareFiles_LocalFileNotExists(self):
         _dom0 = "scaqab10adm01.us.oracle.com"
-        _local_file = "image/System.first.boot.24.1.2.0.0.240812.img"
-        _remote_file = "/EXAVMIMAGES/System.first.boot.24.1.2.0.0.240812.img"
+        _local_file = "image/System.first.boot.26.1.2.0.0.240812.img"
+        _remote_file = "/EXAVMIMAGES/System.first.boot.26.1.2.0.0.240812.img"
         
         _cmds = {
             self.mGetRegexDom0(): [
@@ -1149,8 +1211,8 @@ class ebTestSysImgHandler(ebTestClucontrol):
 
     def test_mCompareFiles_RemoteFileNotExists(self):
         _dom0 = "scaqab10adm01.us.oracle.com"
-        _local_file = "image/System.first.boot.24.1.2.0.0.240812.img"
-        _remote_file = "/EXAVMIMAGES/System.first.boot.24.1.2.0.0.240812.img"
+        _local_file = "image/System.first.boot.26.1.2.0.0.240812.img"
+        _remote_file = "/EXAVMIMAGES/System.first.boot.26.1.2.0.0.240812.img"
         
         _cmds = {
             self.mGetRegexDom0(): [
@@ -1170,7 +1232,7 @@ class ebTestSysImgHandler(ebTestClucontrol):
 
     def test_mGetRemoteFileCksum_TypicalSuccess(self):
         _dom0 = "scaqab10adm01.us.oracle.com"
-        _remote_file = "/EXAVMIMAGES/System.first.boot.24.1.2.0.0.240812.img"
+        _remote_file = "/EXAVMIMAGES/System.first.boot.26.1.2.0.0.240812.img"
         _hash_value = "d2fd86abc..."
         
         _cmds = {
@@ -1193,7 +1255,7 @@ class ebTestSysImgHandler(ebTestClucontrol):
 
     def test_mGetRemoteFileCksum_FileNotExists(self):
         _dom0 = "scaqab10adm01.us.oracle.com"
-        _remote_file = "/EXAVMIMAGES/System.first.boot.24.1.2.0.0.240812.img"
+        _remote_file = "/EXAVMIMAGES/System.first.boot.26.1.2.0.0.240812.img"
         
         _cmds = {
             self.mGetRegexDom0(): [
@@ -1212,7 +1274,7 @@ class ebTestSysImgHandler(ebTestClucontrol):
 
     def test_mGetRemoteFileCksum_CommandFails(self):
         _dom0 = "scaqab10adm01.us.oracle.com"
-        _remote_file = "/EXAVMIMAGES/System.first.boot.24.1.2.0.0.240812.img"
+        _remote_file = "/EXAVMIMAGES/System.first.boot.26.1.2.0.0.240812.img"
         
         _cmds = {
             self.mGetRegexDom0(): [
@@ -1233,7 +1295,7 @@ class ebTestSysImgHandler(ebTestClucontrol):
         self.assertIsNone(result)
 
     def test_mGetLocalFileCksum_TypicalSuccess(self):
-        _local_file = "image/System.first.boot.24.1.2.0.0.240812.img"
+        _local_file = "image/System.first.boot.26.1.2.0.0.240812.img"
         _hash_value = "d2fd86abc..."
         
         node = exaBoxNode(get_gcontext())
@@ -1245,7 +1307,7 @@ class ebTestSysImgHandler(ebTestClucontrol):
             self.assertEqual(result, _hash_value)
 
     def test_mGetLocalFileCksum_FileNotExists(self):
-        _local_file = "image/System.first.boot.24.1.2.0.0.240812.img"
+        _local_file = "image/System.first.boot.26.1.2.0.0.240812.img"
         
         node = exaBoxNode(get_gcontext())
         
@@ -1254,7 +1316,7 @@ class ebTestSysImgHandler(ebTestClucontrol):
             self.assertIsNone(result)
 
     def test_mGetLocalFileCksum_CommandFails(self):
-        _local_file = "image/System.first.boot.24.1.2.0.0.240812.img"
+        _local_file = "image/System.first.boot.26.1.2.0.0.240812.img"
         
         node = exaBoxNode(get_gcontext())
         

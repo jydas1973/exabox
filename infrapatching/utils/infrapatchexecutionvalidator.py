@@ -1,10 +1,10 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/infrapatching/utils/infrapatchexecutionvalidator.py /main/28 2025/08/29 06:28:17 araghave Exp $
+# $Header: ecs/exacloud/exabox/infrapatching/utils/infrapatchexecutionvalidator.py /main/29 2026/01/13 09:51:33 nelango Exp $
 #
 # infrapatchexecutionvalidator.py
 #
-# Copyright (c) 2023, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2023, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      infrapatchexecutionvalidator.py - Validates whether the API will be executed or not
@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    nelango     01/09/26 - Bug 38676078 - Add IPMI servicestate for exacs
 #    araghave    06/24/25 - Enhancement Request 38082882 - HANDLING EXACLOUD
 #                           ELU CHANGES FOR DOM0 PATCHING
 #    sdevasek    02/14/25 - ENH 37496197 - INFRAPATCHING TEST AUTOMATION -
@@ -541,16 +542,11 @@ class InfrapatchExecutionValidator:
 
          Skip this check in case of an exasplice patch operation
          or the patch operation type is not upgrade.
-         or the environment is not EXACC
          or the parameter enable_service_state_on_iloms_priorto_dom0_cell_patching
          is set to False in infrapatching.conf.
         '''
         if self.__targetHandlerInstance is None:
             ebLogInfo("TargetHandler Instance is None in enableServiceStateOnIlomsPriorToDom0CellPatchingEnabled. Returning False")
-            return False
-
-        if not self.__targetHandlerInstance.mIsExaCC():
-            ebLogInfo("enableServiceStateOnIlomsPriorToDom0CellPatchingEnabled method is applicable only to EXACC environments.")
             return False
 
         _enable_service_state_on_iloms_priorto_dom0_cell_patching = mGetInfraPatchingConfigParam('enable_service_state_on_iloms_priorto_dom0_cell_patching')

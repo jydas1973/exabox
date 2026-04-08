@@ -4,7 +4,7 @@
 #
 # sopexecutescripts.py
 #
-# Copyright (c) 2023, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2023, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      sopexecutescripts.py - <one-line expansion of the name>
@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    aararora    02/27/26 - Bug 38902170: Correct resource leak issues
 #    aypaul      06/17/25 - Bug#37990012 Improve error logging for non
 #                           reachable iloms.
 #    ririgoye    06/02/25 - Bug 38014410 - SOP: REMOTE EXECUTION FAILED DUE TO 
@@ -437,11 +438,13 @@ class SOPExecution():
                             if _connected_node.mFileExists(_return_json_path):
                                 ebLogTrace(f"Fetching execution_output.json from {_return_json_path} on remote host: {_node}")
                                 if isLocal:
-                                    _cmd_op["return_json"] = json.load(open(_return_json_path, 'r'))
+                                    with open(_return_json_path, 'r') as _fh:
+                                        _cmd_op["return_json"] = json.load(_fh)
                                 else:
                                     _local_return_json_path = f"/tmp/{uuid.uuid1()}_execution_output.json"
                                     _connected_node.mCopy2Local(_return_json_path, _local_return_json_path)
-                                    _cmd_op["return_json"] = json.load(open(_local_return_json_path, 'r'))
+                                    with open(_local_return_json_path, 'r') as _fh:
+                                        _cmd_op["return_json"] = json.load(_fh)
                             else:
                                 ebLogWarn(f"Return json is configured but script did not produce any execution_output.json at {_return_json_path}")
                         self.__output[_node] = _cmd_op
@@ -481,11 +484,13 @@ class SOPExecution():
                         if _connected_node.mFileExists(_return_json_path):
                             ebLogTrace(f"Fetching execution_output.json from {_return_json_path} on remote host: {_node}")
                             if isLocal:
-                                _cmd_op["return_json"] = json.load(open(_return_json_path, 'r'))
+                                with open(_return_json_path, 'r') as _fh:
+                                    _cmd_op["return_json"] = json.load(_fh)
                             else:
                                 _local_return_json_path = f"/tmp/{uuid.uuid1()}_execution_output.json"
                                 _connected_node.mCopy2Local(_return_json_path, _local_return_json_path)
-                                _cmd_op["return_json"] = json.load(open(_local_return_json_path, 'r'))
+                                with open(_local_return_json_path, 'r') as _fh:
+                                    _cmd_op["return_json"] = json.load(_fh)
                         else:
                             ebLogWarn(f"Return json is configured but script did not produce any execution_output.json at {_return_json_path}")
                     ebLogTrace(f"Command output: {_cmd_op}")

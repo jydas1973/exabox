@@ -1,9 +1,9 @@
 #
-# $Header: ecs/exacloud/exabox/infrapatching/handlers/targetHandler/infrapatchmgrhandler.py /main/19 2025/11/08 08:54:10 araghave Exp $
+# $Header: ecs/exacloud/exabox/infrapatching/handlers/targetHandler/infrapatchmgrhandler.py remamid_bug-38983193/2 2026/03/04 17:32:56 remamid Exp $
 #
 # infrapatchmgrhandler.py
 #
-# Copyright (c) 2024, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2024, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      infrapatchmgrhandler.py - <one-line expansion of the name>
@@ -17,6 +17,9 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    remamid     02/19/26 - Revert 38671388
+#    remamid     12/16/25 - Add error message when domu nohup patchmgr
+#                           execution fails bug 38671388
 #    araghave    09/11/25 - Enh 38173247 - EXACLOUD CHANGES TO SUPPORT DOMU ELU
 #                           INFRA PATCH OPERATIONS
 #    araghave    06/24/25 - Enhancement Request 38082882 - HANDLING EXACLOUD
@@ -574,7 +577,6 @@ class InfraPatchManager(PatchManager):
 
             # Execute patchmgr command
             _node.mExecuteCmdLog(aPatchMgrCmd)
-
             if aPrepareRoceVerifyCfgCmd and int(_node.mGetCmdExitStatus()) != 0:
                 '''
                   Verify config can fail in some environements due to misconfiguration

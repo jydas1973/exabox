@@ -1,9 +1,9 @@
 #
-# $Header: ecs/exacloud/exabox/infrapatching/handlers/targetHandler/switchhandler.py /main/39 2025/09/02 17:58:33 ajayasin Exp $
+# $Header: ecs/exacloud/exabox/infrapatching/handlers/targetHandler/switchhandler.py /main/40 2026/01/15 05:47:57 araghave Exp $
 #
 # switchhandler.py
 #
-# Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      switchhandler.py - Patch - Switch Basic Functionality
@@ -15,6 +15,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    araghave    12/16/25 - Enh 38766076 - CONFIGURE UPDATE-CRYPTO-POLICIES
+#                           BEFORE AND AFTER SWITCH PATCHING
 #    ajayasin    08/05/25 - moving handler function from clucontrol.py
 #                           clucommandhandler.py to reduce the clucontrol.py
 #                           size
@@ -751,7 +753,7 @@ class SwitchHandler(TargetHandler):
         # Reading the path of the input file from the reference of last request_id run
         _input_file_retry_case = _patchMgrObj.mGetNodesToBePatchedFile()
 
-        # Read list of ibswith from input file
+        # Read list of ibswitch from input file
         _list_of_ibswitches_retry_case = _patchMgrObj.mGetNodeListFromNodesToBePatchedFile(aHost=self.mGetDom0ToPatchcellSwitches())
 
         # Clean the environment: Delete passwordless, delete input file
@@ -773,6 +775,9 @@ class SwitchHandler(TargetHandler):
         _discarded = []
         _patchMgrObj = None
         _list_of_nodes_for_node_progress_details = []
+        _dom0_candidates, _dom0_crypto_host, _crypto_setup_result = self.mPrepareDom0CryptoPolicy((TASK_PATCH, TASK_PREREQ_CHECK), _no_action_taken)
+        if _crypto_setup_result:
+            return _crypto_setup_result, _no_action_taken
 
         if not self.mPatchRequestRetried():
             _list_of_ibswitches, _discarded = self.mFilterIBSwitchesToPatch(aIBswitchesToUpgrade)
@@ -816,7 +821,7 @@ class SwitchHandler(TargetHandler):
 
             _ret, _patchmgr_active_node = _patchMgrObj.mCheckForPatchMgrSessionExistence()
             if _ret == PATCHMGR_SESSION_ALREADY_EXIST:
-                return _ret, _no_action_taken
+                return self.mFinalizeDom0CryptoPolicy(_task_type, _dom0_crypto_host, _ret), _no_action_taken
 
             # Delete images from /dev/shm on each switch
             for _ibswitch in _list_of_ibswitches:
@@ -831,7 +836,7 @@ class SwitchHandler(TargetHandler):
                  be run in case of NTP issues and patchmgr logs will not 
                  be generated.
                 '''
-                return _ret, _no_action_taken
+                return self.mFinalizeDom0CryptoPolicy(_task_type, _dom0_crypto_host, _ret), _no_action_taken
 
             # Check SM Partition count
             for _ibswitch in _list_of_ibswitches:
@@ -839,7 +844,7 @@ class SwitchHandler(TargetHandler):
                     _ret = SWITCH_SM_PARTITION_CONFIGURATION_ERROR
                     _suggestion_msg = f"IBSwitch SM partitioning is not configured on IBSwitch : {_ibswitch} appropriately."
                     self.mAddError(_ret, _suggestion_msg)
-                    return _ret, _no_action_taken
+                    return self.mFinalizeDom0CryptoPolicy(_task_type, _dom0_crypto_host, _ret), _no_action_taken
 
             # Gather precheck data
             if _task_type not in [TASK_PREREQ_CHECK, TASK_ROLLBACK_PREREQ_CHECK]:
@@ -849,7 +854,7 @@ class SwitchHandler(TargetHandler):
                 _suggestion_msg = f"Launch node is either down or patches are not staged, unable to proceed with {self.mGetCurrentTargetType()} operation on {_task_type} target."
                 _ret = SWITCH_PATCH_FILES_MISSING
                 self.mAddError(_ret, _suggestion_msg)
-                return _ret, _no_action_taken
+                return self.mFinalizeDom0CryptoPolicy(_task_type, _dom0_crypto_host, _ret), _no_action_taken
 
             # create patchmgr nodes file
             _input_file = _patchMgrObj.mCreateNodesToBePatchedFile(aLaunchNode=self.mGetDom0ToPatchcellSwitches(), aHostList=_list_of_ibswitches)
@@ -884,7 +889,7 @@ class SwitchHandler(TargetHandler):
             _suggestion_msg = "No available ibswitches to run the patchmgr. Nothing to do here."
             self.mAddError(_ret, _suggestion_msg)
 
-        return _ret, _no_action_taken
+        return self.mFinalizeDom0CryptoPolicy(_task_type, _dom0_crypto_host, _ret), _no_action_taken
 
     def mPatchIBSwitchesRolling(self, aListOfNodes, aPatchMgrObj):
 

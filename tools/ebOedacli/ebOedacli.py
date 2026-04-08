@@ -1,7 +1,7 @@
 """
-$Header: 
+$Header:
 
- Copyright (c) 2014, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     ebOedacli - Basic functionality
@@ -15,6 +15,8 @@ NOTE:
 History:
 
     MODIFIED   (MM/DD/YY)
+       jesandov 04/03/26 - Bug 39039331 - Add validation in case of missing data
+       aararora 02/27/26 - Bug 38902170: Correct resource leak issues
        jesandov 06/03/25 - Bug 38024144 - Add sanitize string to ignore errors
        prsshukl 09/17/24 - Bug 37068271 - Fix exacloud condition to ignore oeda
                            warning
@@ -41,7 +43,7 @@ from time import gmtime, strftime
 
 from exabox.tools.AttributeWrapper import wrapStrBytesFunctions
 from exabox.core.Context import get_gcontext
-from exabox.log.LogMgr import ebLogError, ebLogInfo, ebLogWarn, ebLogDebug, ebLogVerbose
+from exabox.log.LogMgr import ebLogError, ebLogInfo, ebLogWarn, ebLogDebug, ebLogVerbose, ebLogTrace
 from exabox.core.Error import ExacloudRuntimeError
 from exabox.core.Node import exaBoxNode
 
@@ -70,7 +72,7 @@ class ebOedacli(object):
 
         self.mLog("Info", "__init__")
 
-        if aOedacliPath is not None and not self.mProbePath(): 
+        if aOedacliPath is not None and not self.mProbePath():
             _msg = "Invalid path to oedacli: {0}".format(aOedacliPath)
             self.mLog("Error", _msg)
             raise ExacloudRuntimeError(0x0EDA, 0x0EDA, _msg)
@@ -252,7 +254,7 @@ class ebOedacli(object):
         if len(_list) == 0:
             return ''
         return ' '.join(_list)
-    
+
     def mRun(self, aLoadPath=None, aSavePath=None):
 
         #Save the Load file path
@@ -340,7 +342,22 @@ class ebOedacli(object):
         _cmd = """sed -i 's/JAVA_OPTIONS=.*/JAVA_OPTIONS="{0}"/g' {1}"""
         _cmd = _cmd.format(_javaOptions, self.mGetOedacliPath())
         _cmd = shlex.split(_cmd)
-        out = subprocess.Popen(_cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        _sed_proc = subprocess.Popen(
+            _cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            shell=False,
+        )
+        try:
+            _sed_proc.communicate()
+        finally:
+            if _sed_proc.stdin:
+                _sed_proc.stdin.close()
+            if _sed_proc.stdout:
+                _sed_proc.stdout.close()
+            if _sed_proc.stderr:
+                _sed_proc.stderr.close()
 
         #Execute the Oedacli script
         _oedacliArgs = get_gcontext().mGetConfigOptions()["oedacli_extra_args"].split(" ")
@@ -358,18 +375,17 @@ class ebOedacli(object):
             self.mLog("Info", f"Commands file: {_outfile}")
 
         _outfileFd1 = open(_outfile, "w")
-
-        _subproc = subprocess.Popen(_cmd, stdin=subprocess.PIPE,  \
-                                          stdout=_outfileFd1, \
-                                          stderr=_outfileFd1, shell=False)
-
-        _lastLineLogOedacliIdx = len(self.mGetOedacliLogLines())
-        _lastOedacliOutput = "oedacli>"
-
-        _errMsg = "Oedacli Error found on script execution."
-        _errMsg += "Please review the log: {0}".format(os.path.join(self.mGetLogDir(), self.mGetLogFile()))
-
+        _subproc = None
         try:
+            _subproc = subprocess.Popen(_cmd, stdin=subprocess.PIPE,  \
+                                              stdout=_outfileFd1, \
+                                              stderr=_outfileFd1, shell=False)
+
+            _lastLineLogOedacliIdx = len(self.mGetOedacliLogLines())
+            _lastOedacliOutput = "oedacli>"
+
+            _errMsg = "Oedacli Error found on script execution."
+            _errMsg += "Please review the log: {0}".format(os.path.join(self.mGetLogDir(), self.mGetLogFile()))
 
             _cmdIdx = 0
             _lastCmdIdx = 0
@@ -522,14 +538,126 @@ class ebOedacli(object):
                             _callback["fx"](_cmd, _callback["args"])
 
         finally:
-
             _outfileFd1.close()
-            _subproc.terminate()
+            if _subproc is not None:
+                if _subproc.stdin:
+                    try:
+                        _subproc.stdin.close()
+                    except Exception:
+                        pass
+                try:
+                    _subproc.terminate()
+                    _subproc.wait(timeout=30)
+                except subprocess.TimeoutExpired:
+                    _subproc.kill()
+                    try:
+                        _subproc.wait(timeout=10)
+                    except subprocess.TimeoutExpired:
+                        pass
 
         _scriptOut = ""
         with open(_outfile, "r") as _f:
             _scriptOut = _f.read().strip()
 
         return _scriptOut
+
+    @staticmethod
+    def mComputeOedacliPath(aCluctrlObj):
+
+        def mWalkJson(aCurrentRule, aCurrentOptions, aPath):
+
+            if not aCurrentRule or not aCurrentOptions:
+                ebLogTrace(f"Missing aCurrentRule:{aCurrentRule} or aCurrentOptions:{aCurrentOptions}. Path: {aPath}")
+                return False
+
+            if isinstance(aCurrentOptions, list):
+                _res = False
+                for _curr in aCurrentOptions:
+                    _res = _res or mWalkJson(aCurrentRule, _curr, aPath)
+                return _res
+
+            for _key, _next in aCurrentRule.items():
+
+                _path = f"{aPath}/{_key}"
+
+                if _key not in aCurrentOptions:
+                    ebLogTrace(f"Key '{_key}' missing aCurrentOptions: {aCurrentOptions}. Path: {aPath}")
+                    return False
+
+                else:
+
+                    # Iterate over next values
+                    if isinstance(_next, list):
+                        _res = True
+                        for _child in _next:
+                            _res = _res and mWalkJson(_child, aCurrentOptions[_key], _path)
+                        if not _res:
+                            ebLogTrace(f"Missing ({_child}) in list {aCurrentOptions}. Path: {_path}")
+                            return False
+
+                    elif isinstance(_next, dict):
+
+                        _res = False
+
+                        if not aCurrentOptions[_key]:
+                            ebLogTrace(f"Missing value in Payload for ({_key}:{aCurrentOptions[_key]}). Expected: {_next}. Path: {aPath}")
+                            return False
+
+                        if isinstance(aCurrentOptions[_key], list):
+                            for _child in aCurrentOptions[_key]:
+                                _res = mWalkJson(_next, _child, _path)
+                        elif isinstance(aCurrentOptions[_key], dict):
+                            _res = mWalkJson(_next, aCurrentOptions[_key], _path)
+                        elif isinstance(aCurrentOptions[_key], str):
+                            ebLogTrace(f"Incompatibles types between dict ({aCurrentOptions}) and str ({aCurrentOptions[_key]}). Path: {aPath}")
+                            return False
+
+                        if not _res:
+                            return False
+
+                    # Compare currente value
+                    elif isinstance(_next, str):
+                        if re.search(_next, str(aCurrentOptions[_key])):
+                            ebLogTrace(f"Found {_next} in {_path}")
+                            return True
+                        else:
+                            ebLogTrace(f"Not Found {_next} in {_path}")
+                            return False
+
+            return True
+
+        _alternativeOeda = get_gcontext().mCheckConfigOption("alternative_oeda")
+        _defaultOeda = get_gcontext().mCheckConfigOption("oeda_dir")
+
+        if not _alternativeOeda:
+            ebLogInfo(f'Using default OEDA: {_defaultOeda}')
+            return _defaultOeda
+
+        for _possibleOeda in _alternativeOeda:
+
+            if not _possibleOeda or \
+              "matching_rules" not in _possibleOeda or \
+              "oeda_path" not in _possibleOeda:
+                continue
+
+            for _endpoint, _rules in _possibleOeda["matching_rules"].items():
+
+                if _endpoint == "all" or _endpoint == aCluctrlObj.mGetCmd():
+
+                    ebLogTrace(f"Starting validation of alternative OEDA for endpoint: {_endpoint}")
+
+                    for _rule in _rules:
+
+                        _result = False
+                        if aCluctrlObj and aCluctrlObj.mGetOptions() and aCluctrlObj.mGetOptions().jsonconf:
+                            _result = mWalkJson(_rule, aCluctrlObj.mGetOptions().jsonconf, "")
+
+                        if _result:
+                            ebLogInfo(f'Found alternative OEDA: {_possibleOeda["oeda_path"]}')
+                            return _possibleOeda["oeda_path"]
+
+        ebLogInfo(f'Using default OEDA: {_defaultOeda}')
+        return _defaultOeda
+
 
 # end of file

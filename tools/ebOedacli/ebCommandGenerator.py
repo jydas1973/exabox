@@ -1,7 +1,7 @@
 """
 $Header: 
 
- Copyright (c) 2014, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     ebCommandGenerator - Basic functionality
@@ -20,6 +20,7 @@ NOTE:
 History:
 
     MODIFIED   (MM/DD/YY)
+       aararora 04/01/26 - Bug 38900321: Fix issues identified by codev
        aararora 10/31/25 - Bug 38595677: Get base path of exacloud independent
                            of sys.path
        aararora 05/10/22 - Bug 34004578: Bandit issue fix
@@ -111,10 +112,10 @@ class ebCommandGenerator(object):
         return self.__oedaFinalTree
 
     def mGetPreExtraCommands(self):
-        return self.__extraPreCommands
+        return self.__preExtraCommands
 
     def mSetPreExtraCommands(self, aCommands):
-        self.__extraPreCommands = aCommands
+        self.__preExtraCommands = aCommands
 
     def mGetExtraCommands(self):
         return self.__extraCommands

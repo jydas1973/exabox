@@ -1,9 +1,9 @@
 #
-# $Header: ecs/exacloud/exabox/ovm/cluencryption.py /main/50 2025/08/08 21:50:09 jfsaldan Exp $
+# $Header: ecs/exacloud/exabox/ovm/cluencryption.py jfsaldan_bug-38496061/3 2026/02/21 00:10:03 jfsaldan Exp $
 #
 # cluencryption.py
 #
-# Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      cluencryption.py - Filesystem Encryption Framework
@@ -17,6 +17,11 @@
 #    https://confluence.oraclecorp.com/confluence/display/EDCS/ExaCC-Exacloud+Key-Value+DB+to+save+FS+Encryptation+Passphrase
 #
 #    MODIFIED   (MM/DD/YY)
+#    aararora    01/27/26 - Bug 38723384: Add retry/force logic for crs restart
+#    jfsaldan    10/06/25 - Bug 38496061 - EXACC:BB:FEDRAMP:ADD NODE OPERATION
+#                           HANGED - OEDACLI ERROR FOUND ON SCRIPT EXECUTION |
+#                           U02 DISK APPEARS ON DOMU SECONDS AFTER ATTACHMENT
+#                           FINISHES
 #    jfsaldan    08/04/25 - Bug 38268596 - EXACLOUD FEDRAMP PREVENT PROV
 #                           PROBLEM | FS_ENCRYPTION FILE SHREDDING FAILS
 #                           CAUSING INSTALL CLUSTERS TO FAIL
@@ -148,6 +153,7 @@ from exabox.core.Context import get_gcontext
 from exabox.core.Error import ExacloudRuntimeError
 from exabox.utils.node import (connect_to_host, node_cmd_abs_path_check,
                                node_exec_cmd_check, node_exec_cmd)
+from exabox.ovm.utils.clu_utils import mRunCrsCommandsWithRetry
 
 from exabox.utils.common import version_compare
 from exabox.log.LogMgr import ebLogError, ebLogInfo, ebLogTrace, ebLogWarn, ebLogCritical
@@ -693,9 +699,17 @@ def encryptionSetupDomU(aCluCtrl: any, aDom0: str, aDomU: str, aMountPoint: str)
                 _bin_kill = node_cmd_abs_path_check(_node, "kill")
                 _bin_lsof = node_cmd_abs_path_check(_node, "lsof", True)
 
-                _cmd = f"{_bin_crsctl} stop crs -f"
-                ebLogTrace(_cmd)
-                node_exec_cmd(_node, _cmd)
+                _stop_cmds = [
+                    f"{_bin_crsctl} stop crs -f"
+                ]
+                # The original behaviour of not raising exception is preserved
+                # Below will retry the stop crs command 3 times if initial ones
+                # fail. There is also a 10 seconds delay in running each retry.
+                mRunCrsCommandsWithRetry(
+                    _node,
+                    _stop_cmds,
+                    aLabel=f"CRS stop before encrypting {aMountPoint} on {aDomU}",
+                    aRaiseOnFailure=False)
 
                 _cmd = f"{_bin_lsof} -- {aMountPoint}"
                 _out = node_exec_cmd(_node, _cmd)
@@ -4350,9 +4364,17 @@ def setupU01EncryptedDiskPerHost(aEbox, aOptions, aDom0, aDomU,
             _crs_started = True
             _bin_crsctl = f"{_grid_loc}/bin/crsctl"
 
-            _cmd = f"{_bin_crsctl} stop crs -f"
-            _out_crs_stop = node_exec_cmd(_node, _cmd)
-            ebLogTrace(_out_crs_stop)
+            _stop_cmds = [
+                f"{_bin_crsctl} stop crs -f"
+            ]
+            # The original behaviour of not raising exception is preserved
+            # Below will retry the stop crs command 3 times if initial ones
+            # fail. There is also a 10 seconds delay in running each retry.
+            mRunCrsCommandsWithRetry(
+                _node,
+                _stop_cmds,
+                aLabel=f"CRS stop before encryption on {aDomU}",
+                aRaiseOnFailure=False)
 
         _cmd = f"{_bin_lsof} -- {aMountPoint}"
         _out_lsof = node_exec_cmd(_node, _cmd)
@@ -4500,6 +4522,12 @@ def setupU01EncryptedDiskPerHost(aEbox, aOptions, aDom0, aDomU,
         _out_cat = node_exec_cmd_check(_node, f"{_bin_cat} {_file_fstab}")
         ebLogTrace(f"Contents of {_file_fstab} from {aDomU} is:\n "
             f"{_out_cat.stdout}")
+
+        # We run pvscan
+        _bin_pvscan = node_cmd_abs_path_check(_node, "pvscan", sbin=True)
+        _out_pvscan = node_exec_cmd_check(_node, f"sync;sync;sync;{_bin_pvscan} --cache")
+        ebLogTrace(f"PVscan output: {_out_pvscan}")
+        time.sleep(60)
 
     # Success
     ebLogInfo(f"Encryption setup of {aMountPoint} in {aDomU} finished ok")

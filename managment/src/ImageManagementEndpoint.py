@@ -1,5 +1,5 @@
 """
- Copyright (c) 2019, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2019, 2026, Oracle and/or its affiliates.
 
 NAME:
     ImageManagementEndpoint - Basic functionality
@@ -11,6 +11,8 @@ NOTE:
     None
 
 History:
+    shapatna    02/09/2026 - Bug: 38900266 - Fix for issues pointed by Codev 
+                             in exabox/management directory
     cagaray     03/04/2025 - 37787638: make post operations async
     cagaray     03/03/2025 - Bug#34807833: redownload operation and optional payload for list
     rbehl       02/12/2019 - Bug#30243322: remoteec restart imagemgmt
@@ -60,7 +62,9 @@ class ImageManagementEndpoint(AsyncTrackEndpoint):
             return
 
         # Check whether this validation is really needed
-        __op = self.mGetBody()['op']
+        __op = None
+        if 'op' in self.mGetBody():
+            __op = self.mGetBody()['op']
         if __op is None:
             self.mGetResponse()['status'] = 500
             self.mGetResponse()['error'] = 'op is a required parameter.'
@@ -178,6 +182,7 @@ class ImageManagementEndpoint(AsyncTrackEndpoint):
             if __ocps_setup_json == "":
                 self.mGetResponse()['status'] = 500
                 self.mGetResponse()['error'] = 'Error obtaining ocpsSetup.json file '
+                return 
             self.mGetLog().mInfo(f"manual_operation.sh will be called with ocpsSetup.json:{__ocps_setup_json}")
             with tempfile.NamedTemporaryFile(delete=False) as __payload_file:
                 __payload_file.write(__payload)

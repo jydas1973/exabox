@@ -1,5 +1,5 @@
 """
- Copyright (c) 2019, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2019, 2026, Oracle and/or its affiliates.
 
 NAME:
     kvmcpumgr - Cpu Functionality for KVM.
@@ -439,6 +439,17 @@ class exaBoxKvmCpuMgr(object):
                 _db = ebGetDefaultDB()
                 _db.mUpdateRequest(_reqobj)
 
+        def _mGetCmdOutputLines(aNode, aCmd):
+            _in, _out, _err = aNode.mExecuteCmd(aCmd)
+            _rc = aNode.mGetCmdExitStatus()
+            if _rc != 0:
+                _out_text = _out.read() if _out else ""
+                _err_text = _err.read() if _err else ""
+                _detail_error = (f"Command failed (rc={_rc}): {aCmd}. "
+                    f"stdout: {_out_text}. stderr: {_err_text}")
+                raise ExacloudRuntimeError(0x0780, 0xA, _detail_error)
+            return _out.readlines() if _out else []
+
         _valid_modes = ['dg_vmmaker', 'dg_oedacli', 'vm_maker']
         _cpu_manage_mode = self.__ecc.mCheckConfigOption('cpu_manage_mode')
         if _cpu_manage_mode is not None:
@@ -618,41 +629,62 @@ class exaBoxKvmCpuMgr(object):
 
             _node = exaBoxNode(get_gcontext())
             _node.mConnect(aHost=_hyp)
-            _in, _out, _err = _node.mExecuteCmd("/usr/bin/virsh nodeinfo | /bin/grep 'CPU(s)' | /bin/awk '{print$2}'")
-            if _out:
-                _out = _out.readlines()
-                _dat = _out[0].strip()
-                _reserved = HYPERVISOR_RSRVD_CORES * self.__ht_factor
-                _in, _out, _err = _node.mExecuteCmd("/usr/sbin/vm_maker --list --vcpu | /bin/grep 'Host reserved' | /bin/awk '{print $5}'")
-                _out = _out.readlines()
-                if _out and len(_out):
-                    _reserved = _out[0].strip()
-                    ebLogInfo(f'*** cpus reserved for the dom0 {_hyp}: {_reserved}')
-                _maxcores = int(_dat) - int(_reserved)
-                ebLogInfo(f'*** In dom0 {_hyp}, the total cpus allocated for all the guests cannot exceed {_maxcores}')
-                # If cos enabled, consider virtual max cores
-                if _cos:
-                    ebLogInfo('*** Maximum cos value on dom0 %s : %s' % (_hyp, _allocatable_cores))
-                    _maxvcores = int(_allocatable_cores)
+            _out_lines = _mGetCmdOutputLines(_node, "/usr/bin/virsh nodeinfo")
+            _cpu_line = next(
+                (line for line in _out_lines if line.strip().startswith("CPU(s)")),
+                None,
+            )
+            if not _cpu_line:
+                _detail_error = ("Failed to parse CPU(s) from output of /usr/bin/virsh nodeinfo: "
+                    f"{''.join(_out_lines)}")
+                raise ExacloudRuntimeError(0x0780, 0xA, _detail_error)
+
+            _dat = _cpu_line.split(":", 1)[1].strip().split()[0]
+            _reserved = HYPERVISOR_RSRVD_CORES * self.__ht_factor
+            _out_lines = _mGetCmdOutputLines(_node, "/usr/sbin/vm_maker --list --vcpu")
+            _reserved_line = next(
+                (line for line in _out_lines if "Host reserved" in line),
+                None,
+            )
+            if _reserved_line:
+                _reserved = _reserved_line.split()[-1]
+                ebLogInfo(f'*** cpus reserved for the dom0 {_hyp}: {_reserved}')
+            _maxcores = int(_dat) - int(_reserved)
+            ebLogInfo(f'*** In dom0 {_hyp}, the total cpus allocated for all the guests cannot exceed {_maxcores}')
+            # If cos enabled, consider virtual max cores
+            if _cos:
+                ebLogInfo('*** Maximum cos value on dom0 %s : %s' % (_hyp, _allocatable_cores))
+                _maxvcores = int(_allocatable_cores)
 
             _is_pingable = _host_d[_dom]['active']
             #
             # Fetch current vCPU for Domain
             #
-            _in, _out, _err = _node.mExecuteCmd("/usr/sbin/vm_maker --list --vcpu --domain %s | /bin/awk -F: '{print $4}'" % (_dom))
+            _out_lines = _mGetCmdOutputLines(
+                _node,
+                f"/usr/sbin/vm_maker --list --vcpu --domain {_dom}",
+            )
 
             #virsh command runs successfully even if domain is shutdown.
-            if _out:
-                _out = _out.readlines()
-                _currvcpus = int(_out[0].strip())
+            _vm_line = next((line for line in _out_lines if line.strip()), None)
+            if _vm_line:
+                _parts = _vm_line.split(":")
+                _currvcpus = int(_parts[3].strip().split()[0])
                 ebLogTrace(f'*** Existing cpu count for {_dom} : {_currvcpus}')
                 #
                 # Fetch current MAXVCPUs (not the one set in vm.cfg)
                 #
-            _in, _out, _err = _node.mExecuteCmd("/usr/bin/virsh vcpucount %s | /bin/grep maximum | /bin/grep config | /bin/awk '{print $3}'" % (_dom))
-            if _out:
-                _out = _out.readlines()
-                _currmaxvcpus = int(_out[0])
+            _out_lines = _mGetCmdOutputLines(
+                _node,
+                f"/usr/bin/virsh vcpucount {_dom}",
+            )
+            _max_line = next(
+                (line for line in _out_lines if "maximum" in line and "config" in line),
+                None,
+            )
+            if _max_line:
+                _tokens = _max_line.split()
+                _currmaxvcpus = int(_tokens[2])
                 ebLogTrace('*** Maximum allocatable cpus for domain %s : %d' % (_dom, _currmaxvcpus))
 
             _data_d['vms'][_dom]['currvcpus']    = _currvcpus
@@ -740,11 +772,16 @@ class exaBoxKvmCpuMgr(object):
             #
             # Check vm.cfg settings : maxvcpus and current vCPUs
             #
-            _cmd = "/usr/bin/virsh vcpucount " + _dom + " | /bin/grep maximum | /bin/grep config | /bin/awk '{print $3}'"
-            _in, _out, _err = _node.mExecuteCmd(_cmd)
-            if _out:
-                _out = _out.readlines()
-                _maxvcpus = int(_out[0].strip())
+            _out_lines = _mGetCmdOutputLines(
+                _node,
+                f"/usr/bin/virsh vcpucount {_dom}",
+            )
+            _max_line = next(
+                (line for line in _out_lines if "maximum" in line and "config" in line),
+                None,
+            )
+            if _max_line:
+                _maxvcpus = int(_max_line.split()[2])
             #
             # _data_d udpate
             #
@@ -814,21 +851,23 @@ class exaBoxKvmCpuMgr(object):
                     _sum_vcpus = 0
 
                     _cluster_list=[]
-                    _cmd = "/usr/sbin/vm_maker --list-domains | /bin/awk '{print $1}'"
-                    _, _out, _ = _node.mExecuteCmd(_cmd)
-                    if _out:
-                        _out = _out.readlines()
-                        for _line in _out:
-                            if not _line.isspace():
-                                _cluster_list.append(_line.strip().split('(')[0])
+                    _cmd = "/usr/sbin/vm_maker --list-domains"
+                    _out_lines = _mGetCmdOutputLines(_node, _cmd)
+                    for _line in _out_lines:
+                        if not _line.isspace():
+                            _cluster_list.append(_line.strip().split()[0].split('(')[0])
 
                     for _vm in _cluster_list:
-                        _in, _out, _err = _node.mExecuteCmd("/usr/sbin/vm_maker --list --vcpu --domain %s | /bin/awk -F: '{print $4}'" % (_vm))
-                        _out = _out.readlines()
-                        if _out:
+                        _out_lines = _mGetCmdOutputLines(
+                            _node,
+                            f"/usr/sbin/vm_maker --list --vcpu --domain {_vm}",
+                        )
+                        _vm_line = next((line for line in _out_lines if line.strip()), None)
+                        if _vm_line:
+                            _parts = _vm_line.split(":")
                             # sum all vcpus except the domain whose _vcpus is getting updated.
                             if _vm not in _dom:
-                                _sum_vcpus += int(_out[0].strip())
+                                _sum_vcpus += int(_parts[3].strip().split()[0])
                         else:
                             _detail_error = 'Can not retrieve cpu allocation for (%s)' % (_dom)
                             ebLogError('*** ' + _detail_error)

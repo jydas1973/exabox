@@ -1,10 +1,10 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/exatest/ovm/tests_clucontrol_img_scenarios.py /main/7 2025/12/01 22:37:00 avimonda Exp $
+# $Header: ecs/exacloud/exabox/exatest/ovm/tests_clucontrol_img_scenarios.py jesandov_bug-38358445/2 2026/02/09 14:16:06 jesandov Exp $
 #
 # tests_clucontrol_img_scenarios.py
 #
-# Copyright (c) 2024, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2024, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_clucontrol_img_scenarios.py - <one-line expansion of the name>
@@ -201,6 +201,7 @@ class ebTestSystemFirstBootScenarios(ebTestClucontrol):
             'allow_domu_custom_version': 'False',
             'default_domu_img_version': '',
             'default_domu_img_version_last_res': '',
+            'uefi_enforced': "False"
         }
         
         # _imageMap will mock the list of System Image files for each Dom0
@@ -313,6 +314,7 @@ class ebTestSystemFirstBootScenarios(ebTestClucontrol):
             'allow_domu_custom_version': 'False',
             'default_domu_img_version': '',
             'default_domu_img_version_last_res': '',
+            'uefi_enforced': "False"
         }
         
         # _imageMap will mock the list of System Image files for each Dom0
@@ -432,6 +434,7 @@ class ebTestSystemFirstBootScenarios(ebTestClucontrol):
             'allow_domu_custom_version': 'True',
             'default_domu_img_version': '23.1.13.0.0.240410.1',
             'default_domu_img_version_last_res': '',
+            'uefi_enforced': "False"
         }
         
         # _imageMap will mock the list of System Image files for each Dom0
@@ -472,6 +475,7 @@ class ebTestSystemFirstBootScenarios(ebTestClucontrol):
 
                 ],
                 [
+                    exaMockCommand("/bin/test -e /EXAVMIMAGES/System.first.boot.23.1.13.0.0.240410.1.rtg.img", aRc=1, aStdout="" ,aPersist=True),
                     exaMockCommand("/bin/test -e /EXAVMIMAGES/System.first.boot.23.1.13.0.0.240410.1.kvm.img", aRc=1, aStdout="" ,aPersist=True),
                     exaMockCommand("/bin/test -e /EXAVMIMAGES/System.first.boot.23.1.13.0.0.240410.1.img", aRc=0, aStdout="" ,aPersist=True),
                 ]
@@ -486,6 +490,7 @@ class ebTestSystemFirstBootScenarios(ebTestClucontrol):
 
                 ],
                 [
+                    exaMockCommand("/bin/test -e /EXAVMIMAGES/System.first.boot.23.1.13.0.0.240410.1.rtg.img", aRc=1, aStdout="" ,aPersist=True),
                     exaMockCommand("/bin/test -e /EXAVMIMAGES/System.first.boot.23.1.13.0.0.240410.1.kvm.img", aRc=1, aStdout="" ,aPersist=True),
                     exaMockCommand("/bin/test -e /EXAVMIMAGES/System.first.boot.23.1.13.0.0.240410.1.img", aRc=0, aStdout="" ,aPersist=True),
                 ]
@@ -550,6 +555,7 @@ class ebTestSystemFirstBootScenarios(ebTestClucontrol):
             'allow_domu_custom_version': 'False',
             'default_domu_img_version': '',
             'default_domu_img_version_last_res': '22.1.18.0.0.231208',
+            'uefi_enforced': "False"
         }
         
         # _imageMap will mock the list of System Image files for each Dom0
@@ -670,6 +676,7 @@ class ebTestSystemFirstBootScenarios(ebTestClucontrol):
             'allow_domu_custom_version': 'True',
             'default_domu_img_version': '',
             'default_domu_img_version_last_res': '22.1.18.0.0.231208',
+            'uefi_enforced': "False"
         }
         
         # _imageMap will mock the list of System Image files for each Dom0
@@ -720,6 +727,13 @@ class ebTestSystemFirstBootScenarios(ebTestClucontrol):
                     exaMockCommand("test.*touch", aRc=0, aStdout=""),
                     exaMockCommand("/bin/test -e /EXAVMIMAGES/System.first.boot.24.1.4.0.0.241007.img", aRc=0, aStdout=""),
                     exaMockCommand("/sbin/touch /EXAVMIMAGES/System.first.boot.24.1.4.0.0.241007.img", aRc=0, aPersist=True)
+                ],
+                [
+                    exaMockCommand("/bin/test -e /EXAVMIMAGES/System.first.boot.24.1.4.0.0.241007.rtg.img", aRc=1, aStdout="",aPersist=True),
+                    exaMockCommand("/bin/test -e /EXAVMIMAGES/System.first.boot.24.1.4.0.0.241007.kvm.img", aRc=1, aStdout="",aPersist=True),
+                    exaMockCommand("/bin/test -e /EXAVMIMAGES/System.first.boot.24.1.4.0.0.241007.img", aRc=1, aStdout=""),                    
+                    exaMockCommand("/bin/scp images/System.first.boot.24.1.4.0.0.241007.kvm.img.bz2 /EXAVMIMAGES/System.first.boot.24.1.4.0.0.241007.kvm.img.bz2", aRc=0,aPersist=True),
+                    exaMockCommand("/bin/test -e /sbin/pbunzip2", aRc=0, aStdout=""),
                 ]
             ]
         }

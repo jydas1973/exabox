@@ -16,7 +16,8 @@ grid_out = """
 "RECOC8":{"dg_storage_props":{"total_mb":"200", "used_mb":"100"}, "failgroups":{"SCAQAB10CELADM01":{"num_disks":"2", "celldisks":"cl1"}}},
 "DATAC8":{"dg_storage_props":{"total_mb":"200", "used_mb":"100"}, "failgroups":{"SCAQAB10CELADM02":{"num_disks":"2", "celldisks":"cl1"}}},
 "SPRC8":{"rebalance_status":{"status":"DONE"}, "dg_storage_props":{"total_mb":"200", "used_mb":"100"}, "failgroups":{"SCAQAB10CELADM03":{"num_disks":"2", "celldisks":"cl1"}}},
-"msg":"Done"
+"msg":"Done",
+"infofile_content":{"SPRC8":{"rebalance_status":{"status":"DONE"}, "dg_storage_props":{"total_mb":"200", "used_mb":"100"}, "failgroups":{"SCAQAB10CELADM03":{"num_disks":"2", "celldisks":"cl1"}}}}
 }
 """
 

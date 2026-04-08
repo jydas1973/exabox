@@ -1,0 +1,357 @@
+{
+    "adb_s": "False",
+    "bonding_operation": "create-service",
+    "cloudvendor": "oci",
+    "clusterType": "smartstorage",
+    "clusterVault": "oracle-vault",
+    "concurrent_operation": "true",
+    "customer_network": {
+        "network_services": {
+            "dns": [
+                "169.254.169.254"
+            ],
+            "ntp": [
+                "169.254.169.254"
+            ]
+        },
+        "nodes": [
+            {
+                "admin": null,
+                "backup": {
+                    "dom0_oracle_name": "sea201611exdd012",
+                    "domainname": "backup.exadbxsdevvcn.oraclevcn.com",
+                    "domu_oracle_name": "sea201611exddu1202",
+                    "gateway": "10.0.1.1",
+                    "hostname": "gold021-bkp-xdjxg",
+                    "hw_node_id": null,
+                    "ip": "10.0.1.13",
+                    "ipv6": null,
+                    "mac": "00:00:17:01:9C:4B",
+                    "mtu": "9000",
+                    "netmask": "255.255.255.0",
+                    "network_virtualization": null,
+                    "standby_vnic_mac": "00:00:17:01:85:2E",
+                    "v6gateway": null,
+                    "v6netmask": null,
+                    "vlantag": "1032"
+                },
+                "client": {
+                    "dom0_oracle_name": "sea201611exdd012",
+                    "domainname": "exadbxs.exadbxsdevvcn.oraclevcn.com",
+                    "domu_oracle_name": "sea201611exddu1202",
+                    "gateway": "10.0.0.1",
+                    "hostname": "gold021-xqnxx",
+                    "hw_node_id": null,
+                    "ip": "10.0.0.44",
+                    "ipv6": null,
+                    "mac": "00:00:17:01:0F:35",
+                    "mtu": "9000",
+                    "natdomainname": "sea2mvm01roce.adminsea2.oraclevcn.com",
+                    "natgateway": "10.1.0.1",
+                    "natip": "10.1.1.23",
+                    "natmask": "255.255.0.0",
+                    "natvlantag": "100",
+                    "netmask": "255.255.255.0",
+                    "network_virtualization": null,
+                    "standby_vnic_mac": "00:00:17:01:58:1D",
+                    "v6gateway": null,
+                    "v6netmask": null,
+                    "vlantag": "1031"
+                },
+                "eth0_removed": "False",
+                "fqdn": "sea201611exdd012.sea2xx2xx0051qf.adminsea2.oraclevcn.com",
+                "monitoring": {
+                    "bond0": {
+                        "cavium_ids": [
+                            {
+                                "id": "JCN2124A16829",
+                                "networkinterface": "eth2"
+                            },
+                            {
+                                "id": "JCN2120A12773",
+                                "networkinterface": "eth1"
+                            }
+                        ],
+                        "gateway": "10.0.0.1",
+                        "ip": "10.0.0.116",
+                        "netmask": "255.255.255.0",
+                        "preferred_interface": "eth2",
+                        "vlantag": 0
+                    }
+                },
+                "vip": {
+                    "domainname": "exadbxs.exadbxsdevvcn.oraclevcn.com",
+                    "hostname": "gold021-vip-fkqys",
+                    "ip": "10.0.0.81",
+                    "ipv6": null
+                },
+                "vmId": "ocid1.exacomputevminstance.region1.sea.anzwkljshnge2iqa7i2sxqx7qzizq3kepnghfakuswrbf4wsoxfx537ixqva",
+                "volumes": [
+                    {
+                        "attach_host": "sea201611exdd012.sea2xx2xx0051qf.adminsea2.oraclevcn.com",
+                        "dom0": "sea201611exdd012.sea2xx2xx0051qf.adminsea2.oraclevcn.com",
+                        "domU": "sea201611exddu1201.sea2xx2xx0051qf.adminsea2.oraclevcn.com",
+                        "guestdevicename": null,
+                        "volumedevicepath": "u01_Vmrujgo_1_08c4",
+                        "volumeid": "ocid1.exascalevolume.region1.sea.anzwkljsqi6y7haaxpubjfnxcula2zq3yjktjwtya6zibd3mzwejuzz2vsxq",
+                        "volumename": "u01",
+                        "volumesizegb": "42",
+                        "volumetype": "u01"
+                    },
+                    {
+                        "attach_host": "sea201611exdd012.sea2xx2xx0051qf.adminsea2.oraclevcn.com",
+                        "dom0": "sea201611exdd012.sea2xx2xx0051qf.adminsea2.oraclevcn.com",
+                        "domU": "sea201611exddu1201.sea2xx2xx0051qf.adminsea2.oraclevcn.com",
+                        "guestdevicename": null,
+                        "volumedevicepath": "gcv_Vmrujgo_1_14f0",
+                        "volumeid": "ocid1.exascalevolume.region1.sea.anzwkljsqi6y7haah5ia6impzznq6zr6xdc4v45e6b2vuqdmuh552f2sobea",
+                        "volumename": "gcv",
+                        "volumesizegb": "2",
+                        "volumetype": "gcv"
+                    },
+                    {
+                        "attach_host": "sea201611exdd012.sea2xx2xx0051qf.adminsea2.oraclevcn.com",
+                        "dom0": "sea201611exdd012.sea2xx2xx0051qf.adminsea2.oraclevcn.com",
+                        "domU": "sea201611exddu1201.sea2xx2xx0051qf.adminsea2.oraclevcn.com",
+                        "guestdevicename": null,
+                        "volumedevicepath": "system_Vmrujgo_1_0aa2",
+                        "volumeid": "ocid1.exascalevolume.region1.sea.anzwkljsqi6y7haatyxadfic5kvtjdc6ffdokkcaaq4wfvih7edkb7gifjua",
+                        "volumename": "system",
+                        "volumesizegb": "118",
+                        "volumetype": "system"
+                    },
+                    {
+                        "attach_host": "sea201611exdd012.sea2xx2xx0051qf.adminsea2.oraclevcn.com",
+                        "dom0": "sea201611exdd012.sea2xx2xx0051qf.adminsea2.oraclevcn.com",
+                        "domU": "sea201611exddu1201.sea2xx2xx0051qf.adminsea2.oraclevcn.com",
+                        "guestdevicename": null,
+                        "volumedevicepath": "u02_Vmrujgo_1_3a88",
+                        "volumeid": "ocid1.exascalevolume.region1.sea.anzwkljsqi6y7haafejd5vyzqazxdi4glcfznp2oeiqr46vie7gfpog7ao5q",
+                        "volumename": "u02",
+                        "volumesizegb": "62",
+                        "volumetype": "u02"
+                    }
+                ]
+            }
+        ],
+        "scan": {
+            "hostname": "basegold02-scan",
+            "ips": [
+                "10.0.0.59",
+                "10.0.0.181",
+                "10.0.0.248"
+            ],
+            "port": 1521,
+            "tcp_ssl_port": null,
+            "v6ips": []
+        },
+        "timezone": "UTC"
+    },
+    "dbaas_api": {
+        "FLAGS": "",
+        "action": "set",
+        "object": "os",
+        "operation": "cloud_properties",
+        "outputfile": "/tmp/cloudProperties_2026.03.25.21.03.21",
+        "params": {
+            "adb_s": {
+                "enabled": "False"
+            },
+            "atp": {
+                "enabled": "False"
+            },
+            "cns": {
+                "enabled": "False"
+            },
+            "common": {
+                "dbsystemocid": "ocid1.exacomputevmcluster.region1.sea.anzwkljshnge2iqakysbismezt4osu3fcoskqp2yfm5qq2fmkvu4kbsaeqgq",
+                "fedramp": "disabled",
+                "fips_compliance": "disabled",
+                "oss_url": "https://swiftobjectstorage.r1.oracleiaas.com",
+                "se_linux": "disabled"
+            },
+            "diag": {},
+            "exacompute": {
+                "enabled": "True"
+            },
+            "exascale": {
+                "enabled": "True"
+            },
+            "ords": {
+                "enable": "False"
+            }
+        }
+    },
+    "delete_domu_keys": "false",
+    "dom0": null,
+    "dom0_bonding": true,
+    "ecra": {
+        "whitelist_cidr": [
+            "10.0.1.112/28",
+            "10.0.1.32/28"
+        ]
+    },
+    "fedramp": "N",
+    "filesystems": {
+        "mountpoints": {
+            "/": "15G",
+            "/boot": "1G",
+            "/crashfiles": "20G",
+            "/home": "4G",
+            "/tmp": "10G",
+            "/u01": "40G",
+            "/u02": "60G",
+            "/var": "5G",
+            "/var/log": "18G",
+            "/var/log/audit": "6G",
+            "LVDoNotRemoveOrUse": "3G",
+            "grid": "11G",
+            "swap": "16G",
+            "system": "114G"
+        }
+    },
+    "gold_image_provisioning": "True",
+    "grid_version": "19",
+    "image_base_bom": {
+        "BOM_file_version": "1.0.4",
+        "BuildID": "GoldImageBuild_2026-03-29_020003",
+        "artifacts": {
+            "gi": "grid_23.9.0.25.07",
+            "guest_image": "System.first.boot.25.2.2.0.0.250908.rtg.img",
+            "is_supported": true,
+            "rpms": {
+                "dbaastools_exa-1.0-26.2.1.0.0_260327.1500.x86_64.rpm": {
+                    "md5sum": "8a82b179f7ebd77c5ca8f91c8901ac5f",
+                    "version": "1.0.26.2.1.0.0_260327.1500"
+                },
+                "dbcs-admin-update-26.2.1.0.0_260327.1500.x86_64.rpm": {
+                    "md5sum": "5915ee5adeccca7c235a48e871194c1e",
+                    "version": "26.2.1.0.0.260327.1500"
+                },
+                "dbcs-agent-update-26.2.1.0.0_260327.1500.x86_64.rpm": {
+                    "md5sum": "62f4e0d5e40eed476e0c7d431cbf42ff",
+                    "version": "26.2.1.0.0.260327.1500"
+                },
+                "dbcs-agent.OL7.x86_64.rpm": {
+                    "md5sum": "126d9028096b6fa4a67bcff8083d193a",
+                    "version": "2.8OL7.25.4.1.0.0_251107.1239"
+                },
+                "exacloud-gold-config-1.0-20251110.x86_64.rpm": {
+                    "md5sum": "2921c8b438ef395dc9820d477342d0cb",
+                    "version": "1.0"
+                },
+                "kmstdecli-0.4.5-1.noarch.rpm": {
+                    "md5sum": "70425766c037cb4df55ff2d772b9d47c",
+                    "version": "0.4.5.1"
+                },
+                "libkmstdepkcs11_2.6-2.6-1-Linux.rpm": {
+                    "md5sum": "fff7abceb4c0d6ea77944582a27290ca",
+                    "version": "2.6.1"
+                }
+            },
+            "serviceType": "EXADB_XS"
+        },
+        "build_state": {
+            "elapsed_time": "0:21:47.327320",
+            "end_time": "2026-03-29 02:21:53+184323",
+            "logs": "/home/oracle/exacloud/exagip/logs/GoldImageBuild_2026-03-29_020003.log",
+            "start_time": "2026-03-29 02:00:05+857003",
+            "status": "Success"
+        },
+        "gold_image": {
+            "oss_url": null,
+            "system_image": "GoldImageBuild_2026-03-29_020003/system_ccf93dbd786a6e1922fd5c4d97764a65b6a73bf2b42251b4a2d44c8014479fb5.img.bz2",
+            "system_size": "114",
+            "u01_image": "GoldImageBuild_2026-03-29_020003/u01_ccf93dbd786a6e1922fd5c4d97764a65b6a73bf2b42251b4a2d44c8014479fb5.img.bz2",
+            "u01_size": "42"
+        },
+        "master_edv_volumes": [
+            {
+                "system_vault_name": null,
+                "system_vault_ocid": null,
+                "system_volume_name": null,
+                "system_volume_ocid": null,
+                "u01_vault_name": null,
+                "u01_vault_ocid": null,
+                "u01_volume_name": null,
+                "u01_volume_ocid": null
+            }
+        ],
+        "operational_vm": null,
+        "platformtype": "exacsexacompute",
+        "promotion_state": {
+            "elapsed_time": null,
+            "end_time": null,
+            "logs": null,
+            "start_time": null,
+            "status": null
+        },
+        "validation_state": {
+            "elapsed_time": "0:07:56.212262",
+            "end_time": "2026-03-30 02:10:15+649993",
+            "logs": "/home/oracle/exacloud/exagip/logs/GoldImageValidate_2026-03-30_020216.log",
+            "start_time": "2026-03-30 16:22:34+869242",
+            "status": "Failure"
+        },
+        "volumes": []
+    },
+    "isClone": false,
+    "kvmroce": {
+        "ComputeNetmask": "255.255.0.0",
+        "StorageNetmask": "255.255.0.0",
+        "computeNetwork": {
+            "gold021-xqnxx.exadbxs.exadbxsdevvcn.oraclevcn.com": {
+                "clusterInterconnectIps": [
+                    "100.107.136.68",
+                    "100.107.136.69"
+                ],
+                "storageIps": [
+                    "100.105.64.82",
+                    "100.105.64.83"
+                ]
+            }
+        },
+        "computeVlanId": "58219",
+        "storageNetwork": {},
+        "storageVlanId": "3999"
+    },
+    "operation": "create-service",
+    "rack": {
+        "backup_disk": false,
+        "cores": 2,
+        "create_sparse": "false",
+        "ecra_db_rack_name": "exacompute-sea2-d1-c211d06b-f389-4d0c-88b7-18260b0bae11-clu01",
+        "gb_memory": "22",
+        "gb_storage": 1024,
+        "id": "4bd57f5a-8e8b-4196-b793-807b8e581e7d",
+        "model": "X9M-2",
+        "model_subtype": "STANDARD",
+        "name": "basegold02",
+        "size": "ELASTIC-RACK",
+        "storageType": "ASM",
+        "storage_distribution": "80.00:20.00:0.00",
+        "tb_storage_": "1",
+        "vmclustertype": ""
+    },
+    "roce_information": {
+        "sea201611exdd012.sea2xx2xx0051qf.adminsea2.oraclevcn.com": {
+            "stre0_ip": "100.105.64.15",
+            "stre1_ip": "100.105.64.16",
+            "subnet_mask": "255.255.0.0",
+            "vlan_id": "3999"
+        }
+    },
+    "serviceSubType": "exadbxs",
+    "serviceType": "Exacompute",
+    "skip_sysimage_version_check": true,
+    "storageType": "Exascale",
+    "vm": {
+        "cores": 2,
+        "gb_memory": 22,
+        "size": "Large"
+    },
+    "vmboss": {
+        "su_config_file": {},
+        "vmboss_map": []
+    }
+}

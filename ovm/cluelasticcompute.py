@@ -1,7 +1,7 @@
 """
 $Header:
 
- Copyright (c) 2014, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     OVM - Basic functionality
@@ -15,6 +15,25 @@ NOTE:
 History:
 
     MODIFIED   (MM/DD/YY)
+    aararora    03/20/26 - 39106054: Falcon agent install for new compute additions
+    pbellary    03/16/26 - Fix dom0 network reset for add node
+    atgandhi    03/15/26 - Bug 39011469 - EXACS:26.1:VOTING FILES FOR A CLUSTER
+                           IN ECS_EXAUNITDETAILS UNCHANGED AFTER TERMINATE VM
+    aararora    03/13/26 - Bug 38723373: Improve crs stop resiliency for
+    pbellary    03/04/26 - Bug 39037277 - CLUSTER XMLS GET BONDETH4 SET FOR BACKUP NETWORK CONFIGURATION INSTEAD OF BONDETH1
+    prsshukl    03/04/25 - Bug 38828221: Copy customer Root CA for SSL Inspection enabled infra
+    prsshukl    02/23/26 - Bug 38992962 - ADBS ELASTIC SCALING:ADD VM FAILED AT 
+                           CREATE GUEST: GET ASMSYS PASSWORD FROM WALLET
+    rajsag      02/17/26 - 38857796 - exacc:bb:exacloud: progress percentage
+                           drops while elastic cell operation is in progress.
+    aararora    02/17/26 - Bug 38944580: Reinstall dbaastools rpm after
+                           cprops.ini generation for exacc
+    jfsaldan    02/04/26 - Bug 38922245 - EXADBXS:25.4.1.0.0:260120.1400: R1 -
+                           ENDINSTALL FAILED - FILENOTFOUNDERROR: [ERRNO 2] NO
+                           SUCH FILE | VMBACKUP.CONF MISSING
+    nyvn        01/16/26 - Bug 38821760 - EXACC : EXACLOUD DOES NOT UPDATE
+                           CLUSTERSJSON XML AFTER DELETE NODE
+    aypaul      01/16/26 - ER#38277264 SELinux fleet exacloud implementation
     jfsaldan    11/28/25 - Bug 38693893 - EXACS:BUTTERFLY:OC39:ADD VM FAILING
                            AT RUN ROOTSCRIPT STEP:ERROR:OEDA-1200: ROOT.SH
                            INITIALIZATION FOR CLUSTER CL-K3YQCYTA FAILED ON
@@ -496,7 +515,7 @@ from exabox.ovm.csstep.cs_golden_backup import csGoldenBackup
 from exabox.ovm.csstep.cs_exascale_complete import csExaScaleComplete as exadbxsComplete
 from exabox.ovm.csstep.exascale.cs_exascale_complete import csExaScaleComplete as xsComplete
 from exabox.ovm.cluexascale import ebCluExaScale, mRemoveVMmount
-from exabox.ovm.utils.clu_utils import ebCluUtils
+from exabox.ovm.utils.clu_utils import ebCluUtils, mRunCrsCommandsWithRetry
 from exabox.exakms.ExaKmsEntry import ExaKmsHostType
 from exabox.ovm.cluvmrecoveryutils import NodeRecovery
 from exabox.utils.common import version_compare
@@ -506,6 +525,8 @@ from exabox.ovm.adbs_elastic_service import (mReturnSrcDom0DomUPair, mUpdateQuor
                                              mAddExacliPasswdToNewDomUs, mGetorCreateDomUObj, mCreateADBSSiteGroupConfig)
 from exabox.ovm.cluhostaccesscontrol import addRoceNetworkHostAccessControl
 from exabox.BaseServer.AsyncProcessing import ProcessManager, ProcessStructure
+from exabox.ovm.selinuxcontrols import ebSelinuxControls
+from exabox.ovm.configmgmt import ebConfigCollector
 
 OSTP_CREATE_VM    = 2
 OSTP_INSTALL_CLUSTER = 7
@@ -570,7 +591,7 @@ class ebCluReshapeCompute(object):
         self.__srcdom0=''
         self.mSetSrcDom0DomU()
         self.__clu_utils = ebCluUtils(aExaBoxCluCtrlObj)
-        
+        self.__selinux_controls = self.__eboxobj.mGetSelinuxController()
 
         ebLogInfo("init completed")
 
@@ -1433,6 +1454,7 @@ class ebCluReshapeCompute(object):
         _utils = _ebox.mGetExascaleUtils()
         _pchecks = ebCluPreChecks(_ebox)
         _domUDict = {}
+        _data_d = {}
 
         # Construct grid home using the grid version in the existing node.
         _gridhome, _, _ = _ebox.mGetOracleBaseDirectories(aDomU = _srcdomU)
@@ -1571,8 +1593,15 @@ class ebCluReshapeCompute(object):
         # dom0-domU pair).
 
         for step in _step_list:
-
             ebLogInfo(f"Executing do: {_do} / undo: {_undo} of step: {step}")
+
+            if step not in ("OSTP_PREVM_INSTALL"):
+                _step_time = time.time()
+                if _ebox.mCheckDom0NetworkType():
+                    if _ebox.mCheckConfigOption('reset_net_mapping', 'True'):
+                        _ebox.mResetDom0NetworkMapping()
+                _ebox.mLogStepElapsedTime(_step_time, 'Check Network Discovery Completed')
+
             if step == "UPDATE_ADBS_VM" and _do:
                 for _, _domU in mReturnSrcDom0DomUPair(_ebox):
                     _domU_obj = mGetorCreateDomUObj(_domU, _domUDict)
@@ -1608,7 +1637,7 @@ class ebCluReshapeCompute(object):
                     _stepSpecificDetails = self.mGetCluUtils().mStepSpecificDetails("elasticAddDetails", 'ONGOING', f"Elastic Add Compute step {step} in progress", step)
                     self.mGetCluUtils().mUpdateTaskProgressStatus([], 0, step, "In Progress", _stepSpecificDetails) 
 
-                if step == "CREATE_GUEST" and _ebox.mIsXS():
+                if step == "CREATE_GUEST" and (_ebox.mIsXS() or _utils.mIsEDVImageSupported(aOptions) or _utils.mIsEDVBackupSupported(aOptions)):
                     _utils.mEnableQinQIfNeeded(aOptions, aDom0List=_newdom0List)
                     _failedList = []
                     #perform check to deduce if QinQ is enabled
@@ -1616,10 +1645,11 @@ class ebCluReshapeCompute(object):
                         # execute command to enable QinQ
                         ebLogInfo(f" *** Enabling QinQ on the Host Nodes {_failedList}. Host node will be restarted serially to handle that")
                         _utils.mSetupRoCEIPs(aOptions, _failedList, aDom0List=_newdom0List)
-                        _rc = _utils.mValidateGuest(aOptions, _failedList)# validate domU after rebooting of dom0s for QinQ enabling
-                        if _rc != 0:
-                            ebLogError("*** DomU Validation failed after enabling QinQ")
-                            return _rc
+                        #Require CP to inject tmp ssh key, disabling until CP fixes the issue
+                        #_rc = _utils.mValidateGuest(aOptions, _failedList)# validate domU after rebooting of dom0s for QinQ enabling
+                        #if _rc != 0:
+                        #    ebLogError("*** DomU Validation failed after enabling QinQ")
+                        #    return _rc
 
                 self.mExecuteOEDACLIDoStep(_newdomUList, step, aOptions)
 
@@ -1737,10 +1767,10 @@ class ebCluReshapeCompute(object):
                 # Update images to install cluster
                 _ebox.mUpdateDepFiles()
 
-                _selinux_status = _ebox.mGetSELinuxMode("domu")
+                _selinux_status = self.__selinux_controls.mGetSELinuxMode("domu")
                 if _selinux_status:
                     try:
-                        _return_code = _ebox.mProcessSELinuxUpdate(aOptions, True)
+                        _return_code = self.__selinux_controls.mProcessSELinuxUpdate(aOptions, True)
                         if _return_code == SELINUX_UPDATE_SUCCESS:
                             ebLogInfo("SE Linux mode/policy update succeeded for elastic scale compute.")
                     except ExacloudRuntimeError as ere:
@@ -1833,9 +1863,11 @@ class ebCluReshapeCompute(object):
                     _obj = ebCopyDBCSAgentpfxFile(_ebox)
                     _obj.mCopyDbcsAgentpfxFiletoDomUsForFedramp()
 
+                    self.mGetCluUtils().mSetupCustomerRootCACertificates(aOptions)
+
                 # Executes the steps required post GI NID installation.
                 # Post GI NID also makes sure ACFS is loaded.
-                _ebox.mAddPostGINIDSteps([OSTP_POSTGI_NID], aOptions, _gridhome)
+                _ebox.mAddPostGINIDSteps([OSTP_POSTGI_NID], aOptions, _gridhome, aReshapeObj=self)
 
                 if not _ebox.mIsAdbs():
                     # Identify if this is Multicloud env
@@ -1897,9 +1929,17 @@ class ebCluReshapeCompute(object):
                         with connect_to_host(_newdomU, get_gcontext()) as _node:
                             _node.mExecuteCmd(f"/usr/bin/chmod -R 775 /u01/app/grid/diag/crs/{_host}/crs/*")
 
+                self.mGetCluUtils().mInstallFalconAgentOnDomus(_newdomUList, "Elastic Add Compute")
+
                 ebLogInfo("OSTP_POSTGI_NID")
+                
+                try:
+                    self._add_voting_files_info(_data_d)
+                except Exception as e:
+                    ebLogError(f"There was an error in adding voting files during post_add_cell_check step: {e}")
+                    
                 _stepSpecificDetails = self.mGetCluUtils().mStepSpecificDetails("elasticAddDetails", 'DONE', "Elastic Add Compute Post GI NID completed", step)
-                self.mGetCluUtils().mUpdateTaskProgressStatus([], 100, step, "Done", _stepSpecificDetails)
+                self.mGetCluUtils().mUpdateTaskProgressStatus([], 100, step, "Done", _stepSpecificDetails, _data_d)
 
             elif step == "OSTP_PREDB_INSTALL" and _do:
 
@@ -1971,7 +2011,8 @@ class ebCluReshapeCompute(object):
 
                 ebLogInfo('*** Exacloud Operation Successful : Add Node completed')
                 _ebox.mUpdateStatusOEDA(True, OSTP_END_INSTALL, [OSTP_END_INSTALL], 'Add Node Completed')
-
+                
+                
                 _stepSpecificDetails = self.mGetCluUtils().mStepSpecificDetails("elasticAddDetails", 'DONE', "Elastic Add Compute Compute End Install completed", step)
                 self.mGetCluUtils().mUpdateTaskProgressStatus([], 100, step, "Done", _stepSpecificDetails)
 
@@ -2086,7 +2127,9 @@ class ebCluReshapeCompute(object):
         _ebox.mSaveClusterConfiguration()
 
         # Configure vm backups on the new dom0s
-        self.mConfigureVMBackup(aOptions,_srcdom0, _newdom0List)
+        # Skip it for exadb-xs service
+        if not _ebox.mIsExaScale():
+            self.mConfigureVMBackup(aOptions,_srcdom0, _newdom0List)
 
         # CONFIGURE EDV VMBACKUP/LOCAL VMBACKUP
         if not _ebox.isBaseDB() and not _ebox.mIsExaScale():
@@ -2364,6 +2407,7 @@ class ebCluReshapeCompute(object):
 
             _exascale = ebCluExaScale(_ebox)
             _exascale.mUpdateVolumesOedacli(aWhen="AddNode")
+            self.mUpdateDom0DomUPair(None)
 
         #ADD 2T MEMORY SUPPORT FOR X9M
         _exadata_model = _ebox.mGetExadataDom0Model(_srcdom0)
@@ -2547,7 +2591,7 @@ class ebCluReshapeCompute(object):
             if _ebox.IsZdlraProv():                           
                  _pswd = _ebox.mGetZDLRA().mGetWalletViewEntry('passwd', _srcdomU)
             elif _ebox.mIsAdbs():
-                _pswd = _ebox.mGetWalletViewEntry('passwd', _srcdomU)
+                _pswd = _ebox.mGetAsmSysPasswordForAdbs('asmsys', _srcdomU)
             else:         
                  _pswd = _ebox.mGetSysPassword(_srcdomU)      
             _ebox.mUpdateOedaUserPswd(_oeda_path, "non-root", _pswd)                              
@@ -2619,7 +2663,7 @@ class ebCluReshapeCompute(object):
             if _ebox.IsZdlraProv():
                 _pswd = _ebox.mGetZDLRA().mGetWalletViewEntry('passwd', _srcdomU)
             elif _ebox.mIsAdbs():
-                _pswd = _ebox.mGetWalletViewEntry('passwd', _srcdomU)
+                _pswd = _ebox.mGetAsmSysPasswordForAdbs('asmsys', _srcdomU)
             else:
                 _pswd = _ebox.mGetSysPassword(_srcdomU)
             _ebox.mUpdateOedaUserPswd(_oeda_path, "non-root", _pswd)
@@ -3215,7 +3259,7 @@ class ebCluReshapeCompute(object):
                         if _out:
                             ebLogInfo(f'OUT: {_out}')
 
-    def mUpdateRPM(self, aSrcDomU, aNewDomU, aOptions=None):
+    def mUpdateRPM(self, aSrcDomU, aNewDomU, aOptions=None, aInstallDbaastoolsOnly=False):
         _srcdomU = aSrcDomU
         _newdomU = aNewDomU
         _ebox = self.__eboxobj
@@ -3287,6 +3331,10 @@ class ebCluReshapeCompute(object):
                 # if that exist in images folder else it returns the default name
                 # hence its safe to depend on mGetDbaastoolRpmName
                 _ebox.mUpdateRpm(_dbaastools_rpm)
+
+        if aInstallDbaastoolsOnly:
+            ebLogInfo(f'Installed/Updated dbaastools rpm only.')
+            return
 
         # Identify if this is Multicloud env
         _isMulticloud, _ = self.mIsMulticloud(_srcdomU)
@@ -3529,6 +3577,13 @@ class ebCluReshapeCompute(object):
         _ebox.mSetSharedEnv(None)
         _ebox.mCheckSharedEnvironment()
 
+        # Bypass standard network checks
+        _step_time = time.time()
+        if _ebox.mCheckDom0NetworkType():
+            if _ebox.mCheckConfigOption('reset_net_mapping', 'True'):
+                _ebox.mResetDom0NetworkMapping()
+        _ebox.mLogStepElapsedTime(_step_time, 'Check Network Discovery Completed')
+
         #
         # RESHAPE CLUSTER WITH DELETE NON-PARTICIPANT Subset Node
         #
@@ -3558,7 +3613,7 @@ class ebCluReshapeCompute(object):
         
         _patchconfig = _ebox.mGetPatchConfig()
         _ebox.mExecuteLocal("/bin/cp {} {}".format(_patchconfig, _deletenodexml))
-
+        _data_d = {}
         #
         # GI_DELETE
         #
@@ -3619,6 +3674,7 @@ class ebCluReshapeCompute(object):
                     
                 elif step == "OSTP_POSTVM_DELETE":
                     self.mRemoveComputePostVMDelete(["OSTP_POSTVM_DELETE"], aOptions)
+
                 #
                 # Update Final status
                 #
@@ -3639,6 +3695,9 @@ class ebCluReshapeCompute(object):
                 _ebox.mSetPatchConfig(_deletenodexml)
                 _ebox.mPatchXMLForNodeSubset(aOptions)
                 _ebox.mSaveXMLClusterConfiguration()
+                domu_list = [ _domu for _ , _domu in _ebox.mGetOrigDom0sDomUs()]
+                _ebox.mDeleteClusterFileForDomUs(list(set(domu_list) | set(_reshape_domu_list))) 
+                _ebox.mSaveClusterDomUList()
 
                 _patchconfig = _ebox.mGetPatchConfig()
                 ebLogInfo('ebCluCtrl: Saved patched Cluster Config: ' + _patchconfig)
@@ -3647,9 +3706,13 @@ class ebCluReshapeCompute(object):
 
                 self.mPostReshapeValidation(aOptions,None)
                 _ebox.mUpdateStatusOEDA(True, OSTP_END_INSTALL, [OSTP_END_INSTALL], 'Delete Node Completed')
+                try:
+                    self._add_voting_files_info(_data_d)
+                except Exception as e:
+                    ebLogError(f"There was an error in adding voting files during post_add_cell_check step: {e}")
                 ebLogInfo('*** Exacloud Operation Successful : Delete Node completed')
             _stepSpecificDetails = self.mGetCluUtils().mStepSpecificDetails("elasticDeleteDetails", 'DONE', f"Elastic Delete Compute step {step} completed", step)
-            self.mGetCluUtils().mUpdateTaskProgressStatus([], 100, step, "DONE", _stepSpecificDetails)
+            self.mGetCluUtils().mUpdateTaskProgressStatus([], 100, step, "DONE", _stepSpecificDetails, _data_d)
                 
 
     def mExecDelNodeEndStep(self, aOptions):
@@ -3847,7 +3910,13 @@ class ebCluReshapeCompute(object):
             ebLogInfo(f"Removing stale entries of VM {_delnode} in the node {_srcdomU}")                   
 
             _node.mExecuteCmdLog(f'{_path}/bin/crsctl unpin css -n {_delnode}')
-            _node.mExecuteCmdLog(f'{_path}/bin/crsctl stop cluster -n {_delnode}')
+            _stop_cluster_cmd = f'{_path}/bin/crsctl stop cluster -n {_delnode}'
+            _force_stop_cluster_cmd = f'{_stop_cluster_cmd} -f'
+            mRunCrsCommandsWithRetry(
+                _node,
+                [_stop_cluster_cmd, _force_stop_cluster_cmd],
+                aLabel=f'crsctl stop cluster for {_delnode}',
+                aRaiseOnFailure=False)
             _node.mExecuteCmdLog(f'{_path}/bin/crsctl delete node -n {_delnode}')
 
             _i, _o, _e = _node.mExecuteCmd(f'{_path}/bin/srvctl config vip -n {_delnode} | grep "VIP IPv4 Address"')
@@ -4047,7 +4116,7 @@ class ebCluReshapeCompute(object):
                 continue
             for _node in _databases[_dbname]['dbNodeLevelDetails']:
                 if _node == _domu_shrtnm: 
-                    if _databases["dbNodeLevelDetails"][_node]["status"] in ["OPEN", "MOUNTED", "READ_ONLY"]:
+                    if _databases[_dbname]["dbNodeLevelDetails"][_node]["status"] in ["OPEN", "MOUNTED", "READ_ONLY"]:
                         _detail_error = f"Failed to remove DB instances {_dbname} using dbaascli on {_node}"
                         _ebox.mUpdateErrorObject(gNodeElasticError['DB_INST_NOT_REMOVED'], _detail_error)
                         raise ExacloudRuntimeError(0x0771, 0xA, _detail_error)
@@ -4345,8 +4414,6 @@ class ebCluReshapeCompute(object):
         finally:
             _ebox.mReleaseRemoteLock()
         
-        _stepSpecificDetails = self.mGetCluUtils().mStepSpecificDetails("elasticDeleteDetails", 'ONGOING', f"Elastic Delete Compute {step} task remove DBHomes in progress", step)
-        self.mGetCluUtils().mUpdateTaskProgressStatus([], 50, step, "In Progress", _stepSpecificDetails)
 
         _remote_lock = _ebox.mGetRemoteLock()
         with _remote_lock():
@@ -4714,3 +4781,26 @@ class ebCluReshapeCompute(object):
             _step_time = time.time()
             _csu.mRemoveStoragePool(_ebox)
             _ebox.mLogStepElapsedTime(_step_time, 'Remove Storage Pool from libvirt definition on added dom0s')
+            
+    def _add_voting_files_info(self, _data_d):
+        """
+        Adds voting disk info to the request data dictionary for POST_ADDCELL_CHECK step.
+        """
+        try:
+            """
+            The voting disk information is shared and consistent across all healthy
+            nodes in the cluster. Running the command on any single node should
+            give complete, accurate list of all voting disks for the whole cluster.
+            """
+            _domU_list = [_domU for _, _domU in self.__eboxobj.mReturnDom0DomUPair()]
+            if _domU_list:
+                _first_domU = _domU_list[0]
+                with connect_to_host(_first_domU, get_gcontext(), username="grid") as _node:
+                    _cell_list = self.__eboxobj.mReturnCellNodes()
+                    _dpairs = self.__eboxobj.mReturnDom0DomUPair()
+                    ovm_configmgmt = ebConfigCollector(_dpairs, _cell_list, self.__eboxobj)
+                    _data_d['voting_files'] = ovm_configmgmt.mGetVotingDiskConfig(_node, _first_domU)
+            else:
+                ebLogWarn("No connectable DomU found, skipping fetch voting disk information.")
+        except Exception as e:
+            ebLogError(f"There was an error in adding voting files: {e}") 

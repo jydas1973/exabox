@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2020, Oracle and/or its affiliates. 
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     BaseLogMgnt - Basic functionality
@@ -11,6 +11,7 @@ NOTE:
     None    
 
 History:
+    aararora    27/02/2026 - Bug 38902170: Correct resource leak issues
     jesandov    26/03/2019 - File Creation
 """
 
@@ -71,7 +72,7 @@ class BaseLogMgnt(object):
         if self.__serverFd is not None:
             self.__serverFd.close()
 
-        if self.__requestsFd is None:
+        if self.__requestsFd is not None:
             self.__requestsFd.close()
 
 

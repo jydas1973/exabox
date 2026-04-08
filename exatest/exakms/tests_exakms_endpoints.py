@@ -4,7 +4,7 @@
 #
 # tests_exakms_endpoints.py
 #
-# Copyright (c) 2021, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_exakms_endpoints.py - <one-line expansion of the name>
@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    gsundara    03/23/26 - Fix exakms ping mock
+#    illamas     03/19/26 - Enh 39058830 add create_key test
 #    ririgoye    10/14/24 - Bug 37076081 - Added UT for syncing exakv.db file
 #    talagusu    07/17/24 - Bug 36572957 - DEFAULT --EXAKMS-KEY-TYPE WHEN
 #                           INSERTING KEYS TO OBJECTSTORE
@@ -39,6 +41,7 @@ import sys
 import json
 import unittest
 import time
+from collections import namedtuple
 
 from random import shuffle
 
@@ -59,7 +62,7 @@ from exabox.exakms.ExaKmsSIV import ExaKmsSIV
 from exabox.exakms.ExaKmsEndpoint import ExaKmsEndpoint
 # Additional imports for new unit tests (kept at top as required)
 from unittest import mock
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, call
 from oci._vendor.urllib3.exceptions import SSLError
 from oci.key_management import KmsCryptoClient
 from exabox.kms.crypt import cryptographyAES
@@ -577,7 +580,7 @@ class ebTestExaKms(ebTestClucontrol):
             ],
             self.mGetRegexLocal(): [
                 [
-                    exaMockCommand("ping.*", aPersist=True),
+                    exaMockCommand("/bin/ping -c 1 *", aPersist=True),
                     exaMockCommand("rm -rf.*", aPersist=True)
                 ]
             ]
@@ -683,6 +686,49 @@ class ebTestExaKms(ebTestClucontrol):
         self.assertTrue("rsa" in _entry.mGetPublicKey())
         self.assertTrue("RSA" in _entry.mGetVersion())
 
+        self.mCleanUpKeys()
+
+    def mExecuteCreateKeyEndpoint(self):
+
+        # Clean up keys
+        self.mCleanUpKeys()
+
+        _host = self.mGetClubox().mReturnDom0DomUPair()[0][0]
+        _user = "root"
+
+        _oldPrivate = self.exakms.mGetEntryClass().mGeneratePrivateKey()
+        _oldEntry = self.exakms.mBuildExaKmsEntry(_host, _user, _oldPrivate)
+        self.exakms.mInsertExaKmsEntry(_oldEntry)
+        _oldPublic = _oldEntry.mGetPublicKey().strip()
+
+        _options = ebJsonObject({
+            "cmd": "create_key",
+            "hostname": _host,
+            "user": _user,
+            "hosttype": ExaKmsHostType.DOM0.name
+        })
+
+        _endpoint = ExaKmsEndpoint(_options)
+        _endpoint.mSetExaKms(self.exakms)
+
+        CmdResult = namedtuple("CmdResult", ["exit_code", "stdout", "stderr"])
+        endpoint_module = sys.modules[ExaKmsEndpoint.__module__]
+
+        with patch.object(endpoint_module, "connect_to_host") as mock_connect,\
+                patch.object(endpoint_module, "node_exec_cmd") as mock_exec:
+            mock_node = Mock()
+            mock_connect.return_value.__enter__.return_value = mock_node
+            mock_connect.return_value.__exit__.return_value = None
+            mock_exec.return_value = CmdResult(0, "", "")
+
+            _rc = _endpoint.mExecute()
+
+        self.assertEqual(_rc, 0, "create_key returned non-zero status")
+
+        _entries = self.exakms.mSearchExaKmsEntries({"FQDN": _host}, aRefreshKey=True)
+        self.assertEqual(len(_entries), 1)
+        self.assertEqual(_entries[0].mGetUser(), _user)
+        self.assertNotEqual(_entries[0].mGetPublicKey().strip(), _oldPublic)
 
         self.mCleanUpKeys()
 
@@ -753,6 +799,7 @@ class ebTestExaKms(ebTestClucontrol):
         self.mExecuteKmsDeleteOnDisk()
         self.mExecuteKmsBackupEndpoint()
         self.mExecuteMigrateEndpoint()
+        self.mExecuteCreateKeyEndpoint()
         self.mExecuteRotateEndpoint()
 
     def test_002_exakms_keysdb(self):

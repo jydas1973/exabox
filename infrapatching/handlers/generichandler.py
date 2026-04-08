@@ -1,9 +1,9 @@
 #
-# $Header: ecs/exacloud/exabox/infrapatching/handlers/generichandler.py /main/197 2025/11/28 06:57:28 araghave Exp $
+# $Header: ecs/exacloud/exabox/infrapatching/handlers/generichandler.py sdevasek_bug-38423778/1 2026/02/16 12:40:18 sdevasek Exp $
 #
 # generichandler.py
 #
-# Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      generichandler.py - This module contains methods to support all the inheriting handlers.
@@ -16,6 +16,26 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    sdevasek    04/01/26 - Bug 39149959 - OCI: SMR PATCHING IS
+#                           LOOKING FOR PATCHES IN ECRA WHICH ARE NOT
+#                           REGISTERED VIA IMAGESERIES AND FAILING
+#    sdevasek    03/18/26 - Bug 39051493 - SMR PATCHING FAILED WITH ERROR :
+#                           "PATCH FILES MISSING ON TH EXACLOUD HOST AND ELU
+#                           PATCHING CANNOT CONTINUE FOR THE CURRENT PATCH
+#                           VERSION - IMAGEVERSION NOT FOUND AS PATCH
+#                           DIRECTORY NONE DOES NOT EXIST."
+#    rbhandar    02/24/26 - Bug 38453227 - AIM4ECS:0X03030012 - INDIVIDUAL
+#                           PATCH REQUEST EXCEPTION DETECTED
+#    araghave    02/19/26 - Bug 38766026 - FAIL DOMU PATCHING IN CASE OF A
+#                           VERSION VALIDATION FAILURE
+#    remamid     02/17/26 - bug 38945791 sticky flag
+#    sdevasek    02/16/26 - Enh 38423778 - VM HA CHECK SHOULD BE PERFORMED ONLY
+#                           ON VM CLUSTERS BELONG TO THE DOM0S WITHIN THE
+#                           MAINTENANCE WINDOW OF GMR
+#    araghave    12/16/25 - Enh 38766076 - CONFIGURE UPDATE-CRYPTO-POLICIES
+#                           BEFORE AND AFTER SWITCH PATCHING
+#    araghave    12/05/25 - Bug 38723453 - OCI: OC35 | DTZ | SMR ROLLBACK
+#                           OPERATION TOOK NON-ROLLING METHOD
 #    araghave    11/13/25 - Bug 38651311 - REPLACE FULLCVSS ELU OPTION WITH
 #                           FULL IN DOMU ELU INFRA PATCHING CODE
 #    jyotdas     10/31/25 - Bug 38575316 - Parallelise the dom0 shutdown across
@@ -435,6 +455,11 @@ from exabox.BaseServer.AsyncProcessing import ProcessManager, ProcessStructure
 from exabox.core.Context import get_gcontext
 from exabox.core.DBStore import ebGetDefaultDB
 from exabox.core.Node import exaBoxNode
+from exabox.infrapatching.core.infrapatcherror import (
+    INDIVIDUAL_PATCH_REQUEST_EXCEPTION_ERROR,
+    SSH_AUTHENTICATION_FAILED,
+    SSH_CONNECTION_TIMEOUT,
+)
 from exabox.infrapatching.core.infrapatcherror import *
 from exabox.infrapatching.core.clupatchhealthcheck import ebCluPatchHealthCheck
 from exabox.infrapatching.core.infrapatchtimestats import InfrapatchingTimeStatsRecord
@@ -652,7 +677,6 @@ class GenericHandler(LogHandler):
         # Include Node list
         self.__all_dom0s = self.mGetDom0ListFromXml()
         self.__dom0_customized_list = self.mGetDom0List()
-
         self.__autonomousVMList = []
         self.__autonomousVMListWithCustomerHostnames = []
         if self.__target_type[0] not in [ PATCH_CELL, PATCH_IBSWITCH, PATCH_SWITCH ]:
@@ -670,54 +694,172 @@ class GenericHandler(LogHandler):
             #If EnablePlugins = yes , plugin will run on all VM
             self.mSetAutonomousVMList()
 
-        self.mConvertExasplice()
+        self.mFixInvalidEluVersionEntries()
+
+    def isSSHConnectivityError(self, aErrorMsg):
+        """
+        Inspect the error message for known SSH failure signatures.
+
+        Returns:
+            tuple[bool, Optional[str]]: True with a specific SSH error code when
+            recognized; (False, None) when the message is not an SSH signature.
+            Callers must handle the None case and supply their own fallback code.
+        """
+        _error_msg_lower = (aErrorMsg or "").lower()
+
+        if "bad authentication type" in _error_msg_lower or "authentication failure" in _error_msg_lower:
+            return True, SSH_AUTHENTICATION_FAILED
+
+        if "connection timed out" in _error_msg_lower or "timeouterror" in _error_msg_lower or "[errno 110]" in _error_msg_lower:
+            return True, SSH_CONNECTION_TIMEOUT
+
+        return False, None
+
+
+    def mBuildSshSuggestion(self, aErrorCode, aErrorMsg, aOperationContext="patch operation"):
+        _host = None
+        if aErrorMsg:
+            _needle = "from the target node:"
+            _lower_msg = aErrorMsg.lower()
+            _needle_idx = _lower_msg.find(_needle)
+            if _needle_idx != -1:
+                _start = _needle_idx + len(_needle)
+                _fragment = aErrorMsg[_start:].strip()
+                if _fragment:
+                    _candidate = _fragment.split()[0].rstrip('".,;:')
+                    if _candidate:
+                        _host = _candidate
+                        self.mPatchLogInfo(f"Identified target node {_host} from SSH error message")
+
+        if aErrorCode == SSH_AUTHENTICATION_FAILED:
+            if _host:
+                return (f"SSH authentication to target {_host} was rejected. Refresh the keys on the host "
+                        "and confirm publickey access before retrying.")
+            return ("SSH authentication to the target host was rejected. Refresh the keys on the host "
+                    "and confirm publickey access before retrying.")
+
+        if aErrorCode == SSH_CONNECTION_TIMEOUT:
+            if _host:
+                return (f"SSH connection to target {_host} timed out. Verify host network reachability, "
+                        "then retry the operation.")
+            return ("SSH connection to the target host timed out. Verify host network reachability, "
+                    "then retry the operation.")
+
+        return f"Exception in Running {aOperationContext} {aErrorMsg}"
+
 
     def mGetCluCtrlInstance(self):
         return self.__cluctrl
 
-    ### Code to be removed ###
-    def mConvertExasplice(self):
-        # in case of exasplice, dom0 and target host is on 24+, need to get the target version from disk and rebuild all the values
+    def mFixInvalidEluVersionEntries(self):
+        """
+        Update the ELUTargetVersiontoNodeMappings if it contains the invalid key
+        'ImageVersion not Found'.
 
-        # check to see if live update is disabled
-        _disable_live_update = mGetInfraPatchingConfigParam('disable_live_update')
-        if _disable_live_update and _disable_live_update.lower() in ['true']:
-            self.mPatchLogInfo('Live update disabled')
+        - If the map is None/empty, do nothing.
+        - Remove the invalid key.
+        - Split the hostnames.
+        - Determine version for each host using mIsOfexaImageType.
+        - Only consider hosts that are in the customized node list
+          (DOM0 or DOMU depending on current target type).
+        - Rebuild / extend the map by version.
+        - On exception, leave the original map unchanged.
+        """
+
+        #  - map is None/empty OR
+        #  - map does not contain the invalid key.
+        if not self.__elu_target_version_to_node_mappings or IMAGE_VER_NOT_FOUND_STR not in self.__elu_target_version_to_node_mappings:
+            self.mPatchLogInfo("ELUTargetVersiontoNodeMappings is None or empty, or the key 'ImageVersion not Found' does not exist.")
             return
 
-        _original_version = self.__target_version
-        _isExaplice = False
-        _new_target_version = None
-        if self.__additional_options[0]['exasplice'].lower() == 'yes':
-            _isExaplice = True
-        _dom0_to_check = self.mGetDom0ToCheck()
-        if PATCH_DOM0 in self.__target_type and _isExaplice and _dom0_to_check and len(self.__target_version) == 6:
-            # check for the host
-            # 6 digits version convention is compared here.
-            _is_of_exaImage_type, _node_version = self.mIsOfexaImageType(_dom0_to_check)
-            if _is_of_exaImage_type:
-                _new_target_version = self.mGetLatestPatchVersionFromDisk(_node_version)
-                if _new_target_version:
-                    self.__target_version = _new_target_version
-                    _orig_dbpatchfile = self.mGetDom0DomUPatchZipFile()[0]
-                    _orig_dom0yum = self.mGetDom0DomUPatchZipFile()[1]
-                    _dbpatchfile = _orig_dbpatchfile.replace(_original_version, _new_target_version)
-                    _dom0Yum = self.mGetYumRepo24(_new_target_version)
-                    self.__dom0domUPatchZipFiles.remove(_orig_dbpatchfile)
-                    self.__dom0domUPatchZipFiles.remove(_orig_dom0yum)
-                    self.mPatchLogInfo(f'New files {_dbpatchfile} - {_dom0Yum}')
-                    if not self.mCheckLocalFileExists(_dbpatchfile):
-                        _suggestion_msg = f'File {_dbpatchfile} does not exist. Please check before retrying'
-                        self.mPatchLogInfo(_suggestion_msg)
-                        self.mAddError(MISSING_PATCH_FILES, _suggestion_msg)
-                    elif not self.mCheckLocalFileExists(_dom0Yum):
-                        _suggestion_msg = f'File {_dom0Yum} does not exist. Please check before retrying'
-                        self.mPatchLogInfo(_suggestion_msg)
-                        self.mAddError(MISSING_PATCH_FILES, _suggestion_msg)
+        self.mPatchLogInfo("key 'ImageVersion not Found' found in ELUTargetVersiontoNodeMappings. Will recalculate ELUTargetVersiontoNodeMappings")
+        _working_map = self.__elu_target_version_to_node_mappings.copy()
+
+        # Determine customized node list based on current target type
+        _target_type = self.mGetTargetTypes()[0]
+        _allowed_hosts = None
+        if _target_type == PATCH_DOM0:
+            _allowed_hosts = self.mGetCustomizedDom0List()
+            self.mPatchLogInfo(
+                f"Using customized DOM0 list with {_allowed_hosts} host(s)."
+            )
+        elif _target_type == PATCH_DOMU:
+            _allowed_hosts = self.mGetCustomizedDomUList()
+            self.mPatchLogInfo(
+                f"Using customized DOMU list with {_allowed_hosts} host(s)."
+            )
+
+        # If we don't have any allowed hosts for this target type, do not
+        # modify the mapping (including the IMAGE_VER_NOT_FOUND_STR entry).
+        if not _allowed_hosts:
+            self.mPatchLogInfo(
+                "No customized host list available for current target type; "
+                "skipping ELU version map fix"
+                )
+            return
+
+        try:
+
+            _hosts_str = _working_map.pop(IMAGE_VER_NOT_FOUND_STR)
+            _hosts = [h.strip() for h in _hosts_str.split(",") if h.strip()]
+
+            _version_to_hosts = {}
+
+            # Build temporary mapping: version -> comma-separated hosts
+            for _host in _hosts:
+                # If we have a restricted list, skip hosts that are not in it
+                if _allowed_hosts is not None and _host not in _allowed_hosts:
+                    self.mPatchLogInfo(
+                        f"Host '{_host}' not in input node list. Skipping."
+                    )
+                    continue
+
+                _, _version = self.mIsOfexaImageType(_host)
+                if _version:
+                    if _version in _version_to_hosts:
+                        _version_to_hosts[_version] += f", {_host}"
                     else:
-                        self.__dom0domUPatchZipFiles.insert(0, _dbpatchfile)
-                        self.__dom0domUPatchZipFiles.insert(1, _dom0Yum)
-                        self.mPatchLogInfo(f'New files in list {self.__dom0domUPatchZipFiles}')
+                        _version_to_hosts[_version] = _host
+                    self.mPatchLogInfo(f"Host '{_host}' version: '{_version}'")
+                else:
+                    if IMAGE_VER_NOT_FOUND_STR in _version_to_hosts:
+                        _version_to_hosts[IMAGE_VER_NOT_FOUND_STR] += f", {_host}"
+                    else:
+                        _version_to_hosts[IMAGE_VER_NOT_FOUND_STR] = _host
+                    self.mPatchLogError(
+                        f"Could not determine version for host '{_host}'. Retaining 'ImageVersion not Found' key."
+                    )
+
+            # Append / add new hosts for each version to the working map
+            for _version, _new_hosts in _version_to_hosts.items():
+                if _version in _working_map:
+                    _existing_hosts = _working_map[_version]
+                    _combined_hosts = (
+                        f"{_existing_hosts}, {_new_hosts}"
+                        if _existing_hosts
+                        else _new_hosts
+                    )
+                    _working_map[_version] = _combined_hosts
+                    self.mPatchLogInfo(
+                        f"Appended to existing version '{_version}': {_combined_hosts}"
+                    )
+                else:
+                    _working_map[_version] = _new_hosts
+                    self.mPatchLogInfo(
+                        f"Added new version '{_version}': {_new_hosts}"
+                    )
+
+            # Only here do we modify the instance attribute
+            self.__elu_target_version_to_node_mappings = _working_map
+            self.mPatchLogInfo(
+                f"Updated ELU map: {self.__elu_target_version_to_node_mappings}"
+            )
+
+        except Exception as _e:
+            self.mPatchLogError(
+                f"Exception while updating ELU map. Original map preserved. Error: {_e}"
+            )
+            self.mPatchLogTrace(traceback.format_exc())
 
     def mGetPatchPayloadsBasePath(self):
         if self.mIsExaCC():
@@ -890,6 +1032,13 @@ class GenericHandler(LogHandler):
     def mGetCRSHelper(self):
         return self.__crs_helper
 
+    def mIsCryptoPolicyResetEnabled(self):
+        _config_value = mGetInfraPatchingConfigParam('enableCryptoPolicyReset')
+        if _config_value:
+            return _config_value.lower() in ['true']
+        else:
+            return False
+
     def mGetEluTargetVersiontoNodeMappings(self):
         '''
          In case of ELU patching, below target version list
@@ -969,12 +1118,25 @@ class GenericHandler(LogHandler):
             'elu_type': '',
             'elu_has_outstanding_work': 'no exadata live update active',
         }
+
+        # Allowed ELU option migrations on the SAME live-update version.
+        # Normalize aliases and be permissive where semantics allow a superset
+        # of fixes to be applied without version change.
+        # Examples (same version):
+        #   - highcvss -> allcvss (allow broader CVSS range)
+        #   - highcvss -> full    (allow complete set)
+        #   - allcvss  -> full    (allow complete set)
+        #   - any      -> applypending (finalize outstanding work)
+        # Also treat legacy aliases high/all as highcvss/allcvss.
         _allowed_migrations = {
+            "high": ["allcvss", "full", "applypending"],
+            "all": ["full", "applypending"],
             "highcvss": ["allcvss", "full", "applypending"],
             "allcvss": ["full", "applypending"],
             "full": ["applypending"],
             "applypending": []
         }
+
         _is_elu_outstanding_work_applicable = False
         _live_update_version = None
         _current_qmr_image_version = None
@@ -1028,7 +1190,8 @@ class GenericHandler(LogHandler):
             if _live_update_version:
                 self.mPatchLogInfo(f"Exadata live update version - {_live_update_version}")
             if _applied_elu_type_on_domu:
-                if _applied_elu_type_on_domu in [ "all", "high" ]:
+                # Normalize legacy aliases to canonical names for downstream checks.
+                if _applied_elu_type_on_domu in ["all", "high"]:
                     _applied_elu_type_on_domu = _applied_elu_type_on_domu + "cvss"
                 self.mPatchLogInfo(f"Exadata live update applied - {_applied_elu_type_on_domu}")
             if _outstanding_work_msg:
@@ -1044,12 +1207,16 @@ class GenericHandler(LogHandler):
             if not _live_update_version or (str(self.mGetTargetVersion()) != str(_live_update_version)):
                 self.mPatchLogInfo(f"Elu upgrade version - {self.mGetTargetVersion()} will be aplicable for patching - Domu - {aDomU}")
                 _is_elu_outstanding_work_applicable = True # Migration to a different version is always allowed
-            elif _applied_elu_type_on_domu and self.mGetEluOptions() in _allowed_migrations.get(_applied_elu_type_on_domu, []):
-                self.mPatchLogInfo(f"Elu patch will be applied on DomU - {aDomU} based on the current elu type - {_applied_elu_type_on_domu} and the elu type passed for upgrade as part of payload is {self.mGetEluOptions()}.")
-                _is_elu_outstanding_work_applicable = True
-            else:
-                self.mPatchLogInfo(f"Elu patch will be skipped on DomU - {aDomU} due to the unsupported ELU Target version and ELU option combination specified.")
-                _is_elu_outstanding_work_applicable = False
+            elif _applied_elu_type_on_domu:
+                # Compare case-insensitively for robustness
+                _applied_type = _applied_elu_type_on_domu.lower()
+                _requested_type = self.mGetEluOptions().lower() if self.mGetEluOptions() else None
+                if _requested_type in _allowed_migrations.get(_applied_type, []):
+                    self.mPatchLogInfo(f"Elu patch will be applied on DomU - {aDomU} based on the current elu type - {_applied_elu_type_on_domu} and the elu type passed for upgrade as part of payload is {self.mGetEluOptions()}.")
+                    _is_elu_outstanding_work_applicable = True
+                else:
+                    self.mPatchLogInfo(f"Elu patch will be skipped on DomU - {aDomU} due to the unsupported ELU Target version and ELU option combination specified.")
+                    _is_elu_outstanding_work_applicable = False
 
             '''
              In case of domu upgraded using "full" elu option, live upgrade details will not be present post applypending
@@ -1144,6 +1311,7 @@ class GenericHandler(LogHandler):
                 # ELU not applied on this current node yet and outstanding work items output must be returned 'no exadata live update active'.
                 self.mPatchLogInfo(
                      f"Elu outstanding work apply will be skipped on {aDomU} as the imageinfo exadata-live-update-has-outstanding-work is - 'no exadata live update active'")
+                _is_elu_outstanding_work_applicable = False
                 _elu_info['elu_version'] = _live_update_version
                 _elu_info['elu_type'] = _applied_elu_type_on_domu
                 _elu_info['elu_has_outstanding_work'] = 'no exadata live update active'
@@ -2858,7 +3026,9 @@ class GenericHandler(LogHandler):
         """
 
         # Patchmgr support only non-rolling style in case of exasplice on dom0 
-        # nodes. So, change to non-rolling if auto or rolling specified by user.
+        # nodes. So, change to non-rolling if auto or rolling specified by user
+        # depending on the infra patching operation. Exasplice rollback must
+        # always be performed in rolling style.
 
         # Cells should be patched in rolling always in case of monthly patching
         # because customer might try VM start/stop operations and those
@@ -2868,7 +3038,16 @@ class GenericHandler(LogHandler):
 
         if self.mIsExaSplice():
             if PATCH_DOM0 in self.__target_type:
-                self.__op_style = OP_STYLE_NON_ROLLING
+                if self.__task == TASK_ROLLBACK:
+                    '''
+                     Perform ELU/Exasplice rollback in rolling to
+                     avoid outage scenarios as all Dom0s will get
+                     rebooted together in case of non-rolling is 
+                     set.
+                    '''
+                    self.__op_style = OP_STYLE_ROLLING
+                else:
+                    self.__op_style = OP_STYLE_NON_ROLLING
             elif  PATCH_CELL in self.__target_type:
                 self.__op_style = OP_STYLE_ROLLING
             self.mPatchLogInfo(
@@ -3042,10 +3221,23 @@ class GenericHandler(LogHandler):
         # mGetDom0DomUCustomerNameMapWithNoZeroVcpu will only contain DomUs up and running.
         _list_of_running_domUs_across_dom0s.extend([(_dom0, [_vm for _vm in _vms if _vm not in aCustomerHostnameVmsDown]) for _dom0, _vms in self.mGetDom0DomUCustomerNameMapWithNoZeroVcpu()])
 
+        # Get current dom0 cluster list in rolling operation
+        _current_dom0_cluster_list = []
+        if self.mGetOpStyle() == OP_STYLE_ROLLING and self.mGetIncludeNodeList():
+            _current_dom0_node = self.mGetIncludeNodeList()[0]
+            _current_dom0_cluster_list = self.mGetClusterListForDom0(_current_dom0_node)
+            if _current_dom0_cluster_list:
+                self.mPatchLogInfo(
+                    f"Cluster list associated with current dom0 {_current_dom0_node} is {json.dumps(_current_dom0_cluster_list, indent=4)}.")
+
         # mGetClusterToVmMapWithNonZeroVcpu contains customer hostnames
         if len(self.mGetClusterToVmMapWithNonZeroVcpu()) > 0 and len(aDomuRunningList) > 0:
             _list_of_domu_not_running_in_cluster = []
             for _cluster_name, _domu_list in self.mGetClusterToVmMapWithNonZeroVcpu():
+
+                # Check if the cluster belongs to the current dom0 in rolling operation and HA check is skipped if the cluster does not belong to current dom0
+                if _current_dom0_cluster_list and _cluster_name not in _current_dom0_cluster_list:
+                    continue
 
                 '''
                  Domu availability check is skipped in case of a single node cluster
@@ -4672,6 +4864,9 @@ class GenericHandler(LogHandler):
 
         try:
             _patchmgr_error_json = {}
+            # Track whether any patchmgr JSON reports a failure; once true it remains true
+            _patch_mgr_error_detected = False
+            _patchmgr_error_json["patch_mgr_error_detected"] = "no"
             _patchmgr_error_json["patch_mgr_error_details"] = []
             _found_exadata_json_error = False
             _exadata_error_json_files = []
@@ -4686,6 +4881,8 @@ class GenericHandler(LogHandler):
                 _target_json = {}
                 _target_json_list = []
                 _target_json_str = None
+                # Flag failures detected while parsing the current JSON file
+                _curr_file_detected_patchmgr_err = False
                 try:
                     if self.mGetInfrapatchExecutionValidator().mCheckCondition('mIsCpsLaunchNodeForDomU'):
                         _cmd_list = []
@@ -4700,8 +4897,6 @@ class GenericHandler(LogHandler):
                         _target_json_str = _node.mReadFile(_json_file)
 
                     if _target_json_str:
-                        _patch_mgr_error_detected = False
-                        _patchmgr_error_json["patch_mgr_error_detected"] = "no"
                         _target_json = json.loads(_target_json_str)
                         for _exadata_error_json_name, _exadata_error_json_value in _target_json.items():
                             if _exadata_error_json_name and _exadata_error_json_name == "Modules":
@@ -4721,14 +4916,15 @@ class GenericHandler(LogHandler):
                                                             if _error_param_name == "Status" and _error_param_value == "Failed":
                                                                 _patchmgr_error_status_json[_patchmgr_error_code_name] = _patchmgr_error_handling_details
                                                                 _patchmgr_error_json["patch_mgr_error_details"].append(_patchmgr_error_status_json)
-                                                                _patch_mgr_error_detected = True
+                                                                _curr_file_detected_patchmgr_err = True
                             elif _exadata_error_json_name and _exadata_error_json_name == "Metadata":
                                 for _item in _exadata_error_json_value:
                                     if "DBNUVersion" in _item.keys():
                                         _patchmgr_error_json["dbnu_version"] = _item["DBNUVersion"]
                                         break
 
-                        if _patch_mgr_error_detected:
+                        if _curr_file_detected_patchmgr_err:
+                            _patch_mgr_error_detected = True
                             _patchmgr_error_json["patch_mgr_error_detected"] = "yes"
 
                 except Exception as e:

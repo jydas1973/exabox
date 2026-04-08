@@ -154,6 +154,7 @@ class ebTestPostVMInstall(ebTestClucontrol):
 
         _cell_commands1 = [
            exaMockCommand('cellcli -e list flashcache attributes name,size', aStdout='', aPersist=True),
+           exaMockCommand('cellcli -e list flashlog attributes name,size', aStdout='', aPersist=True),
            exaMockCommand('cellcli -e list cell detail | grep flashCacheMode', aStdout='', aPersist=True)
            
         ]

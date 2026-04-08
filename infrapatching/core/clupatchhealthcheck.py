@@ -3,7 +3,7 @@
 #
 # clupatchhealthcheck.py
 #
-# Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      clupatchhealthcheck.py - This contains health check methods
@@ -15,6 +15,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    araghave    02/19/26 - Bug 38766026 - FAIL DOMU PATCHING IN CASE OF A
+#                           VERSION VALIDATION FAILURE
 #    ririgoye    11/26/25  - Bug 38636333 - EXACLOUD PYTHON:ADD INSTANTCLIENT
 #                            TO LD_LIBRARY_PATH
 #    araghave    11/13/25 - Bug 38651311 - REPLACE FULLCVSS ELU OPTION WITH
@@ -314,13 +316,13 @@ class ebCluPatchHealthCheck(LogHandler):
         _rc = 1
         _elu_info = {}
         _applied_elu_type_on_domu = None
-        _is_elu_outstanding_work_applicable = False
+        _is_elu_apply_eligible = False
 
         # instantiate the class oracle version
         _verobj = OracleVersion()
 
         try:
-            _ret, _cur_ver_exa, _elu_info, _is_elu_outstanding_work_applicable = self.ghandler.mGetExadataLiveUpdateDetails(aNode)
+            _ret, _cur_ver_exa, _elu_info, _is_elu_apply_eligible = self.ghandler.mGetExadataLiveUpdateDetails(aNode)
             if _ret == PATCH_SUCCESS_EXIT_CODE and len(_elu_info) > 0:
                 _live_version = _elu_info['elu_version']
                 _applied_elu_type_on_domu = _elu_info['elu_type']
@@ -342,7 +344,7 @@ class ebCluPatchHealthCheck(LogHandler):
                         _current_version = _live_version
                         if _live_version:
                             # ELU option validations applicable only to domu patching.
-                            if aNodeType == PATCH_DOMU and not _is_elu_outstanding_work_applicable:
+                            if aNodeType == PATCH_DOMU and not _is_elu_apply_eligible:
                                 _rc = 0
                             else:
                                 self.mPatchLogInfo(f'mCheckTargetVersionForElu: Node {aNode} with QMR version {_cur_ver_exa} has a live update version {_live_version} and node will be updated to {self.ghandler.mGetTargetVersion()}')

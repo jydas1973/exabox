@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2019, Oracle and/or its affiliates. All rights reserved.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     Network - Basic functionality for Node Network
@@ -40,24 +40,27 @@ class exaBoxNetDev(object):
         self.__status   = ebNetDevNone  # Up or Down
         self.__mtu      = ebNetDevUndef
 
+    def _set_type(self, aType):
+        self.__type = aType
 
-class exaBoxLoopBackDev():
+
+class exaBoxLoopBackDev(exaBoxNetDev):
 
     def __init__(self):
-        super(self)
-        self.__type     = ebNetDevLoopBack
+        super().__init__()
+        self._set_type(ebNetDevLoopBack)
 
 class exaBoxEtherDev(exaBoxNetDev):
 
     def __init__(self):
-        super(self)
-        self.__type     = ebNetDevEther
+        super().__init__()
+        self._set_type(ebNetDevEther)
 
 class exaBoxIBDev(exaBoxNetDev):
 
     def __init__(self):
-        super(self)
-        self.__type     = ebNetDevIB
+        super().__init__()
+        self._set_type(ebNetDevIB)
 
 ebNetworkInitialized  = 0
 ebNetworkDiscover     = 1

@@ -1,10 +1,10 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/infrapatching/exacompute/handlers/exacomputegenerichandler.py /main/27 2025/08/20 05:15:38 apotluri Exp $
+# $Header: ecs/exacloud/exabox/infrapatching/exacompute/handlers/exacomputegenerichandler.py /main/29 2026/02/19 11:35:13 sdevasek Exp $
 #
 # exacomputegenerichandler.py
 #
-# Copyright (c) 2022, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2022, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      exacomputegenerichandler.py
@@ -16,6 +16,12 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    sdevasek    02/12/26 - Enh 38891722 - REMOVAL OF SSH EQUIVALENCE BETWEEN
+#                           LAUNCH-NODE AND TARGET-NODES
+#    sdevasek    01/22/26 - Enh 38854794 - EXACOMPUTE FREE POOL NODE  PATCHING:
+#                           UPDATE NODE_PROGRESS_DATA CORRECTLY
+#    sdevasek    01/16/26 - Enh 38821433 - EXACOMPUTE FREE POOL NODE  PATCHING:
+#                           USE ONE OF THE TARGET NODE AS LAUNCHNODE
 #    apotluri    08/11/25 - Bug 38096654 - PRECHECK OF SMR FAILED WITH
 #                           'DIRECTORY FOR EXADATA_RELEASE HAS MORE THAN ONE
 #                           PATCH'
@@ -71,6 +77,7 @@
 #    jyotdas     07/22/22 - Creation
 #
 
+import copy
 import json
 import socket
 import traceback
@@ -146,6 +153,9 @@ class ExaGenericHandler(TargetHandler):
         self.__kvm_env = False
         self.__exacc = False
 
+        # Auto launch node tracking
+        self.__computed_launch_nodes = []
+
         # Generic functions used by all
         self.__clupatchcheck = ebCluPatchHealthCheck(self.__cluctrl, aGenericHandler=self)
 
@@ -177,6 +187,8 @@ class ExaGenericHandler(TargetHandler):
         self.__nodes_to_patch = []
         self.__node_patch_base_dir = PATCH_BASE
         self.__eligible_launch_node = None
+        # This stores np data for already upgarded nodes and precheck failed nodes
+        self.__node_progress_data_for_reporting = []
 
     def mGetCluPatchCheck(self):
         return self.__clupatchcheck
@@ -195,6 +207,43 @@ class ExaGenericHandler(TargetHandler):
 
     def mGetLaunchNodes(self):
         return self.__launch_nodes
+
+    def mSetLaunchNodes(self, aLaunchNodes):
+        self.__launch_nodes = aLaunchNodes or []
+
+    def mSetComputedLaunchNodes(self, aLaunchNodes):
+        self.__computed_launch_nodes = aLaunchNodes or []
+
+    def mGetComputedLaunchNodes(self):
+        return self.__computed_launch_nodes
+
+    def mGetNodeProgressDataForReporting(self):
+        return self.__node_progress_data_for_reporting
+
+    def mSetNodeProgressDataForReporting(self, nodeProgressData):
+        self.__node_progress_data_for_reporting = nodeProgressData
+
+    def mComputeLaunchNodesFromTargetNodes(self, aNodeList=None):
+        """Compute exactly two launch nodes when none are provided."""
+        _targets = self.mGetCustomizedDom0List()
+        _reachable = []
+        _unreachable = []
+        for _candidate in _targets:
+            if self.mGetCluPatchCheck().mPingNode(_candidate):
+                _reachable.append(_candidate)
+            else:
+                _unreachable.append(_candidate)
+
+        if len(_reachable) < 2:
+            _suggestion_msg = ("Unable to auto-select two launch nodes; reachable targets: %s, unreachable targets: %s"
+                % (str(_reachable), str(_unreachable)))
+            self.mPatchLogInfo(_suggestion_msg)
+            return self.mAddError(UNABLE_TO_FIND_ELIGIBLE_LAUNCH_NODE, _suggestion_msg), []
+
+        _selected = _reachable[:2]
+        self.mPatchLogInfo(f"Auto-selected launch nodes: {_selected}; unreachable targets: {_unreachable}")
+        self.mSetComputedLaunchNodes(_selected)
+        return PATCH_SUCCESS_EXIT_CODE, _selected
 
     def mGetMasterReqId(self):
         return self.__master_request_id
@@ -463,6 +512,29 @@ class ExaGenericHandler(TargetHandler):
                         self.mPatchLogError("Unable to write node progress details into Exacloud DB.")
                         self.mPatchLogError(traceback.format_exc())
 
+    def mFetchExistingIterationNodeProgressData(self):
+        """
+        Fetches the existing node progress data from the database that matches the current sub-operation like patch, precheck.
+        """
+        _existing_npdata = []
+        try:
+            _request_id = self.mGetRequestObj().mGetUUID()
+            _request_data = ebCluExaComputePatch.mGetRequestData(_request_id)
+            if _request_data and "output" in _request_data and \
+                    "node_patching_status" in _request_data["output"] and \
+                    "node_patching_progress_data" in _request_data["output"]["node_patching_status"]:
+
+                # Filter the node progress data to match the current sub-operation
+                _existing_npdata = [
+                    _npd for _npd in _request_data["output"]["node_patching_status"]["node_patching_progress_data"]
+                    if _npd.get("patch_sub_operation") == self.mgetSubOperation()
+                ]
+        except Exception as e:
+            self.mPatchLogWarn("Unable to fetch existing node progress data. Proceeding without it.")
+            self.mPatchLogWarn(str(e))
+
+        return _existing_npdata
+
     def mUpdatePatchProgressStatus(self, aNodeList=[], aAlreadyUpgradedNodeList=[], aNode=None, aMergeableNPDataList=[], aFailedNodeList=[]):
         """
            Following operation will be performed :-
@@ -527,7 +599,6 @@ class ExaGenericHandler(TargetHandler):
                 self.mPatchLogError("Unable to write node progress details into Exacloud DB.")
                 self.mPatchLogError(traceback.format_exc())
 
-
         if aNodeList or aAlreadyUpgradedNodeList or aFailedNodeList:
 
             # fill up the payload json for notification
@@ -537,7 +608,12 @@ class ExaGenericHandler(TargetHandler):
             _patch_progress_data = []
             _node_progress_list = {}
 
-            patch_progressing_status_json["launch_node"] = self.mGetLaunchNodes()
+            _computed_launch_nodes = self.mGetComputedLaunchNodes()
+            if _computed_launch_nodes:
+                patch_progressing_status_json["launch_node"] = _computed_launch_nodes
+            else:
+                patch_progressing_status_json["launch_node"] = self.mGetLaunchNodes()
+
             if aAlreadyUpgradedNodeList and len(aAlreadyUpgradedNodeList) > 0:
                 for _node_name in aAlreadyUpgradedNodeList:
                     _node_progress_list = {'node_name': _node_name, 'patchmgr_start_time': _patch_start_time,
@@ -604,7 +680,10 @@ class ExaGenericHandler(TargetHandler):
 
         if not _failed_to_get_npdata_from_xml:
             # Merge current np data from DB and np data for precheck failed nodes/ nodes that are upto date
-            _patch_progressing_status_json = self.mCombinePatchProgressData(_patch_progressing_status_json, aMergeableNPDataList)
+            _merge_list = []
+            if aMergeableNPDataList:
+                _merge_list.extend(aMergeableNPDataList)
+            _patch_progressing_status_json = self.mCombinePatchProgressData(_patch_progressing_status_json, _merge_list)
             if len(_patch_progressing_status_json) != 0:
                 _write_into_request_table_exacloud_db(_patch_progressing_status_json)
                 
@@ -757,36 +836,56 @@ class ExaGenericHandler(TargetHandler):
                         # parse and get the json payload
                         _patch_progressing_status_json, _patch_failure_nodes = self.mParsePatchmgrXml(_patchmgr_xml_data)
 
-            _npdata_for_precheck_failed_and_already_upgraded = None
+            _existing_npdata_to_merge = []
+            # updating node progressing data with the failed precheck nodes and already upgraded nodes
             _npdata_for_precheck_failed_and_already_upgraded = self.mGetNodeProgressData(self.__requestObj.mGetUUID(), "Failed", aIncludeDataForAlreadyUpgradedNodes=True)
-
-            _patch_progressing_status_json = self.mCombinePatchProgressData(_patch_progressing_status_json, _npdata_for_precheck_failed_and_already_upgraded)
+            if _npdata_for_precheck_failed_and_already_upgraded:
+                _existing_npdata_to_merge.extend(_npdata_for_precheck_failed_and_already_upgraded)
+            _patch_progressing_status_json = self.mCombinePatchProgressData(_patch_progressing_status_json, _existing_npdata_to_merge)
 
             # AIM4EXA - Exadata/Exacloud error handling
             if aErrCode and aErrCode not in [ PATCH_SUCCESS_EXIT_CODE ]:
-                self.mExacomputeAndExadataErrorhandling(_patch_progressing_status_json, _errObj, aErrCode)
+                _np_data_with_patch_mgr_err = self.mGetAndDumpPatchMgrErrors(_patch_progressing_status_json, _errObj, aErrCode)
 
-            ebCluExaComputePatch.mUpdateRequestData(self.__requestObj, aData=_patch_progressing_status_json,
-                                                aOptions=self.mGetInputPayload(), aStatusObj=_errObj,
-                                                aDetailsErr=aSuggestionMsg)
+                ebCluExaComputePatch.mUpdateRequestData(self.__requestObj, aData=_np_data_with_patch_mgr_err,
+                                                    aOptions=self.mGetInputPayload(), aStatusObj=_errObj,
+                                                    aDetailsErr=aSuggestionMsg)
+            else:
+                ebCluExaComputePatch.mUpdateRequestData(self.__requestObj, aData=_patch_progressing_status_json,
+                                                    aOptions=self.mGetInputPayload(), aStatusObj=_errObj,
+                                                    aDetailsErr=aSuggestionMsg)
+
         except Exception as e:
             self.mPatchLogError(f"Failed to get patch notification status from node {str(e)}")
             self.mPatchLogError(traceback.format_exc())
         finally:
             return _ret
 
-    def mCombinePatchProgressData(self, aNPDataFromPatchMgrXml, aExistingNPDataList):
+    def mCombinePatchProgressData(self, aNPDataFromPatchMgrXml, aNPDataListToMerge):
         """
-        This method merges current npdata from db and existing npdata list provided.
+        This method merges current npdata from patch manager XML, existing npdata list provided, and existing node progress data fetched from the db here.
+
         """
+        
+        # Ensure aNPDataListToMerge is a list, default to empty list if None
+        aNPDataListToMerge = aNPDataListToMerge or []
+        _existing_npdata = self.mFetchExistingIterationNodeProgressData()
+        if _existing_npdata:
+            aNPDataListToMerge.extend(_existing_npdata)
+
+        _precheck_np_data = self.mGetNodeProgressDataForReporting()
+        if _precheck_np_data:
+            aNPDataListToMerge.extend(_precheck_np_data)
+
         _final_np_data = aNPDataFromPatchMgrXml
         _node_npdata_map_for_existing_data = {}
-        if _final_np_data and len(_final_np_data) != 0:
 
-            # Prepare the map of node to npdata for existing npdata provided
-            if aExistingNPDataList and len(aExistingNPDataList) > 0:
-                for _per_node_npdata in aExistingNPDataList:
-                    _node_npdata_map_for_existing_data[_per_node_npdata["node_name"]] = _per_node_npdata
+        # Prepare the map of node to npdata for existing npdata provided
+        if aNPDataListToMerge and len(aNPDataListToMerge) > 0:
+            for _per_node_npdata in aNPDataListToMerge:
+                _node_npdata_map_for_existing_data[_per_node_npdata["node_name"]] = _per_node_npdata
+
+        if _final_np_data and len(_final_np_data) != 0:
 
             # Merge two data lists into one
             if "node_patching_status" in _final_np_data and "node_patching_progress_data" in _final_np_data["node_patching_status"] and len(_node_npdata_map_for_existing_data) > 0:
@@ -799,13 +898,22 @@ class ExaGenericHandler(TargetHandler):
                     _cur_node_progress_data.append(_node_npdata_map_for_existing_data[_node])
 
                 _final_np_data["node_patching_status"]["node_patching_progress_data"] = _cur_node_progress_data
+        # If no data came from patchmgr XML, return the output with existing npdata
+        elif len(_node_npdata_map_for_existing_data) > 0:
+            _final_np_data = {}
+            _final_np_data["node_patching_status"] = {}
+            _final_np_data["node_patching_status"]["node_patching_progress_data"] = []
+
+            for _node in _node_npdata_map_for_existing_data.keys():
+                _final_np_data["node_patching_status"]["node_patching_progress_data"].append(_node_npdata_map_for_existing_data[_node])
 
         return _final_np_data
 
-    def mExacomputeAndExadataErrorhandling(self, aFinalNpData, aErrObj, aErrCode):
+    def mGetAndDumpPatchMgrErrors(self, aFinalNpData, aErrObj, aErrCode):
         '''
          This method populates exacompute patch failures
          related to AIM4EXA - Exadata error handling.
+         It returns Node progress data JSON along with patch manager error details if exists.
         '''
         _exadata_patch_err_json = {}
         _final_exacloud_error_json_data = {}
@@ -815,6 +923,7 @@ class ExaGenericHandler(TargetHandler):
         _combined_data = {}
         _err_code = None
         _patch_error_json_data = {}
+        _final_np_data_copy = copy.deepcopy(aFinalNpData) if aFinalNpData is not None else {}
 
         try:
             if aErrObj:
@@ -823,7 +932,14 @@ class ExaGenericHandler(TargetHandler):
             if aErrCode and aErrCode in [PATCHMGR_COMMAND_FAILED]:
                 _final_exacloud_error_json_data["node_patching_status"] = {}
                 _final_exacloud_error_json_data["node_patching_status"]['patch_mgr_error'] = {}
-                for _launch_node in self.mGetLaunchNodes():
+
+                _launch_nodes = []
+                if len(self.mGetLaunchNodes()) == 0 and len(self.mGetComputedLaunchNodes()) > 0:
+                    _launch_nodes.extend(self.mGetComputedLaunchNodes())
+                else:
+                    _launch_nodes.append(self.mGetEligibleLaunchNode())
+
+                for _launch_node in _launch_nodes:
                     _exadata_patch_err_json = self.mGetPatchMgrErrorHandlingDetails(_launch_node)
                     if _exadata_patch_err_json and ("patch_mgr_error_details" in _exadata_patch_err_json):
                         _error_list = _exadata_patch_err_json["patch_mgr_error_details"]
@@ -909,16 +1025,24 @@ class ExaGenericHandler(TargetHandler):
                 with open(_exacloud_patch_error_json_file, 'w') as _ec_patch_error_fd:
                     json.dump(_combined_data, _ec_patch_error_fd, indent=4)
 
+                # Update the copy with patch_mgr_error
+                if "node_patching_status" in _final_exacloud_error_json_data and "patch_mgr_error" in \
+                        _final_exacloud_error_json_data["node_patching_status"]:
+                    _final_np_data_copy["patch_mgr_error"] = _final_exacloud_error_json_data["node_patching_status"][
+                        'patch_mgr_error']
+                return _final_np_data_copy
+
         except Exception as e:
             self.mPatchLogWarn(f"Failed to generate Exadata/Exacloud error handling json. Error - {str(e)}")
             self.mPatchLogError(traceback.format_exc())
+            return _final_np_data_copy
 
     def mSetEnvironment(self):
         """
          Sets the common envrironment for all tasks in Compute node
         """
         _ret = PATCH_SUCCESS_EXIT_CODE
-        _launch_node = None
+        _launch_nodes = []
         _exacompute_node_list = None
         _unreachable_exacompute_node_list = None
 
@@ -947,7 +1071,7 @@ class ExaGenericHandler(TargetHandler):
                 if not self.__node_local_patch_zip2:
                     _suggestion_msg = "Compute node Patch Zip file not found"
                     _ret = self.mAddError(PATCH_ZIP_FILE_NOT_FOUND, _suggestion_msg)
-                    return _ret, _launch_node, _exacompute_node_list, _unreachable_exacompute_node_list
+                    return _ret, _launch_nodes, _exacompute_node_list, _unreachable_exacompute_node_list
 
 
                 # Compute node patching needs 2 zip files. first one has the patchmgr, second one is the actual patch
@@ -964,14 +1088,21 @@ class ExaGenericHandler(TargetHandler):
                         self.mGetNodePatchZipSizeMB() + self.mGetNodePatchZip2SizeMB() + int(
                     self.mGetExadataPatchWorkingSpaceMB()))
 
+                if not self.mGetLaunchNodes():
+                    self.mPatchLogInfo("Launch nodes not provided; deriving from target list")
+                    _derive_rc, _computed_launch_nodes = self.mComputeLaunchNodesFromTargetNodes(self.mGetCustomizedDom0List())
+                    if _derive_rc != PATCH_SUCCESS_EXIT_CODE:
+                        return _derive_rc, _launch_nodes, _exacompute_node_list, _unreachable_exacompute_node_list
+                    self.mPatchLogInfo(f"Auto-derived launch nodes: {_computed_launch_nodes}")
+
                 '''
                 mSetLaunchNodeToPatchOtherNodes call will choose a launch node which is pingable
                 and eligible for patching operation
                 If it is unable to find it will return appropriate error message
                 '''
-                _ret, _launch_node = self.mSetLaunchNodeToPatchOtherNodes()
+                _ret, _launch_nodes = self.mSetLaunchNodeToPatchOtherNodes()
                 if _ret != PATCH_SUCCESS_EXIT_CODE:
-                    return _ret, _launch_node, _exacompute_node_list, _unreachable_exacompute_node_list
+                    return _ret, _launch_nodes, _exacompute_node_list, _unreachable_exacompute_node_list
 
                 '''
                 # Set target version based on the patch tar file version name.
@@ -1004,26 +1135,54 @@ class ExaGenericHandler(TargetHandler):
                     _suggestion_msg = f"None of the target nodes provided are reachable, unable to proceed with precheck. Launch node list provided : {str(self.mGetCustomizedDom0List())}"
                     self.mPatchmgrLogInfo(_suggestion_msg)
                     _exit_code = self.mAddError(DOM0_NOT_PINGABLE, _suggestion_msg)
-                    return _exit_code, _launch_node, _exacompute_node_list, _unreachable_exacompute_node_list
+                    return _exit_code, _launch_nodes, _exacompute_node_list, _unreachable_exacompute_node_list
 
-                # set ssh keys from node patchers to the nodes they will be patching
-                _ssh_env_setup = ebCluSshSetup(self.mGetCluControl())
-                _ssh_env_setup.mSetSSHPasswordlessForInfraPatching(_launch_node, _exacompute_node_list)
-                # Store these in memory for clearing after each operation
-                _sshEnvDict = {
-                    "sshEnv": _ssh_env_setup,
-                    "fromHost": [_launch_node],
-                    "remoteHostLists": [_exacompute_node_list]
-                }
-                self.mSetSSHEnvSetUp(_sshEnvDict)
+                # Set up SSH passwordless access between launch nodes and compute nodes
+                _computed_launch_nodes = self.mGetComputedLaunchNodes()
+                if _computed_launch_nodes:
+                    # For derived launch nodes, there will be two iterations:
+                    # 1. First iteration: Set up SSH passwordless access from the first launch node to all other compute nodes.
+                    # 2. Second iteration: Set up SSH passwordless access from the second launch node to the first launch node.
+                    _src_node_list = []
+                    _remote_node_list = []
+                    _ssh_env_setup = ebCluSshSetup(self.mGetCluControl())
+
+                    for i, _launch_node in enumerate(_computed_launch_nodes):
+                        _ssh_target_node_list = [_computed_launch_nodes[1 - i]]
+                        if i == 0:
+                            _ssh_target_node_list = [_target_node for _target_node in self.mGetCustomizedDom0List() if _target_node != _launch_node]
+                        _ssh_env_setup.mSetSSHPasswordlessForInfraPatching(_launch_node, _ssh_target_node_list)
+                        _src_node_list.append(_launch_node)
+                        _remote_node_list.append(_ssh_target_node_list)
+
+                    _sshEnvDict = {
+                        "sshEnv": _ssh_env_setup,
+                        "fromHost": _src_node_list,
+                        "remoteHostLists": _remote_node_list
+                    }
+                    self.mSetSSHEnvSetUp(_sshEnvDict)
+                else:
+                    # For a normal launch node scenario, there will be one iteration of the patch flow.
+                    _launch_node = _launch_nodes[0]
+                    # set ssh keys from node patchers to the nodes they will be patching
+                    _ssh_env_setup = ebCluSshSetup(self.mGetCluControl())
+                    _ssh_env_setup.mSetSSHPasswordlessForInfraPatching(_launch_node, _exacompute_node_list)
+                    # Store these in memory for clearing after each operation
+                    _sshEnvDict = {
+                        "sshEnv": _ssh_env_setup,
+                        "fromHost": [_launch_node],
+                        "remoteHostLists": [_exacompute_node_list]
+                    }
+                    self.mSetSSHEnvSetUp(_sshEnvDict)
+
                 self.mPatchLogInfo(
                     f"reachable_exacompute_node_list: {str(_exacompute_node_list)} unreachable_exacompute_node_list: {str(_unreachable_exacompute_node_list)}")
-                return _ret, _launch_node, _exacompute_node_list, _unreachable_exacompute_node_list
+                return _ret, _launch_nodes, _exacompute_node_list, _unreachable_exacompute_node_list
         except Exception as e:
             _suggestion_msg = f"Unable to setup environment on {self.mGetTask()}"
             _ret = self.mAddError(INDIVIDUAL_PATCH_REQUEST_EXCEPTION_ERROR, _suggestion_msg)
             self.mPatchLogWarn(traceback.format_exc())
-            _launch_node = None
+            _launch_nodes = []
             _exacompute_node_list = None
         finally:
             self.mPatchLogInfo("Finished Setting up Environment for Compute Nodes.")
@@ -1048,49 +1207,75 @@ class ExaGenericHandler(TargetHandler):
         _local_patch_zip2 = self.__node_local_patch_zip2
         _patch_base_after_unzip = self.mGetNodePatchBaseAfterUnzip()
 
-        for _node in self.mGetLaunchNodes():
-            if self.mGetCluPatchCheck().mPingNode(_node):
-                _launch_ping_node = _node
-                self.mSetEligibleLaunchNode(_node)
-                break
-            else:
-                self.mPatchmgrLogInfo(f"Launch Node : {_node} is not pingable.")
-                continue
+        # Check if derived launch nodes are available
+        if self.mGetComputedLaunchNodes():
+            for _launch_node_candidate in self.mGetComputedLaunchNodes():
+                # Iterate through the derived launch nodes to set them as patch bases
+                _selected_launch_node = self.mSetLaunchNodeAsPatchBase(
+                    aLaunchNodeCandidates=[_launch_node_candidate],
+                    aLocalPatchZipFile=_local_patch_zip,
+                    aPatchZipName=_patch_zip_name,
+                    aPatchZipSizeMb=_patch_zip_size_mb,
+                    aRemotePatchBase=_patch_base,
+                    aRemotePatchZipFile=_patch_zip,
+                    aRemotePatchmgr=_patchmgr,
+                    aRemoteNecessarySpaceMb=_patch_necessary_space_mb,
+                    aPatchBaseDir=self.__node_patch_base_dir,
+                    aSuccessMsg=((PATCH_DOM0.upper())),
+                    aMoreFilesToCopy=[(_local_patch_zip2,
+                                       _patch_base_after_unzip)])
 
-        if _launch_ping_node is None:
-            _suggestion_msg = f"None of the launch nodes provided are reachable, unable to proceed with patch operations. Launch node list provided : {str(self.mGetLaunchNodes())}"
-            self.mPatchmgrLogInfo(_suggestion_msg)
-            _ret = self.mAddError(DOM0_NOT_PINGABLE, _suggestion_msg)
-            return _ret, None
+                if _selected_launch_node is None:
+                    self.mPatchLogError(
+                        f"Unable to set Launch node for the current patch operation with Launch node name : {_selected_launch_node}.")
+                    _suggestion_msg = f"None of the launch nodes selected are eligible for patching operation : {str(self.mGetComputedLaunchNodes())}"
+                    _ret = self.mAddError(UNABLE_TO_FIND_ELIGIBLE_LAUNCH_NODE, _suggestion_msg)
+                    return _ret, []
+            return _ret, self.mGetComputedLaunchNodes()
+        else:
+            # Check the provided launch nodes to find a pingable one
+            # Set the launch node as a patch base
+            for _node in self.mGetLaunchNodes():
+                if self.mGetCluPatchCheck().mPingNode(_node):
+                    _launch_ping_node = _node
+                    self.mSetEligibleLaunchNode(_node)
+                    break
+                else:
+                    self.mPatchmgrLogInfo(f"Launch Node : {_node} is not pingable.")
+                    continue
 
-        _launch_node_candidates = [ _launch_ping_node ]
+            if _launch_ping_node is None:
+                _suggestion_msg = f"None of the launch nodes provided are reachable, unable to proceed with patch operations. Launch node list provided : {str(self.mGetLaunchNodes())}"
+                self.mPatchmgrLogInfo(_suggestion_msg)
+                _ret = self.mAddError(DOM0_NOT_PINGABLE, _suggestion_msg)
+                return _ret, []
 
-        self.mPatchLogInfo(f"Launch node candidates: {str(_launch_node_candidates)}")
+            _launch_node_candidates = [_launch_ping_node]
 
-        # loop twice since we need to set 2 dom[0U]s as dom[0U] patchers
-        _selected_launch_node = self.mSetLaunchNodeAsPatchBase(
-            aLaunchNodeCandidates=_launch_node_candidates,
-            aLocalPatchZipFile=_local_patch_zip,
-            aPatchZipName=_patch_zip_name,
-            aPatchZipSizeMb=_patch_zip_size_mb,
-            aRemotePatchBase=_patch_base,
-            aRemotePatchZipFile=_patch_zip,
-            aRemotePatchmgr=_patchmgr,
-            aRemoteNecessarySpaceMb=_patch_necessary_space_mb,
-            aPatchBaseDir=self.__node_patch_base_dir,
-            aSuccessMsg=((PATCH_DOM0.upper())),
-            aMoreFilesToCopy=[(_local_patch_zip2,
-                               _patch_base_after_unzip)])
+            self.mPatchLogInfo(f"Launch node candidates: {str(_launch_node_candidates)}")
+            _selected_launch_node = self.mSetLaunchNodeAsPatchBase(
+                aLaunchNodeCandidates=_launch_node_candidates,
+                aLocalPatchZipFile=_local_patch_zip,
+                aPatchZipName=_patch_zip_name,
+                aPatchZipSizeMb=_patch_zip_size_mb,
+                aRemotePatchBase=_patch_base,
+                aRemotePatchZipFile=_patch_zip,
+                aRemotePatchmgr=_patchmgr,
+                aRemoteNecessarySpaceMb=_patch_necessary_space_mb,
+                aPatchBaseDir=self.__node_patch_base_dir,
+                aSuccessMsg=((PATCH_DOM0.upper())),
+                aMoreFilesToCopy=[(_local_patch_zip2,
+                                   _patch_base_after_unzip)])
 
-        if _selected_launch_node is None:
-            self.mPatchLogError(
-                f"Unable to set Launch node for the current patch operation with Launch node name : {_selected_launch_node}.")
-            _suggestion_msg = f"None of the launch nodes provided are eligible for patching operation : {str(self.mGetLaunchNodes())}"
-            _ret = self.mAddError(UNABLE_TO_FIND_ELIGIBLE_LAUNCH_NODE, _suggestion_msg)
-            return _ret, None
+            if _selected_launch_node is None:
+                self.mPatchLogError(
+                    f"Unable to set Launch node for the current patch operation with Launch node name : {_selected_launch_node}.")
+                _suggestion_msg = f"None of the launch nodes provided are eligible for patching operation : {str(self.mGetLaunchNodes())}"
+                _ret = self.mAddError(UNABLE_TO_FIND_ELIGIBLE_LAUNCH_NODE, _suggestion_msg)
+                return _ret, []
 
-        self.mPatchLogInfo(f"Selected launch nodes {str(_selected_launch_node)}")
-        return _ret, _selected_launch_node
+            self.mPatchLogInfo(f"Selected launch nodes {str(_selected_launch_node)}")
+            return _ret, [_selected_launch_node]
 
     def mCustomCheck(self, aNodes=None, aTaskType=TASK_POSTCHECK):
         """
@@ -1204,6 +1389,64 @@ class ExaGenericHandler(TargetHandler):
 
     def mPatchRollbackExaComputeNonRolling(self, aBackupMode, aNodePatchList, aPrecheckpatchOperation=False, aRollback=False):
         """
+        Orchestrates the patch/rollback of ExaCompute nodes in a non-rolling fashion.
+
+        Prepares a list of node pairs for patch/rollback, where the first node is the launch node and the second is a list of target nodes to be patched/rolled back.
+        Calls the mPatchRollbackExaComputeNonRollingIter method to perform the actual rollback operation on the target nodes.
+
+        Args:
+            aBackupMode (str): Backup mode for the rollback operation.
+            aNodePatchList (list): List of nodes to be patched/rolled back.
+            aPrecheckpatchOperation (bool, optional): Flag indicating if precheck patch operation is being performed. Defaults to False.
+            aRollback (bool, optional): Flag indicating if rollback operation is being performed. Defaults to False.
+
+        Returns:
+            int: Return code indicating the success or failure of the rollback operation.
+        """
+        _ret = PATCH_SUCCESS_EXIT_CODE
+        _node_patch_lists = []
+
+        if not aNodePatchList:
+            self.mPatchLogInfo("No nodes to patch/rollback")
+            return _ret
+
+        # Check if computed launch nodes are available
+        if  self.__computed_launch_nodes:
+            # Find a launch node that is not in aNodePatchList
+            _launch_node = next((_node for _node in self.__computed_launch_nodes if _node not in aNodePatchList), None)
+            if _launch_node:
+                _node_patch_lists.append((_launch_node, aNodePatchList))
+            else:
+                _primary_launch_node = self.__computed_launch_nodes[0]
+                # Get the target nodes for the first iteration by excluding the primary launch node
+                _first_iteration_targets = [_node for _node in aNodePatchList if _node != _primary_launch_node]
+                if _first_iteration_targets:
+                    _node_patch_lists.append((_primary_launch_node, _first_iteration_targets))
+                # Append the second node pair only if the primary launch node is in the patch list
+                if _primary_launch_node in aNodePatchList:
+                    _node_patch_lists.append((self.__computed_launch_nodes[1], [_primary_launch_node]))
+        else:
+            # If computed launch nodes are not available, use the first pingable node and the provided patch list
+            _node_patch_lists.append((self.mGetEligibleLaunchNode(), aNodePatchList))
+        self.mPatchLogInfo(f"launchnode and targetnode list pairs are {_node_patch_lists}")
+
+        # Get previous node_progress_data
+        _npdata_for_precheck_failed_and_already_upgraded = self.mGetNodeProgressData(self.__requestObj.mGetUUID(),
+                                                                                     "Failed",
+                                                                                     aIncludeDataForAlreadyUpgradedNodes=True)
+        self.mSetNodeProgressDataForReporting(_npdata_for_precheck_failed_and_already_upgraded)
+        # Update initial node_progress_data for patch/rollback
+        self.mUpdatePatchProgressStatus(aNodeList=aNodePatchList)
+ 
+        for _node, _target_node_lists in _node_patch_lists:
+            self.mSetEligibleLaunchNode(_node)
+            _ret = self.mPatchRollbackExaComputeNonRollingIter(aBackupMode, [_node],_target_node_lists,aPrecheckpatchOperation, aRollback)
+            if _ret != PATCH_SUCCESS_EXIT_CODE:
+                break
+        return _ret
+
+    def mPatchRollbackExaComputeNonRollingIter(self, aBackupMode, aLaunchNodeList, aNodePatchList, aPrecheckpatchOperation=False, aRollback=False):
+        """
          patch Compute nodes in non-rolling fashion
         """
 
@@ -1224,7 +1467,7 @@ class ExaGenericHandler(TargetHandler):
 
         _node_patch_base_after_unzip = self.mGetNodePatchBaseAfterUnzip()
         _node_patch_zip2_name = self.mGetNodePatchZip2Name()
-        for _node in self.mGetLaunchNodes():
+        for _node in aLaunchNodeList:
             if self.mGetCluPatchCheck().mPingNode(_node):
                 _node_patcher = _node
                 self.mSetEligibleLaunchNode(_node)
@@ -1286,16 +1529,16 @@ class ExaGenericHandler(TargetHandler):
 
         # set the launch node and execute patchmgr cmd
         _patchMgrObj.mSetLaunchNode(aLaunchNode=_node_patcher)
-        
+
         _patchMgrObj.mExecutePatchMgrCmd(aPatchMgrCmd=_patch_cmd)
 
         # Monitor console log
         # Following InfraPatchManager api sets the patchmgr execution status into mStatusCode method
         # hence not required to return/read a value from this api
-        # this will help to use the patchMgr status apis 
+        # this will help to use the patchMgr status apis
         # (mIsSuccess/mIsFailed/mIsTimedOut/mIsCompleted) wherever required
         _patchMgrObj.mWaitForExaComputePatchMgrCmdExecutionToComplete()
-        
+
         self.mPatchLogInfo("Finished waiting for Patch Manager command execution. Starting to handle exit code from Patch Manager")
 
         _ret = _patchMgrObj.mGetStatusCode()
@@ -1334,6 +1577,7 @@ class ExaGenericHandler(TargetHandler):
         if _ret != PATCH_SUCCESS_EXIT_CODE:
             _patch_failed_message = f"Error patching one of {str(aNodePatchList)} using {_node_patcher} to patch it. return code was {str(_ret)}. Errors on screen and in logs"
             self.mPatchLogError(_patch_failed_message)
+            _ret = self.mAddError(_ret, _patch_failed_message)
             if _node.mIsConnected():
                 _node.mDisconnect()
             return _ret
@@ -1575,3 +1819,13 @@ class ExaGenericHandler(TargetHandler):
             else:
                 self.mPatchLogInfo("No ComputeNode has VMs in running state")
         return _nodes_where_vms_are_running
+
+    def mCleanUpExaComputeSSHEnv(self):
+        """
+        Cleans up the SSH equivalence setup between the launch node and target nodes for ExaCompute patching operations.
+        """
+        try:
+            self.mCleanSSHEnvSetUp()
+        except Exception as e:
+            self.mPatchLogError(f"Error cleaning up SSH environment: {str(e)}")
+            self.mPatchLogError(traceback.format_exc())

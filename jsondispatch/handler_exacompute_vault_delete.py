@@ -4,7 +4,7 @@
 #
 # handler_exacompute_vault_delete.py
 #
-# Copyright (c) 2023, Oracle and/or its affiliates.
+# Copyright (c) 2023, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      handler_exacompute_vault_delete.py - <one-line expansion of the name>
@@ -16,6 +16,9 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    avimonda    03/27/26 - Bug 39047810 - OCI: EXADB-XS: RETIRENODE OPERATION
+#                           SHOULD NOT FAIL WHEN VAULT OR BONDING WAS NOT
+#                           CONFIGURED YET
 #    jesandov    09/14/23 - Creation
 #
 
@@ -44,9 +47,12 @@ class ExaComputeDeleteVault(JDHandler):
         _rc = 0
         _response = {}
 
-
         _hostname = self.mGetOptions().jsonconf.get("hostname")
         _fqdn = self.mGetOptions().jsonconf.get("fqdn")
+
+        if _hostname == "No_Given_Value" or _fqdn == "No_Given_Value":
+            ebLogInfo("Skipping vault delete because vault host configuration is missing")
+            return (0, _response)
 
         with connect_to_host(_fqdn, get_gcontext(), timeout=5) as _node:
 

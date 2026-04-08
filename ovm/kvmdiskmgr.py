@@ -1,5 +1,5 @@
 """
- Copyright (c) 2019, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2019, 2026, Oracle and/or its affiliates.
 
 NAME:
     kvmdiskmgr - Disk management for KVM.
@@ -11,6 +11,10 @@ NOTE:
     None
 
 History:
+    aararora  27/02/26 - Bug 38902170: Correct resource leak issues
+    nelango   02/06/26 - Bug 38700324: lvresize changes for bind mounts
+    bhpati    02/05/26 - Bug 38820127 - OCI: LOCAL STORAGE RESHAPE OPERATION HUNG FOR 2 WEEKS
+    pbellary  12/10/25 - Bug 38745809: RESIZE DOMU FILESYSTEM IS FAILING WITH EDV ENABLED CLUSTERS 
     scoral    10/14/25 - Bug 38500655: Add filesystem pattern compatible with
                          Exascale EDVs.
     scoral    03/26/24 - Bug 36447615: Wrap piped commands with sudo.
@@ -44,7 +48,7 @@ from exabox.utils.node import (
     connect_to_host
 )
 from exabox.ovm.cluencryption import getMountPointInfo, getDiskLabel
-from exabox.ovm.utils.clu_utils import ebCluUtils
+from exabox.ovm.utils.clu_utils import ebCluUtils, mRunCrsCommandsWithRetry
 import json, re
 import math
 import os
@@ -162,183 +166,185 @@ class exaBoxKvmDiskMgr(object):
         _node = exaBoxNode(get_gcontext())
         _node.mConnect(aHost=_domU)
         _eBoxCluCtrl = self.__edp.mGetEbox()
-
-        # Get info about block devices supporting our filesystem to resize
-        _cmdstr = "/usr/bin/lsblk -p -r | /usr/bin/grep -B 3 " + _filesystem
-        _i, _o, _e = _node.mExecuteCmd(_cmdstr)
-        ebLogTrace("Executing cmd : %s"%(_cmdstr))
-        _out = _o.readlines()
-        ebLogTrace("Command output : " + '\n'.join(_out))
-
-        if _out is None:
-            self.logDebugInfo(_out, _e)
-            _detail_error = 'Could not perform filesystem check on ' + _domU + ' for filesystem ' + _filesystem
-            _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_FILE_SYS_CHECK_FAILED'], _detail_error)
-            return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
-
-        # Store disk, partition, and lv to use later
-        _imgdisk = _out[0].strip().split(' ')[0]
-        _diskpart = _out[1].strip().split(' ')[0]
-        _lvpath = _out[2].strip().split(' ')[0]
-
-        ebLogInfo("image disk is : %s"%(_imgdisk))
-        ebLogInfo("partition name is : %s"%(_diskpart))
-        ebLogInfo("lv path is : %s"%(_lvpath))
-
-        # Confirm that the partition is MSDOS, if not we raise an ERROR
-        # See Linux bug 36858945
-        _disk_label = getDiskLabel(_node, _imgdisk)
-        if _disk_label == "msdos":
-            ebLogInfo(f"Disk label {_domU} for {_imgdisk} is already {_disk_label}")
-
-        # if label is GPT, check if gdisk is installed in dom0
-        elif _disk_label == "gpt":
-            _detail_error = (f"The {_imgdisk} partition is detected as GPT. "
-                "The shrink cannot continue, please engage support to convert "
-                "this partition to MSDOS")
-            _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_PARTED_CMD_FAIL'], _detail_error)
-            return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
-
-        # Confirm LUKS keyapi is available before even start
-        _keyapi_file = "/usr/lib/dracut/modules.d/99exacrypt/VGExaDbDisk.u02_extra_encrypted.img#LVDBDisk.key-api.sh"
-        if not _node.mFileExists(_keyapi_file):
-            _detail_error = f'the keyapi script {_keyapi_file} is not present in domU'
-            _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_KEYAPI_FAIL'], _detail_error)
-            return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
-
-        # Force a check on the FS first
-        _bin_e2fsck = node_cmd_abs_path_check(_node, "e2fsck", sbin=True)
-        _cmdstr = f"{_bin_e2fsck} -fy {_filesystem}"
-        _i, _o, _e = _node.mExecuteCmd(_cmdstr)
-        ebLogTrace("Executing cmd : %s"%(_cmdstr))
-        _out = _o.readlines()
-        if _out is None:
-            self.logDebugInfo(_out, _e)
-            _detail_error = 'Could not perform filesystem check on ' + _domU + ' for filesystem ' + _filesystem
-            _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_FILE_SYS_CHECK_FAILED'], _detail_error)
-            return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
-
-        # Resize FS to it's minimum size
-        _bin_resize2fs = node_cmd_abs_path_check(_node, "resize2fs", sbin=True)
-        _cmdstr = f"{_bin_resize2fs} -M {_filesystem}"
-        _i, _o, _e = _node.mExecuteCmd(_cmdstr)
-        ebLogTrace("Executing cmd : %s"%(_cmdstr))
-        _out = _o.readlines()
-        if _node.mGetCmdExitStatus() != 0:
-            self.logDebugInfo(_out, _e)
-            _detail_error = 'filesystem resize command failed in domU'
-            _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_FSRESIZE_FAIL'], _detail_error)
-            return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
-
-        # Close the luks volume
-        _bin_cryptsetup = node_cmd_abs_path_check(_node, "cryptsetup", sbin=True)
-        _luks_size = None
-        _cmdstr = f"{_bin_cryptsetup} close {_filesystem} -v"
-        _i, _o, _e = _node.mExecuteCmd(_cmdstr)
-        ebLogTrace("Executing cmd : %s"%(_cmdstr))
-        _out = _o.readlines()
-        if _node.mGetCmdExitStatus() != 0:
-            self.logDebugInfo(_out, _e)
-            _detail_error = 'cryptsetup resize command failed in domU'
-            _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_LUKSRESIZE_FAIL'], _detail_error)
-            return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
-
-        # LV Shrink/Resize
-        ## We are offsetting by 100MB to accomodate for later partitioning.
-        _lvsize = None
-        if _eBoxCluCtrl.mCheckConfigOption('disable_lvm_snapshot_space','True'):
-            _lvsize = float(_new_sizeGB) - 0.1
-        else:
-            _lvsize = float(_new_sizeGB) - 2.1 # 2 GB space for snapshot
-
-        _partsize = float(_new_sizeGB) - 0.05
         try:
-            _cmdstr = "/usr/sbin/lvresize -L " + str(_lvsize) + "G " + _lvpath + " --force"
+            # Get info about block devices supporting our filesystem to resize
+            _cmdstr = "/usr/bin/lsblk -p -r | /usr/bin/grep -B 3 " + _filesystem
             _i, _o, _e = _node.mExecuteCmd(_cmdstr)
-            _out = _o.read()
-            _err = _e.read()
-            if _node.mGetCmdExitStatus() != 0:
-                ebLogTrace("stdout: {_out}\nstderr: {_err}")
-
-                # Ref, check if stdout/stderr includes
-                _full_out = _out + _err
-                if re.search("New\s+size\s+.*matches\s+existing\s+size", _full_out):
-                    ebLogInfo(f"LVresize failure detected to be caused by using "
-                        "same Target Size. Ignoring error")
-                else:
-                    _detail_error = 'lvresize command failed in domU'
-                    _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_LVRESIZE_FAIL'], _detail_error)
-                    return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
-        finally:
-            # Open Luks volume regardless of LVResize success or Error
-            # It will automatically fill up to use the new LV size or
-            # stay with older size
-            # First try to get keyapi data
-            _out_file = None
-            _i, _o, _e = _node.mExecuteCmd(_keyapi_file)
             ebLogTrace("Executing cmd : %s"%(_cmdstr))
             _out = _o.readlines()
-            if _out:
-                _out_file = _out[0].strip()
-            if _node.mGetCmdExitStatus() != 0:
+            ebLogTrace("Command output : " + '\n'.join(_out))
+
+            if _out is None:
                 self.logDebugInfo(_out, _e)
-                _detail_error = 'calling keyapi command failed in domU'
+                _detail_error = 'Could not perform filesystem check on ' + _domU + ' for filesystem ' + _filesystem
+                _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_FILE_SYS_CHECK_FAILED'], _detail_error)
+                return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
+
+            # Store disk, partition, and lv to use later
+            _imgdisk = _out[0].strip().split(' ')[0]
+            _diskpart = _out[1].strip().split(' ')[0]
+            _lvpath = _out[2].strip().split(' ')[0]
+
+            ebLogInfo("image disk is : %s"%(_imgdisk))
+            ebLogInfo("partition name is : %s"%(_diskpart))
+            ebLogInfo("lv path is : %s"%(_lvpath))
+
+            # Confirm that the partition is MSDOS, if not we raise an ERROR
+            # See Linux bug 36858945
+            _disk_label = getDiskLabel(_node, _imgdisk)
+            if _disk_label == "msdos":
+                ebLogInfo(f"Disk label {_domU} for {_imgdisk} is already {_disk_label}")
+
+            # if label is GPT, check if gdisk is installed in dom0
+            elif _disk_label == "gpt":
+                _detail_error = (f"The {_imgdisk} partition is detected as GPT. "
+                    "The shrink cannot continue, please engage support to convert "
+                    "this partition to MSDOS")
+                _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_PARTED_CMD_FAIL'], _detail_error)
+                return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
+
+            # Confirm LUKS keyapi is available before even start
+            _keyapi_file = "/usr/lib/dracut/modules.d/99exacrypt/VGExaDbDisk.u02_extra_encrypted.img#LVDBDisk.key-api.sh"
+            if not _node.mFileExists(_keyapi_file):
+                _detail_error = f'the keyapi script {_keyapi_file} is not present in domU'
                 _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_KEYAPI_FAIL'], _detail_error)
                 return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
 
-            _bin_cryptsetup = node_cmd_abs_path_check(_node, "cryptsetup", sbin=True)
-            _crypto_name = os.path.basename(_filesystem)
-            _cmdstr = f"{_bin_cryptsetup} open {_lvpath} {_crypto_name} --key-file={_out_file} -v"
+            # Force a check on the FS first
+            _bin_e2fsck = node_cmd_abs_path_check(_node, "e2fsck", sbin=True)
+            _cmdstr = f"{_bin_e2fsck} -fy {_filesystem}"
+            _i, _o, _e = _node.mExecuteCmd(_cmdstr)
+            ebLogTrace("Executing cmd : %s"%(_cmdstr))
+            _out = _o.readlines()
+            if _out is None:
+                self.logDebugInfo(_out, _e)
+                _detail_error = 'Could not perform filesystem check on ' + _domU + ' for filesystem ' + _filesystem
+                _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_FILE_SYS_CHECK_FAILED'], _detail_error)
+                return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
+
+            # Resize FS to it's minimum size
+            _bin_resize2fs = node_cmd_abs_path_check(_node, "resize2fs", sbin=True)
+            _cmdstr = f"{_bin_resize2fs} -M {_filesystem}"
             _i, _o, _e = _node.mExecuteCmd(_cmdstr)
             ebLogTrace("Executing cmd : %s"%(_cmdstr))
             _out = _o.readlines()
             if _node.mGetCmdExitStatus() != 0:
                 self.logDebugInfo(_out, _e)
-                _detail_error = 'cryptsetup open command failed in domU'
+                _detail_error = 'filesystem resize command failed in domU'
+                _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_FSRESIZE_FAIL'], _detail_error)
+                return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
+
+            # Close the luks volume
+            _bin_cryptsetup = node_cmd_abs_path_check(_node, "cryptsetup", sbin=True)
+            _luks_size = None
+            _cmdstr = f"{_bin_cryptsetup} close {_filesystem} -v"
+            _i, _o, _e = _node.mExecuteCmd(_cmdstr)
+            ebLogTrace("Executing cmd : %s"%(_cmdstr))
+            _out = _o.readlines()
+            if _node.mGetCmdExitStatus() != 0:
+                self.logDebugInfo(_out, _e)
+                _detail_error = 'cryptsetup resize command failed in domU'
                 _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_LUKSRESIZE_FAIL'], _detail_error)
                 return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
-            if _out_file and _node.mFileExists(_out_file):
-                ebLogWarn(f"Deleting keyapi {_out_file}")
-                node_exec_cmd(_node, f"/bin/shred -fu {_out_file}")
+
+            # LV Shrink/Resize
+            ## We are offsetting by 100MB to accomodate for later partitioning.
+            _lvsize = None
+            if _eBoxCluCtrl.mCheckConfigOption('disable_lvm_snapshot_space','True'):
+                _lvsize = float(_new_sizeGB) - 0.1
             else:
-                ebLogWarn(f"No keyapi to delete")
+                _lvsize = float(_new_sizeGB) - 2.1 # 2 GB space for snapshot
 
-        # Increase the fs to use the new maximum available
-        _bin_resize2fs = node_cmd_abs_path_check(_node, "resize2fs", sbin=True)
-        _cmdstr = f"{_bin_resize2fs} {_filesystem}"
-        _i, _o, _e = _node.mExecuteCmd(_cmdstr)
-        ebLogTrace("Executing cmd : %s"%(_cmdstr))
-        _out = _o.readlines()
-        if _node.mGetCmdExitStatus() != 0:
-            self.logDebugInfo(_out, _e)
-            _detail_error = 'filesystem resize command failed in domU'
-            _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_FSRESIZE_FAIL'], _detail_error)
-            return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
+            _partsize = float(_new_sizeGB) - 0.05
+            try:
+                _cmdstr = "/usr/sbin/lvresize -L " + str(_lvsize) + "G " + _lvpath + " --force"
+                _i, _o, _e = _node.mExecuteCmd(_cmdstr)
+                _out = _o.read()
+                _err = _e.read()
+                if _node.mGetCmdExitStatus() != 0:
+                    ebLogTrace("stdout: {_out}\nstderr: {_err}")
 
-        # Decrease PV Size
-        _cmdstr = "/usr/sbin/pvresize -y --setphysicalvolumesize " + str(_partsize) + "G " +_diskpart
-        _i, _o, _e = _node.mExecuteCmd(_cmdstr)
-        ebLogTrace("Executing cmd : %s"%(_cmdstr))
-        _out = _o.readlines()
-        if _node.mGetCmdExitStatus() != 0:
-            self.logDebugInfo(_out, _e)
-            _detail_error = 'pvresize command failed in domU'
-            _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_PVRESIZE_FAIL'], _detail_error)
-            return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
+                    # Ref, check if stdout/stderr includes
+                    _full_out = _out + _err
+                    if re.search("New\s+size\s+.*matches\s+existing\s+size", _full_out):
+                        ebLogInfo(f"LVresize failure detected to be caused by using "
+                            "same Target Size. Ignoring error")
+                    else:
+                        _detail_error = 'lvresize command failed in domU'
+                        _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_LVRESIZE_FAIL'], _detail_error)
+                        return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
+            finally:
+                # Open Luks volume regardless of LVResize success or Error
+                # It will automatically fill up to use the new LV size or
+                # stay with older size
+                # First try to get keyapi data
+                _out_file = None
+                _i, _o, _e = _node.mExecuteCmd(_keyapi_file)
+                ebLogTrace("Executing cmd : %s"%(_cmdstr))
+                _out = _o.readlines()
+                if _out:
+                    _out_file = _out[0].strip()
+                if _node.mGetCmdExitStatus() != 0:
+                    self.logDebugInfo(_out, _e)
+                    _detail_error = 'calling keyapi command failed in domU'
+                    _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_KEYAPI_FAIL'], _detail_error)
+                    return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
 
-        # Decrease Partition Size
-        # Parted takes 'GiB' for base 1024 to match LVM 'G' (parted 'G' is base 1000 and not a real Gigabyte)
-        _cmdstr = f"/bin/echo '1\n{_partsize}GiB\nYes' | /bin/sudo /usr/sbin/parted -a none {_imgdisk} ---pretend-input-tty resizepart"
-        _i, _o, _e = _node.mExecuteCmd(_cmdstr)
-        ebLogTrace("Executing cmd : %s"%(_cmdstr))
-        _out = _o.readlines()
-        if _node.mGetCmdExitStatus() != 0:
-            self.logDebugInfo(_out, _e)
-            _detail_error = 'Parted command failed in domU with error ' + str(_node.mGetCmdExitStatus())
-            _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_PARTED_CMD_FAIL'], _detail_error)
-            return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
+                _bin_cryptsetup = node_cmd_abs_path_check(_node, "cryptsetup", sbin=True)
+                _crypto_name = os.path.basename(_filesystem)
+                _cmdstr = f"{_bin_cryptsetup} open {_lvpath} {_crypto_name} --key-file={_out_file} -v"
+                _i, _o, _e = _node.mExecuteCmd(_cmdstr)
+                ebLogTrace("Executing cmd : %s"%(_cmdstr))
+                _out = _o.readlines()
+                if _node.mGetCmdExitStatus() != 0:
+                    self.logDebugInfo(_out, _e)
+                    _detail_error = 'cryptsetup open command failed in domU'
+                    _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_LUKSRESIZE_FAIL'], _detail_error)
+                    return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
+                if _out_file and _node.mFileExists(_out_file):
+                    ebLogWarn(f"Deleting keyapi {_out_file}")
+                    node_exec_cmd(_node, f"/bin/shred -fu {_out_file}")
+                else:
+                    ebLogWarn(f"No keyapi to delete")
 
-        return 0
+            # Increase the fs to use the new maximum available
+            _bin_resize2fs = node_cmd_abs_path_check(_node, "resize2fs", sbin=True)
+            _cmdstr = f"{_bin_resize2fs} {_filesystem}"
+            _i, _o, _e = _node.mExecuteCmd(_cmdstr)
+            ebLogTrace("Executing cmd : %s"%(_cmdstr))
+            _out = _o.readlines()
+            if _node.mGetCmdExitStatus() != 0:
+                self.logDebugInfo(_out, _e)
+                _detail_error = 'filesystem resize command failed in domU'
+                _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_FSRESIZE_FAIL'], _detail_error)
+                return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
+
+            # Decrease PV Size
+            _cmdstr = "/usr/sbin/pvresize -y --setphysicalvolumesize " + str(_partsize) + "G " +_diskpart
+            _i, _o, _e = _node.mExecuteCmd(_cmdstr)
+            ebLogTrace("Executing cmd : %s"%(_cmdstr))
+            _out = _o.readlines()
+            if _node.mGetCmdExitStatus() != 0:
+                self.logDebugInfo(_out, _e)
+                _detail_error = 'pvresize command failed in domU'
+                _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_PVRESIZE_FAIL'], _detail_error)
+                return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
+
+            # Decrease Partition Size
+            # Parted takes 'GiB' for base 1024 to match LVM 'G' (parted 'G' is base 1000 and not a real Gigabyte)
+            _cmdstr = f"/bin/echo '1\n{_partsize}GiB\nYes' | /bin/sudo /usr/sbin/parted -a none {_imgdisk} ---pretend-input-tty resizepart"
+            _i, _o, _e = _node.mExecuteCmd(_cmdstr)
+            ebLogTrace("Executing cmd : %s"%(_cmdstr))
+            _out = _o.readlines()
+            if _node.mGetCmdExitStatus() != 0:
+                self.logDebugInfo(_out, _e)
+                _detail_error = 'Parted command failed in domU with error ' + str(_node.mGetCmdExitStatus())
+                _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_PARTED_CMD_FAIL'], _detail_error)
+                return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
+
+            return 0
+        finally:
+            _node.mDisconnect()
 
     def mExecuteDomUDownsizeSteps(self, aDomU, aFilesystem, aNewSizeGB):
         _domU = aDomU
@@ -398,75 +404,174 @@ class exaBoxKvmDiskMgr(object):
 
             return _Prefx, _nofsck
 
+        def _get_mount_targets():
+            """
+            Returns mount targets for the given filesystem source.
+
+            Exit status 1 with empty output from findmnt is 
+            treated as "no mount targets found".
+            """
+            _cmd = "/bin/findmnt -rn -o TARGET -S " + _filesystem
+            ebLogTrace("Executing cmd : %s"%(_cmd))
+            _mi, _mo, _me = _node.mExecuteCmd(_cmd)
+            _out_lines = _mo.readlines() if _mo else []
+            _err_lines = _me.readlines() if _me else []
+
+            if _node.mGetCmdExitStatus() != 0:
+                if _node.mGetCmdExitStatus() == 1 and not _out_lines:
+                    ebLogTrace("No bind mount targets found for %s" % _filesystem)
+                    return []
+
+                self.logDebugInfo(_out_lines, _err_lines)
+                _detail_error = 'Unable to read mount targets for ' + _filesystem + ' in domU'
+                _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_LVRESIZE_FAIL'], _detail_error)
+                return self.__edp.mRecordError(
+                    gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error
+                )
+
+            _targets = [ _t.strip() for _t in _out_lines ]
+            return [ _t for _t in _targets if _t ]
+
+        def _umount_targets(_targets):
+            """
+            Unmounts the given list of bind-mount targets.
+            Any unmount failure is logged and treated as an error.
+            """
+            for _target in sorted(_targets, key=len, reverse=True):
+                _cmd = "/usr/bin/umount " + _target
+                ebLogTrace("Executing cmd : %s"%(_cmd))
+                _mi, _mo, _me = _node.mExecuteCmd(_cmd)
+                if _node.mGetCmdExitStatus() != 0:
+                    _out_lines = _mo.readlines() if _mo else []
+                    _err_lines = _me.readlines() if _me else []
+                    self.logDebugInfo(_out_lines, _err_lines)
+                    if any('busy' in _line.lower() for _line in _err_lines):
+                        ebLogWarn("Bind mount %s is busy during unmount" % _target)
+                    _detail_error = 'Unable to unmount bind mount ' + _target + ' in domU'
+                    _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_LVRESIZE_FAIL'], _detail_error)
+                    return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
+            return 0
+
+        def _remount_targets(_targets):
+            """
+            Restores bind mounts for the given mount targets.
+
+            Recreates target directories as needed and rebinds them to /u02
+            any mount failure is logged and treated as an error.
+            """
+            for _target in _targets:
+                if _target == "/u02":
+                    continue
+                _cmd = "/usr/bin/mkdir -p " + _target
+                _node.mExecuteCmd(_cmd)
+                _cmd = "/usr/bin/mount --bind /u02 " + _target
+                ebLogTrace("Executing cmd : %s"%(_cmd))
+                _mi, _mo, _me = _node.mExecuteCmd(_cmd)
+                if _node.mGetCmdExitStatus() != 0:
+                    _out_lines = _mo.readlines() if _mo else []
+                    _err_lines = _me.readlines() if _me else []
+                    self.logDebugInfo(_out_lines, _err_lines)
+                    _detail_error = 'Unable to restore bind mount ' + _target + ' in domU'
+                    _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_LVRESIZE_FAIL'], _detail_error)
+                    return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
+            return 0
+
         _node = exaBoxNode(get_gcontext())
         _node.mConnect(aHost=_domU)
         _eBoxCluCtrl = self.__edp.mGetEbox()
 
-        _cmdstr = "/usr/bin/lsblk -p -r | /usr/bin/grep -B 2 " + _filesystem
-        ebLogTrace("Executing cmd : %s"%(_cmdstr))
-        _i, _o, _e = _node.mExecuteCmd(_cmdstr)
-        _out = _o.readlines()
+        try:
+            _cmdstr = "/usr/bin/lsblk -p -r | /usr/bin/grep -B 2 " + _filesystem
+            ebLogTrace("Executing cmd : %s"%(_cmdstr))
+            _i, _o, _e = _node.mExecuteCmd(_cmdstr)
+            _out = _o.readlines()
 
-        ebLogVerbose("Command output : " + '\n'.join(_out))
+            ebLogVerbose("Command output : " + '\n'.join(_out))
 
-        if _out is None:
-            self.logDebugInfo(_out, _e)
-            _detail_error = 'Could not perform filesystem check on ' + _domU + ' for filesystem ' + _filesystem
-            _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_FILE_SYS_CHECK_FAILED'], _detail_error)
-            return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
-            
+            if _out is None:
+                self.logDebugInfo(_out, _e)
+                _detail_error = 'Could not perform filesystem check on ' + _domU + ' for filesystem ' + _filesystem
+                _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_FILE_SYS_CHECK_FAILED'], _detail_error)
+                return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
+                
 
-        _imgdisk = _out[0].strip().split(' ')[0]
-        _diskpart = _out[1].strip().split(' ')[0]
-        ebLogInfo("image disk is : %s"%(_imgdisk))
-        ebLogInfo("partition name is : %s"%(_diskpart))
+            _imgdisk = _out[0].strip().split(' ')[0]
+            _diskpart = _out[1].strip().split(' ')[0]
+            ebLogInfo("image disk is : %s"%(_imgdisk))
+            ebLogInfo("partition name is : %s"%(_diskpart))
 
-        #e2fsck reporting issues due to unsupported feature enabled
-        _lvrzPrefix = "/usr/sbin/"
-        _nofsck = ""
-        if _fsMetacsumChk(_filesystem):
-            _mCopyfsprogs(_node)
-            _lvrzPrefix, _nofsck = _lvszPrefx(_filesystem)
-        
-        ## We are offsetting by 100MB to accomodate for later partitioning.
-        _lvsize = None
-        if _eBoxCluCtrl.mCheckConfigOption('disable_lvm_snapshot_space','True'):
-            _lvsize = float(_new_sizeGB) - 0.1
-        else:
-            _lvsize = float(_new_sizeGB) - 2.1 # 2 GB space for snapshot
-        _partsize = float(_new_sizeGB) - 0.05
-        _cmdstr = _lvrzPrefix + "lvresize --resizefs -L" + str(_lvsize) + "G " + _filesystem + _nofsck
-        ebLogTrace("Executing cmd : %s"%(_cmdstr))
-        _i, _o, _e = _node.mExecuteCmd(_cmdstr)
-        _out = _o.readlines()
-        if _node.mGetCmdExitStatus() != 0:
-            self.logDebugInfo(_out, _e)
-            _detail_error = 'lvresize command failed in domU'
-            _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_LVRESIZE_FAIL'], _detail_error)
-            return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
+            #e2fsck reporting issues due to unsupported feature enabled
+            _lvrzPrefix = "/usr/sbin/"
+            _nofsck = ""
+            if _fsMetacsumChk(_filesystem):
+                _mCopyfsprogs(_node)
+                _lvrzPrefix, _nofsck = _lvszPrefx(_filesystem)
 
-        _cmdstr = "/usr/sbin/pvresize -y --setphysicalvolumesize " + str(_partsize) + "G " +_diskpart
-        ebLogTrace("Executing cmd : %s"%(_cmdstr))
-        _i, _o, _e = _node.mExecuteCmd(_cmdstr)
-        _out = _o.readlines()
-        if _node.mGetCmdExitStatus() != 0:
-            self.logDebugInfo(_out, _e)
-            _detail_error = 'pvresize command failed in domU'
-            _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_PVRESIZE_FAIL'], _detail_error)
-            return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
+            _mount_targets = _get_mount_targets()
+            if not isinstance(_mount_targets, list):
+                return _mount_targets
+            ebLogTrace("Bind mount targets : " + ', '.join(_mount_targets))
 
-        # Parted takes 'GiB' for base 1024 to match LVM 'G' (parted 'G' is base 1000 and not a real Gigabyte)
-        _cmdstr = f"/bin/echo '1\n{_partsize}GiB\nYes' | /bin/sudo /usr/sbin/parted -a none {_imgdisk} ---pretend-input-tty resizepart"
-        ebLogTrace("Executing cmd : %s"%(_cmdstr))
-        _i, _o, _e = _node.mExecuteCmd(_cmdstr)
-        _out = _o.readlines()
-        if _node.mGetCmdExitStatus() != 0:
-            self.logDebugInfo(_out, _e)
-            _detail_error = 'Parted command failed in domU with error ' + str(_node.mGetCmdExitStatus())
-            _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_PARTED_CMD_FAIL'], _detail_error)
-            return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
+            _targets_to_unmount = []
+            for _target in _mount_targets:
+                if _target.startswith('/cca/opctl_') and "/chroot/u02" in _target:
+                    _targets_to_unmount.append(_target)
 
-        return 0
+            _handled_bind_mounts = []
+            if _targets_to_unmount:
+                ebLogInfo("*** Found CCA bind mounts, unmounting before lvresize: %s" % ', '.join(_targets_to_unmount))
+                _rc = _umount_targets(_targets_to_unmount)
+                if _rc != 0:
+                    return _rc
+                _handled_bind_mounts = list(_targets_to_unmount)
+
+            ## We are offsetting by 100MB to accomodate for later partitioning.
+            _lvsize = None
+            if _eBoxCluCtrl.mCheckConfigOption('disable_lvm_snapshot_space','True'):
+                _lvsize = float(_new_sizeGB) - 0.1
+            else:
+                _lvsize = float(_new_sizeGB) - 2.1 # 2 GB space for snapshot
+            _partsize = float(_new_sizeGB) - 0.05
+            _cmdstr = _lvrzPrefix + "lvresize --resizefs -L" + str(_lvsize) + "G " + _filesystem + " --yes" + _nofsck
+            ebLogTrace("Executing cmd : %s"%(_cmdstr))
+            _i, _o, _e = _node.mExecuteCmd(_cmdstr)
+            _out = _o.readlines()
+            if _node.mGetCmdExitStatus() != 0:
+                self.logDebugInfo(_out, _e)
+                _detail_error = 'lvresize command failed in domU'
+                _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_LVRESIZE_FAIL'], _detail_error)
+                return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
+
+            if _handled_bind_mounts:
+                ebLogInfo("*** Restoring CCA bind mounts after lvresize")
+                _rc = _remount_targets(_handled_bind_mounts)
+                if _rc != 0:
+                    return _rc
+
+            _cmdstr = "/usr/sbin/pvresize -y --setphysicalvolumesize " + str(_partsize) + "G " +_diskpart
+            ebLogTrace("Executing cmd : %s"%(_cmdstr))
+            _i, _o, _e = _node.mExecuteCmd(_cmdstr)
+            _out = _o.readlines()
+            if _node.mGetCmdExitStatus() != 0:
+                self.logDebugInfo(_out, _e)
+                _detail_error = 'pvresize command failed in domU'
+                _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_PVRESIZE_FAIL'], _detail_error)
+                return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
+
+            # Parted takes 'GiB' for base 1024 to match LVM 'G' (parted 'G' is base 1000 and not a real Gigabyte)
+            _cmdstr = f"/bin/echo '1\n{_partsize}GiB\nYes' | /bin/sudo /usr/sbin/parted -a none {_imgdisk} ---pretend-input-tty resizepart"
+            ebLogTrace("Executing cmd : %s"%(_cmdstr))
+            _i, _o, _e = _node.mExecuteCmd(_cmdstr)
+            _out = _o.readlines()
+            if _node.mGetCmdExitStatus() != 0:
+                self.logDebugInfo(_out, _e)
+                _detail_error = 'Parted command failed in domU with error ' + str(_node.mGetCmdExitStatus())
+                _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_PARTED_CMD_FAIL'], _detail_error)
+                return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
+
+            return 0
+        finally:
+            _node.mDisconnect()
 
     def mExecuteDomUUpsizeSteps(self, aDomU, aFilesystem, aNewSizeGB):
         _domU = aDomU
@@ -477,60 +582,63 @@ class exaBoxKvmDiskMgr(object):
         _node.mConnect(aHost=_domU)
         _eBoxCluCtrl = self.__edp.mGetEbox()
 
-        _cmdstr = "/usr/bin/lsblk -p -r | /usr/bin/grep -B 2 " + _filesystem
-        ebLogTrace("Executing cmd : %s"%(_cmdstr))
-        _i, _o, _e = _node.mExecuteCmd(_cmdstr)
-        _out = _o.readlines()
+        try:
+            _cmdstr = "/usr/bin/lsblk -p -r | /usr/bin/grep -B 2 " + _filesystem
+            ebLogTrace("Executing cmd : %s"%(_cmdstr))
+            _i, _o, _e = _node.mExecuteCmd(_cmdstr)
+            _out = _o.readlines()
 
-        ebLogVerbose("Command output : " + '\n'.join(_out))
-      
-        if _out is None:
-            self.logDebugInfo(_out, _e)
-            _detail_error = 'Could not perform filesystem check on ' + _domU + ' for filesystem ' + _filesystem
-            _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_FILE_SYS_CHECK_FAILED'], _detail_error)
-            return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
+            ebLogVerbose("Command output : " + '\n'.join(_out))
+        
+            if _out is None:
+                self.logDebugInfo(_out, _e)
+                _detail_error = 'Could not perform filesystem check on ' + _domU + ' for filesystem ' + _filesystem
+                _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_FILE_SYS_CHECK_FAILED'], _detail_error)
+                return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
 
 
-        _imgdisk = _out[0].strip().split(' ')[0]
-        _diskpart = _out[1].strip().split(' ')[0]
-        ebLogInfo("image disk is : %s"%(_imgdisk))
-        ebLogInfo("partition name is : %s"%(_diskpart))
+            _imgdisk = _out[0].strip().split(' ')[0]
+            _diskpart = _out[1].strip().split(' ')[0]
+            ebLogInfo("image disk is : %s"%(_imgdisk))
+            ebLogInfo("partition name is : %s"%(_diskpart))
 
-        _cmdstr = "/usr/sbin/parted -a none " + _imgdisk + " resizepart 1 100%"
-        ebLogTrace("Executing cmd : %s"%(_cmdstr))
-        _i, _o, _e = _node.mExecuteCmd(_cmdstr)
-        _out = _o.readlines()
-        if _node.mGetCmdExitStatus() != 0:
-            self.logDebugInfo(_out, _e)
-            _detail_error = 'Parted command failed in domU'
-            _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_PARTED_CMD_FAIL'], _detail_error)
-            return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
-            
+            _cmdstr = "/usr/sbin/parted -a none " + _imgdisk + " resizepart 1 100%"
+            ebLogTrace("Executing cmd : %s"%(_cmdstr))
+            _i, _o, _e = _node.mExecuteCmd(_cmdstr)
+            _out = _o.readlines()
+            if _node.mGetCmdExitStatus() != 0:
+                self.logDebugInfo(_out, _e)
+                _detail_error = 'Parted command failed in domU'
+                _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_PARTED_CMD_FAIL'], _detail_error)
+                return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
+                
 
-        _cmdstr = "/usr/sbin/pvresize " + _diskpart
-        ebLogTrace("Executing cmd : %s"%(_cmdstr))
-        _i, _o, _e = _node.mExecuteCmd(_cmdstr)
-        _out = _o.readlines()
-        if _node.mGetCmdExitStatus() != 0:
-            self.logDebugInfo(_out, _e)
-            _detail_error = 'pvresize command failed in domU'
-            _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_PVRESIZE_FAIL'], _detail_error)
-            return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
-        if _eBoxCluCtrl.mCheckConfigOption('disable_lvm_snapshot_space','True'):
-            _cmdstr = "/usr/sbin/lvresize --resizefs -l +100%FREE " + _filesystem
-        else:
-            _lvsize = float(_new_sizeGB) - 2 # 2 GB space for snapshot
-            _cmdstr = "/usr/sbin/lvresize --resizefs -L" + str(_lvsize) + "G " + _filesystem
-        ebLogTrace("Executing cmd : %s"%(_cmdstr))
-        _i, _o, _e = _node.mExecuteCmd(_cmdstr)
-        _out = _o.readlines()
-        if _node.mGetCmdExitStatus() != 0:
-            self.logDebugInfo(_out, _e)
-            _detail_error = 'lvresize command failed in domU'
-            _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_LVRESIZE_FAIL'], _detail_error)
-            return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
+            _cmdstr = "/usr/sbin/pvresize " + _diskpart
+            ebLogTrace("Executing cmd : %s"%(_cmdstr))
+            _i, _o, _e = _node.mExecuteCmd(_cmdstr)
+            _out = _o.readlines()
+            if _node.mGetCmdExitStatus() != 0:
+                self.logDebugInfo(_out, _e)
+                _detail_error = 'pvresize command failed in domU'
+                _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_PVRESIZE_FAIL'], _detail_error)
+                return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
+            if _eBoxCluCtrl.mCheckConfigOption('disable_lvm_snapshot_space','True'):
+                _cmdstr = "/usr/sbin/lvresize --resizefs -l +100%FREE " + _filesystem
+            else:
+                _lvsize = float(_new_sizeGB) - 2 # 2 GB space for snapshot
+                _cmdstr = "/usr/sbin/lvresize --resizefs -L" + str(_lvsize) + "G " + _filesystem
+            ebLogTrace("Executing cmd : %s"%(_cmdstr))
+            _i, _o, _e = _node.mExecuteCmd(_cmdstr)
+            _out = _o.readlines()
+            if _node.mGetCmdExitStatus() != 0:
+                self.logDebugInfo(_out, _e)
+                _detail_error = 'lvresize command failed in domU'
+                _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_LVRESIZE_FAIL'], _detail_error)
+                return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
 
-        return 0
+            return 0
+        finally:
+            _node.mDisconnect()
 
     def mExecuteDomUUpsizeStepsEncrypted(self, aDomU, aFilesystem, aNewSizeGB):
         """
@@ -550,153 +658,155 @@ class exaBoxKvmDiskMgr(object):
         _node = exaBoxNode(get_gcontext())
         _node.mConnect(aHost=_domU)
         _eBoxCluCtrl = self.__edp.mGetEbox()
-
-        # Get info about block devices supporting our filesystem to resize
-        _cmdstr = "/usr/bin/lsblk -p -r | /usr/bin/grep -B 3 " + _filesystem
-        _i, _o, _e = _node.mExecuteCmd(_cmdstr)
-        ebLogTrace("Executing cmd : %s"%(_cmdstr))
-        _out = _o.readlines()
-
-        ebLogTrace("Command output : " + '\n'.join(_out))
-
-        if _out is None:
-            self.logDebugInfo(_out, _e)
-            _detail_error = 'Could not perform filesystem check on ' + _domU + ' for filesystem ' + _filesystem
-            _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_FILE_SYS_CHECK_FAILED'], _detail_error)
-            return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
-
-
-        # Store disk/part/lv info to use later
-        _imgdisk = _out[0].strip().split(' ')[0]
-        _diskpart = _out[1].strip().split(' ')[0]
-        _lvpath = _out[2].strip().split(' ')[0]
-
-        ebLogInfo("image disk is : %s"%(_imgdisk))
-        ebLogInfo("partition name is : %s"%(_diskpart))
-        ebLogInfo("lv path is : %s"%(_lvpath))
-
-        # Confirm LUKS keyapi is available before even start
-        _keyapi_file = "/usr/lib/dracut/modules.d/99exacrypt/VGExaDbDisk.u02_extra_encrypted.img#LVDBDisk.key-api.sh"
-        if not _node.mFileExists(_keyapi_file):
-            _detail_error = f'the keyapi script {_keyapi_file} is not present in domU'
-            _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_KEYAPI_FAIL'], _detail_error)
-            return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
-
-        # Fix partition
-        _cmdstr = f"/bin/echo 'Fix\nFix' | /usr/sbin/parted {_imgdisk} ---pretend-input-tty print"
-        _i, _o, _e = _node.mExecuteCmd(_cmdstr)
-        ebLogTrace("Executing cmd : %s"%(_cmdstr))
-        _out = _o.readlines()
-        if _node.mGetCmdExitStatus() != 0:
-            self.logDebugInfo(_out, _e)
-            _detail_error = 'Parted command failed to fix table in domU'
-            _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_PARTED_CMD_FAIL'], _detail_error)
-            return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
-
-        # Resize partition
-        _cmdstr = "/usr/sbin/parted -a none " + _imgdisk + " resizepart 1 100%"
-        _i, _o, _e = _node.mExecuteCmd(_cmdstr)
-        ebLogTrace("Executing cmd : %s"%(_cmdstr))
-        _out = _o.readlines()
-        if _node.mGetCmdExitStatus() != 0:
-            self.logDebugInfo(_out, _e)
-            _detail_error = 'Parted command failed in domU'
-            _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_PARTED_CMD_FAIL'], _detail_error)
-            return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
-
-
-        # Resize PV
-        _cmdstr = "/usr/sbin/pvresize " + _diskpart
-        _i, _o, _e = _node.mExecuteCmd(_cmdstr)
-        ebLogTrace("Executing cmd : %s"%(_cmdstr))
-        _out = _o.readlines()
-        if _node.mGetCmdExitStatus() != 0:
-            self.logDebugInfo(_out, _e)
-            _detail_error = 'pvresize command failed in domU'
-            _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_PVRESIZE_FAIL'], _detail_error)
-            return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
-
-        # Resize LV
-        if _eBoxCluCtrl.mCheckConfigOption('disable_lvm_snapshot_space','True'):
-            _cmdstr = "/usr/sbin/lvresize -l +100%FREE " + _lvpath
-        else:
-            _lvsize = float(_new_sizeGB) - 2 # 2 GB space for snapshot
-            _cmdstr = "/usr/sbin/lvresize -L " + str(_lvsize) + "G " + _lvpath
-        _i, _o, _e = _node.mExecuteCmd(_cmdstr)
-        _out = _o.read()
-        _err = _e.read()
-        if _node.mGetCmdExitStatus() != 0:
-            ebLogTrace("stdout: {_out}\nstderr: {_err}")
-
-            # Ref, check if stdout/stderr includes
-            _full_out = _out + _err
-            if re.search("New\s+size\s+.*matches\s+existing\s+size", _full_out):
-                ebLogInfo(f"LVresize failure detected to be caused by using same Target Size")
-            else:
-                _detail_error = 'lvresize command failed in domU'
-                _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_LVRESIZE_FAIL'], _detail_error)
-
-
-        # Resize LUKS Device
         try:
-            # Try to get keyapi data
-            _out_file = None
-            _i, _o, _e = _node.mExecuteCmd(_keyapi_file)
+            # Get info about block devices supporting our filesystem to resize
+            _cmdstr = "/usr/bin/lsblk -p -r | /usr/bin/grep -B 3 " + _filesystem
+            _i, _o, _e = _node.mExecuteCmd(_cmdstr)
             ebLogTrace("Executing cmd : %s"%(_cmdstr))
             _out = _o.readlines()
-            if _out:
-                _out_file = _out[0].strip()
-            if _node.mGetCmdExitStatus() != 0:
+
+            ebLogTrace("Command output : " + '\n'.join(_out))
+
+            if _out is None:
                 self.logDebugInfo(_out, _e)
-                _detail_error = 'calling keyapi command failed in domU'
+                _detail_error = 'Could not perform filesystem check on ' + _domU + ' for filesystem ' + _filesystem
+                _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_FILE_SYS_CHECK_FAILED'], _detail_error)
+                return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
+
+
+            # Store disk/part/lv info to use later
+            _imgdisk = _out[0].strip().split(' ')[0]
+            _diskpart = _out[1].strip().split(' ')[0]
+            _lvpath = _out[2].strip().split(' ')[0]
+
+            ebLogInfo("image disk is : %s"%(_imgdisk))
+            ebLogInfo("partition name is : %s"%(_diskpart))
+            ebLogInfo("lv path is : %s"%(_lvpath))
+
+            # Confirm LUKS keyapi is available before even start
+            _keyapi_file = "/usr/lib/dracut/modules.d/99exacrypt/VGExaDbDisk.u02_extra_encrypted.img#LVDBDisk.key-api.sh"
+            if not _node.mFileExists(_keyapi_file):
+                _detail_error = f'the keyapi script {_keyapi_file} is not present in domU'
                 _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_KEYAPI_FAIL'], _detail_error)
                 return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
 
-
-            _bin_cryptsetup = node_cmd_abs_path_check(_node, "cryptsetup", sbin=True)
-            _cmdstr = f"{_bin_cryptsetup} resize {_filesystem} --key-file={_out_file} -v"
+            # Fix partition
+            _cmdstr = f"/bin/echo 'Fix\nFix' | /usr/sbin/parted {_imgdisk} ---pretend-input-tty print"
             _i, _o, _e = _node.mExecuteCmd(_cmdstr)
             ebLogTrace("Executing cmd : %s"%(_cmdstr))
             _out = _o.readlines()
             if _node.mGetCmdExitStatus() != 0:
                 self.logDebugInfo(_out, _e)
-                _detail_error = 'cryptsetup resize command failed in domU'
-                _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_LUKSRESIZE_FAIL'], _detail_error)
+                _detail_error = 'Parted command failed to fix table in domU'
+                _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_PARTED_CMD_FAIL'], _detail_error)
                 return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
-        finally:
-            if _out_file and _node.mFileExists(_out_file):
-                ebLogWarn(f"Deleting keyapi {_out_file}")
-                node_exec_cmd(_node, f"/bin/shred -fu {_out_file}")
+
+            # Resize partition
+            _cmdstr = "/usr/sbin/parted -a none " + _imgdisk + " resizepart 1 100%"
+            _i, _o, _e = _node.mExecuteCmd(_cmdstr)
+            ebLogTrace("Executing cmd : %s"%(_cmdstr))
+            _out = _o.readlines()
+            if _node.mGetCmdExitStatus() != 0:
+                self.logDebugInfo(_out, _e)
+                _detail_error = 'Parted command failed in domU'
+                _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_PARTED_CMD_FAIL'], _detail_error)
+                return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
+
+
+            # Resize PV
+            _cmdstr = "/usr/sbin/pvresize " + _diskpart
+            _i, _o, _e = _node.mExecuteCmd(_cmdstr)
+            ebLogTrace("Executing cmd : %s"%(_cmdstr))
+            _out = _o.readlines()
+            if _node.mGetCmdExitStatus() != 0:
+                self.logDebugInfo(_out, _e)
+                _detail_error = 'pvresize command failed in domU'
+                _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_PVRESIZE_FAIL'], _detail_error)
+                return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
+
+            # Resize LV
+            if _eBoxCluCtrl.mCheckConfigOption('disable_lvm_snapshot_space','True'):
+                _cmdstr = "/usr/sbin/lvresize -l +100%FREE " + _lvpath
             else:
-                ebLogWarn(f"No keyapi to delete")
-
-        # Resize Filsystem
-        _fs_info = getMountPointInfo(_node, f"{_filesystem}")
-        if _fs_info.fs_type == "xfs":
-            _bin_xfs_growfs = node_cmd_abs_path_check(_node, "xfs_growfs", sbin=True)
-            _cmdstr = (f"{_bin_xfs_growfs} {_fs_info.mount_point}")
+                _lvsize = float(_new_sizeGB) - 2 # 2 GB space for snapshot
+                _cmdstr = "/usr/sbin/lvresize -L " + str(_lvsize) + "G " + _lvpath
             _i, _o, _e = _node.mExecuteCmd(_cmdstr)
-            ebLogTrace("Executing cmd : %s"%(_cmdstr))
-            _out = _o.readlines()
+            _out = _o.read()
+            _err = _e.read()
             if _node.mGetCmdExitStatus() != 0:
-                self.logDebugInfo(_out, _e)
-                _detail_error = 'filesystem resize command failed in domU'
-                _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_FSRESIZE_FAIL'], _detail_error)
-                return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
+                ebLogTrace("stdout: {_out}\nstderr: {_err}")
 
-        elif _fs_info.fs_type == "ext4":
-            _bin_resize2fs = node_cmd_abs_path_check(_node, "resize2fs", sbin=True)
-            _cmdstr = f"{_bin_resize2fs} {_filesystem}"
-            _i, _o, _e = _node.mExecuteCmd(_cmdstr)
-            ebLogTrace("Executing cmd : %s"%(_cmdstr))
-            _out = _o.readlines()
-            if _node.mGetCmdExitStatus() != 0:
-                self.logDebugInfo(_out, _e)
-                _detail_error = 'filesystem resize command failed in domU'
-                _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_FSRESIZE_FAIL'], _detail_error)
-                return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
+                # Ref, check if stdout/stderr includes
+                _full_out = _out + _err
+                if re.search("New\s+size\s+.*matches\s+existing\s+size", _full_out):
+                    ebLogInfo(f"LVresize failure detected to be caused by using same Target Size")
+                else:
+                    _detail_error = 'lvresize command failed in domU'
+                    _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_LVRESIZE_FAIL'], _detail_error)
 
-        return 0
+
+            # Resize LUKS Device
+            try:
+                # Try to get keyapi data
+                _out_file = None
+                _i, _o, _e = _node.mExecuteCmd(_keyapi_file)
+                ebLogTrace("Executing cmd : %s"%(_cmdstr))
+                _out = _o.readlines()
+                if _out:
+                    _out_file = _out[0].strip()
+                if _node.mGetCmdExitStatus() != 0:
+                    self.logDebugInfo(_out, _e)
+                    _detail_error = 'calling keyapi command failed in domU'
+                    _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_KEYAPI_FAIL'], _detail_error)
+                    return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
+
+
+                _bin_cryptsetup = node_cmd_abs_path_check(_node, "cryptsetup", sbin=True)
+                _cmdstr = f"{_bin_cryptsetup} resize {_filesystem} --key-file={_out_file} -v"
+                _i, _o, _e = _node.mExecuteCmd(_cmdstr)
+                ebLogTrace("Executing cmd : %s"%(_cmdstr))
+                _out = _o.readlines()
+                if _node.mGetCmdExitStatus() != 0:
+                    self.logDebugInfo(_out, _e)
+                    _detail_error = 'cryptsetup resize command failed in domU'
+                    _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_LUKSRESIZE_FAIL'], _detail_error)
+                    return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
+            finally:
+                if _out_file and _node.mFileExists(_out_file):
+                    ebLogWarn(f"Deleting keyapi {_out_file}")
+                    node_exec_cmd(_node, f"/bin/shred -fu {_out_file}")
+                else:
+                    ebLogWarn(f"No keyapi to delete")
+
+            # Resize Filsystem
+            _fs_info = getMountPointInfo(_node, f"{_filesystem}")
+            if _fs_info.fs_type == "xfs":
+                _bin_xfs_growfs = node_cmd_abs_path_check(_node, "xfs_growfs", sbin=True)
+                _cmdstr = (f"{_bin_xfs_growfs} {_fs_info.mount_point}")
+                _i, _o, _e = _node.mExecuteCmd(_cmdstr)
+                ebLogTrace("Executing cmd : %s"%(_cmdstr))
+                _out = _o.readlines()
+                if _node.mGetCmdExitStatus() != 0:
+                    self.logDebugInfo(_out, _e)
+                    _detail_error = 'filesystem resize command failed in domU'
+                    _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_FSRESIZE_FAIL'], _detail_error)
+                    return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
+
+            elif _fs_info.fs_type == "ext4":
+                _bin_resize2fs = node_cmd_abs_path_check(_node, "resize2fs", sbin=True)
+                _cmdstr = f"{_bin_resize2fs} {_filesystem}"
+                _i, _o, _e = _node.mExecuteCmd(_cmdstr)
+                ebLogTrace("Executing cmd : %s"%(_cmdstr))
+                _out = _o.readlines()
+                if _node.mGetCmdExitStatus() != 0:
+                    self.logDebugInfo(_out, _e)
+                    _detail_error = 'filesystem resize command failed in domU'
+                    _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_FSRESIZE_FAIL'], _detail_error)
+                    return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
+
+            return 0
+        finally:
+            _node.mDisconnect()
 
     def mExecuteDom0ResizeSteps(self, aDom0, aDomU, aNewSizeGB, aImageName):
         _dom0 = aDom0
@@ -716,23 +826,25 @@ class exaBoxKvmDiskMgr(object):
         # we need to check if it is an ExaDB-XS cluster, but due to historical
         # reasons, the function name to check that is called "mIsExaScale".
         if _image_name.startswith('/dev/exc/') and not _eBoxCluCtrl.mIsExaScale():
-            _volname = '_'.join(os.path.basename(_image_name).split('_')[:-1])
+            _volname = "_".join(os.path.basename(_image_name).split('_')[:2])
             _xs_utils.mResizeEDVVolume(_volname, f"{_new_sizeGB}g")
-        
-        ## No need to detatch disk before up upscale disk
-        ebLogInfo("*** Resizing image " + _image_name + " on " + _dom0)
-        _cmdstr = "virsh blockresize " + _domU + " " +_image_name + " --size " + str(_new_sizeGB) + "G" 
-        #"qemu-img resize " + _image_name +  " " + str(_new_sizeGB) + "G"
-        ebLogTrace("Executing cmd : %s"%(_cmdstr))
-        _i, _o, _e = _node.mExecuteCmd(_cmdstr)
-        _out = _o.readlines()
-        if _node.mGetCmdExitStatus() != 0:
-            self.logDebugInfo(_out, _e)
-            _detail_error = 'Could not resize image on ' + _dom0
-            _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_IMAGE_RESIZE'], _detail_error)
-            return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
+        try:
+            ## No need to detatch disk before up upscale disk
+            ebLogInfo("*** Resizing image " + _image_name + " on " + _dom0)
+            _cmdstr = "virsh blockresize " + _domU + " " +_image_name + " --size " + str(_new_sizeGB) + "G" 
+            #"qemu-img resize " + _image_name +  " " + str(_new_sizeGB) + "G"
+            ebLogTrace("Executing cmd : %s"%(_cmdstr))
+            _i, _o, _e = _node.mExecuteCmd(_cmdstr)
+            _out = _o.readlines()
+            if _node.mGetCmdExitStatus() != 0:
+                self.logDebugInfo(_out, _e)
+                _detail_error = 'Could not resize image on ' + _dom0
+                _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_IMAGE_RESIZE'], _detail_error)
+                return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
 
-        return 0
+            return 0
+        finally:
+            _node.mDisconnect()
 
 
     def mClusterPartitionResize(self, aOptions):
@@ -936,7 +1048,7 @@ class exaBoxKvmDiskMgr(object):
                 _db_List = _eBoxCluCtrl.mGetActiveDbInstances(_domU)
                 if len(_db_List):
                     _isDatabaseInstanceRunning = True
-                    ebLogWarn(f'*** Active database instances {_db_List} have been detected on : {_domU}')
+                    ebLogInfo(f'*** Active database instances {_db_List} have been detected on : {_domU}')
                 else:
                     ebLogWarn(f'*** There are NO active database instances detected on : {_domU}')
 
@@ -1007,25 +1119,41 @@ class exaBoxKvmDiskMgr(object):
                                     self.logDebugInfo(_out, _e)
 
                         ebLogInfo("*** Stopping cluster services on " + _domU)
-                        _cmdstr = _crsctl_path + " stop cluster -n " + _domU.split(".")[0]
-                        ebLogTrace("Executing cmd : %s"%(_cmdstr))
-                        _i, _o, _e = _node.mExecuteCmd(_cmdstr)
-                        _out = _o.readlines()
-                        if _node.mGetCmdExitStatus() != 0:
-                            self.logDebugInfo(_out, _e)
+                        _stop_cluster_cmds = [
+                            f"{_crsctl_path} stop cluster -n {_domU.split('.')[0]}",
+                            f"{_crsctl_path} stop cluster -n {_domU.split('.')[0]} -f"
+                        ]
+                        # The original behaviour of not raising exception is preserved
+                        # Below will retry the stop cluster command 3 times if initial ones
+                        # fail. There is also a 10 seconds delay in running each retry.
+                        _stop_cluster_success = mRunCrsCommandsWithRetry(
+                            _node,
+                            _stop_cluster_cmds,
+                            aLabel=f"CRS stop cluster services on {_domU}",
+                            aRaiseOnFailure=False
+                        )
+                        # Original error handling is retained
+                        # The logging of stdout and stderr is handled by
+                        # mRunCrsCommandsWithRetry
+                        if not _stop_cluster_success:
                             _detail_error = 'Could not stop cluster services on ' + _domU
                             _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_CRS_STOP'], _detail_error)
                             self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
-                        if len(_out):
-                            ebLogVerbose("Command output : " + '\n'.join(_out))
                         if _oracleHome_in_u02:
                             ebLogInfo("*** Stopping crs on " + _domU)
-                            _cmdstr = _crsctl_path + " stop crs -f "
-                            ebLogTrace("Executing cmd : %s"%(_cmdstr))
-                            _i, _o, _e = _node.mExecuteCmd(_cmdstr)
-                            _out = _o.readlines()
-                            if _node.mGetCmdExitStatus() != 0:
-                                self.logDebugInfo(_out, _e)
+                            # The original behaviour of not raising exception is preserved
+                            # Below will retry the stop crs command 3 times if initial ones
+                            # fail. There is also a 10 seconds delay in running each retry.
+                            _stop_crs_success = mRunCrsCommandsWithRetry(
+                                _node,
+                                [f"{_crsctl_path} stop crs -f"],
+                                aLabel=f"CRS stop on {_domU}",
+                                aRaiseOnFailure=False
+                            )
+                            # Original error handling is retained
+                            # The logging of stdout and stderr is handled by
+                            # mRunCrsCommandsWithRetry
+                            if not _stop_crs_success:
                                 self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'],
                                     "*** Could not stop crs on " + _domU)
                             _cmdstr = "/usr/sbin/advmutil blogtext -c force_reopen"
@@ -1245,10 +1373,15 @@ class exaBoxKvmDiskMgr(object):
                             if _db_started:
                                 ebLogInfo("*** DB has come up")
                             else:
-                                ebLogError("*** DB has failed to come up")
-                                _detail_error = 'Could not start DB on ' + _domU
-                                _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_DB_START'], _detail_error)
-                                return self.__edp.mRecordError(gPartitionError['ErrorFetchingDetails'], "*** " + _detail_error)
+                                _post_crs_db_list = _eBoxCluCtrl.mGetActiveDbInstances(_domU) or []
+                                if sorted(_db_List) == sorted(_post_crs_db_list):
+                                    ebLogInfo(f'*** pre/post CRS restart DB instances on {_domU} are same. Pre CRS DB list:{_db_List}, Post CRS DB List: {_post_crs_db_list}')
+                                else:
+                                    _startup_failed_dbs = sorted(set(_db_List) - set(_post_crs_db_list))
+                                    ebLogError(f"*** DB's {_startup_failed_dbs} has failed to come up on {_domU}")
+                                    _detail_error = f'Could not start DB {_startup_failed_dbs} on {_domU}'
+                                    _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_DB_START'], _detail_error)
+                                    return self.__edp.mRecordError(gPartitionError['ErrorFetchingDetails'], "*** " + _detail_error)
                         else:
                             ebLogWarn(f'*** Skipping the DB check as NO active database instances were found on {_domU} prior to the reshape.')
 
@@ -1289,5 +1422,3 @@ class exaBoxKvmDiskMgr(object):
         _stepSpecificDetails = _clu_utils.mStepSpecificDetails("reshapeDetails", 'DONE', "OH reshape completed", "","OH")
         _clu_utils.mUpdateTaskProgressStatus(_lastNode, 100, "OH Reshape", "DONE", _stepSpecificDetails)
         return 0
-
-

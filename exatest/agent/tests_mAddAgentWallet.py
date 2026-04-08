@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 #
-# $Header: ecs/exacloud/exabox/exatest/agent/tests_mAddAgentWallet.py /main/3 2021/06/01 12:19:51 jfsaldan Exp $
+# $Header: ecs/exacloud/exabox/exatest/agent/tests_mAddAgentWallet.py /main/4 2026/01/19 09:31:06 jesandov Exp $
 #
 # tests_mAddAgentWallet.py
 #
-# Copyright (c) 2021, Oracle and/or its affiliates. 
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_mAddAgentWallet.py - <one-line expansion of the name>
@@ -57,6 +57,27 @@ class ebTestAgentWallet(ebTestClucontrol):
         # Create args structure
         _cmds = {
             self.mGetRegexVm(): [
+                [
+                    exaMockCommand(f"/usr/bin/mkdir -p {_dbcs_target_dir}", aRc=_rc_mkdir_dir),
+                    exaMockCommand(f"/usr/bin/mkdir -p {_cps_target_dir}", aRc=_rc_mkdir_dir),
+                    exaMockCommand(f"/usr/bin/chmod 700 {_dbcs_target_dir}", aRc=_rc_chmod_dir),
+                    exaMockCommand(f"/usr/bin/chmod 700 {_cps_target_dir}", aRc=_rc_chmod_dir),
+                    exaMockCommand(f"/usr/bin/chown opc:opc {_dbcs_target_dir}", aRc=_rc_chown_dir),
+                    exaMockCommand(f"/usr/bin/chown oracle:oinstall {_cps_target_dir}", aRc=_rc_chown_dir),
+                    exaMockCommand(f"/usr/bin/base64 -d {_dbcs_wallet_path}.b64 > {_dbcs_wallet_path}", aRc=0),
+                    exaMockCommand(f"/usr/bin/base64 -d {_cps_wallet_path}.b64 > {_cps_target_dir}", aRc=0),
+                    exaMockCommand(f"/usr/bin/shred {_dbcs_wallet_path}.b64 -vun 7", aRc=0),
+                    exaMockCommand(f"/usr/bin/shred {_cps_wallet_path}.b64 -vun 7", aRc=0),
+                    exaMockCommand(f"/usr/bin/shred {_dbcs_wallet_path}.b64 -vun 3", aRc=0),
+                    exaMockCommand(f"/usr/bin/shred {_cps_wallet_path}.b64 -vun 3", aRc=0),
+                    exaMockCommand(f"/usr/bin/chmod 700 {_dbcs_wallet_path}", aRc=0),
+                    exaMockCommand(f"/usr/bin/chmod 700 {_cps_wallet_path}", aRc=0),
+                    exaMockCommand(f"/usr/bin/chown opc:opc {_dbcs_wallet_path}", aRc=0),
+                    exaMockCommand(f"/usr/bin/chown oracle:oinstall {_cps_wallet_path}", aRc=0),
+                    exaMockCommand(f"/bin/scp .* {_dbcs_target_dir}"),
+                    exaMockCommand(f"/bin/scp .* {_cps_wallet_path}")
+
+                ],
                 [
                     exaMockCommand(f"/usr/bin/mkdir -p {_dbcs_target_dir}", aRc=_rc_mkdir_dir),
                     exaMockCommand(f"/usr/bin/mkdir -p {_cps_target_dir}", aRc=_rc_mkdir_dir),

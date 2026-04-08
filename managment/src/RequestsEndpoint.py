@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2022, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     RequestsHandler - Basic functionality
@@ -11,6 +11,8 @@ NOTE:
     None    
 
 History:
+    shapatna    02/09/2026 - Bug: 38900266 - Fix for issues pointed by Codev 
+                             in exabox/management directory
     hgaldame    10/27/2022 - 34738764 - ociexacc: exacc remoteec enhancements
                              for exacloud requests
     jesandov    26/03/2019 - File Creation
@@ -67,7 +69,21 @@ class RequestsEndpoint(BaseEndpoint):
                         _offset = self.mGetUrlArgs().pop(_key)
                     elif _key == "limit":
                         _limit  = self.mGetUrlArgs().pop(_key)
+            
             _limit = _default_limit_rows_exacc if _limit is None else _limit
+            
+            if isinstance(_limit, str):
+                try:
+                    _limit = int(_limit)
+                except Exception as exp:
+                    _limit = None
+                
+            if isinstance(_offset, str):
+                try:
+                    _offset = int(_offset)
+                except Exception as exp:
+                    _offset = None 
+
             _offset = _offset if _offset and _limit and _offset >= _limit else None
             _notCondition = self.__exacloudCmdBlackList if "cmdtype" not in self.mGetUrlArgs().keys() else None
             _requests = self.__database.mFilterRequests(self.mGetUrlArgs(), _limit, _offset, aNotCondition=_notCondition,

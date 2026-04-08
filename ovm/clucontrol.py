@@ -2,7 +2,7 @@
 """
 $Header: 
 
- Copyright (c) 2014, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     OVM - Basic functionality
@@ -21,10 +21,81 @@ NOTE:
 History:
 
        MODIFIED (MM/DD/YY)
+       jesandov  03/27/26 - 39060375: Fix post validation endpoint on RPM
+                            missing fields
+       jesandov  03/25/26 - Bug 38358445 - Secureboot
+       jesandov  03/23/26 - 39109980: Restore host_state endpoint
+       ririgoye  03/17/26 - Bug 39041356 - exacloud sop local remote execution
+                            will hang on large output
+       aypaul    03/16/26 - ER#38277507 Add selinux operation response to ec
+                            data.
+       avimonda  03/06/26 - Bug 38951559 - GCP: WF WAS STUCK DUE TO NFT RULES
+                            MISMATCHES ON DIFFERENT NODES
+       nyvn      03/05/26 - Bug 39028499 - EXACC - EXACLOUD UPDATES THE WRONG
+                            CLUSTER CONFIG DIR FOR CLUSTERS WITH SINGLE VM
+                            DURING REHOME
+       pbellary  03/04/26 - Bug 39037277 - CLUSTER XMLS GET BONDETH4 SET FOR BACKUP NETWORK CONFIGURATION INSTEAD OF BONDETH1
+       bhpati    03/02/26 - Bug 38959704 - OCI:CPU SCALE UP FAILED -
+                            VM_CPUCOUNT DYNAMIC RESIZE FAILED
+       aararora  02/27/26 - Bug 38902170: Correct resource leak issues
+       ajayasin  02/27/26 - 39018800:n-3,26ai:default gi support from UI
+       naps      02/25/26 - Bug 38984665 - handle vm operations during cell
+                            downtime.
+       vikasras 02/17/26 -  Bug 38782517 MEMRESHAPE | CRS SERVICES WERE NOT 
+                            RESTARTED IN ROLLING FASHION BETWEEN THE NODES 
+                            CAUSING OUTAGE
+       prsshukl  02/25/26 - Bug 39005447 - EXACS:25.4.1.1:ADBS ELASTIC
+                            SCALING:ADD VM FAILED AT POSTGINID: NO GI HOME
+                            FOUND IN DOMU STARTING THE VMBACKUP
+       prsshukl  03/04/25 - Bug 38828221: Copy customer Root CA for SSL Inspection enabled infra
+       pbellary  02/24/26 - Bug 38997265 - INFRA-PATCHING PRECHECKS FAILING WITH ERROR "INVALID XML: VAULT TAG IS MISSING IN INPUT XML"
+       aararora  02/17/26 - Bug 38944580: Reinstall dbaastools rpm after
+                            cprops.ini generation for exacc
+       avimonda  02/16/26 - Add patch-only comment
+       jesandov  02/11/26 - 38934422: Add flag to skip nft tables duplicationg
+                            call
+       mpedapro  02/09/26 - Enh::38914367 use domuId instead of domuname for
+                            sriov function
+       avimonda  02/06/26 - Bug 38904960 - OCI: EXADB-D DOMU OS PATCH PRECHECK
+                            FAILED WITH ECRA ERROR WHEN ADMIN CAVIUM IS DOWN
+       ririgoye  02/06/26 - Enh 38337110 - CLUSTERLESS PATCHING SHOULD CONNECT
+                            TO FREE NODES FROM PAYLOAD FOR EXACS SERVICE FOR
+                            EXACLOUD VALIDATION
+       joysjose  02/02/26 - Bug 38911199
+       kanmanic  02/02/26 - update vm_clusters_limit default
+       joysjose  01/29/26 - Fix cluster path join
+       aararora  01/27/26 - Bug 38723384: Add retry/force logic for crs restart
+       nyvn      01/22/26 - Bug 38876086 - EXACC - EXACLOUD RSYNC FOR
+                            CLUSTERSJSON DOES NOT HANDLE DELETION OF FILES
+       aypaul    01/16/26 - ER#38277264 SELinux fleet exacloud implementation
+       naps      01/16/26 - Bug 38843402 - skip old checks for dom0 min version
+                            of 18.2 .
+       jesandov  01/15/26 - 38775717: Access Agent Wallet after creating it
+       jesandov  01/08/26 - 38828218: Avoid raising an exception when there are
+                            not db created while checking for db is up
+       aararora  01/08/26 - Bug 38785417: Set the supported flag correctly if
+                            100 Gbps speed is unsupported
+       avimonda  12/18/25 - Bug 38740007: The payload's storageType key is
+                            nested under Params, causing the code to miss
+                            Exascale flag detection and default to ASM mode.
+       remamid   12/15/25 - skipping kvdbsync for resizecpu bug 3870532
+       abysebas  12/12/25 - ENH 38737846 - PHASE 1: HANDLE
+                            POSTPOWERMANAGEMENTTASK - UPDATE ECRA DB, POWER
+                            METRIC COLLECTIONS
+       vikasras  10/14/25 - Bug 38362546 - ADDVM FAILED WHEN ADDVM FOR NODE 1
+                            (PRIMARY IS ADDING) , ONLY SECONDARY NODE 2 IS AVAILABLE
+       jzandate  12/12/25 - Enh 38754947 - safe fallback exadbxs admin info
+       nelango   12/08/25 - Bug 38694209: Handle hostname with no digits
        prsshukl  12/01/25 - 38711578 - [EXACC EXACLOUD]: REMOVE
                             ENABLE_CA_SIGNED_CERTS FLAG FROM EXABOX.CONF
+       avimonda  11/26/25 - Bug 38632230: Bug 38632230 - GCP: EXACS:
+                            PROVISIONING FAILED WITH FILENOTFOUNDERROR: [ERRNO
+                            2] NO SUCH FILE OR DIRECTORY:
+                            'CLUSTERS/KQQ100319EXDDU1101KQQ100319EXDDU1201'
        ririgoye  11/26/25 - Bug 38636333 - EXACLOUD PYTHON:ADD INSTANTCLIENT TO
                             LD_LIBRARY_PATH
+       remamid   11/24/25 - Add a check for shmmall and shmmax vmset vmreboot
+                            bug 38626206
        jesandov  11/21/25 - 38677852: Remove log message on duplicated nft rules
        prsshukl  11/20/25 - Enh 38394526 - EXACC: SUPPORT PER DOMU DOMUCLIENT
                             CERTIFICATE DURING CREATE SERVICE, ADD NODE
@@ -32,11 +103,17 @@ History:
                             PYTHON WARNINGS
        prsshukl  11/20/25 - Bug 38675257 - EXADBXS PROVISIONING FAILING IN
                             FETCHUPDATEDXMLFROMEXACLOUD
+       shapatna  11/19/25 - Bug 38669143: Fix Parsing issue related
+                            to the creation of results zip file
+       bhpati    11/18/25 - Bug 38593631 - Exadata Cell Flashcache Missing
+                            After Cell Addition
        joysjose  11/18/25 - Bug 38665213 - EXACS: NEW NAMING FOR 23.26.0.0.0
                             CAUSING FAILURE IN POSTVMINSTALL STEP WHILE PARSING
                             DATE
        prsshukl  11/16/25 - Bug 36981808 - UT for ADBS PHASE 2 -> ELASTIC
        scoral    11/14/25 - Bug 38635624 - Use SCANPORT for IPv6 SCAN if available.
+       bhpati    11/13/25 - Bug 38467261 - Remove vm operation failed - ssh
+                            test to the vm failed during pre-check
        remamid   11/12/25 - Add an option to copy different dbaasapi payload to
                             each domu bug 38581933
        mpedapro  11/12/25 - Enh::38235082 Xml patching changes for sriov
@@ -308,7 +385,7 @@ from exabox.utils import common
 from exabox.tools.AttributeWrapper import wrapStrBytesFunctions
 import paramiko
 from paramiko.ssh_exception import SSHException
-from exabox.infrapatching.core.infrapatcherror import PATCHING_NODE_SSH_CHECK_FAILED, ebPatchFormatBuildError 
+from exabox.infrapatching.core.infrapatcherror import PATCHING_NODE_SSH_CHECK_FAILED, PATCHING_CONNECT_FAILED, ebPatchFormatBuildError 
 from exabox.core.Error import ebError, ExacloudRuntimeError, gReshapeError, gPartialError, gProvError, gNodeElasticError
 from exabox.core.Node import exaBoxNode, exaBoxNodePool
 from exabox.log.LogMgr import ebLogError, ebLogInfo, ebLogWarn, ebLogDebug, ebLogVerbose, ebLogJson, ebLogCritical, ebLogTrace, gLogMgrDirectory
@@ -338,7 +415,9 @@ from exabox.ovm.sysimghandler import (copyVMImageVersionToDom0IfMissing,
                                       mBuildVDisk,
                                       mCopySystemImgLocalToDOM0,
                                       mIsRtgImg,
-                                      mIsRtgImgPresent)
+                                      mIsRtgImgPresent,
+                                      mIsUefiImg,
+                                      mIsUefiImgPresent)
 from exabox.ovm.clumisc import (ebCluPreChecks, ebCluFetchSshKeys, 
                                 ebCluScheduleManager, ebCluCellValidate, 
                                 ebCluServerSshConnectionCheck, 
@@ -373,6 +452,8 @@ import getpass
 import fcntl
 import shutil
 import copy
+import io
+import tempfile
 from six.moves import urllib
 from typing import Any, Dict, List, Mapping, Sequence, Optional, Tuple, Set
 from exabox.network.NfTables import NfTables
@@ -481,7 +562,7 @@ from exabox.exadbxs.edv import get_hosts_edv_from_cs_payload, get_hosts_edv_stat
 from exabox.ovm.cluvmreconfig import mVMReconfig
 from exabox.ovm.vmboss import ebCluVmbackupObjectStore
 from exabox.ovm.userutils import ebUserUtils
-from exabox.ovm.utils.clu_utils import ebCluUtils
+from exabox.ovm.utils.clu_utils import ebCluUtils, mRunCrsCommandsWithRetry
 from exabox.network.NetworkUtils import NetworkUtils
 from exabox.ovm.clumisc import mWaitForSystemBoot, ebCluStorageReshapePrecheck
 from exabox.ovm.secureerase.secureerase import SecureErase
@@ -491,6 +572,7 @@ from exabox.ovm.clucommandhandler import CommandHandler
 from exabox.ovm.clucontrol_deprecated import ebCluControlDeprecated
 from exabox.ovm.cluacceleratednetwork import ebCluAcceleratedNetwork
 from exabox.ovm.adbs_elastic_service import exaBoxAdbs
+from exabox.ovm.selinuxcontrols import ebSelinuxControls
 
 
 DEVNULL = open(os.devnull, 'wb')
@@ -544,9 +626,6 @@ VM_MODE   = 1
 GI_MODE   = 2
 VMGI_MODE = 3
 
-#SELINUX Update return codes
-SELINUX_UPDATE_SUCCESS = 0
-
 CUSTOMUSERS = 'users_with_custom_id'
 CUSTOMGROUPS = 'groups_with_custom_id'
 
@@ -587,6 +666,7 @@ class exaBoxCluCtrl(object):
         self.__rack_size = None
         self.__fedramp = False
         self.__casignedcerts = False
+        self.__sslinspection = False
         self.__ut = False
         self.__exadata_images_map = {}
         self.__dyndepfiles = self.mReadDynDepConfig() #read only once, clone it if needed
@@ -666,7 +746,7 @@ class exaBoxCluCtrl(object):
         # 15 minutes default timeout for VM CPU resize
         _pvl = self.mCheckConfigOption('timeout_vmcpu_resize')
         if _pvl is not None:
-            self.__timeout_vmcpu_resize = int(_pvl)
+            self.__timeout_vmcpu_resize = int(_pvl) * 60
         else:
             self.__timeout_vmcpu_resize = 900
 
@@ -830,6 +910,11 @@ class exaBoxCluCtrl(object):
 
         self.__command_handler = CommandHandler(self)
         self.__cellInfo = {}
+
+        self.__selinux_controls = ebSelinuxControls(self)
+
+    def mGetSelinuxController(self):
+        return self.__selinux_controls
 
     def mGetCluCtrlDeprecateObj(self):
         return self.__cluCtrlDeprecatedObj
@@ -1256,9 +1341,31 @@ class exaBoxCluCtrl(object):
         if not aOptions:
             aOptions = self.mGetArgsOptions()
         if self.mIsOciEXACC() and aOptions is not None and aOptions.jsonconf is not None and 'caSignedCerts' in list(aOptions.jsonconf.keys()) and aOptions.jsonconf['caSignedCerts']:
-            ebLogInfo("*** caSignedCerts FEATURE ENABLE")
+            ebLogTrace("*** caSignedCerts FEATURE ENABLE")
             self.__casignedcerts = True
         return self.__casignedcerts
+
+    def mIsSslInspectionEnabled(self, aOptions=None):
+        self.__sslinspection = False
+        if not aOptions:
+            aOptions = self.mGetArgsOptions()
+        if self.mIsOciEXACC():
+            _key_store = "/opt/oci/exacc/exacloud/dbcli/bin/mkstore"
+            _wallet_loc = "/opt/oci/exacc/config/wallet/"
+            _ssl_inspection_flag = "sslInspectionEnabled"
+
+            if os.path.exists(_key_store) and os.path.exists(_wallet_loc):
+                _rc, _, _out, _err = self.mExecuteLocal(f'{_key_store} -wrl {_wallet_loc} -viewEntry "{_ssl_inspection_flag}" -nologo')
+                if _rc == 0:
+                    _output = _out.strip()
+                    _val = _output.split("=")[1].strip()
+                    if _val.lower() == "true":
+                        self.__sslinspection = True
+                        ebLogTrace("sslInspection is enabled for the infra")
+                else:
+                    ebLogTrace("sslInspection is disabled for the infra")
+            
+        return self.__sslinspection
 
     def mIs19cVMGI(self):
         return self.__19cVMGI
@@ -3693,6 +3800,67 @@ class exaBoxCluCtrl(object):
         #coreDumpUtil = ebCoredumpUtil(doms=self.mReturnDom0DomUPair(), payload=aOptions.jsonconf)
         #coreDumpUtil.mRunCoredumpUtil()
 
+    def mRefreshSysctl(self, aNode, aFile):
+
+        _rc = 0
+        _retryCount = 3
+        _backOff = 3
+        _cmdTimeout = 300
+
+        _confRetryCount = self.mCheckConfigOption('sysctl_refresh_retry_count')
+        if _confRetryCount is not None:
+            try:
+                _retryCount = int(_confRetryCount)
+            except ValueError:
+                ebLogWarn(f"Invalid sysctl_refresh_retry_count '{_confRetryCount}', using default {_retryCount}")
+
+
+        _confBackoff = self.mCheckConfigOption('sysctl_refresh_retry_backoff')
+        if _confBackoff is not None:
+            try:
+                _backOff = int(_confBackoff)
+            except ValueError:
+                ebLogWarn(f"Invalid sysctl_refresh_retry_backoff '{_confBackoff}', using default {_backOff}")
+
+
+        _confTimeout = self.mCheckConfigOption('sysctl_refresh_timeout')
+        if _confTimeout is not None:
+            try:
+                _cmd_timeout = int(_confTimeout)
+            except ValueError:
+                ebLogWarn(f"Invalid sysctl_refresh_timeout '{_confTimeout}', using default {_cmdTimeout}")
+
+
+        _sysctl = node_cmd_abs_path_check(aNode, "sysctl", sbin=True)
+        _cmd = f"{_sysctl} -p {aFile}"
+
+        for _attempt in range(1, _retryCount + 1):
+
+            _isLastAttempt = (_attempt == _retryCount)
+
+            _rc, _, _ = node_exec_cmd(
+                aNode, _cmd, log_stdout_on_error=_isLastAttempt,
+                timeout=_cmdTimeout)
+            if _rc == 0:
+                return _rc
+
+            ebLogError(f"The {_cmd} returned error on attempt {_attempt} on host {aNode.mGetHostname()}")
+            if _isLastAttempt:
+                try:
+                    _fileContents = node_read_text_file(aNode, aFile)
+                except Exception as exc:
+                    ebLogWarn(
+                        f"Unable to read {aFile} on host "
+                        f"{aNode.mGetHostname()}: {exc}")
+                else:
+                    ebLogError(
+                        f"Contents of {aFile} on host {aNode.mGetHostname()}:\n"
+                        f"{_fileContents}")
+            else:
+                time.sleep(_backOff)
+
+        return _rc
+
 
     def mSetSysCtlConfigValue(self, aNode, aConfigName, aConfigValue, aRaiseException=True, aInstantApply=True, aValidate=True):
 
@@ -3724,10 +3892,8 @@ class exaBoxCluCtrl(object):
         
         # Refresh the sysctl
         if aInstantApply:
-            _cmd = f"/usr/sbin/sysctl -p {_file}"
-            aNode.mExecuteCmd(_cmd, aTimeout=300)
-            if aNode.mGetCmdExitStatus():
-                ebLogError(f'{_cmd} returned error')
+            _ret = self.mRefreshSysctl(aNode, _file)
+            if _ret:
                 return False
 
         # Get the current value after the refresh
@@ -4677,7 +4843,7 @@ class exaBoxCluCtrl(object):
             ebLogInfo('*** JSON Payload dbParams saved as: '+_config_name)
             for _k in list(_dict.keys()):
                 if not self.IsZdlraProv() and "passwd" in _k and _dbagent_wallet_loc and _dict[_k]:
-                    _wallet_key = self.mAddWalletEntry(_key_store, _dbagent_wallet_loc, _k, _dict[_k])
+                    _wallet_key = self.mAddWalletEntry(_key_store, _dbagent_wallet_loc, _k, _dict[_k], aAccessWallet=True)
                     _password = self.mGetWalletViewEntry(_wallet_key)
                     if _password == _dict[_k]:
                         ebLogInfo('*** Add Wallet Entry success')
@@ -5248,10 +5414,34 @@ class exaBoxCluCtrl(object):
         if self.mIsExaScale():
             return {}
 
+        _jconf = None
+        if self.__options and self.__options.jsonconf:
+            _raw = self.__options.jsonconf
+            if isinstance(_raw, dict):
+                _jconf = _raw
+            elif isinstance(_raw, str):
+                try:
+                    with open(_raw, "r", encoding="utf-8") as f:
+                        _jconf = json.load(f)
+                except (OSError, json.JSONDecodeError):
+                    try:
+                        _jconf = json.loads(_raw)
+                    except json.JSONDecodeError:
+                        _jconf = None
+            else:
+                _jconf = None
+
+        _excluded_node_list = self.mGetExcludedList()
+        _allowed_node_list = _jconf.get("StorageNodeList", []) if isinstance(_jconf, dict) else []
+
         if aIsClusterLessXML:
-            _excluded_node_list = self.mGetExcludedList()
             _data={}
-            for _cell in self.mReadCellMachines():
+
+            _cell_list = self.mReadCellMachines()
+            if len(_allowed_node_list) > 0:
+                _cell_list = [_c for _c in _cell_list if _c in _allowed_node_list]
+
+            for _cell in _cell_list:
                 if _cell not in _excluded_node_list:
                     _data[_cell]=[]
             return _data
@@ -5275,6 +5465,12 @@ class exaBoxCluCtrl(object):
                 _mac_list = _dg.mGetDiskGroupMachines()
                 for _mac in _mac_list:
                     _cell_dict[_mac] = None
+
+        # Filter cells if allowed list has a length of more than zero
+        if _allowed_node_list:
+            _cell_dict = {k: v for k, v in _cell_dict.items() if k in _allowed_node_list}
+        if _excluded_node_list:
+            _cell_dict = {k: v for k, v in _cell_dict.items() if k not in _excluded_node_list}
 
         _cell_data = {}
         for _cellname in list(_cell_dict.keys()):
@@ -6636,8 +6832,15 @@ class exaBoxCluCtrl(object):
                 _mac_id = _get_mac_id(_dpairs[1][0])
 
             if _vlan_id == '':
-                _ret = ''.join(filter(str.isdigit, str(_dpairs[0][1]))).replace('0','')[-3:]
-                _id = _ret[0]
+                #Bug 38694209 - Prevent crashing when _dpairs[0][1] has only zeros or no digits
+                #and derive a safe suffix by computing SHA-224 hash for digitless hostnames.
+                _numeric = ''.join(filter(str.isdigit, str(_dpairs[0][1]))).replace('0', '')
+                if _numeric:
+                    _id = _numeric[-3:][0]
+                else:
+                    _digest_byte = hashlib.sha224(str(_dpairs[0][1]).encode('utf-8')).digest()[0]
+                    _id = str((_digest_byte % 9) + 1)
+                    ebLogInfo(f"*** Hostname {_dpairs[0][1]} has no digits; derived CKM suffix {_id} from SHA-224 hash")
             else:
                 _id = _vlan_id[0]
 
@@ -8099,6 +8302,7 @@ class exaBoxCluCtrl(object):
         vmImageVersionNum = ""
         _all_dom0s_same_version = False
         _all_dom0s_are_rtg_compat = False
+        _all_dom0s_are_uefi_compat = False
         _enforceRtg = False
         
         dom0sImagesVersion = mGetDom0sImagesListSorted(self)
@@ -8123,12 +8327,17 @@ class exaBoxCluCtrl(object):
         if self.mIsKVM():
             # If aCustomVersion is NOT RTG, then it has precedence over the infra
             if (aCustomVersion is None) \
-            or (aCustomVersion and mIsRtgImg(aCustomVersion)):
+            or (aCustomVersion and mIsRtgImg(aCustomVersion)) \
+            or (aCustomVersion and mIsUefiImg(aCustomVersion)):
                 # Dom0's may have slight diff images, such as 24.1 or 24.2
                 # As long as ALL are Greater Than 24.0, these will be RTG compatible
                 if all( mIsRtgImg(img) for img in dom0sImagesVersion ):
                     ebLogInfo(f"All dom0s are rtg compat")
                     _all_dom0s_are_rtg_compat = True
+                
+                if all( mIsUefiImg(img) for img in dom0sImagesVersion ):
+                    ebLogInfo(f"All dom0s are uefi compat")
+                    _all_dom0s_are_uefi_compat = True
                 
                 # At this point it is known if the infra supports RTG, but it is
                 # also required to verify if the RTG file exists somewhere.
@@ -8138,14 +8347,23 @@ class exaBoxCluCtrl(object):
                 if not isRtgImgPresentInDom0s and not isRtgImgPresentInLocal:                     
                     _all_dom0s_are_rtg_compat = False
                 
+                isUefiImgPresentInDom0s, isUefiImgPresentInLocal = \
+                    mIsUefiImgPresent(self,vmImageVersionNum)
+                if not isUefiImgPresentInDom0s and not isUefiImgPresentInLocal:
+                    _all_dom0s_are_uefi_compat = False
+                    if self.mCheckConfigOption('uefi_enforced').upper() == "TRUE":
+                        _msg = f"UEFI image is required to proceed: {vmImageVersionNum}"
+                        raise ExacloudRuntimeError(0x0730, 0xA, _msg)
+
+
                 # Making sure that if all the dom0s are rtg compatible then, rtg image is picked up.
-                if _all_dom0s_are_rtg_compat:
+                if _all_dom0s_are_rtg_compat or _all_dom0s_are_uefi_compat:
                     _enforceRtg = True
         else:
             ebLogInfo("XEN detected, RTG logic does NOT apply. Use IMG.")
 
         # Copy minimal image to images folder
-        _imgName = formatVMImageBaseName(vmImageVersionNum, False, _all_dom0s_are_rtg_compat)
+        _imgName = formatVMImageBaseName(vmImageVersionNum, False, _all_dom0s_are_rtg_compat, _all_dom0s_are_uefi_compat)
         _imgNameXML = formatVMImageBaseName(vmImageVersionNum, False, False)
         _Dom0sWithImg = mSearchImgInDom0s(self,_imgName)
         
@@ -8161,7 +8379,8 @@ class exaBoxCluCtrl(object):
             # and the rtg.img file is NOT present in all Dom0s
             # and the rtg image is present in one Dom0 at least
             # then we need to ensure this particular rtg is copied
-            if _all_dom0s_are_rtg_compat and len(_Dom0sWithImg) != len(dom0sImagesVersion):
+            if (_all_dom0s_are_rtg_compat or _all_dom0s_are_uefi_compat) and \
+               len(_Dom0sWithImg) >= 1:
                 _enforceRtg = True
             
             mCopySystemImgLocalToDOM0(self, vmImageVersionNum, _Dom0sWithImg, _enforceRtg)
@@ -8526,7 +8745,7 @@ class exaBoxCluCtrl(object):
         for _cell in _cell_list:
             if self.mIsOciEXACC() and self.mIsFedramp():
                 _rc, _str = self.mMakeFipsCompliant(self.__options, aHost=_cell)
-            elif self.mGetSELinuxMode("cell") and self.mIsHostOL8(_cell) and not self.mIsOciEXACC():
+            elif self.__selinux_controls.mGetSELinuxMode("cell") and self.mIsHostOL8(_cell) and not self.mIsOciEXACC():
                 _rc, _str = self.mMakeFipsCompliant(self.__options, aHost=_cell)
             else:
                 _rc, _str = self.mMakeFipsCompliant(self.__options, aHost=_cell, aSshConfOnly=True)
@@ -8535,12 +8754,12 @@ class exaBoxCluCtrl(object):
                 _reboot_set.add(_cell)
 
         if self.__cmd not in ["vmgi_reshape", "elastic_cell_update"] and self.__options.jsonconf:
-            _sestatus = self.mGetSELinuxMode("cell")
+            _sestatus = self.__selinux_controls.mGetSELinuxMode("cell")
             if _sestatus:
                 for _cell in _cell_list:
                     _node = exaBoxNode(get_gcontext())
                     _node.mConnect(aHost=_cell)       
-                    if self.mSetSeLinux(_node, _sestatus, "cell"):
+                    if self.__selinux_controls.mSetSeLinux(_node, _sestatus, "cell"):
                         _reboot_set.add(_cell)
                     _node.mDisconnect()
             else:
@@ -8551,13 +8770,56 @@ class exaBoxCluCtrl(object):
         if _reboot_set:
             self.mRebootNodesIfNoVMExists(_reboot_set, "cell")
 
+    def mCompileSelinuxResponse(self):
+
+        def _mUpdateRequestData(aDataD):
+            _data_d = aDataD
+            _reqobj = self.mGetRequestObj()
+            if _reqobj is not None:
+                if _reqobj.mGetData() != 'Undef':
+                    _existing_data_dict = None
+                    #Current expectation from data field is that it is either Undef or a json string.
+                    #If this is not a string we overwrite and send the selinux response only.
+                    try:
+                        _existing_data_dict = json.loads(_reqobj.mGetData())
+                        _data_d |= _existing_data_dict
+                    except (json.JSONDecodeError, ValueError) as e:
+                        ebLogWarn("JSONDecodeError while compiling selinux response, defaulting to selinux response only.")
+
+                _reqobj.mSetData(json.dumps(_data_d))
+                _db = ebGetDefaultDB()
+                _db.mUpdateRequest(_reqobj)
+
+
+        if len(self.__selinux_controls.mGetSELinuxStatusForClusterOperations()) == 0:
+            ebLogWarn("No SELinux operations were performed during this cluster operation.")
+        else:
+            ebLogTrace(f"SELinux operation status: {self.__selinux_controls.mGetSELinuxStatusForClusterOperations()}")
+            _compiled_status = {}
+            for _operation_status in self.__selinux_controls.mGetSELinuxStatusForClusterOperations():
+                if "componentType" in _operation_status:
+                    _component = _operation_status["componentType"]
+                    if _component not in _compiled_status:
+                        _compiled_status[_component] = {"nodeStatus": list()}
+                    _node_status = {"hostname": _operation_status["hostname"], "status" : {"modeUpdate": _operation_status["modeUpdate"], "selinuxStatus": _operation_status["selinuxStatus"]}}
+                    _compiled_status[_component]["nodeStatus"].append(_node_status)
+
+            _ec_data_info = {"sestatus": list()}
+            for _component in _compiled_status:
+                _component_status = copy.deepcopy(_compiled_status[_component])
+                _component_status["componentType"] = _component
+                _ec_data_info["sestatus"].append(_component_status)
+
+            ebLogTrace(f"SELinux configuration status: {_ec_data_info}")
+            _mUpdateRequestData(_ec_data_info)
+
     # These checks are especially needed on multi-VM racks
     #
     def mCheckDom0Resources(self, aOptions):
 
             _sestatus = None
             if self.__options.jsonconf:
-                _sestatus = self.mGetSELinuxMode("dom0")
+                _sestatus = self.__selinux_controls.mGetSELinuxMode("dom0")
 
 
 
@@ -8570,7 +8832,7 @@ class exaBoxCluCtrl(object):
             def _mConfigFipsSelinux(aDom0, aRebootlist):
                 _dom0 = aDom0
                 _reboot_list = aRebootlist
-                _node = exaBoxNode(get_gcontext())
+
                 with connect_to_host(_dom0, get_gcontext()) as _node:
                 # Put ADB-S Marker in Dom0s if applicable
                     self.mCreateVnumaMarker(aOptions, _dom0)
@@ -8578,13 +8840,6 @@ class exaBoxCluCtrl(object):
                     if _str == "reboot_host":
                         _reboot_list.append(_dom0)
                         ebLogInfo('need to reboot host')
-
-                #SE LINUX check
-                    if self.__cmd not in ["vmgi_reshape", "elastic_cell_update"] and _sestatus is not None:
-                        if self.mSetSeLinux(_node, _sestatus, "dom0"):
-                            _reboot_list.append(_dom0)
-                    else:
-                        ebLogWarn("*** se_linux key not present")
 
                     if not self.mIsKVM():
 
@@ -8638,6 +8893,15 @@ class exaBoxCluCtrl(object):
             _plist.mJoinProcess()
 
             _reboot_set = set(_reboot_list)
+            #Need to keep this SELinux check out of multiprocessing for data race conditions.
+            for _dom0, _ in self.mReturnDom0DomUPair():
+                with connect_to_host(_dom0, get_gcontext()) as _connected_node:
+                    if self.__cmd not in ["vmgi_reshape", "elastic_cell_update"] and _sestatus is not None:
+                        if self.__selinux_controls.mSetSeLinux(_connected_node, _sestatus, "dom0"):
+                            _reboot_set.add(_dom0)
+                    else:
+                        ebLogWarn("*** se_linux key not present")
+
             # Reboot the dom0s if single VM or log banner to advertise reboot is needed to apply SELinux changes
             if _reboot_set:
                 self.mRebootNodesIfNoVMExists(_reboot_set, "dom0")
@@ -8647,7 +8911,7 @@ class exaBoxCluCtrl(object):
                 if self.mCheckConfigOption('vm_clusters_limit') is not None:
                     _vm_clusters_limit = self.mCheckConfigOption('vm_clusters_limit')
                 else:
-                    _vm_clusters_limit = 24
+                    _vm_clusters_limit = 173
 
                 _numVMs = self.mCheckNumVM()
                 if (_numVMs == -1) or (_numVMs >= int(_vm_clusters_limit)):
@@ -9160,6 +9424,12 @@ class exaBoxCluCtrl(object):
 
 
     def mCheck19cCapableComputeImage(self):
+
+        if self.mCheckConfigOption('skip_min_dom0version_check', 'True'):
+            #All Dom0s are now more than 18.2
+            self.__over18cSupported = True
+            ebLogTrace(f'*** Skipping mCheck19cCapableComputeImage !')
+            return True
 
         _minversion = '182000'
         _dom0s = list(map(operator.itemgetter(0),self.mReturnDom0DomUPair()))
@@ -9890,7 +10160,7 @@ IPV6INIT=no"""
         return 0
 
 
-    def mSetupNatNfTablesOnDom0v2(self, aMode=False, aDom0s=None):
+    def mSetupNatNfTablesOnDom0v2(self, aMode=False, aDom0s=[]):
 
         def mConfigureRulesDom0(aDom0):
 
@@ -9908,7 +10178,7 @@ IPV6INIT=no"""
             if self.mCheckConfigOption('vm_clusters_limit') is not None:
                 _vm_clusters_limit = int(self.mCheckConfigOption('vm_clusters_limit'))
             else:
-                _vm_clusters_limit = 24
+                _vm_clusters_limit = 173
 
             # ExaDB-D flow
             if self.__exabm or not self.__shared_env:
@@ -10118,7 +10388,11 @@ IPV6INIT=no"""
                         ebLogTrace(f"Rule already exists: {_rule}")
 
                 # Remove duplicated Rules
-                nftObj.mDeleteDuplicateNFTRules(_node)
+                if self.mIsExaScale():
+                    if not self.mCheckConfigOption('skip_nft_duplicates_check', 'True'):
+                        nftObj.mDeleteDuplicateNFTRules(_node)
+                else:
+                    nftObj.mDeleteDuplicateNFTRules(_node)
 
                 #
                 # Commit/Save rules for NFT table v4/v6
@@ -10141,14 +10415,12 @@ IPV6INIT=no"""
         # Parallel Execution
         _plist = ProcessManager()
 
-        for _dom0, _domU in self.mReturnDom0DomUPair():
-            if aDom0s and _dom0 in aDom0s:
-
-                _p = ProcessStructure(mConfigureRulesDom0, [_dom0])
-                _p.mSetMaxExecutionTime(-1) # No timeout
-                _p.mSetJoinTimeout(5)
-                _p.mSetLogTimeoutFx(ebLogWarn)
-                _plist.mStartAppend(_p)
+        for _dom0 in aDom0s:
+            _p = ProcessStructure(mConfigureRulesDom0, [_dom0])
+            _p.mSetMaxExecutionTime(-1) # No timeout
+            _p.mSetJoinTimeout(5)
+            _p.mSetLogTimeoutFx(ebLogWarn)
+            _plist.mStartAppend(_p)
 
         _plist.mJoinProcess()
 
@@ -11549,9 +11821,9 @@ IPV6INIT=no"""
             _node.mResetHostKey(aHost=_domu)
             _node.mConnect(aHost=_domu)
 
-            _sestatus = self.mGetSELinuxMode("domU")
+            _sestatus = self.__selinux_controls.mGetSELinuxMode("domu")
             if self.__cmd not in ["vmgi_reshape", "elastic_cell_update"] and _sestatus is not None:
-                self.mSetSeLinux(_node, _sestatus, "domU")
+                self.__selinux_controls.mSetSeLinux(_node, _sestatus, "domU")
             else:
                 ebLogWarn("*** se_linux key not present")
 
@@ -11735,18 +12007,34 @@ IPV6INIT=no"""
             #
             # Check if Flash Cache is enabled
             #
+            _flashcache_enabled = True
             _cmd = 'cellcli -e list flashcache attributes name,size'
             _node=exaBoxNode(get_gcontext(), Cluctrl = self)
             _node.mConnect(aHost=_cell)
             _i, _o, _e = _node.mExecuteCmdCellcli(_cmd)
             _output = _o.readlines()
             if _output is None or not len(_output):
+                _flashcache_enabled = False
                 ebLogWarn('*** FlashCache is not enabled on the Cell: %s' % (_cell))
                 if self.mCheckConfigOption('force_flashcache_pcs','True'):
                     _node.mDisconnect()
                     return False
             else:
                 ebLogInfo('*** Cell %s FlashCache enabled' % (_cell))
+
+            #
+            # Check if Flashlog is enabled
+            #
+            _flashlog_enabled = True
+            _cmd = 'cellcli -e list flashlog attributes name,size'
+            _i, _o, _e = _node.mExecuteCmdCellcli(_cmd)
+            _output = _o.readlines()
+            if _output is None or not len(_output):
+                _flashlog_enabled = False
+                ebLogWarn('*** Flashlog is not enabled on the Cell: %s' % (_cell))
+            else:
+                ebLogInfo('*** Cell %s Flashlog enabled' % (_cell))
+
             #
             # Check WriteBack Cache enabled
             #
@@ -11759,15 +12047,22 @@ IPV6INIT=no"""
                     k,v = _status.split(':')
                     k = k.strip()
                     v = v.strip()
-                    _status_dict[k] = v
-            _node.mDisconnect()
+                    _status_dict[k] = v            
             # flashCacheMode
             if 'flashCacheMode' in list(_status_dict.keys()) and _status_dict['flashCacheMode'].upper() == 'WRITEBACK':
                 ebLogInfo('*** Cell already setup with flashCacheMode to writeback')
+                if not _flashlog_enabled:
+                    #default size is 512MB if size not specified
+                    _node.mExecuteCmdLog('cellcli -e create flashlog all')
+                if not _flashcache_enabled:
+                    ebLogInfo(f"*** Creating flashcache on the cell: {_cell}")
+                    _node.mExecuteCmdLog('cellcli -e create flashcache all')
+                _node.mDisconnect()
                 return True
             else:
                 if self.__debug:
                     ebLogInfo('*** Cell flashCacheMode was not set. Review log for additional information')
+                _node.mDisconnect()
                 return False
 
         _plist = ProcessManager()
@@ -13367,13 +13662,11 @@ IPV6INIT=no"""
                         ebLogInfo(f"Missing GI Home for DB: {aDBName}")
                         return None, None, None
 
-                    _cmd = ("/bin/cat /var/opt/oracle/creg/grid/grid.ini "
-                            "| /bin/grep \"^oracle_home\" "
-                            "| /bin/cut -d '=' -f 2")
-                    _gi_home = node_exec_cmd(_node, _cmd).stdout.strip()
+                    # For ADBS, /etc/oratab is always present with the correct value
+                    _gi_home,_ = self.__ADBSobj.mGetGridHome(_domU)
 
                     if _gi_home:
-                        ebLogInfo(f"*** GI Home {_gi_home} found from grid.ini in {_domU}")
+                        ebLogInfo(f"*** GI Home {_gi_home} found from /etc/oratab in {_domU}")
                     else:
                         ebLogWarn(f"*** No GI Home found in {_domU} !!!")
                         return None, None, None
@@ -13652,9 +13945,14 @@ IPV6INIT=no"""
             ebLogInfo("Using GI from command line: {0}".format(_gi_version))
 
         else:
-
-            # check first domU is connectable
-            _domU = self.mReturnDom0DomUPair()[0][1]
+            _domU=""
+            if self.__cmd == 'vmgi_reshape':
+                _options = self.mGetArgsOptions()
+                _reshape = ebCluReshapeCompute(self, _options)
+                _domU = _reshape.mGetSrcDomU()
+            else:            
+                # check first domU is connectable
+                _domU = self.mReturnDom0DomUPair()[0][1]
 
             _node = exaBoxNode(get_gcontext())
             if _node.mIsConnectable(aHost=_domU):
@@ -13981,7 +14279,11 @@ IPV6INIT=no"""
         #
         # Apply Basesystem changes
         #
-        self.mBaseSystemConfiguration(aOptions)
+        if aOptions and self.mGetCmd() == "vm_cmd" and aOptions.vmcmd and ebVmCmdCheckOptions(aOptions.vmcmd, ['skip_basesystem_config']):
+            #we dont need to do this for vm operations like cpuresize, start and shutdown.
+            ebLogTrace(f'skipping base system configuration')
+        else:
+            self.mBaseSystemConfiguration(aOptions)
 
         #
         # Save new XML Cluster configuration file
@@ -14086,13 +14388,13 @@ IPV6INIT=no"""
         ebLogVerbose("Save XML Cluster Configuration")
         #
         # Create Cluster directory (only if not yet created)
-        #
+        # safely, even with parallel runs.
+
         self.__cluster_path = 'clusters/'+self.__key
         _dir = self.__cluster_path
-        try:
-            os.stat(_dir)
-        except:
-            os.makedirs(_dir)
+
+        os.makedirs(_dir, exist_ok=True)
+
             # VGE: MVM-Todo, copy keys from AdminXML/keys directory
 
         # Lock will be applicable only when the clean_cluster_folder operation is enabled in exabox.conf
@@ -14160,13 +14462,27 @@ IPV6INIT=no"""
         # Check if XML has already been saved (check hash prefix)
         #
         _path  = None
-        _ld = os.listdir(_dir)
-        for _e in _ld:
-            if _e.split('_')[0] == _hash:
-                _path  = _e
-                self.__patchconfig = _dir+'/'+_path
-                break
-        if _path is None or self.mIsExaScale() or self.mIsXS():
+        if self.mIsExaScale():
+            _path = _dir+'/'+_hash+'_'+str(uuid.uuid1())+'.xml'
+            self.__patchconfig = _path
+            self.__config.mWriteConfig(_path)
+        else:
+            _bytes = None
+            _ld = os.listdir(_dir)
+            for _e in _ld:
+                if _e.split('_')[0] == _hash:
+                    _file_path = os.path.join(_dir, _e)
+                    # Verify the file really matches the hash value received from ecra
+                    with open(_file_path, "rb") as f:
+                        _bytes = f.read()
+                    _file_hash = hashlib.sha256(_bytes).hexdigest()
+                    ebLogTrace(f"ECRA XML HASH VALUE:{_hash}")
+                    ebLogTrace(f"HASH VALUE of XML from cluster directory:{_file_hash}")
+                    if _file_hash == _hash:
+                        _path  = _e
+                        self.__patchconfig = _dir+'/'+_path
+                        break
+        if _path is None or self.mIsXS():
             _path = _dir+'/'+_hash+'_'+str(uuid.uuid1())+'.xml'
             self.__patchconfig = _path
             self.__config.mWriteConfig(_path)
@@ -14174,7 +14490,7 @@ IPV6INIT=no"""
         # Make sure to return absolute path
         #
         self.__patchconfig = os.getcwd() + '/' + self.__patchconfig
-        self.__cluster_path = self.mGetBasePath() + '/clusters/'+self.__key
+        self.__cluster_path = os.path.join(self.mGetBasePath(), 'clusters', self.__key)
         #
         # Update XML path in request obj
         #
@@ -14327,7 +14643,7 @@ IPV6INIT=no"""
         if _config['remote_cps_host'] is not None and _is_cps_sw_upgrade_running is False:
             _remote_cps_host = _config['remote_cps_host']
             ebLogInfo('*** Syncing clustersjson folder to the remote node {0}'.format(_remote_cps_host))
-            _cmd = '/bin/rsync -e "ssh -o StrictHostKeyChecking=no" -avzr {0}/clustersjson {1}:{0}'.format(os.path.abspath('clusters/'), _remote_cps_host)
+            _cmd = '/bin/rsync --delete -e "ssh -o StrictHostKeyChecking=no" -avzr {0}/clustersjson {1}:{0}'.format(os.path.abspath('clusters/'), _remote_cps_host)
             self.mExecuteLocal(_cmd, aStdOut=DEVNULL, aStdErr=DEVNULL)
 
     #Function to add error code to DB
@@ -14511,9 +14827,12 @@ IPV6INIT=no"""
         if _jconf is not None:
             if 'excludeNodeList' in _jconf and _jconf['excludeNodeList']:
                 return _jconf['excludeNodeList']
+            elif 'AdditionalOptions' in _jconf:
+                for _option_dict in _jconf["AdditionalOptions"]:
+                    if "ExcludedNodeList" in _option_dict.keys():
+                        return _option_dict["ExcludedNodeList"]
             else:
                 return []
-
         return []
 
     def mReadBaseDBdom0domU(self):
@@ -14535,23 +14854,49 @@ IPV6INIT=no"""
         if self.isBaseDB() or self.isExacomputeVM():
             return self.mReadBaseDBdom0domU()
 
+        # Get filter if present in the payload
+        _jconf = None
+
+        if self.__options and self.__options.jsonconf:
+            _raw = self.__options.jsonconf
+            if isinstance(_raw, dict):
+                _jconf = _raw
+            elif isinstance(_raw, str):
+                try:
+                    with open(_raw, "r", encoding="utf-8") as f:
+                        _jconf = json.load(f)
+                except (OSError, json.JSONDecodeError):
+                    try:
+                        _jconf = json.loads(_raw)
+                    except json.JSONDecodeError:
+                        _jconf = None
+            else:
+                _jconf = None
+                
+        _allowed = _jconf.get("ComputeNodeList", []) if isinstance(_jconf, dict) else []
+        _excluded_node_list = self.mGetExcludedList()
+
         if aIsClusterLessXML:
             _dom0List = self.mReadComputes()
+            
             def _generateDummy(aDom0):
                 _pos = aDom0.find('.')
                 return [aDom0, aDom0[:_pos] + 'dummydomu' + aDom0[_pos:]]
+
             if aRetDummyDomu:
                 _orig_node_list = [_generateDummy(_dom0) for _dom0 in _dom0List]
             else:
                 _orig_node_list = []
                 for _dom0 in _dom0List:
                     _orig_node_list.append([_dom0, ""])
+
+            if len(_allowed) > 0:
+                _orig_node_list = [[_dom0, _domU] for _dom0, _domU in _orig_node_list if _dom0 in _allowed]
+
             if aExcludeNodeList:
                 _excluded_node_list = aExcludeNodeList
-            else:
-                _excluded_node_list = self.mGetExcludedList()
 
-            return list(filter(lambda x: x[0] not in _excluded_node_list,_orig_node_list))
+            return list(filter(lambda x: x[0] not in _excluded_node_list, _orig_node_list))
 
 
         # If aClusterId is not defined return the first cluster
@@ -14579,6 +14924,12 @@ IPV6INIT=no"""
                     _dom0 = _ml[_m].mGetMacHostName()
                     _host = _mac_config.mGetMacHostName()
                     _ddpair.append([_dom0, _host])
+
+        # Filter dom0s if allowed list has a length of more than zero
+        if _allowed:
+            _ddpair = list(filter(lambda x: x[0] in _allowed, _ddpair))
+        if _excluded_node_list:
+            _ddpair = list(filter(lambda x: x[0] not in _excluded_node_list))
 
         if self.mIsXmlElasticShape():
             self.__domus_dom0s[clusterId] = _ddpair
@@ -15684,6 +16035,14 @@ IPV6INIT=no"""
         if not self.__ociexacc or not self.mIsExaCCMasterCPS():
             return 
         
+        #use program_arguments.conf to control kvdb sync
+        _options = aOptions or self.mGetArgsOptions()
+
+        if self.__cmd == 'vm_cmd' and _options is not None:
+            _vmcmd = getattr(_options, 'vmcmd', None)
+            if _vmcmd and ebVmCmdCheckOptions(_vmcmd, ['no_kvdb_sync']):
+                ebLogInfo(f"*** Skipping KVDB sync for vm_cmd: {_vmcmd}")
+                return
         # Sync exakv.db file in standby CPS
         ebLogInfo("Running mSyncKVDBOverNetworkSend, this could take a while")
         return ExaKmsEndpoint(aOptions).mSyncKVDBSend()
@@ -17122,8 +17481,8 @@ IPV6INIT=no"""
         self.mSetStorageDesc(ebCluStorageDesc(self.__config))
 
         # Saves the config xml in clusters/CC'/
-        self.mSaveXMLClusterConfiguration()
         self.mBuildClusterId(aForce=True)
+        self.mSaveXMLClusterConfiguration()
 
     # The function executes the steps preparatory for VM installation.
     #
@@ -17600,93 +17959,77 @@ IPV6INIT=no"""
         raises ExacloudRuntimeError
         """
 
-        def executeOrRaise(aNode: exaBoxNode, aDomU: str, aCmd: str) -> None:
-            """
-            Helper function
-            This function will execute aCmd on an already connected aNode
-            If cmd returns non-zero code, it will raise ExacloudRuntimeError
-            and will close aNode connection
-            """
-            _, _o, _e = _node.mExecuteCmd(aCmd)
-            _rc = _node.mGetCmdExitStatus()
-            if _rc:
-                _messages = '\n'.join(_o.readlines())+'\n'.join(_e.readlines())
-                _err_msg = (f"Failed to create wallet in {aDomU}. "
-                            f"Command '{aCmd}' failed with exit code {_rc}, "
-                            f"stdout and sterr: {_messages}")
-                ebLogError(_err_msg)
-                raise ExacloudRuntimeError(0x098, 0xA, _err_msg)
-
-        _domU = None
-
-        def copyWallet(aNode: exaBoxNode, aEncodedWallet: str,
+        def copyWallet(aDomU: str, aEncodedWallet: str,
                 aRemoteDir: str, aUserPermission:str,
                 aGroupPermission:str) -> None:
             """
             This function copies aEncodedWallet to domU in aRemoteDir as
             cwallet.sso and sets proper permissions/ownership in addition
             to decode (base64) aEncodedWallet.
-            param aNode: an already connected node to a domU host
+            param aDomU: DomU name to create the node
             param aEncodedWallet: Filepath of desired wallet to copy on domU
             param aRemoteDir: Path in DomU where well copy wallet
             raises ExacloudRuntimeError:
             returns: None
             """
-            _agent_wallet = aEncodedWallet
-            _node = aNode
-            if not os.path.isfile(_agent_wallet):
-                _err_msg = (f"Wallet {os.path.basename(_agent_wallet)} "
-                             "does not exists")
-                ebLogError(_err_msg)
-                raise ExacloudRuntimeError(0x098, 0xA, _err_msg)
 
-            _remote_file_path = os.path.join(aRemoteDir, "cwallet.sso")
-            _remote_file_base64 = _remote_file_path + ".b64"
+            _domU = aDomU
+            with connect_to_host(_domU, get_gcontext(), username='root') as _node:
 
-            # Make sure remote dir exists
-            _cmd = f"/usr/bin/mkdir -p {aRemoteDir}"
-            executeOrRaise(_node, _domU, _cmd)
+                _agent_wallet = aEncodedWallet
+                if not os.path.isfile(_agent_wallet):
+                    _err_msg = (f"Wallet {os.path.basename(_agent_wallet)} "
+                                 "does not exists")
+                    ebLogError(_err_msg)
+                    raise ExacloudRuntimeError(0x098, 0xA, _err_msg)
 
-            # Assign proper permissions to remote dir
-            _cmd = f"/usr/bin/chmod 700 {aRemoteDir}"
-            executeOrRaise(_node, _domU, _cmd)
+                _remote_file_path = os.path.join(aRemoteDir, "cwallet.sso")
+                _remote_file_base64 = _remote_file_path + ".b64"
 
-            # Assign proper ownership to remote dir
-            _cmd = ("/usr/bin/chown "
-                   f"{aUserPermission}:{aGroupPermission} "
-                   f"{aRemoteDir}")
-            executeOrRaise(_node, _domU, _cmd)
+                # Make sure remote dir exists
+                _cmd = f"/usr/bin/mkdir -p {aRemoteDir}"
+                node_exec_cmd_check(_node, _cmd)
 
-            # Copy base64 wallet to domU
-            _node.mCopyFile(_agent_wallet, _remote_file_base64)
+                # Assign proper permissions to remote dir
+                _cmd = f"/usr/bin/chmod 700 {aRemoteDir}"
+                node_exec_cmd_check(_node, _cmd)
 
-            # Decode base64 to final wallet
-            _cmd = (f"/usr/bin/base64 -d {_remote_file_base64} > "
-                    f"{_remote_file_path}")
-            executeOrRaise(_node, _domU, _cmd)
+                # Assign proper ownership to remote dir
+                _cmd = ("/usr/bin/chown "
+                       f"{aUserPermission}:{aGroupPermission} "
+                       f"{aRemoteDir}")
+                node_exec_cmd_check(_node, _cmd)
 
-            # Shred encoded wallet (no longer needed)
-            _pass = self.mCheckConfigOption('vmerase_pass')
-            if _pass is None:
-                _pass = 3
-            else:
-                try:
-                    _pass = int(_pass[:_pass.lower().find('pass')])
-                except:
+                # Copy base64 wallet to domU
+                _node.mCopyFile(_agent_wallet, _remote_file_base64)
+
+                # Decode base64 to final wallet
+                _cmd = (f"/usr/bin/base64 -d {_remote_file_base64} > "
+                        f"{_remote_file_path}")
+                node_exec_cmd_check(_node, _cmd)
+
+                # Shred encoded wallet (no longer needed)
+                _pass = self.mCheckConfigOption('vmerase_pass')
+                if _pass is None:
                     _pass = 3
-            _cmd = (f"/usr/bin/shred {_remote_file_base64} "
-                    f"-vun {_pass}")
-            executeOrRaise(_node, _domU, _cmd)
+                else:
+                    try:
+                        _pass = int(_pass[:_pass.lower().find('pass')])
+                    except:
+                        _pass = 3
+                _cmd = (f"/usr/bin/shred {_remote_file_base64} "
+                        f"-vun {_pass}")
+                node_exec_cmd_check(_node, _cmd)
 
-            # Assign proper permissions to remote wallet file
-            _cmd = f"/usr/bin/chmod 700 {_remote_file_path}"
-            executeOrRaise(_node, _domU, _cmd)
+                # Assign proper permissions to remote wallet file
+                _cmd = f"/usr/bin/chmod 700 {_remote_file_path}"
+                node_exec_cmd_check(_node, _cmd)
 
-            # Assign proper ownership to remote wallet file
-            _cmd = ("/usr/bin/chown "
-                   f"{aUserPermission}:{aGroupPermission} "
-                   f"{_remote_file_path}")
-            executeOrRaise(_node, _domU, _cmd)
+                # Assign proper ownership to remote wallet file
+                _cmd = ("/usr/bin/chown "
+                       f"{aUserPermission}:{aGroupPermission} "
+                       f"{_remote_file_path}")
+                node_exec_cmd_check(_node, _cmd)
 
             ebLogInfo("Succesfully added wallet "
                      f"{os.path.basename(aEncodedWallet)} on '{_domU}'")
@@ -17704,18 +18047,18 @@ IPV6INIT=no"""
         _dbcs_group_owner = "opc"
         _cps_user_owner = "oracle"
         _cps_group_owner = "oinstall"
+        _cps_wallet_copied = False
 
         if os.path.isfile(_dbcs_local_dir) and os.path.isfile(_cps_local_dir):
             for _, _domU in self.mReturnDom0DomUPair():
-                _node = exaBoxNode(get_gcontext())
-                try:
-                    _node.mConnect(aHost=_domU)
-                    copyWallet(_node, _dbcs_local_dir, _dbcs_target_dir,
-                            _dbcs_user_owner, _dbcs_group_owner)
-                    copyWallet(_node, _cps_local_dir, _cps_target_dir,
+
+                copyWallet(_domU, _dbcs_local_dir, _dbcs_target_dir,
+                        _dbcs_user_owner, _dbcs_group_owner)
+
+                if not _cps_wallet_copied:
+                    copyWallet(_domU, _cps_local_dir, _cps_target_dir,
                             _cps_user_owner, _cps_group_owner)
-                finally:
-                    _node.mDisconnect()
+                    _cps_wallet_copied = True
         else:
             ebLogInfo("DBCS and/or CPS agent wallets don't "
                      f"exist in '{_bundle_wallets_path}'. This is no-op")
@@ -17822,7 +18165,7 @@ IPV6INIT=no"""
     # flow. So, please make sure both the flows remain intact on changing
     # the code in this function.
     #
-    def mAddPostGINIDSteps(self, aStepList, aOptions, aGridHome=None):
+    def mAddPostGINIDSteps(self, aStepList, aOptions, aGridHome=None, aReshapeObj=None):
         _step_list = aStepList
         ebLogInfo('*** Setting up NID requirements')
         _step_time = time.time()
@@ -17919,6 +18262,17 @@ IPV6INIT=no"""
             if self.isATP():
                 ebLogInfo("*** Installing DBAAS Tools Exa ATP rpm ***")
                 self.mUpdateRpm('dbaastools_exa_atp.x86_64.rpm')
+            if self.mIsOciEXACC() and not self.isATP() and aReshapeObj:
+                # Refer 38944580 - For exacc (non atp), we need to have cprops.ini created before dbaastools rpm
+                # installation but we checked that cprops.ini is created by a dbaasapi call which
+                # needs dbaastools rpm to be preinstalled. So, the alternate solution is followed
+                # here to have the dbaastools re-installed after cprops.ini generation to have
+                # 38944580 fixed
+                for _newdomu in _domu_list:
+                    aReshapeObj.mUpdateRPM(aReshapeObj.mGetSrcDomU(),
+                                           _newdomu,
+                                           aOptions,
+                                           aInstallDbaastoolsOnly=True)
 
         # Run OCDE init setup in new nodes
         if not self.IsZdlraProv() and not self.mIsAdbs():
@@ -19750,8 +20104,8 @@ IPV6INIT=no"""
                 if "ip" in _admin_net and "hostname" in _admin_net or \
                    "natip" in _client_net and "nathostname" in _client_net:
 
-                    _domu_net_client_single_stack.mSetNatHostName(_admin_net.get('hostname', _client_net['nathostname']))
-                    _nat_host = _admin_net.get('hostname', _client_net['nathostname'])
+                    _domu_net_client_single_stack.mSetNatHostName(_admin_net.get('hostname', _client_net.get('nathostname')))
+                    _nat_host = _admin_net.get('hostname', _client_net.get('nathostname'))
 
                     _domain = ""
                     if "domainname" in _admin_net:
@@ -19761,9 +20115,9 @@ IPV6INIT=no"""
                         _domu_net_client_single_stack.mSetNatDomainName(_client_net['natdomainname'])
                         _domain = _client_net['natdomainname']
 
-                    if _admin_net.get("ip", _client_net["natip"]) == "discover":
+                    if _admin_net.get("ip", _client_net.get("natip")) == "discover":
 
-                        _nathost = _admin_net.get('hostname', _client_net['nathostname'])
+                        _nathost = _admin_net.get('hostname', _client_net.get('nathostname'))
 
                         if _domain:
                             _nathost = f"{_nathost}.{_domain}"
@@ -19779,8 +20133,8 @@ IPV6INIT=no"""
                                 _nat_addr = _hostname.group(1)
 
                     else:
-                        _domu_net_client_single_stack.mSetNatAddr(_admin_net.get("ip", _client_net["natip"]))
-                        _nat_addr = _admin_net.get("ip", _client_net["natip"])
+                        _domu_net_client_single_stack.mSetNatAddr(_admin_net.get("ip", _client_net.get("natip")))
+                        _nat_addr = _admin_net.get("ip", _client_net.get("natip"))
 
                     # Validate that client 'natip' is a valid ip
                     __natip = _domu_net_client_single_stack.mGetNetNatAddr()
@@ -19805,8 +20159,8 @@ IPV6INIT=no"""
             elif _client_net.get('natvlantag'):
                 _domu_net_client_single_stack.mSetNetVlanNatId(_client_net.get('natvlantag'))
 
-            if _admin_net.get('netgateway'):
-                _domu_net_client_single_stack.mSetNetNatGateway(_admin_net.get('netgateway'))
+            if _admin_net.get('gateway'):
+                _domu_net_client_single_stack.mSetNetNatGateway(_admin_net.get('gateway'))
             elif _client_net.get('natgateway'):
                 _domu_net_client_single_stack.mSetNetNatGateway(_client_net.get('natgateway'))
 
@@ -19858,7 +20212,7 @@ IPV6INIT=no"""
                 __lacp_enabled(_customer_conf, net_type=CLIENT))
             
             #Setting accelaratedNetwork flag if needed. Feature and env checks will be done inside the function. 
-            ebCluAcceleratedNetwork.addAcceleratedNetworkOedaAction(self, _domu_net_client_single_stack.mGetNetId(), _dom0_key, _domu_conf.mGetMacHostName(), _client_net.get("network_virtualization"), self.__extraXmlPatchingCommands)
+            ebCluAcceleratedNetwork.addAcceleratedNetworkOedaAction(self, _domu_net_client_single_stack.mGetNetId(), _client_gatewayv6, _dom0_key, _domu_id, _client_net.get("network_virtualization"), self.__extraXmlPatchingCommands)
 
             _mtu_set = None
             client_mtu = _client_net.get("mtu")
@@ -20022,7 +20376,7 @@ IPV6INIT=no"""
                 __lacp_enabled(_customer_conf, net_type=BACKUP))
 
             #Setting accelaratedNetwork flag if needed. Feature and env checks will be done inside the function. 
-            ebCluAcceleratedNetwork.addAcceleratedNetworkOedaAction(self, _domu_net_backup_single_stack.mGetNetId(), _dom0_key, _domu_conf.mGetMacHostName(), _backup_net.get("network_virtualization"), self.__extraXmlPatchingCommands)
+            ebCluAcceleratedNetwork.addAcceleratedNetworkOedaAction(self, _domu_net_backup_single_stack.mGetNetId(), _backup_gatewayv6, _dom0_key, _domu_id, _backup_net.get("network_virtualization"), self.__extraXmlPatchingCommands)
 
             backup_mtu = _backup_net.get("mtu")
             _mtu_set = None
@@ -20043,6 +20397,9 @@ IPV6INIT=no"""
                     _dict_oeda_args["SLAVE"] = _net_slaves_backup
                 else:
                     _dict_oeda_args["SLAVE"] = _domu_net_backup_single_stack.mGetNetSlave()
+                #If backup network is enabled with sriov, get the slave names for it and update. 
+                if ebCluAcceleratedNetwork.checkInputAndValidateEnvForAcceleratedNetwork(self, _dom0_key, _domu_id, _backup_net.get('network_virtualization')):
+                    _dict_oeda_args["SLAVE"] = ebCluAcceleratedNetwork.getAcceleratedNetworkSlavesForDomuMaster("backup")
                 _dict_oeda_args["HOSTNAME"] = _backup_net['hostname']
                 _dict_oeda_args["DOMAINNAME"] = _backup_net['domainname']
                 _dict_oeda_args["IP"] = _backup_ipv6
@@ -21048,7 +21405,8 @@ IPV6INIT=no"""
                 _gihc = self.__clusters.mGetCluster()
                 if self.mGetGiMultiImageSupport():
                     # check if GI version supported by oeda
-                    if mGetGridListSupportedByOeda(self, _giversion):
+                    supported_by_oeda,_ = mGetGridListSupportedByOeda(self, _giversion)
+                    if supported_by_oeda:
                         _set_cluster_version = _giversion
                     else:
                         # if oeda does not support this grid version skip the minor version
@@ -21111,24 +21469,54 @@ IPV6INIT=no"""
         #
         if self.mGetGiMultiImageSupport():
             _set_cluster_version = ""
+            _found_grid_version = False
             _version = int(''.join(_giversion.split('.')[:4]))
             #'23.26.0.0.251021' -> 232600
             #"23.9.0.0.251021" -> 23900 which is less than 232600
             #"19.28.0.0.250715" -> 192800 which is less than 232600
             #23.26.1.0.260115" -> 232610 which is greater than 232600 (future releases)
             if _version >= 232600:
-                _set_cluster_version = '.'.join(_giversion.split('.')[:4] + ['0']) #sets 23.26.0.0.0 for 26ai
-                ebLogTrace(f"Cluster version prepared to patch XML: {_set_cluster_version} ")
+                # check if GI version supported by oeda and get supported list
+                supported_by_oeda,oeda_supported_gi_list = mGetGridListSupportedByOeda(self, _giversion,aGrid26aiSupport=True)
+                if supported_by_oeda:
+                    _found_grid_version = True
+                    _set_cluster_version = '.'.join(_giversion.split('.')[:4] + ['0']) #sets 23.26.0.0.0 for 26ai
+                else:
+                    ebLogInfo(f"Given GI ver not supported by OEDA: {_giversion}")
+                    filtered_list = [v for v in oeda_supported_gi_list if v.startswith("23")]
+                    sorted_list = sorted(filtered_list, key=lambda v: tuple(map(int, v.split("."))),reverse=True)
+                    #choose the latest version from the oeda list
+                    if sorted_list:
+                        _set_cluster_version = sorted_list[0]
+                        if _set_cluster_version.startswith("23.26"):
+                            _found_grid_version = True
+                        else:
+                            ebLogInfo("Could not find GI version starts with 23.26,trying to find lesser version")
+                            _oeda_prefix = ".".join(_set_cluster_version.split(".")[:3])
+                            for imgnode in self.__repo_inventory["grid-klones"]:
+                                imgversion = imgnode.get("version", "")
+                                if imgversion.startswith(_oeda_prefix + "."):
+                                    _set_cluster_version = imgversion
+                                    _found_grid_version = True
+                                    break
+                if not _found_grid_version:
+                    _error_str = "Given GI ver not supported by OEDA and Could not get supportedGI list from OEDA"
+                    ebLogError(f"{_error_str}")
+                    raise ExacloudRuntimeError(0x0828, 0xA, _error_str, aStackTrace=True)
+                ebLogInfo(f"Selecting latest gi version {_set_cluster_version} from oeda supported list")
                 #for further versions, 23.26.1.0.date --> patches 23.26.1.0.0
-            # check if GI version supported by oeda
-            elif mGetGridListSupportedByOeda(self, _giversion):
-                _set_cluster_version = _giversion
             else:
-                # if oeda does not support this grid version skip the minor version
-                _set_cluster_version = _gihv[2]+'.'+_gihv[3]
+                # check if GI version supported by oeda and get supported list
+                supported_by_oeda,oeda_supported_gi_list = mGetGridListSupportedByOeda(self, _giversion)
+                if supported_by_oeda:
+                    _set_cluster_version = _giversion
+                else:
+                    # if oeda does not support this grid version skip the minor version
+                    _set_cluster_version = _gihv[2]+'.'+_gihv[3]
+            _gi_major_version = _gihv[2] # only major version
             _gihc.mSetCluVersion(_set_cluster_version)
             ebLogTrace(f'GI version patched to XML : {_set_cluster_version}')
-            _gi_major_version = _gihv[2] # only major version
+            ebLogTrace(f'Major Version : {_gi_major_version}')
         else:
             if len(_gihv[2]):
                 _gihc.mSetCluVersion(_gihv[0]+'.'+_gihv[3])     # conv. doy to date done via config
@@ -23125,9 +23513,9 @@ IPV6INIT=no"""
             _dbs_not_up = _clu_utils.getNotUpDbsList(aDomU)
             if _dbs_not_up:
                 _detail_error = "vmid: %s - Database did not start after boot. DBs not up list : %s" % (aDomU, _dbs_not_up) 
-            ebLogError('***  ' + _detail_error)
-            self.mUpdateErrorObject(gReshapeError['ERROR_DB_START'],_detail_error)
-            raise ExacloudRuntimeError(0x0451, 0xA, _detail_error)
+                ebLogError('***  ' + _detail_error)
+                self.mUpdateErrorObject(gReshapeError['ERROR_DB_START'],_detail_error)
+                raise ExacloudRuntimeError(0x0451, 0xA, _detail_error)
 
         _db = ebGetDefaultDB()
         _dbs_not_up = _clu_utils.getNotUpDbsList(aDomU)
@@ -23178,61 +23566,141 @@ IPV6INIT=no"""
             
     def mGetActiveDbInstances(self, aDomU):
         """
-            Return Dict of database Instances for domU for each db
+            Return list of active database instance names for the given domU.
+            Keeps polling srvctl status for each database until all instances
+            report an allowed state or the retry limit is exhausted.
         """
+        # -----------------------------------------------------------------
+        # Retry configuration
+        # -----------------------------------------------------------------
+        _max_retries = 10              # total attempts
+        _sleep_seconds = 30            # wait time between attempts
+
         _node = exaBoxNode(get_gcontext())
         _node.mSetUser('root')
         _node.mConnect(aHost=aDomU)
-        _path = None
-        if self.IsZdlraProv():
-            _path, _sid = self.mGetGridHome(aDomU)
-            _cmd_prefix = 'ORACLE_HOME=%s;export ORACLE_HOME;ORACLE_SID=%s; export ORACLE_SID;PATH=$PATH:$ORACLE_HOME/bin;export PATH;' % (_path,_sid)
-            _cmd = _cmd_prefix + '/usr/bin/su grid -c "$ORACLE_HOME/bin/srvctl config database"'
-        else:
-            _path, _, _  = self.mGetOracleBaseDirectories(aDomU)
-            _cmd_pfx = 'ORACLE_HOME=%s;export ORACLE_HOME;' % (_path)
-            _cmd = _cmd_pfx + "$ORACLE_HOME/bin/srvctl config database"
-        ebLogInfo(f'command to be executed:{_cmd}')
-        _i, _o, _e = _node.mExecuteCmd(_cmd)
-        _out = _o.readlines()
-        _rc = _node.mGetCmdExitStatus()
-        if not _out or len(_out) == 0 or _rc:
-            ebLogError('*** Command %s execution failed with return code :%s'%(_cmd, _rc))
-            _node.mDisconnect()
-            return []
-        ebLogInfo('*** DB name list of all Dbs:  %s ' % (_out))
-        _dbName = _out
-        _db_instances=[]
-        _out_autorestart = []
 
-        for _dbname in _dbName:
-            _dbname = _dbname.strip()
-            _oh, _, _= self.mGetOracleBaseDirectories(aDomU, _dbname)
-            if _oh == "":
-                ebLogWarn('*** Skip getting DB running instances for DB %s as oracle home path is not found'%(_dbname))
-                continue
-            _cmd_oh = '/usr/bin/su grid -c "export ORACLE_HOME=%s; %s/bin/srvctl status database -d %s | /usr/bin/grep %s "'%(_oh,_oh,_dbname,aDomU.split('.')[0])
-            _i, _o, _e = _node.mExecuteCmd(_cmd_oh)
-            _out = _o.readlines()
-            ebLogInfo(f"*** Output of command {_cmd_oh}: \n{''.join(_out).strip()}\nError: {str(_e.readlines())}")
-            if _out and 'not running' not in str(_out):
-                _cmd_autorestart = (
-                    "/usr/bin/su grid -c \"export ORACLE_HOME=%s; "
-                    "%s/bin/srvctl config database -d %s | "
-                    "awk -F': ' '/Management policy/ {print \\$2}'\""
-                    % (_oh, _oh, _dbname)
+        try:
+            if self.IsZdlraProv():
+                _path, _sid = self.mGetGridHome(aDomU)
+                _cmd_prefix = (
+                    'ORACLE_HOME=%s;export ORACLE_HOME;'
+                    'ORACLE_SID=%s; export ORACLE_SID;'
+                    'PATH=$PATH:$ORACLE_HOME/bin;export PATH;'
+                ) % (_path, _sid)
+                _cmd = (
+                    _cmd_prefix
+                    + '/usr/bin/su grid -c "$ORACLE_HOME/bin/srvctl config database"'
                 )
+            else:
+                _path, _, _ = self.mGetOracleBaseDirectories(aDomU)
+                _cmd = (
+                    'ORACLE_HOME={0};export ORACLE_HOME;'.format(_path)
+                    + '$ORACLE_HOME/bin/srvctl config database'
+                )
+
+            ebLogInfo(f'command to be executed:{_cmd}')
+            _i, _o, _e = _node.mExecuteCmd(_cmd)
+            _out = _o.readlines()
+            _rc = _node.mGetCmdExitStatus()
+            if not _out or len(_out) == 0 or _rc:
+                ebLogError('*** Command %s execution failed with return code :%s' % (_cmd, _rc))
+                return []
+
+            ebLogInfo('*** DB name list of all Dbs:  %s ' % (_out))
+            _db_instances = []
+
+            _allowed_statuses = r'Open(?:,Readonly)?|Restricted\s+Access'
+            _status_line_pat = re.compile(
+                r'^Instance\s+(?P<inst>\S+).*?Instance\s+status:\s+(?P<status>%s)(?:,.*|\.\s.*|\.$|\s*$)'
+                % _allowed_statuses,
+                re.IGNORECASE,
+            )
+
+            for _dbname in _out:
+                _dbname = _dbname.strip()
+                _oh, _, _ = self.mGetOracleBaseDirectories(aDomU, _dbname)
+                if _oh == "":
+                    ebLogWarn('*** Skip getting DB running instances for DB %s as oracle home path is not found' % (_dbname))
+                    continue
+
+                _cmd_oh = (
+                    '/usr/bin/su grid -c "export ORACLE_HOME=%s; '
+                    '%s/bin/srvctl status database -d %s -v"'
+                ) % (_oh, _oh, _dbname)
+
+                _attempt = 0
+                _last_bad_lines = []
+                _last_good_instances = []
+
+                while _attempt < _max_retries:
+                    _attempt += 1
+                    ebLogInfo(f'Checking status for DB {_dbname} (attempt {_attempt}/{_max_retries})')
+                    _i, _o, _e = _node.mExecuteCmd(_cmd_oh)
+                    _raw_lines = [line.strip() for line in _o.readlines() if line.strip()]
+
+                    if not _raw_lines:
+                        ebLogWarn(f'srvctl status returned no output for {_dbname} (attempt {_attempt})')
+                        _last_bad_lines = ['<no output from srvctl status>']
+                    else:
+                        _bad_lines = []
+                        _good_instances = []
+
+                        for _line in _raw_lines:
+                            _status_match = _status_line_pat.search(_line)
+                            if not _status_match:
+                                _bad_lines.append(_line)
+                                continue
+
+                            _inst_name = _status_match.group('inst')
+                            _status_value = _status_match.group('status')
+                            ebLogInfo(f'Parsed instance "{_inst_name}" with status "{_status_value}" for DB {_dbname}')
+                            _good_instances.append(_inst_name)
+
+                        if not _bad_lines and _good_instances:
+                            _last_bad_lines = []
+                            _last_good_instances = _good_instances
+                            ebLogInfo(f'All instances for DB {_dbname} are in an allowed state after attempt {_attempt}')
+                            break
+
+                        _last_bad_lines = _bad_lines
+                        _last_good_instances = _good_instances
+
+                    if _attempt < _max_retries:
+                        ebLogWarn(f'{len(_last_bad_lines)} instance status issues for {_dbname}; waiting {_sleep_seconds}s before retry')
+                        time.sleep(_sleep_seconds)
+
+                if _last_bad_lines:
+                    err_msg = (
+                        f'After {_max_retries} attempts, the following instance(s) for '
+                        f'database {_dbname} on {aDomU} are still not in one of the allowed state:\n' +
+                        '\n'.join(_last_bad_lines)
+                    )
+                    ebLogError(err_msg)
+                    ebLogInfo('*** mGetActiveDbInstances : Open, Open,Readonly, and Restricted Access as valid states')
+                    raise RuntimeError(err_msg)
+
+                _cmd_autorestart = (
+                    "/usr/bin/su grid -c 'export ORACLE_HOME={oh}; {oh}/bin/srvctl config database -d {db} | "
+                    "awk -F': ' '/Management policy/ {{print \\$2}}'"
+                ).format(oh=_oh, db=_dbname)
                 _i, _o, _e = _node.mExecuteCmd(_cmd_autorestart)
                 _out_status = _o.readlines()
                 ebLogInfo(f'*** _out_status is {_out_status} ')
+
                 if any('AUTOMATIC' in status for status in _out_status):
-                    _out_autorestart = _out[0].strip().split(' ')
-                    if len(_out_autorestart) > 1:
-                        _db_instances.append(_out_autorestart[1])
+                    _db_instances.extend(_last_good_instances)
                 else:
-                    ebLogInfo(f'*** Skipping adding db instance of {_dbname} for post restart check')
-        ebLogInfo('*** DB running instances:  %s ' % (_db_instances))
-        return _db_instances
+                    ebLogInfo(
+                        f'*** Skipping adding db instance of {_dbname} for post restart check '
+                        f'(Management policy not AUTOMATIC)'
+                    )
+
+            ebLogInfo('*** DB running instances:  %s ' % (_db_instances))
+            return _db_instances
+
+        finally:
+            _node.mDisconnect()
 
 
     def mShutdownVMForReshape(self,aDom0, aDomU, aOptions,aNode):
@@ -23269,6 +23737,18 @@ IPV6INIT=no"""
                 self.mCheckIfCrsDbsUp(aDomU)
             else:
                 raise
+
+        _shared_mem_validation = self.mCheckSubConfigOption(
+            'reshape_memory', 'shared_memory_validation'
+        )
+        _clu_utils = ebCluUtils(self)
+        if str(_shared_mem_validation).upper() == 'TRUE':
+            _clu_utils.mValidateSharedMemSettings(aDomU)
+        else:
+            ebLogInfo(
+                f"*** Skipping shared memory validation for {aDomU}"
+                " as per exabox.conf configuration"
+            )
 
         if aDB:
             _db = ebGetDefaultDB()
@@ -25971,7 +26451,7 @@ IPV6INIT=no"""
 
     def IsHeteroConfig(self) -> Tuple[bool, Set[str]]:
         _list = []        
-        for _dom0, _ in self.mReturnDom0DomUPair():
+        for _dom0, _ in self.mGetOrigDom0sDomUs():
             _model = self.mGetNodeModel(_dom0)
             _list.append(_model)
         rCode = len(set(_list)) != 1
@@ -26022,10 +26502,12 @@ IPV6INIT=no"""
         self.mSetPatchConfig(_updatedxml)
         return 0
 
-    def mPatchNetworkSlaves(self, aDomU, aClientSlave, aBackSlave):
+    def mPatchNetworkSlaves(self, aDomU, aClientSlave, aBackSlave, aClientMaster=None, aBackupMaster=None):
         _domU = aDomU
         _clientSlave = aClientSlave
         _backupSlave = aBackSlave
+        _client_master = aClientMaster
+        _backup_master = aBackupMaster
 
         _oeda_path  = self.mGetOedaPath()
         _oedacli_bin = _oeda_path + '/oedacli'
@@ -26039,9 +26521,9 @@ IPV6INIT=no"""
         self.mExecuteLocal("/bin/cp {} {}".format(_patchconfig, _updatedxml))
 
         _id, _host, _ = self.mGetNetworkSlaves(_domU, "client")
-        _oedacli_mgr.mUpdateNetworkSlaves(_clientSlave, _id, _host, "client", _patchconfig, _updatedxml)
+        _oedacli_mgr.mUpdateNetworkSlaves(_clientSlave, _id, _host, "client", _patchconfig, _updatedxml, aMaster=_client_master)
         _id, _host, _ = self.mGetNetworkSlaves(_domU, "backup")
-        _oedacli_mgr.mUpdateNetworkSlaves(_backupSlave, _id, _host, "backup", _updatedxml, _updatedxml)
+        _oedacli_mgr.mUpdateNetworkSlaves(_backupSlave, _id, _host, "backup", _updatedxml, _updatedxml, aMaster=_backup_master)
         self.mSetPatchConfig(_updatedxml)
 
     def mPatchDRNetworkSlaves(self, aDomU, aDRSlaves, aBridge=None):
@@ -26078,16 +26560,22 @@ IPV6INIT=no"""
         _ociexacc = self.mIsOciEXACC()
         _X11:Set[str] = {'X11'}
         _client_slaves, _backup_slaves, _dr_slaves = [],[],[]
+        _client_master, _backup_master = None, None
 
         if _ociexacc and _use_xml_patching:
             ebLogInfo("UPDATING XML WITH CLIENT/BACKUP SLAVES...")
             for _dom0, _domU in self.mReturnDom0DomUPair():
                 _net_info = self.mGetNetworkSetupInformation(aNetworkType="all", aDom0=_dom0)
-                if _net_info and 'client' in _net_info.keys() and 'bond_slaves' in _net_info['client'].keys():
+                if _net_info and 'client' in _net_info.keys() and 'bond_slaves' in _net_info['client'].keys() \
+                    and 'bond_master' in _net_info['client'].keys():
                     _client_slaves = _net_info['client']['bond_slaves'].split()
-                if _net_info and 'backup' in _net_info.keys() and 'bond_slaves' in _net_info['backup'].keys():
+                    _client_master = _net_info['client']['bond_master']
+                if _net_info and 'backup' in _net_info.keys() and 'bond_slaves' in _net_info['backup'].keys() \
+                    and 'bond_master' in _net_info['backup'].keys():
                     _backup_slaves = _net_info['backup']['bond_slaves'].split()
-                self.mPatchNetworkSlaves(_domU, _client_slaves, _backup_slaves)
+                    _backup_master = _net_info['backup']['bond_master']
+
+                self.mPatchNetworkSlaves(_domU, _client_slaves, _backup_slaves, _client_master, _backup_master)
                 if _net_info and 'dr' in _net_info.keys() and 'bond_slaves' in _net_info['dr'].keys():
                     _dr_slaves = _net_info['dr']['bond_slaves'].split()
                     _bridge = _net_info['dr']['bridge']
@@ -26495,6 +26983,7 @@ IPV6INIT=no"""
                         if _rc != 0:
                             _err_msg = f"{_dom0}:Failed to update speed {_optimum_speed} on interface:{_ethx}"
                             ebLogError(_err_msg)
+                            all_interfaces_ok = False
 
             _is_supported = all_interfaces_ok # Should be True if loop finished
 
@@ -28024,7 +28513,7 @@ IPV6INIT=no"""
         return _oracle_home, _dbagent_wallet_loc
 
 
-    def mAddWalletEntry(self, aKeyStore, aWalletLoc, aWalletKey, aPasswd):
+    def mAddWalletEntry(self, aKeyStore, aWalletLoc, aWalletKey, aPasswd, aAccessWallet: bool = False):
 
         _key_store = aKeyStore
         _wallet_loc = aWalletLoc
@@ -28033,6 +28522,17 @@ IPV6INIT=no"""
 
         _domu_list = [ _domu for _ , _domu in self.mReturnDom0DomUPair()]
         _domu = _domu_list[0]
+
+        if aAccessWallet and (self.__cmd in ['db_install']):
+            with connect_to_host(_domu, get_gcontext(), username='oracle') as _node:
+
+                # Access the wallet for first time as oracle user
+                _cmd = f'{_key_store} -wrl {_wallet_loc} -list'
+                node_exec_cmd_check(_node, _cmd)
+
+                _cmd = f'ls -lthr {_wallet_loc}*'
+                _node.mExecuteCmdLog(_cmd)
+
         _node = exaBoxNode(get_gcontext())
 
         try:
@@ -28377,7 +28877,7 @@ IPV6INIT=no"""
 
         for _k in list(_dict.keys()):
             if not self.IsZdlraProv() and ("passwd" in _k or "adminPassword" in _k) and _dbagent_wallet_loc and _dict[_k]:
-                _wallet_key = self.mAddWalletEntry(_key_store, _dbagent_wallet_loc, _k, _dict[_k])
+                _wallet_key = self.mAddWalletEntry(_key_store, _dbagent_wallet_loc, _k, _dict[_k], aAccessWallet=True)
                 _password = self.mGetWalletViewEntry(_wallet_key)
                 if _password == _dict[_k]:
                     ebLogInfo('*** Add Wallet Entry success')
@@ -28864,14 +29364,20 @@ IPV6INIT=no"""
                 # Restart CRS in all cluster.  If the following crsctl commands
                 # fail we log stdout/stderr (this is important for diag).
                 ebLogInfo("Restarting CRS services in the cluster")
+                # For stop and start, 3 retry attempts will be used with 10 seconds
+                # delay between each retry attempt.
+                # The original behaviour of raising exception on failure
+                # is preserved.
                 if "stop" in aRequestedOperations:
-                    node_exec_cmd_check(
-                        node, f"{crsctl} stop cluster -all",
-                        log_stdout_on_error=True)
+                    mRunCrsCommandsWithRetry(
+                        node,
+                        [f"{crsctl} stop cluster -all", f"{crsctl} stop cluster -all -f"],
+                        aLabel="CRS stop (cluster reboot)")
                 if "start" in aRequestedOperations:
-                    node_exec_cmd_check(
-                        node, f"{crsctl} start cluster -all",
-                        log_stdout_on_error=True)
+                    mRunCrsCommandsWithRetry(
+                        node,
+                        [f"{crsctl} start cluster -all"],
+                        aLabel="CRS start (cluster reboot)")
 
             self.mCheckCrsIsUp(domus[0], domus)
             self.mCheckAsmIsUp(domus[0], domus)
@@ -29010,7 +29516,7 @@ IPV6INIT=no"""
             if aOedaPath:
                 _oeda_path = aOedaPath
             else:
-                _oeda_path = self.__ctx.mGetOEDAPath()
+                _oeda_path = ebOedacli.mComputeOedacliPath(self)
             if not self.__node.mFileExists(_oeda_path+'/install.sh'):
                 ebLogError('Could not find OEDA one command installer in: '+_oeda_path)
                 # TODO: Raise an exception
@@ -29023,6 +29529,8 @@ IPV6INIT=no"""
             _pchecks = ebCluPreChecks(self)
             _rc = _pchecks.mFetchHardwareAlerts(aOptions, aStep="ELASTIC_SHAPES_VALIDATION")
             return _rc
+        if aCmd == 'enable_qinq':
+            return self.mGetCommandHandler().mHandlerEnableQinQ(aOptions)
         if aCmd == 'xsvault':
             return self.mGetCommandHandler().mHandlerXsVaultOperation()
         if aCmd == 'xsput':
@@ -29053,7 +29561,7 @@ IPV6INIT=no"""
             if aOedaPath:
                 _oeda_path = aOedaPath
             else:
-                _oeda_path = self.__ctx.mGetOEDAPath()
+                _oeda_path = ebOedacli.mComputeOedacliPath(self)
             if not self.__node.mFileExists(_oeda_path+'/install.sh'):
                 ebLogError('Could not find OEDA one command installer in: '+_oeda_path)
                 # TODO: Raise an exception
@@ -29235,6 +29743,7 @@ IPV6INIT=no"""
                     'get_exawatcher_log'            : self.mHandlerGetExawatcherLogs,
                     'generate_switches_keys'        : self.mHandlerGenerateSwitchesKeys,
                     'get_dom0_existing_guests_size' : self.mHandlerGetDom0ExistingGuestsSize,
+                    'get_listener_address_cmd'      : self.mHandleExaCCGetListenerAddress,
                     'hardware_alerts'               : self.mHandlerGetHWAlerts,
                     'host_state'                    : self.mHandlerHostState,
                     'healthcheckpostprov'           : handler.mHandlerHealthCheckPostProv,
@@ -29348,7 +29857,8 @@ IPV6INIT=no"""
                     'xsget'                         : handler.mHandlerXsGet,
                     'xsput'                         : handler.mHandlerXsPut,
                     'get_cluster_details_consistency': self.mHandlerGetClusterDetailsforConsistency,
-                    'exascale_nodes_conf'           : handler.mHandlerXsUpdateNodesConf
+                    'exascale_nodes_conf'           : handler.mHandlerXsUpdateNodesConf,
+                    'enable_qinq'                   : handler.mHandlerEnableQinQ
                    }
 
 
@@ -29423,27 +29933,151 @@ IPV6INIT=no"""
     
     def mHandlerStopStartHostViaIlom(self):
         """
-        Entry point for host power operations via ILOM: start, stop, and lowpowermode.
+        Entry point for host power operations via ILOM.
 
-        Payload sample:
-        {
-            "operation": "start | stop | lowpowermode",
-            "parallel_process": true/false,  # optional for start/stop
+        Supported payloads
+        ------------------
+        1) Single start / stop
+           {
+             "operation": "start" | "stop",
+             "parallel_process": true,
+             "host_ilom_pair": {
+               "dom0-a": "ilom-a",
+               "dom0-b": "ilom-b"
+             }
+           }
+
+        2) Combined start + stop
+           {
+             "operation": "start_stop",
+             "parallel_process": true,                # optional, applied when sub-payload omits it
+             "start_host_ilom_pair": {
+               "dom0-a": "ilom-a"
+             },
+             "stop_host_ilom_pair": {
+               "dom0-b": "ilom-b"
+             }
+           }
+
+        3) Low power mode operations (unchanged)
+           {
+             "operation": "lowpowermode",
+             "host_ilom_pair": {...},
+             "lowpoweroperation": "schedule | schedule_add | schedule_remove | schedule_clear | get_all",
+             "lowPowerModeSchedule": [...],
+             "lowPowerModeUntil": "..."
+           }
+
+        Response examples
+        -----------------
+        • "operation": "start"
+
+          Request
+
+          {
+            "operation": "start",
+            "parallel_process": true,
             "host_ilom_pair": {
-                "iad103716exdd013.iad103716exd.adminiad1.oraclevcn.com" : "iad103716exdd013lo.iad103716exd.adminiad1.oraclevcn.com"
-                "iad103712exdcl07.iad103712exd.adminiad1.oraclevcn.com": "iad103712exdcl07lo.iad103712exd.adminiad1.oraclevcn.com"
+              "iad103716exdd013.iad103716exd.adminiad1.oraclevcn.com":
+                "iad103716exdd013lo.iad103716exd.adminiad1.oraclevcn.com",
+              "iad103712exdcl07.iad103712exd.adminiad1.oraclevcn.com":
+                "iad103712exdcl07lo.iad103712exd.adminiad1.oraclevcn.com"
+            }
+          }
+
+          Response
+
+          {
+            "operation": "start",
+            "nodes": {
+              "iad103716exdd013.iad103716exd.adminiad1.oraclevcn.com": {
+                "status": "Success",
+                "completed_at": "2025-01-05T13:32:10Z"
+              },
+              "iad103712exdcl07.iad103712exd.adminiad1.oraclevcn.com": {
+                "status": "Failed: Timeout while waiting for host iad103712exdcl07.iad103712exd.adminiad1.oraclevcn.com to be started."
+              }
+            }
+          }
+
+        • "operation": "stop"
+
+          Request
+
+          {
+            "operation": "stop",
+            "parallel_process": false,
+            "host_ilom_pair": {
+              "iad103700exddb01.iad103700exd.adminiad1.oraclevcn.com":
+                "iad103700exddb01lo.iad103700exd.adminiad1.oraclevcn.com",
+              "iad103700exddb02.iad103700exd.adminiad1.oraclevcn.com":
+                "iad103700exddb02lo.iad103700exd.adminiad1.oraclevcn.com"
+            }
+          }
+
+          Response
+
+          {
+            "operation": "stop",
+            "nodes": {
+              "iad103700exddb01.iad103700exd.adminiad1.oraclevcn.com": {
+                "status": "Success",
+                "completed_at": "2025-01-05T13:35:42Z"
+              },
+              "iad103700exddb02.iad103700exd.adminiad1.oraclevcn.com": {
+                "status": "Failed: Timeout while waiting for host iad103700exddb02.iad103700exd.adminiad1.oraclevcn.com to be stopped."
+              }
+            }
+          }
+
+        • "operation": "start_stop"
+
+          Request
+
+          {
+            "operation": "start_stop",
+            "parallel_process": true,
+            "start_host_ilom_pair": {
+              "iad103716exdd013.iad103716exd.adminiad1.oraclevcn.com":
+                "iad103716exdd013lo.iad103716exd.adminiad1.oraclevcn.com",
+              "iad103712exdcl07.iad103712exd.adminiad1.oraclevcn.com":
+                "iad103712exdcl07lo.iad103712exd.adminiad1.oraclevcn.com"
             },
-            # Optional for lowpowermode:
-            "lowpoweroperation": "schedule | schedule_add | schedule_remove | schedule_clear | get_all",
-            "lowPowerModeSchedule": [  # optional unless schedule intent
-                {
-                    "startTimestamp": "2025-01-03T18:00:00-07:00",
-                    "durationMinutes": 720,
-                    "frequency": "daily"
+            "stop_host_ilom_pair": {
+              "iad103700exddb01.iad103700exd.adminiad1.oraclevcn.com":
+                "iad103700exddb01lo.iad103700exd.adminiad1.oraclevcn.com"
+            }
+          }
+
+          Response
+
+          {
+            "operation": "start_stop",
+            "results": {
+              "start": {
+                "operation": "start",
+                "nodes": {
+                  "iad103716exdd013.iad103716exd.adminiad1.oraclevcn.com": {
+                    "status": "Success",
+                    "completed_at": "2025-01-05T13:40:05Z"
+                  },
+                  "iad103712exdcl07.iad103712exd.adminiad1.oraclevcn.com": {
+                    "status": "Success",
+                    "completed_at": "2025-01-05T13:40:17Z"
+                  }
                 }
-            ],
-            "lowPowerModeUntil": "..." | "" | "NEVER"
-        }
+              },
+              "stop": {
+                "operation": "stop",
+                "nodes": {
+                  "iad103700exddb01.iad103700exd.adminiad1.oraclevcn.com": {
+                    "status": "Success",
+                    "completed_at": "2025-01-05T13:42:11Z"
+                  }
+                }
+              }
+            }
+          }
         """
         aOptions = self.mGetArgsOptions()
         _reqobj = self.mGetRequestObj()
@@ -29458,12 +30092,47 @@ IPV6INIT=no"""
             if not _operation:
                 raise ExacloudRuntimeError(0x0208, 0xA, "Missing 'operation' in payload")
 
+            if _operation not in ("start", "stop", "start_stop", "lowpowermode"):
+                raise ExacloudRuntimeError(0x0208, 0xA, f"Unsupported operation: {_operation}")
+
             if _operation == "lowpowermode":
                 _data_d = _stopStartViaIlom.mHandleLowPowerMode(aOptions)
+
             elif _operation in ("start", "stop"):
                 _data_d = _stopStartViaIlom.mStopStartHostViaIlom(aOptions)
-            else:
-                raise ExacloudRuntimeError(0x0208, 0xA, f"Unsupported operation: {_operation}")
+
+            else:  # start_stop
+                start_raw = _json.get("start_host_ilom_pair")
+                stop_raw = _json.get("stop_host_ilom_pair")
+
+                if not start_raw and not stop_raw:
+                    raise ExacloudRuntimeError(
+                        0x0208,
+                        0xA,
+                        "At least one of 'start_host_ilom_pair' or 'stop_host_ilom_pair' must be provided for operation 'start_stop'",
+                    )
+
+                start_result, start_hosts = _stopStartViaIlom.mRunSingleOperation("start", start_raw, aOptions, _json)
+                stop_result, stop_hosts = _stopStartViaIlom.mRunSingleOperation("stop", stop_raw, aOptions, _json)
+
+                merged_resp = {
+                    "operation": "start_stop",
+                    "results": {},
+                }
+
+                if "parallel_process" in _json:
+                    merged_resp["parallel_process"] = _json["parallel_process"]
+                if start_hosts is not None:
+                    merged_resp["start_host_ilom_pair"] = copy.deepcopy(start_hosts)
+                if stop_hosts is not None:
+                    merged_resp["stop_host_ilom_pair"] = copy.deepcopy(stop_hosts)
+
+                if start_result is not None:
+                    merged_resp["results"]["start"] = start_result
+                if stop_result is not None:
+                    merged_resp["results"]["stop"] = stop_result
+
+                _data_d = merged_resp
 
             if _reqobj is not None:
                 _reqobj.mSetData(json.dumps(_data_d, sort_keys=True))
@@ -29481,7 +30150,7 @@ IPV6INIT=no"""
 
         _, _domUs, _, _ = self.mReturnAllClusterHosts()
         cluSshTest = ebCluServerSshConnectionCheck(self)
-        _rc = cluSshTest.mServerSshConnectionCheck(aOptions, _domUs)
+        _rc = cluSshTest.mNodeSubsetSshConnectionCheck(aOptions, _domUs)
 
         if _rc != 0:
             return _rc
@@ -29878,12 +30547,16 @@ IPV6INIT=no"""
             #Console output
             ebLogInfo(json.dumps(_dom0_disk_utilization_dict, sort_keys=True))
 
+
     def mHandlerHostState(self):
+
         aOptions = self.mGetArgsOptions()
-        if not aOptions.hostname:
+
+        if "jsonconf" not in aOptions or not aOptions.jsonconf or "hostname" not in aOptions.jsonconf:
             ebLogError('Missing target hostname parameter')
             return(0x0119)
-        _opHostname = aOptions.hostname
+
+        _opHostname = aOptions.jsonconf["hostname"]
 
         ebLogInfo('*** Checking if host %s is pingable' %(_opHostname))
         if not self.mPingHost(_opHostname):
@@ -29891,15 +30564,10 @@ IPV6INIT=no"""
             return (0x0403)
         ebLogInfo('*** Host %s is pingable' %(_opHostname))
 
-        _node = exaBoxNode(get_gcontext())
-        ebLogInfo('*** Attempting connection to: %s' % (_opHostname))
-        try:
-            _node.mConnect(aHost=_opHostname)
-            _node.mExecuteCmdLog('hostname -f')
-        except:
-            ebLogInfo('*** SSH to %s failed' % (_opHostname))
-            return (0x0411)
-        _node.mDisconnect()
+        with connect_to_host(_opHostname, self.mGetCtx()) as _node:
+            node_exec_cmd_check(_node, "hostname -f")
+
+        return 0
 
     def mHandlerCPSSetup(self):
         if self.mIsKVM():  # RoCE
@@ -30163,21 +30831,24 @@ IPV6INIT=no"""
                     if _rpm == "ahf_setup":
                         continue
 
-                    _rpmName = _bomSpec["artifacts"]["rpms"][_rpm]["name"]
+                    if "artifacts" in _bomSpec and "rpms" in _bomSpec["artifacts"] and \
+                       _rpm in _bomSpec["artifacts"]["rpms"] and "name" in _bomSpec["artifacts"]["rpms"][_rpm]:
 
-                    _cmd = "/bin/rpm -q --qf '%{VERSION}.%{RELEASE}' " + _rpmName
-                    _, _o, _ = _node.mExecuteCmd(_cmd)
-                    _version = _o. read().strip()
+                        _rpmName = _bomSpec["artifacts"]["rpms"][_rpm]["name"]
 
-                    if not _version or _version < _bomSpec["artifacts"]["rpms"][_rpm]["version"]:
+                        _cmd = "/bin/rpm -q --qf '%{VERSION}.%{RELEASE}' " + _rpmName
+                        _, _o, _ = _node.mExecuteCmd(_cmd)
+                        _version = _o. read().strip()
 
-                        _msg = f"RPM {_rpmName} difference in version. Installed: '{_version}'"
-                        _msg = f"{_msg}, In Bom: '{_bomSpec['artifacts']['rpms'][_rpm]['version']}'"
+                        if not _version or _version < _bomSpec["artifacts"]["rpms"][_rpm]["version"]:
 
-                        _result["RPMS"] = {
-                            "Status": "Failure",
-                            "Reason": _msg
-                        }
+                            _msg = f"RPM {_rpmName} difference in version. Installed: '{_version}'"
+                            _msg = f"{_msg}, In Bom: '{_bomSpec['artifacts']['rpms'][_rpm]['version']}'"
+
+                            _result["RPMS"] = {
+                                "Status": "Failure",
+                                "Reason": _msg
+                            }
 
                 if "RPMS" not in _result:
                     _result["RPMS"] = {"Status": "Success"}
@@ -30255,6 +30926,82 @@ IPV6INIT=no"""
             aOptions = self.mGetArgsOptions()
         _pchecks = ebCluPreChecks(self)
         return _pchecks.mEMClusterDetails(aOptions)
+
+    def mHandleExaCCGetListenerAddress(self):
+
+        aOptions = self.mGetArgsOptions()
+        _vmname = aOptions.jsonconf["vmid"]
+        _infoFound = None
+
+        for _dom0, _domU in self.mReturnDom0DomUPair():
+
+            if _domU == _vmname:
+                _infoFound = self.mGetRuntimeDomUNetworkInfo(_dom0, _domU)
+                break
+
+        if not _infoFound:
+            raise ExacloudRuntimeError(0x0825, 0xA, f"Missing VM NAME: {_vmname}")
+
+        _result = [
+            _infoFound["CLIENT-IP"],
+            _infoFound["DNAT-IP"],
+            "127.0.0.1"
+        ]
+
+        _reqobj = self.mGetRequestObj()
+        if _reqobj is not None:
+            _reqobj.mSetData(json.dumps(_result, sort_keys=True))
+            _db = ebGetDefaultDB()
+            if self.__debug:
+               ebLogInfo("%s: mHandlerClusterXmlInfo: DB UpdateRequest." % (datetime.datetime.now()))
+            _db.mUpdateRequest(_reqobj)
+
+        ebLogInfo(json.dumps(_result, sort_keys=True, indent=4))
+        return 0
+
+
+    def mGetRuntimeDomUNetworkInfo(self, aDom0, aVmName):
+
+        _res = {}
+
+        # Get Client IP
+        _xmlInfo = self.mGetVMNetConfigs(aVmName)
+
+        if "client" in _xmlInfo:
+            _res["CLIENT-IP"] = _xmlInfo['client'].mGetNetIpAddr()
+            _res["CLIENT-FQDN"] = _xmlInfo['client'].mGetNetHostName() + "." + _xmlInfo['client'].mGetNetDomainName()
+            _res["NAT-FQDN"] = _xmlInfo['client'].mGetNetNatHostName() + "." + _xmlInfo['client'].mGetNetNatDomainName()
+            _res["NAT-IP"] = _xmlInfo['client'].mGetNetNatAddr()
+
+        if "backup" in _xmlInfo:
+            _res["BACKUP-IP"] = _xmlInfo['backup'].mGetNetIpAddr()
+            _res["BACKUP-FQDN"] = _xmlInfo['backup'].mGetNetHostName() + "." + _xmlInfo['backup'].mGetNetDomainName()
+
+        if "private" in _xmlInfo:
+            _res["PRIVATE-IP"] = _xmlInfo['private'].mGetNetIpAddr()
+            _res["PRIVATE-FQDN"] = _xmlInfo['private'].mGetNetHostName() + "." + _xmlInfo['private'].mGetNetDomainName()
+
+        # Get DNAT IP
+        if "NAT-IP" in _res:
+
+            _nftDom0s = self.mGetHostsByTypeAndOLVersion(ExaKmsHostType.DOM0, ["OL8"])
+            _iptDom0s = self.mGetHostsByTypeAndOLVersion(ExaKmsHostType.DOM0, ["OL7", "OL6"])
+
+            with connect_to_host(aDom0, self.mGetCtx()) as _node:
+
+                if aDom0 in _nftDom0s:
+                    _cmd = """/usr/sbin/nft -a list ruleset | /bin/grep "%s " | /bin/awk '{print $13}'""" % _res["NAT-IP"]
+                    _, _out, _ = node_exec_cmd_check(_node, _cmd)
+                    _ip = _out.strip()
+                    _res["DNAT-IP"] = _ip
+
+                elif aDom0 in _iptDom0s:
+                    _cmd = """/usr/sbin/iptables -S -t nat | /bin/grep " \-d" | /bin/grep "%s/" | /bin/awk '{print $8}'""" % _res["NAT-IP"]
+                    _, _out, _ = node_exec_cmd_check(_node, _cmd)
+                    _ip = _out.strip()
+                    _res["DNAT-IP"] = _ip
+
+            return _res
 
     def mHandlerEMDBDetails(self, aOptions=None):
         
@@ -31225,13 +31972,6 @@ IPV6INIT=no"""
         aOptions = self.mGetArgsOptions()
         self.mDom0UpdateCurrentOpLog(aOptions, "Reshape Operation", "started")
 
-        _step_time = time.time()
-        # Bypass standard network checks
-        if self.mCheckDom0NetworkType():
-            if self.mCheckConfigOption('reset_net_mapping','True'):
-                self.mResetDom0NetworkMapping()
-        self.mLogStepElapsedTime(_step_time, 'Check Network Discovery Completed')
-
         self.mPublishNewNodeKey(aOptions)
         _reshape = ebCluReshapeCompute(self, aOptions)
         _reshape.mReshapeVMGI(aOptions)
@@ -32100,7 +32840,7 @@ IPV6INIT=no"""
             _exaunit_id = f"exaunit_{str(_params['exaunitid']).zfill(11)}" if _params.get("exaunitid") else "0000-0000-0000-0000"
         self.mSetExaunitID(_exaunit_id)
 
-        self.__oeda_path = self.__ctx.mGetOEDAPath()
+        self.__oeda_path = ebOedacli.mComputeOedacliPath(self)
         _rpath = f"{self.__oeda_path}/requests/{_exaunit_id}_{_uuid}"
         self.mExecuteCmdLog(f"/bin/mkdir -p {_rpath}")
         self.mExecuteCmdLog(f"/bin/mkdir -p {_rpath}/WorkDir",aLogAsWarn=True)
@@ -32205,6 +32945,7 @@ IPV6INIT=no"""
     def mDispatchNonXMLCluster(self, aCmd, aOptions=None, aJob=None):
 
         ebLogVerbose("mDispatchNonXMLCluster: aCmd = %s" % aCmd)
+        self.mSetCmd(aCmd)
 
         _rc = ebError(0x0000)
         #
@@ -32225,7 +32966,7 @@ IPV6INIT=no"""
         _oeda_path=None
 
         self.__base_path = self.__ctx.mGetBasePath()
-        self.__oeda_path = self.__ctx.mGetOEDAPath()
+        self.__oeda_path = ebOedacli.mComputeOedacliPath(self)
         self.__uuid = aJob.mGetUUID()
         self.__cmd  = aCmd
 
@@ -32313,7 +33054,7 @@ IPV6INIT=no"""
                 ebLogInfo(f"ADBD Environment detect, fallback ssh keys to: {_keytype}")
 
         # Change support for ECDSA in FIPs + OL8
-        seStatus = self.mGetSELinuxMode("domu")
+        seStatus = self.__selinux_controls.mGetSELinuxMode("domu")
         _enableFips = self.mGetEnableFipsPayload()
 
         # Login to domU in patching operation to known Se Linux type
@@ -32431,10 +33172,55 @@ IPV6INIT=no"""
 
         get_gcontext().mSetExaKmsSingleton(ExaKmsSingleton())
 
+    def mResolveStorageType(self, aStorageType):
+
+        if isinstance(aStorageType, str):
+            _storageType = aStorageType.strip()
+            if _storageType:
+                _storageType = _storageType.upper()
+                if _storageType in ("EXASCALE", "XS"):
+                    return _storageType
+        return None
+
+    def mExtractStorageType(self, aOptions):
+
+        storageType = None
+
+        if aOptions is not None:
+            jsonconf = getattr(aOptions, "jsonconf", None)
+
+            if isinstance(jsonconf, dict):
+                storageType = self.mResolveStorageType(jsonconf.get("storageType"))
+                if storageType:
+                    ebLogInfo(f"The storageType: {storageType} obtained from jsonconf")
+
+                if storageType is None:
+                    rack_conf = jsonconf.get("rack")
+                    if isinstance(rack_conf, dict):
+                        storageType = self.mResolveStorageType(rack_conf.get("storageType"))
+                        if storageType:
+                            ebLogInfo(f"The storageType: {storageType} obtained from rack")
+
+                if storageType is None:
+                    params = jsonconf.get("Params")
+                    if isinstance(params, list) and params:
+                        first_param = params[0]
+                        if isinstance(first_param, dict):
+                            storageType = self.mResolveStorageType(first_param.get("storageType"))
+                            if storageType:
+                                ebLogInfo(f"The storageType: {storageType} obtained from Params")
+
+            if storageType is None:
+                storageType = self.mResolveStorageType(getattr(aOptions, "storageType", None))
+                if storageType:
+                    ebLogInfo(f"The storageType: {storageType} obtained from Options")
+
+        return storageType
 
     def mDispatchCluster(self, aCmd, aOptions=None, aJob=None):
 
         ebLogVerbose("mDispatchCluster: aCmd = %s" % aCmd)
+        self.mSetCmd(aCmd)
 
         if aOptions and aOptions.jsonconf:
             _aparams_str = aOptions.jsonconf
@@ -32469,7 +33255,7 @@ IPV6INIT=no"""
         _exceptionRaised = False
 
         self.__base_path = self.__ctx.mGetBasePath()
-        self.__oeda_path = self.__ctx.mGetOEDAPath()
+        self.__oeda_path = ebOedacli.mComputeOedacliPath(self)
         self.__uuid = aJob.mGetUUID()
         self.__cmd  = aCmd
         _db = ebGetDefaultDB()
@@ -32487,30 +33273,19 @@ IPV6INIT=no"""
         get_gcontext().mSetRegEntry("aOptions", aOptions)
 
         self.mSetExaScale(False)
-        if aOptions is not None and aOptions.jsonconf is not None and \
-           "storageType" in list(aOptions.jsonconf.keys()) and \
-           str(aOptions.jsonconf['storageType'].upper()) == "EXASCALE":
+        self.mSetXS(False)
+        storageType = self.mExtractStorageType(aOptions)
+
+        if storageType == "EXASCALE":
             ebLogInfo("*** EXASCALE ENABLE")
             self.mSetExaScale(True)
             self.mSetStorageType("EXASCALE")
-        elif aOptions is not None and hasattr(aOptions, "storageType") and \
-           str(aOptions.storageType).upper() == "EXASCALE":
-            ebLogInfo("*** EXASCALE ENABLE")
-            self.mSetExaScale(True)
-            self.mSetStorageType("EXASCALE")
-        elif aOptions is not None and aOptions.jsonconf is not None and \
-           "storageType" in list(aOptions.jsonconf.keys()) and \
-           str(aOptions.jsonconf['storageType'].upper()) == "XS":
-            ebLogInfo("*** XS(EXASCALE) ENABLE")
-            self.mSetXS(True)
-            self.mSetStorageType("XS")
-        elif aOptions is not None and aOptions.jsonconf is not None and \
-           "rack" in list(aOptions.jsonconf.keys()) and "storageType" in list(aOptions.jsonconf["rack"].keys()) and \
-           str(aOptions.jsonconf['rack']['storageType'].upper()) == "XS":
+        elif storageType == "XS":
             ebLogInfo("*** XS(EXASCALE) ENABLE")
             self.mSetXS(True)
             self.mSetStorageType("XS")
         else:
+            ebLogInfo("*** ASM ENABLE")
             self.mSetStorageType("ASM")
 
         self.mIsFedramp(aOptions)
@@ -32610,7 +33385,29 @@ IPV6INIT=no"""
             # Check shared environemt only for install/delete operation - review other ops if applicable
             if (ebCluCmdCheckOptions(aCmd, ['check_shared_env']) and not self.__skip_dom0_validation) or \
                self.mIsExaScale():
-                self.mCheckSharedEnvironment()
+                # This is only handled for patching purposes.
+                if ebCluCmdCheckOptions(aCmd, ['patch']):
+                    try:
+                        self.mCheckSharedEnvironment()
+                    except TimeoutError as exc:
+                        ebLogError(f"*** Shared-environment timeout: {exc}")
+                        ebLogError(traceback.format_exc())
+                        _rc = PATCHING_CONNECT_FAILED
+                        _code, _msg, _ = ebPatchFormatBuildError(_rc)
+                        _db.mUpdateChildRequestError(self.__uuid, _code, _msg)
+                        return _rc
+                    except SSHException as e:
+                        ebLogError(f"*** Exception in dispatch cluster: {e}")
+                        ebLogError(f"{traceback.format_exc()}")
+                        _rc = PATCHING_NODE_SSH_CHECK_FAILED
+                        _code, _error_msg, _ = ebPatchFormatBuildError(_rc)
+                        _db.mUpdateChildRequestError(self.__uuid, _code, _error_msg)
+                        return _rc
+
+                    except Exception as e:
+                        raise e
+                else:
+                    self.mCheckSharedEnvironment()
 
             # Calculate OEDA
             self.mCalculateNoOeda(aCmd)
@@ -32623,10 +33420,10 @@ IPV6INIT=no"""
                 self.mRestoreOEDASSHKeys(aOptions)
 
             if aCmd == "selinuxpolicy_update":
-                return self.mProcessSELinuxUpdate(aOptions)
+                return self.__selinux_controls.mProcessSELinuxUpdate(aOptions)
 
             if aCmd == "get_custom_policies":
-                return self.mGetGeneratedSELinuxPolicies(aOptions)
+                return self.__selinux_controls.mGetGeneratedSELinuxPolicies(aOptions)
 
             # 
             # Mainly wrapper around mPatchClusterConfig
@@ -32991,33 +33788,42 @@ IPV6INIT=no"""
         _poll_o.register(_proc.stdout, select.POLLIN)
         _s_time = time.time()
 
-        while 1:
-            _poll_rc = _poll_o.poll(0)
-            if _poll_rc:
-                _ol = _fd_out.readline()
-                if _ol is not None and _ol != '':
-                    if not aSkipLog:
-                        ebLogInfo(_ol.strip())
-                    _out += [_ol]
-                else:
-                    break
-            _e_time = time.time() - _s_time
-            if _timeout is not None and _e_time >= _timeout:
-                ebLogInfo("Terminate actual Command SubProcess: {0}".format(aCmd))
-                _out = subprocess.check_output(['/bin/ps', '-ax']).decode('utf8')
-                _matching_process = list(filter(lambda x: '{}'.format(aCmd) in x, _out.split('\n')))
-                _pids = list(map(lambda x: x.split()[0], _matching_process))
-                ebLogInfo("List of process to be killed: {0}".format(_pids))
-                for _pid in _pids:
-                    _process = psutil.Process(int(_pid))
-                    for _proc in _process.children(recursive=True):
-                        ebLogInfo(f"Killing child process {_proc.pid} of parent {_pid}.")
-                        _proc.kill()
-                    ebLogInfo(f"Killing parent process {_pid}.")
-                    _process.kill()
-                raise ExacloudRuntimeError(0x0117, 0xA, 'Timeout Exception')
-            # TODO: Add expo backoff timeout
-            time.sleep(1)
+        try:
+            while 1:
+                _poll_rc = _poll_o.poll(0)
+                if _poll_rc:
+                    _ol = _fd_out.readline()
+                    if _ol is not None and _ol != '':
+                        if not aSkipLog:
+                            ebLogInfo(_ol.strip())
+                        _out += [_ol]
+                    else:
+                        break
+                _e_time = time.time() - _s_time
+                if _timeout is not None and _e_time >= _timeout:
+                    ebLogInfo("Terminate actual Command SubProcess: {0}".format(aCmd))
+                    _out = subprocess.check_output(['/bin/ps', '-ax']).decode('utf8')
+                    _matching_process = list(filter(lambda x: '{}'.format(aCmd) in x, _out.split('\n')))
+                    _pids = list(map(lambda x: x.split()[0], _matching_process))
+                    ebLogInfo("List of process to be killed: {0}".format(_pids))
+                    for _pid in _pids:
+                        _process = psutil.Process(int(_pid))
+                        for _child_proc in _process.children(recursive=True):
+                            ebLogInfo(f"Killing child process {_child_proc.pid} of parent {_pid}.")
+                            _child_proc.kill()
+                        ebLogInfo(f"Killing parent process {_pid}.")
+                        _process.kill()
+                    raise ExacloudRuntimeError(0x0117, 0xA, 'Timeout Exception')
+                # TODO: Add expo backoff timeout
+                time.sleep(1)
+        finally:
+            try:
+                _proc.wait()
+            finally:
+                if _proc.stdout:
+                    _proc.stdout.close()
+                if _proc.stderr:
+                    _proc.stderr.close()
 
         return [_out,_err]
 
@@ -33040,14 +33846,51 @@ IPV6INIT=no"""
         _stdin = aStdIn
         _std_out = aStdOut
         _stderr = aStdErr
+        _proc = None
         try:
             _proc = subprocess.Popen(_args, stdin=_stdin, stdout=_std_out, stderr=_stderr, cwd=_current_dir)
-            _std_out, _std_err = wrapStrBytesFunctions(_proc).communicate(timeout=aTimeOut)
+            _stdout_bytes, _stderr_bytes = _proc.communicate(timeout=aTimeOut)
             _rc = _proc.returncode
+
+            def _wrap_existing(aStream):
+                if aStream in (None, subprocess.DEVNULL):
+                    return aStream
+                return wrapStrBytesFunctions(aStream)
+            
+            def _make_temp_stream(aData):
+                _temp = tempfile.TemporaryFile(mode='w+b')
+                if aData:
+                    _temp.write(aData)
+                _temp.seek(0)
+                return wrapStrBytesFunctions(_temp)
+
+            if _std_out == subprocess.PIPE:
+                _stdout_stream = _make_temp_stream(_stdout_bytes)
+            else:
+                _stdout_stream = _wrap_existing(_std_out)
+
+            if _stderr == subprocess.PIPE:
+                _stderr_stream = _make_temp_stream(_stderr_bytes)
+            elif _stderr == subprocess.STDOUT:
+                _stderr_stream = _stdout_stream
+            else:
+                _stderr_stream = _wrap_existing(_stderr)
+
+            _std_out = _stdout_stream.read() if hasattr(_stdout_stream, "read") else ""
+            _std_err = _stderr_stream.read() if hasattr(_stderr_stream, "read") else ""
         except Exception as e:
             _rc = 2
             _std_out = ""
             _std_err = str(e)
+        finally:
+            if _proc is not None:
+                try:
+                    _proc.wait()
+                finally:
+                    if _proc.stdout:
+                        _proc.stdout.close()
+                    if _proc.stderr:
+                        _proc.stderr.close()
 
         ebLogTrace(f"*** mExecuteLocal: Executed command: {aCmd}. Return code: {_rc}.")
         if aLogOutError:
@@ -35409,265 +36252,27 @@ IPV6INIT=no"""
         _processes.mJoinProcess()
 
 
-    def mGetGeneratedSELinuxPolicies(self, aOptions):
-        if aOptions is not None and aOptions.jsonconf is not None and aOptions.jsonconf.get("se_linux", None) is not None:
-            if type(self.__options.jsonconf["se_linux"]) is str:
-                _error_str = "Incorrect SE Linux configuration in request payload."
-                raise ExacloudRuntimeError(0x0121, 0xA, _error_str, aStackTrace=False)
-
-            _db = ebGetDefaultDB()
-            dictHostToGeneratedPolicies = dict()
-            listOfInfrastructureComponents = aOptions.jsonconf.get("se_linux").get("infraComponent", [])
-            sendAll = aOptions.jsonconf.get("sendall", False)
-            if sendAll:
-                ebLogInfo("Exacloud will send back all generated policies irrespective of previous sync operation.")
-            for component in listOfInfrastructureComponents:
-                listOfNodes = component.get("targetComponentName", [])
-                ebLogInfo("List of hosts to sync generated policy files: {}.".format(listOfNodes))
-                for thisNode in listOfNodes:
-                    targetHost = str(thisNode)
-                    listOfPolicies = list()
-                    if sendAll:
-                        listOfPolicies = _db.mGetAllSELinuxPolicy(targetHost)
-                    else:
-                        listOfPolicies = _db.mGetUnsyncedSELinuxPolicy(targetHost)
-                    if listOfPolicies is None or len(listOfPolicies) == 0:
-                        dictHostToGeneratedPolicies[targetHost] = []
-                    else:
-                        finalListOfPolicies = list()
-                        for thisRow in listOfPolicies:
-                            finalListOfPolicies.append(thisRow[0])
-                        dictHostToGeneratedPolicies[targetHost] = finalListOfPolicies
-            _reqobj = self.mGetRequestObj()
-            _reqobj.mSetStatusInfo(json.dumps(dictHostToGeneratedPolicies))
-            ebLogDebug("Complete statusinfo of operation: {}".format(json.dumps(dictHostToGeneratedPolicies, indent = 4)))
-            _db.mUpdateRequest(_reqobj)
-
-            #Marking policies of all hosts currently synced with ECRA
-            for component in listOfInfrastructureComponents:
-                listOfNodes = component.get("targetComponentName", [])
-                for thisNode in listOfNodes:
-                    targetHost = str(thisNode)
-                    _db.mUpdateAllPoliciesOfHostAsSynced(targetHost)
-
-            return SELINUX_UPDATE_SUCCESS
-        else:
-            _error_str = "Missing required information in exacloud payload."
-            raise ExacloudRuntimeError(0x0121, 0xA, _error_str, aStackTrace=False)
-
-
-    def mGenerateCustomPolicyFileForThisRequest(self):
-        reqObj = self.mGetRequestObj()
-        if reqObj is not None:
-            startTime = reqObj.mGetTimeStampStart()
-            ebLogTrace("Request start time was: {}".format(startTime))
-            dom0s = [dom0 for dom0, _ in self.mReturnDom0DomUPair()]
-            generatedPolicyFileMap = dict()
-            for dom0 in dom0s:
-                checkNode = exaBoxNode(get_gcontext())
-                checkNode.mSetUser("root")
-                # The mIsConnectable have no retry hence this check makse sense here.
-                if checkNode.mIsConnectable(aHost=dom0):
-                    with connect_to_host(dom0, get_gcontext()) as dom0Node:
-
-                        ebLogTrace("Checking if python3 exists on {}".format(dom0))
-                        python3Executable = None
-                        if dom0Node.mFileExists("/usr/bin/python3"):
-                            python3Executable = "/usr/bin/python3"
-                        if python3Executable is None and dom0Node.mFileExists("/bin/python3"):
-                            python3Executable = "/bin/python3"
-
-                        if python3Executable is None:
-                            ebLogWarn("Python3 does not exist on node {}. Skipping custom SE Linux policy generation".format(dom0))
-                            continue
-                        customPolicyScriptPath = os.path.join(self.mGetBasePath(),"scripts/selinux/createCustomAuditLog.py")
-                        remoteScriptPath = os.path.join("/root", "createCustomAuditLog.py")
-                        try:
-                            dom0Node.mCopyFile(customPolicyScriptPath, remoteScriptPath)
-                        except:
-                            continue
-                        cmdToExecute = "{0} {1} -st \"{2}\"".format(python3Executable, remoteScriptPath, startTime)
-                        ebLogTrace("Executing command: {}".format(cmdToExecute))
-                        fin, fout, ferr = dom0Node.mExecuteCmd(cmdToExecute)
-
-                        returnCode = dom0Node.mGetCmdExitStatus()
-                        if returnCode != 0:
-                            ebLogWarn("Failed to generate custom policies on {}".format(dom0))
-                            err = ferr.readlines()
-                            if err:
-                                for e in err:
-                                    ebLogWarn(e[:-1].encode('utf-8'))
-                        else:
-                            ebLogTrace("Command execution successful.")
-                            out = fout.readlines()
-                            if out:
-                                for e in out:
-                                    outputLine = e[:-1]
-                                    ebLogTrace(outputLine)
-                                    remoteFileLocation = None
-                                    if outputLine.startswith("Custom policy file created:"):
-                                        remoteFileLocation = outputLine.split(":")[1]
-                                        baseName = os.path.basename(remoteFileLocation)
-                                        strFileContent = dom0Node.mReadFile(remoteFileLocation)
-                                        enc64Data = b64encode(strFileContent)
-                                        strEncodedData = enc64Data.decode('utf-8')
-                                        generatedPolicyFileMap[str(dom0)] = strEncodedData
-                                        cmdToExecute = "/bin/rm {0}".format(remoteFileLocation)
-                                        dom0Node.mExecuteCmd(cmdToExecute)
-                        
-                        cmdToExecute = "/bin/rm {0}".format(remoteScriptPath)
-                        dom0Node.mExecuteCmd(cmdToExecute)
-
-            if len(generatedPolicyFileMap.keys()) > 0:
-                _db = ebGetDefaultDB()
-                hostList = list(generatedPolicyFileMap.keys())
-                for thisHost in hostList:
-                    _db.mInsertGeneratedSELinuxPolicy(reqObj.mGetUUID(), thisHost,generatedPolicyFileMap.get(thisHost))
-
-
-    def mUpdateListWithDomainNameIfRequired(self, listOfNodes, listOfAllHosts):
-
-        hostNameToFQDNHostName = defaultdict(lambda: None)
-        for thisHost in listOfAllHosts:
-            hostName = thisHost.split(".")[0]
-            hostNameToFQDNHostName[hostName] = thisHost
-        
-        for thisIndex, thisNode in enumerate(listOfNodes):
-            if thisNode.find(".") == -1:
-                if hostNameToFQDNHostName[thisNode] != None:
-                    listOfNodes[thisIndex] = hostNameToFQDNHostName[thisNode]
-                else:
-                    return False
-
-        return True
-
-
-    def mProcessSELinuxUpdate(self, aOptions, isElastic=False):
-
-        """Return status code meaning:
-           0 : Successful.
-           1 : mode update failure only.
-           2 : policy update failure only.
-           3 : mode and policy update failure."""
-
-        #TODO: reboot nodes.
-        _hasModeUpdateFailed = False
-        _hasPolicyUpdateFailed = False
-        if aOptions is not None and aOptions.jsonconf is not None and aOptions.jsonconf.get("se_linux", None) is not None:
-            if type(self.__options.jsonconf["se_linux"]) is str:
-                _error_str = "Incorrect SE Linux configuration in request payload."
-                raise ExacloudRuntimeError(0x0121, 0xA, _error_str, aStackTrace=False)
-            listOfInfrastructureComponents = aOptions.jsonconf.get("se_linux").get("infraComponent", [])
-            statusOfComponents = list()
-            ebLogInfo("Shared environment: {0}".format(self.__shared_env))
-            listOfAllHosts = self.mGetHostList()
-            for component in listOfInfrastructureComponents:
-                completeStatus = dict()
-
-                newMode = component["mode"]
-                componentType = component["component"]
-                if componentType == "domu" and not isElastic:
-                    ebLogWarn("SE Linux update operations for domUs are supported only during provisioning and elastic scale compute.")
-                    continue
-
-                listOfNodes = component["targetComponentName"]
-                preComputedList = True
-                if type(listOfNodes) is str and listOfNodes == "all":
-                    preComputedList = False
-                    listOfNodes = list()
-                    if componentType == "dom0":
-                        listOfNodes = [dom0 for dom0, _ in self.mReturnDom0DomUPair()]
-                    elif componentType == "cell":
-                        listOfNodes = [cell for cell in self.mReturnCellNodes()]
-                    elif componentType == "domu":
-                        listOfNodes = [domU for _, domU in self.mReturnDom0DomUPair()]
-
-                if type(listOfNodes) is not list:
-                    ebLogError("Invalid value for list of nodes. Value = {0}".format(listOfNodes))
-                    _hasModeUpdateFailed = True
-                    _hasPolicyUpdateFailed = True
-                    continue
-
-                if preComputedList:
-                    _ret = self.mUpdateListWithDomainNameIfRequired(listOfNodes, listOfAllHosts)
-                    if not _ret:
-                        _error_str = "Failed to obtain domain name for list of Nodes."
-                        raise ExacloudRuntimeError(0x0123, 0xA, _error_str, aStackTrace=False)
-
-                ebLogInfo("Processing SE Linux updates for {0}s: {1}".format(componentType, listOfNodes))
-
-                completeStatus["componentType"] = componentType
-                nodeStatusList = list()
-                _reboot_set = set()
-                for thisNode in listOfNodes:
-                    with connect_to_host(thisNode, get_gcontext()) as _node:
-                        operationStatus = dict()
-                        operationStatus["modeUpdate"] = "Success"
-                        operationStatus["policyUpdate"] = "Success"
-                        if self.mSetSeLinux(_node, newMode, componentType, operationStatus):
-                            _reboot_set.add(thisNode)
-
-                        if operationStatus["modeUpdate"] == "Failure":
-                            _hasModeUpdateFailed = True
-                        if operationStatus["policyUpdate"] == "Failure":
-                            _hasPolicyUpdateFailed = True
-                        thisNodeStatus = dict()
-                        thisNodeStatus["hostname"] = str(thisNode)
-                        thisNodeStatus["status"] = operationStatus
-                        nodeStatusList.append(thisNodeStatus)
-                
-                if _reboot_set:
-                    self.mRebootNodesIfNoVMExists(_reboot_set, componentType)
-
-                completeStatus["nodeStatus"] = nodeStatusList
-                policyFileKey = "{0}_policy".format(componentType)
-                if policyFileKey in aOptions.jsonconf.get("se_linux").keys():
-                    policyFileList = aOptions.jsonconf.get("se_linux").get(policyFileKey)
-                    for policyFile in policyFileList:
-                        if os.path.exists(policyFile):
-                            os.remove(policyFile)
-
-                statusOfComponents.append(completeStatus)
-
-            _reqobj = self.mGetRequestObj()
-            detailedStatusInfo = dict()
-            detailedStatusInfo["components"] = statusOfComponents
-            _reqobj.mSetStatusInfo(json.dumps(detailedStatusInfo, indent = 4))
-            ebLogDebug("Complete status of operation: {0}".format(json.dumps(detailedStatusInfo, indent = 4)))
-            _db = ebGetDefaultDB()
-            _db.mUpdateRequest(_reqobj)
-
-            if _hasModeUpdateFailed and _hasPolicyUpdateFailed:
-                _error_str = "Failed to update SE Linux mode and policies."
-                raise ExacloudRuntimeError(0x0123, 0xA, _error_str, aStackTrace=False)
-            elif _hasModeUpdateFailed:
-                _error_str = "Failed to update SE Linux mode."
-                raise ExacloudRuntimeError(0x0124, 0xA, _error_str, aStackTrace=False)
-            elif _hasPolicyUpdateFailed:
-                _error_str = "Failed to update SE Linux policies."
-                raise ExacloudRuntimeError(0x0125, 0xA, _error_str, aStackTrace=False)
-            else:
-                return SELINUX_UPDATE_SUCCESS
-        else:
-            _error_str = "Missing SE Linux configuration in request payload."
-            raise ExacloudRuntimeError(0x0121, 0xA, _error_str, aStackTrace=False)
-
-
-    def mRebootNodesIfNoVMExists(self, aRebootSet: set, aComponentType: str) -> None:
+    def mRebootNodesIfNoVMExists(self, aRebootSet: set, aComponentType: str, aStaggeredReboot=False) -> None:
 
         _reboot_set = aRebootSet
         _component_type = aComponentType
         if _component_type == "domu":
-            _plist = ProcessManager()
-            for _node in _reboot_set:
-                ebLogInfo("Rebooting {0} ({1}).".format(_component_type, _node))
-                _p = ProcessStructure(self.mRebootNode, [_node], _node)
-                _p.mSetMaxExecutionTime(30*60) # 30 minutes timeout
-                _p.mSetJoinTimeout(10)
-                _p.mSetLogTimeoutFx(ebLogWarn)
-                _plist.mStartAppend(_p)
-            _plist.mJoinProcess()
-            ebLogInfo(f"Reboot of domUs: {_reboot_set} was successful.")
+            if not aStaggeredReboot:
+                _plist = ProcessManager()
+                for _node in _reboot_set:
+                    ebLogInfo("Rebooting {0} ({1}).".format(_component_type, _node))
+                    _p = ProcessStructure(self.mRebootNode, [_node], _node)
+                    _p.mSetMaxExecutionTime(30*60) # 30 minutes timeout
+                    _p.mSetJoinTimeout(10)
+                    _p.mSetLogTimeoutFx(ebLogWarn)
+                    _plist.mStartAppend(_p)
+                _plist.mJoinProcess()
+                ebLogInfo(f"Reboot of domUs: {_reboot_set} was successful.")
+            else:
+                for _node in _reboot_set:
+                    ebLogInfo("Rebooting {0} ({1}).".format(_component_type, _node))
+                    self.mRebootNode(_node)
+                    ebLogInfo(f"Reboot of domU: {_node} was successful.")
             return
         if _component_type == "dom0":
             _any_vm_running = False
@@ -35680,17 +36285,23 @@ IPV6INIT=no"""
             if not self.__shared_env or _any_vm_running is False:
                 self.mAcquireRemoteLock()
                 ebLogInfo(f"No VMs are running or it is a SVM environment for the dom0s: {_reboot_set}, Rebooting all dom0s for selinux changes to take effect.")
-                _plist = ProcessManager()
-                for _node in _reboot_set:
-                    ebLogInfo("Rebooting {0} ({1}).".format(_component_type, _node))
-                    _p = ProcessStructure(self.mRebootNode, [_node], _node)
-                    _p.mSetMaxExecutionTime(30*60) # 30 minutes timeout
-                    _p.mSetJoinTimeout(10)
-                    _p.mSetLogTimeoutFx(ebLogWarn)
-                    _plist.mStartAppend(_p)
-                _plist.mJoinProcess()
-                self.mReleaseRemoteLock()
-                ebLogInfo(f"Reboot of dom0s: {_reboot_set} was successful.")
+                if not aStaggeredReboot:
+                    _plist = ProcessManager()
+                    for _node in _reboot_set:
+                        ebLogInfo("Rebooting {0} ({1}).".format(_component_type, _node))
+                        _p = ProcessStructure(self.mRebootNode, [_node], _node)
+                        _p.mSetMaxExecutionTime(30*60) # 30 minutes timeout
+                        _p.mSetJoinTimeout(10)
+                        _p.mSetLogTimeoutFx(ebLogWarn)
+                        _plist.mStartAppend(_p)
+                    _plist.mJoinProcess()
+                    self.mReleaseRemoteLock()
+                    ebLogInfo(f"Reboot of dom0s: {_reboot_set} was successful.")
+                else:
+                    for _node in _reboot_set:
+                        ebLogInfo("Rebooting {0} ({1}).".format(_component_type, _node))
+                        self.mRebootNode(_node)
+                        ebLogInfo(f"Reboot of dom0: {_node} was successful.")
             else:
                 ebLogWarn("Dom0s {0} needs to be rebooted manually since there are running VMs.".format(_reboot_set))
             return
@@ -35705,16 +36316,22 @@ IPV6INIT=no"""
                     break
             if not self.__shared_env or _any_vm_running is False:
                 ebLogInfo(f"No VMs are running or it is a SVM environment for the dom0s: {_all_dom0s}, Rebooting cells for selinux changes to take effect.")
-                _plist = ProcessManager()
-                for _node in _reboot_set:
-                    ebLogInfo("Rebooting {0} ({1}).".format(_component_type, _node))
-                    _p = ProcessStructure(self.mRebootNode, [_node], _node)
-                    _p.mSetMaxExecutionTime(30*60) # 30 minutes timeout
-                    _p.mSetJoinTimeout(10)
-                    _p.mSetLogTimeoutFx(ebLogWarn)
-                    _plist.mStartAppend(_p)
-                _plist.mJoinProcess()
-                ebLogInfo(f"Reboot of cells: {_reboot_set} was successful.")
+                if not aStaggeredReboot:
+                    _plist = ProcessManager()
+                    for _node in _reboot_set:
+                        ebLogInfo("Rebooting {0} ({1}).".format(_component_type, _node))
+                        _p = ProcessStructure(self.mRebootNode, [_node], _node)
+                        _p.mSetMaxExecutionTime(30*60) # 30 minutes timeout
+                        _p.mSetJoinTimeout(10)
+                        _p.mSetLogTimeoutFx(ebLogWarn)
+                        _plist.mStartAppend(_p)
+                    _plist.mJoinProcess()
+                    ebLogInfo(f"Reboot of cells: {_reboot_set} was successful.")
+                else:
+                    for _node in _reboot_set:
+                        ebLogInfo("Rebooting {0} ({1}).".format(_component_type, _node))
+                        self.mRebootNode(_node)
+                        ebLogInfo(f"Reboot of cell: {_node} was successful.")
             else:
                 ebLogWarn("Cells {0} needs to be rebooted manually since there are running VMs.".format(_reboot_set))
 
@@ -35751,129 +36368,6 @@ IPV6INIT=no"""
 
         ebLogInfo(f"Enable FIPs: {_enablefips}")
         return _enablefips
-
-
-    def mGetSELinuxMode(self, aNodeType):
-
-        if self.__options is not None and self.__options.jsonconf is not None and self.__options.jsonconf.get("se_linux", None) is not None:
-            if type(self.__options.jsonconf["se_linux"]) is str:
-                return None
-            aNodeType = aNodeType.lower()
-            listOfInfraComponents = self.__options.jsonconf["se_linux"]["infraComponent"]
-            for infraComponent in listOfInfraComponents:
-                if infraComponent["component"] == aNodeType:
-                    return infraComponent["mode"]
-
-        return None
-
-    def mSetSeLinux(self, aNode, aStatus, anodeType = None, operationStatusDict = None):
-        """
-          aNode: node connected ready to execute commands
-          aStatus: desired status of SELinux to have -> Enabled or Disabled
-          Return type: boolean
-              True: Reboot needed to achieve desired SELinux status (i.e. sed performed)
-              False: No reboot needed because desired SELinux status was already present
-        """
-
-        aStatus = str(aStatus).lower()
-        _permissible_vals = ["enforcing", "permissive", "disabled"]
-        if aStatus not in _permissible_vals:
-            ebLogError("*** Invalid SE_LINUX mode. Value: {0}".format(aStatus))
-            if operationStatusDict is None:
-                operationStatusDict = dict()
-            operationStatusDict["modeUpdate"] = "Failure"
-            operationStatusDict["policyUpdate"] = "Success"
-            return False
-
-        _modeUpdateStatus = "Success"
-        _policyUpdateStatus = "Success"
-        _node = aNode
-        _cmdstr = "/bin/grep -i \"^\\s*SELINUX\" /etc/selinux/config"
-        _f, _o, _e = _node.mExecuteCmd(_cmdstr)
-        _rc = _node.mGetCmdExitStatus()
-        _needs_change = False
-        _current_status = "disabled"
-        _lines = _o.readlines()
-
-        if _rc == 0:
-            for _line in _lines:
-                _line = _line.replace(" ", "") 
-                _line = _line.replace(os.linesep, "") 
-                _vals = _line.split("=") #SELINUX=disabled/permissive/enforcing
-
-                if len(_vals) == 2 and _vals[0] == "SELINUX":
-                    if _vals[1] in _permissible_vals and _vals[1] != aStatus:
-                        _current_status = _vals[1]
-                        _needs_change = True
-                        break
-
-        _rv = False
-
-        if _needs_change:
-            _updateSELinuxMode = True
-            if aStatus == "enforcing":
-                _node.mExecuteCmdLog("/bin/touch /.autorelabel")
-                _thisReturnCode = _node.mGetCmdExitStatus()
-                if _thisReturnCode != 0:
-                    ebLogError("Failed to create autorelabel file on the host. Will not update SELinux mode. Exception policies will be loaded if present.")
-                    _updateSELinuxMode = False
-                    _modeUpdateStatus = "Failure"
-                else:
-                    ebLogInfo("Successfully created the autorelabel file.")
-
-            if _updateSELinuxMode:
-                _cmdstr = "/bin/sed -i --follow-symlinks s/SELINUX={0}/SELINUX={1}/ /etc/selinux/config".format(_current_status, aStatus)
-                _node.mExecuteCmdLog(_cmdstr)
-                _thisReturnCode = _node.mGetCmdExitStatus()
-                if _thisReturnCode != 0:
-                    ebLogError("Failed to update mode to {0}".format(aStatus))
-                    _modeUpdateStatus = "Failure"
-                else:
-                    _rv = True
-                    ebLogInfo("SELinux will be {0}".format(aStatus))
-        else:
-            ebLogWarn("*** SE Linux value already at: {0}".format(aStatus))
-
-        #Update policies on the node in case se linux status is set to enforcing.
-        if aStatus == "enforcing" or aStatus == "permissive":
-            if anodeType is None:
-                ebLogWarn("*** Unable to update security policies for node type None.")
-                _policyUpdateStatus = "Failure"
-            else:
-                anodeType = anodeType.lower()
-                _keyName = "{0}_policy".format(anodeType)
-                policyFileList = list()
-                if type(self.__options.jsonconf.get("se_linux")) is str:
-                    policyFileList = None
-                else:
-                    policyFileList = self.__options.jsonconf.get("se_linux").get(_keyName, None)
-
-                if policyFileList is None:
-                    ebLogWarn("*** Policy file details absent in payload. ***")
-                else:
-                    for _policy_file in policyFileList:
-                        if not os.path.exists(_policy_file):
-                            ebLogWarn("*** Unable to locate policy file: {0}".format(_policy_file))
-                            _policyUpdateStatus = "Failure"
-                        else:
-                            simpleFileName = _policy_file.split("/")[-1]
-                            currentUUID = simpleFileName.split(".")[0]
-                            _dst_file = "/tmp/{0}_policies_{1}.pp".format(anodeType, currentUUID)
-                            _node.mCopyFile(_policy_file, _dst_file)
-                            _cmdstr = "/usr/sbin/semodule -i {0}".format(_dst_file)
-                            _f, _o, _e = _node.mExecuteCmd(_cmdstr)
-                            _rc = _node.mGetCmdExitStatus()
-                            if _rc == 0:
-                                ebLogInfo("{0} Security policies successfully loaded.".format(anodeType))
-                            else:
-                                ebLogError("Failed to load security policies for {0}.".format(anodeType))
-                                _policyUpdateStatus = "Failure"
-
-        if operationStatusDict is None:
-            operationStatusDict = dict()
-        operationStatusDict["modeUpdate"] = _modeUpdateStatus
-        operationStatusDict["policyUpdate"] = _policyUpdateStatus
-        return _rv
 
     def mGetOEDAExtraArgs(self) -> str:
         _args = self.mCheckConfigOption('oeda_extra_args')
@@ -36054,7 +36548,7 @@ IPV6INIT=no"""
                 _cmd_str = '/opt/exadata_ovm/vm_maker --remove-domain '+_domu+' --force'
                 _cmd_str2 = '/usr/sbin/vm_maker --stop-domain '+_domu + ' --force'
                 _cmd_str3 = '/usr/bin/virsh undefine '+_domu
-                _chkvm_cmd = '/usr/sbin/vm_maker --list-domains | /bin/grep -w '+_domu
+                _chkvm_cmd = '/usr/sbin/vm_maker --list-domains | /bin/grep "^' + _domu + '("'
                 _hypervisor_service = 'libvirtd'
                 if self.__exabm:
                     _cmd_str3 += ' ; /opt/exadata_ovm/vm_maker --remove-bridge vmeth200'

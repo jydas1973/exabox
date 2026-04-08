@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 #
-# $Header: ecs/exacloud/exabox/ovm/cluvmrecoveryutils.py /main/28 2025/09/23 07:26:34 aararora Exp $
+# $Header: ecs/exacloud/exabox/ovm/cluvmrecoveryutils.py /main/29 2026/01/21 09:00:53 jesandov Exp $
 #
 # cluvmrecoveryutils.py
 #
-# Copyright (c) 2021, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      cluvmrecoveryutils - Implementation layer for the VM recovery
@@ -16,6 +16,7 @@
 #      NONE
 #
 #    MODIFIED   (MM/DD/YY)
+#    jesandov    01/12/26 - 38765088: Include admin information if avaliable
 #    akkar       08/18/25 - Bug 38313259: Fix RTG image copy during node
 #                           recovery
 #    aararora    08/05/25 - ER 38132942: Single stack support for ipv6
@@ -328,7 +329,7 @@ class NodeRecovery(object):
         _domU = aDomU
         _dom0_bonding = aDom0Bonding
         _ebox = self.__cluctrl
-        new_payload = { "client": {}, "backup": {}, "vip": {}}
+        new_payload = { "client": {}, "backup": {}, "vip": {}, "admin": {}}
         new_payload["fqdn"] = _dom0
         new_payload["bonding_operation"] = "vmbackup-restore"
         new_payload["dom0_bonding"] = _dom0_bonding
@@ -389,7 +390,29 @@ class NodeRecovery(object):
                     new_payload["client"]["v6gateway"] = _gateway
                     new_payload["client"]["v6netmask"] = _mask
                     new_payload["client"]["ipv6"] = _ip
-            elif _net_conf.mGetNetType() == "backup":
+            elif _net_conf.mGetNetType() == "admin":
+                _nat_dn = _net_conf.mGetNetNatDomainName()
+                _nat_ip = _net_conf.mGetNetNatAddr()
+                _nat_mask = _net_conf.mGetNetNatMask()
+                _nat_hn = _net_conf.mGetNetNatHostName()
+
+                new_payload["admin"]["fqdn"] = _fqdn
+                new_payload["admin"]["mac"] = _mac
+                new_payload["admin"]["natdomain"] = _nat_dn
+                new_payload["admin"]["natip"] = _nat_ip
+                new_payload["admin"]["natnetmask"] = _nat_mask
+                new_payload["admin"]["slaves"] = _slaves
+                new_payload["admin"]["vlantag"] = _vlantag
+                new_payload["admin"]["domu_oracle_name"] = _nat_hn
+                if not _nw_utils.mIsIPv6(_ip):
+                    new_payload["admin"]["ip"] = _ip
+                    new_payload["admin"]["gateway"] = _gateway
+                    new_payload["admin"]["netmask"] = _mask
+                elif _nw_utils.mIsIPv6(_ip):
+                    new_payload["admin"]["v6gateway"] = _gateway
+                    new_payload["admin"]["v6netmask"] = _mask
+                    new_payload["admin"]["ipv6"] = _ip
+            elif _net_conf.mGetNetType() in ["backup"]:
                 new_payload["backup"]["fqdn"] = _fqdn
                 new_payload["backup"]["mac"] = _mac
                 new_payload["backup"]["slaves"] = _slaves

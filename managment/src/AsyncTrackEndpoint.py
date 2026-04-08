@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2023, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     AsyncTrackingEndpoint - Basic functionality
@@ -11,6 +11,8 @@ NOTE:
     None    
 
 History:
+    shapatna    02/09/2026 - Bug: 38900266 - Fix for issues pointed by Codev 
+                             in exabox/management directory
     hgaldame    06/05/2022 - 34146854 - oci/exacc: persists exacloud remote ec 
                              async request status
     hgaldame    04/06/2022 - 33643036 - remote ec to return text as json object
@@ -333,7 +335,10 @@ class AsyncTrackEndpoint(EditorEndpoint):
                             _process.mSetLogFile(_file)
 
                     else:
-                        _file = self.mGetPath(self.mGetBody()['file'])
+                        _body = self.mGetBody()
+                        _file_param = _body.get('file')
+                        if _file_param:
+                            _file = self.mGetPath(_file_param)
 
                 if _file is None:
                     self.mGetResponse()['status'] = 404

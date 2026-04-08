@@ -1,10 +1,10 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/ovm/clunetworkreconfigcommons.py /main/1 2025/05/21 05:57:34 rkhemcha Exp $
+# $Header: ecs/exacloud/exabox/ovm/clunetworkreconfigcommons.py /main/2 2026/02/01 21:21:54 rkhemcha Exp $
 #
 # clunetworkreconfigcommons.py
 #
-# Copyright (c) 2025, Oracle and/or its affiliates.
+# Copyright (c) 2025, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      clunetworkreconfigcommons.py - Common classes/methods for reconfig/revert reconfig network flows
@@ -13,24 +13,23 @@
 #      Houses common methods needed for clunetworkreconfig.py and clurevertnetworkreconfig.py
 #
 #    MODIFIED   (MM/DD/YY)
+#    rkhemcha    01/29/26 - 38879074 - Support reconfig on single node CPS
 #    rkhemcha    02/14/25 - Creation
 #
 
-import os
-import copy
 import json
+import os
 import shlex
 import subprocess
+from contextlib import contextmanager
 from time import sleep
 
-
-from contextlib import contextmanager
-from exabox.log.LogMgr import ebLog
-from exabox.core.Node import exaBoxNode
 from exabox.core.Context import get_gcontext
 from exabox.core.DBStore import ebGetDefaultDB
-from exabox.network.dns.DNSConfig import ebDNSConfig
 from exabox.core.Error import ExacloudRuntimeError, gNetworkError
+from exabox.core.Node import exaBoxNode
+from exabox.log.LogMgr import ebLog
+from exabox.network.dns.DNSConfig import ebDNSConfig
 from exabox.ovm.hypervisorutils import HVIT_XEN, HVIT_KVM
 
 SUPPORTED_NETWORKS = ["backup"]
@@ -59,8 +58,14 @@ class ebCluNetworkReconfigHandler(object):
             self.isRevert = True
         self.errorCode = 0x8007 if self.isRevert else 0x8006
 
-        self.masterCps = self.mGetEbox().mCheckConfigOption("oeda_host").split('.')[0]
-        self.remoteCps = self.mGetEbox().mCheckConfigOption("remote_cps_host").split('.')[0]
+        # Read local and remote CPS names from exabox.conf
+        # The CPS name can be short name or FQDN
+        primaryCps = self.ebox.mCheckConfigOption("oeda_host")
+        secondaryCps = self.ebox.mCheckConfigOption("remote_cps_host")
+
+        self.masterCps = getHostname(primaryCps)
+        if secondaryCps:
+            self.remoteCps = getHostname(secondaryCps)
 
         self.mPrintLogHeader()
         self.mValidateEnv()
@@ -232,7 +237,6 @@ class ebCluNetworkReconfigHandler(object):
     def mUpdateDnsRecord(self):
         """
         Utility which checks whether hostname/IP is changing for any/(passed) node
-        :param alias: compute node alias
         :return: Boolean
         """
         for node in self.payload["updateNetwork"]["nodes"]:
@@ -408,8 +412,13 @@ class NodeUtils(object):
             else 0x8006
 
         # Read local and remote CPS names from exabox.conf
-        self.masterCps = eBox.mCheckConfigOption("oeda_host").split('.')[0]
-        self.remoteCps = eBox.mCheckConfigOption("remote_cps_host").split('.')[0]
+        # The CPS name can be short name or FQDN
+        primaryCps = self.ebox.mCheckConfigOption("oeda_host")
+        secondaryCps = self.ebox.mCheckConfigOption("remote_cps_host")
+
+        self.masterCps = getHostname(primaryCps)
+        if secondaryCps:
+            self.remoteCps = getHostname(secondaryCps)
 
         # Fetch network information
         self.interfaceInfo = self.mGetInterfaceInfo()
@@ -429,7 +438,8 @@ class NodeUtils(object):
     def mGetUUID(self):
         return self.mGetEbox().mGetUUID()
 
-    def mGetVlanOpKey(self, op, network):
+    @staticmethod
+    def mGetVlanOpKey(op, network):
         if op == "delete":
             return "vlan_delete_" + network
         elif op == "add":
@@ -994,3 +1004,8 @@ class NodeUtils(object):
             _msg = f"CMD: {aCmd} | RC: {ex.returncode} | OUT: {ex.output} | HOST: {aHost}"
             ebLog("nw_reconfig", "DEBUG", _msg)
             return ex.returncode, ex.output
+
+def getHostname(hostname):
+    if '.' in hostname:
+        return hostname.split('.')[0]
+    return hostname

@@ -4,7 +4,7 @@
 #
 # test_dom0.py
 #
-# Copyright (c) 2021, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      test_dom0.py - <one-line expansion of the name>
@@ -16,6 +16,9 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    avimonda    03/09/26 - Modifying tests for fix related to Bug 38951559 -
+#                           GCP: WF WAS STUCK DUE TO NFT RULES MISMATCHES ON
+#                           DIFFERENT NODES
 #    naps        08/14/24 - Bug 36949876 - X11 ipconf path changes.
 #    rkhemcha    02/01/24 - 36251119 - Add tests for update network flow with
 #                           dr enabled
@@ -4140,8 +4143,9 @@ class ebTestDom0HealthCheck(ebTestClucontrol):
                                        aRc=0, aStdout="net.ipv4.conf.all.arp_announce=2", aPersist=True),
                         exaMockCommand("/bin/cp", aRc=0, aPersist=True),
                         exaMockCommand("/bin/sed", aRc=0, aPersist=True),
-                        exaMockCommand("/usr/sbin/sysctl -p", aRc=0, aStdout="random O/P", aPersist=True),
-                        exaMockCommand("/usr/sbin/sysctl -n net.ipv4.conf.all.arp_ignore", aRc=0, aStdout="1",
+                        exaMockCommand("/bin/test -e /sbin/sysctl", aRc=0, aStdout="/usr/sbin/sysctl", aPersist=True),
+                        exaMockCommand("/sbin/sysctl -p", aRc=0, aStdout="random O/P", aPersist=True),
+                        exaMockCommand("/sbin/sysctl -n net.ipv4.conf.all.arp_ignore", aRc=0, aStdout="1",
                                        aPersist=True),
                         exaMockCommand("/bin/cat sysctl.conf | grep 'net.ipv4.conf.all.arp_ignore'",
                                        aRc=0, aStdout="net.ipv4.conf.all.arp_ignore=1", aPersist=True)
@@ -4193,8 +4197,9 @@ class ebTestDom0HealthCheck(ebTestClucontrol):
                                        aRc=0, aStdout="net.ipv4.conf.all.arp_ignore=1", aPersist=False),
                         exaMockCommand("/bin/cp", aRc=0, aPersist=True),
                         exaMockCommand("/bin/sed", aRc=0, aPersist=True),
-                        exaMockCommand("/usr/sbin/sysctl -p", aRc=0, aStdout="random O/P", aPersist=True),
-                        exaMockCommand("/usr/sbin/sysctl -n net.ipv4.conf.all.arp_ignore", aRc=0, aStdout="0",
+                        exaMockCommand("/bin/test -e /sbin/sysctl", aRc=0, aStdout="/usr/sbin/sysctl", aPersist=True),
+                        exaMockCommand("/sbin/sysctl -p", aRc=0, aStdout="random O/P", aPersist=True),
+                        exaMockCommand("/sbin/sysctl -n net.ipv4.conf.all.arp_ignore", aRc=0, aStdout="0",
                                        aPersist=True),
                         exaMockCommand("/bin/cat sysctl.conf | grep 'net.ipv4.conf.all.arp_ignore'",
                                        aRc=0, aStdout="net.ipv4.conf.all.arp_ignore=0", aPersist=True)

@@ -1,7 +1,7 @@
 """
 $Header:
 
- Copyright (c) 2014, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     oedacli - 
@@ -15,6 +15,10 @@ NOTE:
 History:
 
     MODIFIED   (MM/DD/YY)
+    oespinos   03/09/26 - Bug 39001455 Deconfigure exascale kvm host
+    pbellary   03/04/26 - Bug 39037277 - CLUSTER XMLS GET BONDETH4 SET FOR BACKUP NETWORK CONFIGURATION INSTEAD OF BONDETH1
+    mpedapro   02/03/26 - Enh::38914367 support for oeda bonding options for
+                          accelerated network enabled domu
     prsshukl   11/20/25 - Bug 38675257 - EXADBXS PROVISIONING FAILING IN
                           FETCHUPDATEDXMLFROMEXACLOUD
     mpedapro   11/14/25 - Enh::38235082 xml patching changes for sriov
@@ -283,18 +287,23 @@ class OedacliCmdMgr(object):
         self.oxm.save_action()
         self.oxm.run_oedacli(aSrcXml, aDestXml, None, aDeploy)
 
-    def mUpdateNetworkSlaves(self, aSlaves, aID, aHostname, aNetworkType, aSrcXml, aDestXml, aBridge=None):
+    def mUpdateNetworkSlaves(self, aSlaves, aID, aHostname, aNetworkType, aSrcXml, aDestXml, aBridge=None, aMaster=None):
         _slaves = ','.join(aSlaves)
         _id = aID
         _host = aHostname
         _type = aNetworkType
+        _master = aMaster
 
         if aBridge:
             self.oxm.oc_cmd(command=f'ALTER NETWORK NETWORKBRIDGE={aBridge} SLAVE="{str(_slaves)}"',
                             where={'ID':str(_id), 'HOSTNAME':str(_host), 'NETWORKTYPE':str(_type)})
         else:
-            self.oxm.oc_cmd(command=f'ALTER NETWORK SLAVE="{str(_slaves)}"',
-                            where={'ID':str(_id), 'HOSTNAME':str(_host), 'NETWORKTYPE':str(_type)})
+            if _master:
+                self.oxm.oc_cmd(command=f'ALTER NETWORK MASTER="{str(_master)}" SLAVE="{str(_slaves)}"',
+                                where={'ID':str(_id), 'HOSTNAME':str(_host), 'NETWORKTYPE':str(_type)})
+            else:
+                self.oxm.oc_cmd(command=f'ALTER NETWORK SLAVE="{str(_slaves)}"',
+                                where={'ID':str(_id), 'HOSTNAME':str(_host), 'NETWORKTYPE':str(_type)})
         self.oxm.save_action()
         self.oxm.run_oedacli(aSrcXml, aDestXml, None, False)
 
@@ -680,15 +689,8 @@ class OedacliCmdMgr(object):
                     }
                 )
             else:
+                self.setAcceleratedNetworkParams(aCluCtrl, _json['dom0']['hostname'], _client['fqdn'], _client_gateway_single_stack, _client_gatewayv6, _client.get('slaves'), "client", _client.get('network_virtualization'))
                 _arguments = {'mac': _client['mac'], 'vlanid': _vlan}
-                _set_accelerated_network = ebCluAcceleratedNetwork.checkInputAndValidateEnvForAcceleratedNetwork(aCluCtrl, _json['dom0'][
-                    'hostname'], _client.get('fqdn'), _client.get('network_virtualization'))
-                if _set_accelerated_network:
-                    ebLogInfo('Enabling accelerated network for client-net of domu ' + _client.get('fqdn'))
-                    _arguments['ACCELERATEDNETWORK'] = 'ENABLED'
-                    #OEDA is yet to support below bonding_opts argument. Once it supports will uncomment and test this code.
-                    # _arguments['BONDING_OPTS'] = ebCluAcceleratedNetwork.getBondingOptions(_ebox, _client_gateway_single_stack, _client.get('slaves'), _client['fqdn'].split('.')[0])
-                _set_accelerated_network = False 
                 if _client_gateway_single_stack and _client_netmask_single_stack:
                     _arguments["gateway"] = _client_gateway_single_stack
                     _arguments["netmask"] = _client_netmask_single_stack
@@ -724,15 +726,8 @@ class OedacliCmdMgr(object):
                     }
                 )
             else:
+                self.setAcceleratedNetworkParams(aCluCtrl, _json['dom0']['hostname'], _backup['fqdn'], _backup_gateway_single_stack, _backup_gatewayv6, _backup.get('slaves'), "backup", _backup.get('network_virtualization'))
                 _arguments = {'mac': _backup['mac'], 'vlanid': _vlan}
-                _set_accelerated_network = ebCluAcceleratedNetwork.checkInputAndValidateEnvForAcceleratedNetwork(aCluCtrl, _json['dom0'][
-                    'hostname'], _backup.get('fqdn'), _backup.get('network_virtualization'))
-                if _set_accelerated_network:
-                    ebLogInfo('Enabling accelerated network for backup network of domu ' + _backup.get('fqdn'))
-                    _arguments['ACCELERATEDNETWORK'] = 'ENABLED'
-                    #OEDA is yet to support below bonding_opts argument. Once it supports will uncomment and test this code.
-                    # _arguments['BONDING_OPTS'] = ebCluAcceleratedNetwork.getBondingOptions(_ebox, _backup_gateway_single_stack, _backup.get('slaves'), _backup['fqdn'].split('.')[0])
-                _set_accelerated_network = False
                 if _backup_gateway_single_stack and _backup_netmask_single_stack:
                     _arguments['gateway'] = _backup_gateway_single_stack
                     _arguments['netmask'] = _backup_netmask_single_stack
@@ -857,6 +852,11 @@ class OedacliCmdMgr(object):
                         _net_slaves = _backup_payload["slaves"]
                     else:
                         _net_slaves = _domu_net_backup_v4.mGetNetSlave()
+
+                    if ebCluAcceleratedNetwork.checkInputAndValidateEnvForAcceleratedNetwork(aCluCtrl,
+                                                _json['dom0']['hostname'], _backup['fqdn'], _backup.get('network_virtualization')):
+                        _net_slaves = ebCluAcceleratedNetwork.getAcceleratedNetworkSlavesForDomuMaster("backup")
+
                     if not _ociexacc and 'mac' in _backup_payload:
                         _backup_mac = _backup_payload['mac'].lower()
                     if 'mtu' in _backup_payload:
@@ -1012,6 +1012,19 @@ class OedacliCmdMgr(object):
         self.oxm.save_action()
         self.oxm.run_oedacli(aSrcXml, aDestXml, None, False)
 
+    def mUndoConfigureKVMHosts(self, aSrcXml, aDestXml, aComputeList):
+        self.mDeployExascaleAction(aSrcXml, aDestXml, "UNDOCONFIGUREKVMHOSTS", aComputeList)
+
+    def mDeployExascaleAction(self, aSrcXml, aDestXml, aAction, aHostnames=None):
+        _command = f"DEPLOY EXASCALE ACTION={aAction}"
+        if aHostnames:
+            _hostnamelist = ' '.join(aHostnames)
+            _command = _command + f" WHERE HOSTNAMES='{_hostnamelist}'"
+        ebLogInfo(f"Running oedacli command : {_command}")
+        self.oxm.oc_cmd(command=_command)
+        self.oxm.save_action()
+        self.oxm.run_oedacli(aSrcXml, aDestXml, None, True)
+
     def mUpdateEFRack(self, aSrcXml, aDestXml, aHostName, aCellType):
         _hostname = aHostName
         _cell_type = aCellType
@@ -1041,3 +1054,31 @@ class OedacliCmdMgr(object):
         self.oxm.save_action()
         self.oxm.run_oedacli(aSrcXml, aDestXml, None, False)
 
+    def setAcceleratedNetworkParams(self, aCluCtrl, dom0HostName, networkHostname, gateWay, ipv6GatewaWay, slaves, networkType, networkVirtualizationValue="virtio"):
+        _set_accelerated_network = ebCluAcceleratedNetwork.checkInputAndValidateEnvForAcceleratedNetwork(aCluCtrl, dom0HostName, networkHostname, networkVirtualizationValue)
+        if _set_accelerated_network:
+            ebLogInfo('Enabling accelerated network for ' + networkType + ' network of domu ' + networkHostname)
+            accelerated_nw_arguments = {}
+            accelerated_nw_arguments['ACCELERATEDNETWORK'] = 'ENABLED'
+            if slaves is None or slaves.strip() == '':
+                if networkType == "client":
+                    slaves = "eth1 eth2"
+                else:
+                    slaves = "eth3 eth4"
+                ebLogInfo('No slaves specified, using default value :: ' + slaves + ' for slaves of network :: ' + networkType)
+            else:
+                if networkType == "backup":
+                    slaves = "eth3 eth4"
+                    ebLogInfo('Updating slaves as :: ' + slaves + ' for network :: ' + networkType + ' as it is enabled with accelerated network')
+            accelerated_nw_arguments['slave'] = slaves.strip()
+            accelerated_nw_arguments['BONDING_OPTS'] = ebCluAcceleratedNetwork.getBondingOptions(aCluCtrl, gateWay, ipv6GatewaWay, slaves, None)
+            self.oxm.oc_cmd(
+                command='ALTER NETWORK',
+                arguments=accelerated_nw_arguments,
+                where={
+                    'networktype': networkType,
+                    'networkhostname': networkHostname.split('.')[0]
+                }
+            )
+            self.oxm.save_action()
+            self.oxm.merge_actions(True)

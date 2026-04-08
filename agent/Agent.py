@@ -1,7 +1,7 @@
 """
 $Header:
 
- Copyright (c) 2014, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     Agent - Configuration File Managemenet
@@ -14,6 +14,17 @@ NOTE:
 
 History:
    MODIFIED (MM/DD/YY)
+    aypaul     03/03/26 - Bug#38900084 Fix code issues from codev
+    aararora   02/27/26 - Bug 38902170: Correct resource leak issues
+    rajsag     02/17/26 - 38857796 - exacc:bb:exacloud: progress percentage
+                          drops while elastic cell operation is in progress.
+    kanmanic   02/09/26 - 38938929 - validate_elastic_reshape remove success
+                          setting from output.success
+    kanmanic   01/27/26 - Bug 38875642 validate_elastic_reshape returns 0 on 
+                           failure
+   nisrikan  01/20/26 - Bug 38702503 - NEED A MECHANISM TO ROUTE CALLS TO OPCTL IN CASE OF NODE CONNECTION FAILURES
+   llmartin  12/12/25 - Enh 38754528 - provide RPMs info on /Version endpoint
+   pbellary  12/09/25 - Bug 38740441 - EXACLOUD: ADD COMPUTE WF DID NOT ENABLE QINQ IN ELASTIC NODE
    ririgoye  11/26/25 - Bug 38636333 - EXACLOUD PYTHON:ADD INSTANTCLIENT TO
                         LD_LIBRARY_PATH
    aypaul    11/26/25 - ER#38653499 Add trace message for LD_LIBRARY_PATH
@@ -210,7 +221,8 @@ from exabox.core.Core import ebCoreContext
 from exabox.core.Context import get_gcontext, ReadOnlyDict
 from exabox.log.LogMgr import (ebLogError, ebLogInfo, ebLogWarn, ebLogDebug, ebLogTrace,
                                 ebThreadLocalLog, ebLogAgent, ebLogAddDestinationToLoggers,
-                                ebLogDeleteLoggerDestination, ebGetDefaultLoggerName, ebFormattersEnum)
+                                ebLogDeleteLoggerDestination, ebGetDefaultLoggerName,
+                                ebFormattersEnum, ebThreadLoggingClose)
 from exabox.ovm.clucontrol import exaBoxCluCtrl
 from exabox.ovm.cludiag import ebDownloadLog
 from exabox.ovm.cluincident import ebIncidentNode
@@ -248,7 +260,7 @@ from exabox.infrapatching.core.infrapatcherror import PATCH_SUCCESS_EXIT_CODE
 import exabox.network.HTTPSHelper as HTTPSHelper
 from exabox.network.ExaHTTPSServer import ExaHTTPSServer, ExaHTTPRequestHandler
 from exabox.infrapatching.utils.utility import mPopulateDispatcherErrorForInfraPatch, isInfrapatchErrorCode, mCheckInfraPatchConfigOptionExists, mCheckDispatcherErrorCode
-from exabox.ovm.opctlMgr import ExaCloudWrapper
+from exabox.ovm.opctlExaCSMgr import ExaCloudWrapper
 from exabox.agent.HTTPSignatureVerification import insertRestrictedEndpointsInformation
 from exabox.tools.Utils import mBackupFile
 from exabox.utils.common import get_ecradb_details
@@ -1407,10 +1419,9 @@ class ebRestHttpListener(ExaHTTPRequestHandler):
             else:
                 if len(_body) >= 5:
                     cmd_type = _body[4]
-                    if cmd_type and "opctl_cmd" in cmd_type and not get_gcontext().mCheckConfigOption('ociexacc', True):
+                    if cmd_type and "opctl_exacs_cmd" in cmd_type and not get_gcontext().mCheckConfigOption('ociexacc', True):
                         _response = self.mCheckOpctlStatus(_body, aParams, _db, _response)
 
-                _response["stepProgressDetails"] = _step_status["stepProgressDetails"]
                 _current_job = ebJobRequest(None, {}, aDB=_db)
                 _current_job.mLoadRequestFromDB(aParams['uuid'])
                 is_patching_operation = False
@@ -1446,6 +1457,8 @@ class ebRestHttpListener(ExaHTTPRequestHandler):
                 if "stepProgressDetails" in _request_data:
                     _step_progress_details = json.loads(_request_data)
                     _response["stepProgressDetails"] = _step_progress_details["stepProgressDetails"]
+                else:
+                    _response["stepProgressDetails"] = _step_status["stepProgressDetails"]
 
                 if _dispatcher_error_found is False:
                     _patch_rows = _db.mGetChildRequestsList(aParams['uuid'])
@@ -1555,7 +1568,7 @@ class ebRestHttpListener(ExaHTTPRequestHandler):
                 # treated as failure and eventually PSM read it as fail. So,
                 # we need to trap the error code '701-614 and 703-614' and
                 # mark as success.
-                
+                #
                 if error_code and error_code not in ['0', 'Undef', '701-614', '703-614', PATCH_SUCCESS_EXIT_CODE]:
                     _response['success'] = 'False'
                 else:
@@ -1807,7 +1820,7 @@ class ebRestHttpListener(ExaHTTPRequestHandler):
         _single_worker_patchmgr_cmds = ['infra_patch_operation']
         _exempt_cmds = ['checkcluster', 'host_state']
         _diskgroup_cmds = ['diskgroup']
-        _non_xml_cmds = ['validate_elastic_shapes','xsvault','infra_vm_states','xsput','xsget']
+        _non_xml_cmds = ['validate_elastic_shapes','xsvault','infra_vm_states','xsput','xsget', 'enable_qinq']
 
         # Check if all Parameters are available
         if not aParams or not len(list(aParams.keys())):
@@ -2365,7 +2378,6 @@ class ebRestHttpListener(ExaHTTPRequestHandler):
                 "oeda_build"  : _oeda_build_version
             }
         else:
-
             params = [get_gcontext().mGetOEDAPath() + "/oedacli", "-v"]
 
             sp = subprocess
@@ -2380,6 +2392,8 @@ class ebRestHttpListener(ExaHTTPRequestHandler):
                 "oeda_build"  : _oeda_build_version
             }
 
+         # Get RPMs version information
+        rpm_info = get_gcontext().mComputeRpmVersion()
 
         _response = aResponse
         _response["status"]  = "Done"
@@ -2389,6 +2403,10 @@ class ebRestHttpListener(ExaHTTPRequestHandler):
         _response["oeda"]    = _versions["oeda"]  #needed in this form for ECRACLI
         _response["oeda_build"]    = _versions["oeda_build"]  #needed in this form for ECRACLI
         _response["agent"]   = _versions["agent"] #needed in this form for ECRACLI
+
+        for rpm_label, rpm_version in rpm_info.items():
+            _response[rpm_label] = rpm_version  #needed in this form for ECRACLI
+
         return
 
     def mAgentCluster(self, aParams, aResponse): #------/AgentCluster JSONResponse
@@ -3350,7 +3368,7 @@ class ebRestHttpListener(ExaHTTPRequestHandler):
             ebLogInfo(f"opctl_idemtoken {opctl_idemtoken}")
 
             # check the idemtoken file and update the status in DB. Once updated fetch the response from DB
-            opctl_obj = ExaCloudWrapper.set_infra_type()
+            opctl_obj = ExaCloudWrapper.set_infra_type(infra="cloudexadatainfrastructure")
             new_body = opctl_obj.check_status_for_idemtoken(aParams, opctl_idemtoken)
             if not new_body:
                  response["status"] = "Done"
@@ -3474,6 +3492,9 @@ class ebRestListener(object):
         except Exception as ex:
             with CrashDump() as c:
                 c.ProcessException()
+        finally:
+            if (os.getpid() != self.__main_agent_pid):
+                ebThreadLoggingClose()
 
     def mStartRestListener(self):
 
@@ -3810,7 +3831,7 @@ class ebAgentDaemon(object):
                 if os.path.exists(exacc_json_path):
                     exacc_json = json.load(open(exacc_json_path))
                     monConfig = exacc_json.get("monitoringConfig", None)
-                    if "region" in monConfig:
+                    if monConfig is not None and isinstance(monConfig, dict) and "region" in monConfig:
                         region = monConfig.get("region", None)
                     ebLogInfo(f"API Access Control is enabled in the region: {region}")
 
@@ -4036,13 +4057,17 @@ class ebAgentDaemon(object):
         _cmd_list.append(['/bin/awk', '{print $1}'])       #Get only the PID
         _cmd_list.append(['/bin/grep', '-v', str(os.getpid())]) #Remove self script
 
+        _cmd_exec_prev = None
+        _cmd_exec_procs = []
         try:
             for i in range(len(_cmd_list)):
                 if i == 0:
                     _cmd_exec_first = subprocess.Popen(_cmd_list[i], stdout=subprocess.PIPE)
                 else:
                     _cmd_exec_first = subprocess.Popen(_cmd_list[i], stdin=_cmd_exec_prev.stdout, stdout=subprocess.PIPE)
+                    _cmd_exec_prev.stdout.close()
                 _cmd_exec_prev = _cmd_exec_first
+                _cmd_exec_procs.append(_cmd_exec_first)
             if _cmd_exec_prev:
                 _out, _err = wrapStrBytesFunctions(_cmd_exec_prev).communicate()
                 if _cmd_exec_prev.returncode != 0:
@@ -4077,6 +4102,13 @@ class ebAgentDaemon(object):
         except Exception as e:
             ebLogError("*** exception while Apply Kill of Exacloud Processes: {}\nStack: {}".format(
                        e, traceback.format_exc()))
+        finally:
+            for _proc in _cmd_exec_procs[:-1]:
+                try:
+                    # A 10 seconds safe timeout for the ps, grep, etc commands
+                    _proc.wait(timeout=10)
+                except Exception:
+                    pass
 
     @staticmethod
     def mAgentGracefulStop(aOptions=None):

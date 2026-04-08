@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# $Header: ecs/exacloud/exabox/exatest/agent/tests_client.py /main/10 2025/09/12 16:20:01 jesandov Exp $
+# $Header: ecs/exacloud/exabox/exatest/agent/tests_client.py /main/11 2025/12/11 09:46:13 aypaul Exp $
 #
 # tests_client.py
 #
@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    aypaul      12/09/25 - Bug#38736166 Enhance code coverage with Cline
 #    abflores    07/18/25 - Fix sop ETF
 #    abflores    06/18/25 - Bug 38022923 - Increase coverage
 #    prsshukl    04/04/24 - Bug 36480365 - Commenting the unittest
@@ -84,7 +85,7 @@ def populateTestOptions(thisOptions):
     thisOptions.status = None
     thisOptions.monitor = None
     thisOptions.patchclu = None
-    thisOptions.async = None
+    setattr(thisOptions, 'async', None)
     thisOptions.exaunitid = None
     thisOptions.workflowid = None
 

@@ -1,9 +1,9 @@
 #
-# $Header: ecs/exacloud/exabox/infrapatching/utils/utility.py /main/41 2025/10/22 08:33:53 sdevasek Exp $
+# $Header: ecs/exacloud/exabox/infrapatching/utils/utility.py jyotdas_bug-38824997/1 2026/02/09 15:58:54 jyotdas Exp $
 #
 # utility.py
 #
-# Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      utility.py - This module contains all the generic methods for each of the handlers.
@@ -15,8 +15,10 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
-#    jyotdas     02/06/26 - Enh - Allow LATEST targetVersion for DOM0
-#                           exasplice patching
+#    kdas        03/15/26 - ER 38354388 - EXACC: INCLUDE NETWORK INTERFACE 
+#                           ALERT ON PATCHING PRE-CHECK
+#    jyotdas     02/09/26 - ENH 38824997 - Support target version for dom0 and
+#                           kvm host elu
 #    sdevasek    10/10/25 - ENH 38437135 - IMPLEMENT ADDITION OF SCRIPTNAME
 #                           SCRIPTBUNLDENAME AND SCRIPTBUNDLEHASH ATTRIBUTES
 #                           TO ECRA REGISTERED PLUGINS METADATA REGISTRATION
@@ -128,11 +130,12 @@ except ImportError:
 from exabox.core.Context import get_gcontext
 from exabox.core.Node import exaBoxNode
 from exabox.infrapatching.utils.constants import ANSI_ESCAPE, WAIT_LINES_ESCAPE, INFRA_PATCHING_HANDLERS, \
-    TASK_HANDLER_MAP, TARGET_HANDLER_MAP, INFRA_PATCHING_KNOWN_ALERTS_EXACOMPUTE,                         \
+    TASK_HANDLER_MAP, TARGET_HANDLER_MAP, INFRA_PATCHING_KNOWN_ALERTS_EXACOMPUTE, PATCH_DOM0,              \
     INFRA_PATCHING_KNOWN_ALERTS_EXACC, INFRA_PATCHING_KNOWN_ALERTS_EXACS, INFRA_PATCHING_CONF_FILE,       \
     EXACOMPUTE_PATCH_CONF_FILE, EXACS_SRV, EXACC_SRV, KEY_API, TASK_MOCK_HANDLER_MAP, TARGET_MOCK_HANDLER_MAP, \
     SHELL_CMD_TIMEOUT_EXIT_CODE, SHELL_CMD_DEFAULT_TIMEOUT_IN_SECONDS, PATCH_CELL_CLUSTERLESS, PATCH_DOM0_CLUSTERLESS, \
-    PATCH_DOM0
+    INFRA_PATCHING_KNOWN_SOFTWARE_ALERTS_EXACC, INFRA_PATCHING_KNOWN_SOFTWARE_ALERTS_EXACS,               \
+    INFRA_PATCHING_KNOWN_SOFTWARE_ALERTS_EXACOMPUTE
 from exabox.log.LogMgr import ebLogInfo, ebLogDebug, ebLogWarn, ebLogError, ebLogTrace
 from exabox.infrapatching.core.infrapatcherror import *
 from exabox.ovm.cluencryption import getMountPointInfo
@@ -408,6 +411,31 @@ def mGetInfraPatchingKnownAlert(aKey, aSrvType):
     else:
         ebLogError(f"{_infa_paching_config_file} file is not present or empty")
     ebLogInfo(f"Infra known alerts {aKey}: {_return_list}")
+    return _return_list
+
+def mGetInfraPatchingKnownSoftwareAlert(aKey, aSrvType):
+    _dict_infrapatching_config = None
+    _return_list = None
+    _infa_paching_config_file = f"{get_gcontext().mGetBasePath()}/exabox/infrapatching/config/{INFRA_PATCHING_CONF_FILE}"
+    if aSrvType == EXACC_SRV:
+        _key = INFRA_PATCHING_KNOWN_SOFTWARE_ALERTS_EXACC
+    elif aSrvType == EXACS_SRV:
+        _key = INFRA_PATCHING_KNOWN_SOFTWARE_ALERTS_EXACS
+    else:
+        _key = INFRA_PATCHING_KNOWN_SOFTWARE_ALERTS_EXACOMPUTE
+
+    with open(_infa_paching_config_file) as fd:
+        _dict_infrapatching_config = json.load(fd, object_pairs_hook=OrderedDict)
+    # Validate if infra known software alerts are in infrapatching.conf
+    if _dict_infrapatching_config:
+        if (_key in list(_dict_infrapatching_config.keys()) and
+           aKey in list(_dict_infrapatching_config[_key].keys())):
+            _return_list = list(_dict_infrapatching_config[_key][aKey])
+        else:
+            ebLogError(f"{_key}/{aKey} is not present in config file {_infa_paching_config_file}")
+    else:
+        ebLogError(f"{_infa_paching_config_file} file is not present or empty")
+    ebLogInfo(f"Infra known software alerts {aKey}: {_return_list}")
     return _return_list
 
 def mGetLaunchNodeConfig(aLaunchNodeType, aOption):

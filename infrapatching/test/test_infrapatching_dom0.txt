@@ -1,9 +1,9 @@
 #
-# $Header: ecs/exacloud/exabox/infrapatching/test/test_infrapatching_dom0.txt /main/54 2025/12/04 04:10:46 araghave Exp $
+# $Header: ecs/exacloud/exabox/infrapatching/test/test_infrapatching_dom0.txt mirrodri_bug-37516838/5 2026/03/02 17:39:51 mirrodri Exp $
 #
 # test_infrapatching_dom0.py
 #
-# Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      test_infrapatching_dom0.py - Unit test case script for all Dom0 operations.
@@ -15,6 +15,15 @@
 #      Unit test case script for all Dom0 operations.
 #
 #    MODIFIED   (MM/DD/YY)
+#    sdevasek    02/26/26 - Bug 39008110 - REMOVE ELUOPTIONS FROM ADDITIONAL
+#                           OPTIONS IN DOM0 TEST SETUP
+#    mirrodri    02/06/26 - Enh 37516807 - INFRAPATCHING TEST AUTOMATION - 
+#                           TEST ADDITION TO VALIDATE DISPATCHER ERROR
+#    mirrodri    02/06/26 - Enh 37516838 - INFRAPATCHING TEST AUTOMATION - 
+#                           TEST ADDITION TO VALIDATE PATCH PAYLOAD PARAMETERS
+#    sdevasek    01/06/26 - Enh 38854805 - USE DELETE API TO USE QUERY PARAMS
+#    araghave    12/05/25 - Bug 38723453 - OCI: OC35 | DTZ | SMR ROLLBACK
+#                           OPERATION TOOK NON-ROLLING METHOD
 #    sdevasek    10/13/25 - ENH 38437135 - IMPLEMENT ADDITION OF SCRIPTNAME
 #                           SCRIPTBUNLDENAME AND SCRIPTBUNDLEHASH ATTRIBUTES
 #                           TO ECRA REGISTERED PLUGINS METADATA REGISTRATION
@@ -113,7 +122,7 @@
 #    emekala     03/07/23 - Enh 35143881 - REMOVE PLUGIN EXECUTION FOR ROLLBACK
 #                           TESTS IN INFRAPATCHING AUTOMATION
 #    emekala     02/27/23 - Enh 35123619 - TEST DEPENDENCY ADDITION FOR BACKUP
-#                           TESTS WITH ROLLBACK TESTS
+#                           TESTS WITH ROLLBACK TESTS 
 #    apotluri    02/16/23 - ENH 34292618 - INFRAPATCHING AUTOMATION STABILITY -
 #                           CLEAR UP SPACE IN THE NODES IN AUTOMATION RACK
 #    emekala     02/15/23 - Enh 35027349 - ENABLE POSTCHECK AND BACKUP_IMAGE
@@ -146,6 +155,9 @@
 #    araghave    05/27/21 - Enh 32929805 - INFRA PATCHING TEST FRAMEWORK
 #    rkhemcha    08/28/20 - Creation
 #
+
+import json
+import time
 
 import pytest
 import unittest
@@ -207,6 +219,7 @@ class Test_dom0_class(unittest.TestCase):
         mUpdateAdditionalOptionsInPayload("OneoffCustomPluginFile", "none")
         mUpdateAdditionalOptionsInPayload("OneoffScriptArgs", "none")
         mUpdateAdditionalOptionsInPayload("exasplice", "no")
+        mDeleteAdditionalOptionsFromPayload("ELUOptions")
         mUpdateParamInPayload("BackupMode", "yes")
         mUpdateParamInPayload("EnablePlugins", "no")
         mUpdateParamInPayload("PluginTypes", "none")
@@ -222,8 +235,10 @@ class Test_dom0_class(unittest.TestCase):
         mExecuteRemoteExasshCmd(
             "/bin/sed  \\'s/ClientAliveInterval.*/ClientAliveInterval 600/\\' -i /etc/ssh/sshd_config",
             Test_dom0_class.__dom0s)
-
-
+        # Exasplice flag need to be reverted to 'no' at the end of an
+        # exasplice operation is complete.
+        mUpdateAdditionalOptionsInPayload("exasplice", "no")
+    
     @pytest.mark.dom0_patch_prereq_check
     def test_dom0_patch_prereq_check(self):
         _result, _status_output = mExecuteInfraPatchCommandWithDCSAgentChecks(TASK_PREREQ_CHECK, PATCH_DOM0,
@@ -288,30 +303,38 @@ class Test_dom0_class(unittest.TestCase):
         self.mValidatePatchOperationWithIncludeNodeList()
 
         # step2: When FailOnError is set to Yes, operation should fail
-        _scrip_alias = "script_%s_%s" % (PATCH_DOM0, ONEOFF_PLUGIN)
+        _script_alias = "script_%s_%s" % (PATCH_DOM0, ONEOFF_PLUGIN)
         plugin_meta_data_handler = InfrapatchPluginMetadataHandler()
         _data = '{"ScriptName": "%s.sh", "ScriptAlias": "%s", "ChangeRequestID": "CRID-4567", "Description": ' \
                 '"sample", "PluginType": "%s", "PluginTarget": "%s", "FailOnError":"Yes"}' % (
-                    _scrip_alias,
-                    _scrip_alias, ONEOFF_PLUGIN,
+                    _script_alias,
+                    _script_alias, ONEOFF_PLUGIN,
                     PATCH_DOM0)
         _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
 
         _result, _status_output = mExecuteInfraPatchCommandWithDCSAgentChecks(TASK_ONEOFFV2, PATCH_DOM0)
         self.assertFalse(_result, "Oneoffv2 operation should have failed.")
 
-        # step3: When IsEnabled is set to No, oneoff plugin script should not get executed, execution oneoff fails
-        # since there is no script to execute which is provided as input
+    @pytest.mark.dom0_plugin_metadata_delete_query
+    def test_dom0_plugin_metadata_delete_with_query_params(self):
         plugin_meta_data_handler = InfrapatchPluginMetadataHandler()
+        _script_alias = "script_%s_%s_%d" % (PATCH_DOM0, ONEOFF_PLUGIN, int(time.time()))
         _data = '{"ScriptName": "%s.sh", "ScriptAlias": "%s", "ChangeRequestID": "CRID-4567", "Description": ' \
-                '"sample", "PluginType": "%s", "PluginTarget": "%s", "FailOnError":"No","IsEnabled":"No"}' % (
-                    _scrip_alias, 
-                    _scrip_alias, ONEOFF_PLUGIN,
+                '"sample", "PluginType": "%s", "PluginTarget": "%s", "ScriptBundleHash":"dummy-hash"}' % (
+                    _script_alias,
+                    _script_alias, ONEOFF_PLUGIN,
                     PATCH_DOM0)
-        _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
 
-        _result, _status_output = mExecuteInfraPatchCommandWithDCSAgentChecks(TASK_ONEOFFV2, PATCH_DOM0)
-        self.assertFalse(_result, "Oneoffv2 operation should have failed.")
+        _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(
+            _data)
+        self.assertEqual(
+            _ret, 0,
+            "Plugin metadata registration failed for dom0 delete test: %s" % _out)
+        _ret, _out = plugin_meta_data_handler.mDeleteRegisteredInfrapatchPluginMetadataScriptsByQuery(
+            _script_alias, PATCH_DOM0, ONEOFF_PLUGIN)
+        self.assertEqual(
+            _ret, 0,
+            f"Plugin metadata deletion via query params failed for dom0: {_out}")
 
     @pytest.mark.dom0_one_off_v2_plugin_metadata_validator
     def test_dom0_one_of_v2_plugin_metadata_validator(self):
@@ -505,6 +528,30 @@ class Test_dom0_class(unittest.TestCase):
         _status_json = json.loads(self.__patch_operation_status_output)
         _error_code = _status_json["errorCode"]
         self.assertEqual(_error_code, "0x030B0003", "The expected error code is not returned when the plugin execution failed.")
+    
+    @pytest.mark.dom0_postcheck_invalid_inputs
+    def test_dom0_postcheck_invalid_inputs(self):
+        invalid_cases = [
+            ("BackupMode",    "unrecognized_backup_mode"),
+            ("target",        "unsupported_target_type"),
+            ("TargetVersion", "invalid_target_version"),
+            ("PluginTypes",   "unsupported_plugin_type"),
+            ("operation",     "invalid_operation_token"),
+            ("Fedramp",       "invalid_fedramp_flag"),
+        ]
+
+        for param_name, invalid_value in invalid_cases:
+            original_value = mGetParamValueFromPayLoadJson(param_name)
+            try:
+                mUpdateParamInPayload(param_name, invalid_value)
+                result, status_output = mExecuteInfraPatchCommand(
+                    TASK_POSTCHECK, PATCH_DOM0, OP_STYLE_ROLLING
+                )
+                status_json = json.loads(status_output)
+                self.assertFalse(result, f"Expected failure for invalid {param_name}")
+                self.assertNotEqual(status_json["errorCode"], "0x00000000")
+            finally:
+                mUpdateParamInPayload(param_name, original_value)
 
     @pytest.mark.dom0_postcheck
     def test_dom0_postcheck(self):
@@ -551,6 +598,7 @@ class Test_dom0_class(unittest.TestCase):
             self.assertTrue(_ret, "Could not stop the crs on the VMs.")
         _result, _status_output = mExecuteInfraPatchCommandWithDCSAgentChecks(TASK_POSTCHECK, PATCH_DOM0)
         self.assertTrue(_result, "Postcheck operation failed.")
+        
 
     @pytest.mark.dom0_rollback
     def test_dom0_rollback(self):
@@ -651,10 +699,8 @@ class Test_dom0_class(unittest.TestCase):
     @pytest.mark.dom0_rollback_elu
     def test_dom0_rollback_elu(self):
         mUpdateAdditionalOptionsInPayload("exasplice", "yes")
-        _dom0s = Test_dom0_class.__dom0s
-        # Run rollback operation with first dom0
-        _include_node_list = ",".join(_dom0s[:1])
-        mUpdateAdditionalOptionsInPayload("IncludeNodeList", _include_node_list)
+        # While Elu upgrade is performed one node at a time, rollback must
+        # be supported with multiple nodes.
         _result, _status_output = mExecuteInfraPatchCommandWithRetry(TASK_ROLLBACK, PATCH_DOM0, OP_STYLE_AUTO)
         self.assertTrue(_result, "Dom0 ELU rollback operation failed.")
 
@@ -1133,4 +1179,3 @@ class Test_dom0_class(unittest.TestCase):
 
         _messages_missing = len(_missing_messages) > 0
         self.assertFalse(_messages_missing, "Following messages are not found in %s log of %s after %s : \n%s" % (_plugin_log, Test_dom0_class.__dom0s[0], timeStamp, _missing_messages))
-

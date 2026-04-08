@@ -1,9 +1,9 @@
 #
-# $Header: ecs/exacloud/exabox/infrapatching/test/infrapatching_coverage.txt /main/6 2025/07/22 09:41:33 apotluri Exp $
+# $Header: ecs/exacloud/exabox/infrapatching/test/infrapatching_coverage.txt /main/7 2026/02/02 12:08:33 sdevasek Exp $
 #
 # infrapatching_coverage.py
 #
-# Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      infrapatching_coverage.py - Infrapatching code coverage calculator for integration tests.
@@ -15,6 +15,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    sdevasek    01/27/26 - Enh 38876183 - CODE COVERAGE TO USE PYTHON COMMAND
+#                           INSTEAD OF PYTHON3
 #    apotluri    07/21/25 - Enhancement Request 37982406 - COMBINE COVERAGE
 #                           REPORTS FROM CLUSTERLESS SETUP AND REGULAR COVERAGE
 #                           RUN SETUP
@@ -242,7 +244,7 @@ exacloud =
         self.mUpdateCoveragerc()
 
         # 3. Combine code coverage data
-        _coverage_data_combine_cmd = "%s/bin/python3 -m  coverage combine" % self.__exacloud_install_path
+        _coverage_data_combine_cmd = "%s/bin/python -m  coverage combine" % self.__exacloud_install_path
         utils.mPatchLogInfo("Command used to combine the coverage is %s." % _coverage_data_combine_cmd)
         _output, _stat = utils.mExecuteLocal(_coverage_data_combine_cmd)
         if _stat != 0:
@@ -252,7 +254,7 @@ exacloud =
         utils.mPatchLogInfo("Coverage data combine completed.")
 
         # 4. Generate text summary report for code coverage
-        _generate_text_summary_report_cmd = "%s/bin/python3 -m  coverage  report  -i --include=%s > %s" \
+        _generate_text_summary_report_cmd = "%s/bin/python -m  coverage  report  -i --include=%s > %s" \
                                             % (self.__exacloud_install_path,
                                                os.path.join(self.__exacloud_install_path, 'exabox/infrapatching/*'),
                                                aTextPathToSaveReportData)
@@ -266,7 +268,7 @@ exacloud =
             return
 
         # 5. Generate html report
-        _generate_cov_html_report_cmd = "%s/bin/python3 -m  coverage  html -i --include=%s" \
+        _generate_cov_html_report_cmd = "%s/bin/python -m  coverage  html -i --include=%s" \
                                         % (self.__exacloud_install_path,
                                            os.path.join(self.__exacloud_install_path, 'exabox/infrapatching/*'))
         utils.mPatchLogInfo("Command used to generate html report is %s." % _generate_cov_html_report_cmd)
@@ -307,16 +309,16 @@ exacloud =
         """
 
         utils.mPatchLogInfo("Executing prerequisites for code coverage setup is started.")
-        # 1. Install coverage package  bin/python3 -m pip install --proxy=http://www-proxy.us.oracle.com:80/ 'coverage==5.0.3'
+        # 1. Install coverage package  bin/python -m pip install --proxy=http://www-proxy.us.oracle.com:80/ 'coverage==5.0.3'
 
-        _coverage_package_install_cmd = "%s/bin/python3 -m pip install  %s" % (self.__exacloud_install_path,
+        _coverage_package_install_cmd = "%s/bin/python -m pip install  %s" % (self.__exacloud_install_path,
                                                                                          COVERAGE_PACKAGE)
         utils.mPatchLogInfo("Command used to install coverage package is %s." % _coverage_package_install_cmd)
         _output, _stat = utils.mExecuteLocal(_coverage_package_install_cmd)
         if _stat != 0:
             utils.mPatchLogWarn("Failed to install coverage package, so trying with proxy")
             utils.mPatchLogInfo("Command used to install coverage package is %s." % _coverage_package_install_cmd)
-            _coverage_package_install_cmd = "%s/bin/python3 -m pip install --proxy=%s %s" % (self.__exacloud_install_path,
+            _coverage_package_install_cmd = "%s/bin/python -m pip install --proxy=%s %s" % (self.__exacloud_install_path,
                                                                                              PROXY, COVERAGE_PACKAGE)
             _output, _stat = utils.mExecuteLocal(_coverage_package_install_cmd)
             if _stat != 0:

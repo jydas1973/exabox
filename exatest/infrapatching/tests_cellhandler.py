@@ -1,10 +1,10 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/exatest/infrapatching/tests_cellhandler.py /main/21 2025/09/16 16:36:19 avimonda Exp $
+# $Header: ecs/exacloud/exabox/exatest/infrapatching/tests_cellhandler.py /main/24 2026/02/21 03:43:32 nelango Exp $
 #
 # tests_cellhandler.py
 #
-# Copyright (c) 2022, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2022, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_cellhandler.py - Class for testing cell precheck, patch and rollback
@@ -17,6 +17,10 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    nelango     02/19/26 - Bug 38930043 : unittest for ssh key removal in
+#                           cells during ecra switchover
+#    nelango     01/30/26 - Bug 38901967: No ilom service state disabling
+#    nelango     01/09/26 - Bug 38676078 - update ipmi tests
 #    avimonda    09/12/25 - Bug 38293914 - OCI: MISLEADING ERROR IN THE ECACLI
 #                           STATUS FOR EXACLOUD
 #    nelango     01/20/25 - Bug 37328906: ipmi servicestate checks during
@@ -59,12 +63,14 @@
 #
 
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock, call
 from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
 from exabox.log.LogMgr import ebLogInfo
 from exabox.infrapatching.handlers.targetHandler.cellhandler import CellHandler
 from exabox.core.Node import exaBoxNode
 from exabox.core.MockCommand import exaMockCommand
+from exabox.infrapatching.utils.constants import EXAPATCHING_KEY_TAG
+from exabox.ovm.clumisc import ebCluSshSetup
 
 cmdHypervisorOutput="""xen
 b25bc434-c151-4b83-abf4-a6cfdca28ee8
@@ -352,12 +358,38 @@ class ebTestCellHandler(ebTestClucontrol):
         input_file="/EXAVMIMAGES/22.1.15.0.0.231006.patch.zip/patch_22.1.15.0.0.231006/node_list"
         self.assertEqual(cellHandler.mCellsCleanUp(input_file, cellHandler.mGetCallBacks()), '0x00000000')
 
+    def _mock_ipmi_commands(self, mock_execute_cmd, initial_state="enabled"):
+        executed_cmds = []
+        service_state = {"value": initial_state}
+
+        def _execute_side_effect(command):
+            executed_cmds.append(command)
+            stdout = MagicMock()
+            if "setval /SP/services/ipmi/servicestate enabled" in command:
+                service_state["value"] = "enabled"
+                stdout.readlines.return_value = ["Sun OEM setval command successful."]
+            elif "setval /SP/services/ipmi/servicestate disabled" in command:
+                service_state["value"] = "disabled"
+                stdout.readlines.return_value = ["Sun OEM setval command successful."]
+            elif "getval" in command:
+                stdout.readlines.return_value = [f"Target Value: {service_state['value']}"]
+            else:
+                stdout.readlines.return_value = []
+            return None, stdout, MagicMock()
+
+        mock_execute_cmd.side_effect = _execute_side_effect
+        return executed_cmds, service_state
+
+    @patch("exabox.core.Node.exaBoxNode.mDisconnect")
+    @patch("exabox.core.Node.exaBoxNode.mIsConnected", return_value=True)
+    @patch("exabox.core.Node.exaBoxNode.mGetCmdExitStatus", return_value=0)
+    @patch("exabox.core.Node.exaBoxNode.mExecuteCmd")
+    @patch("exabox.core.Node.exaBoxNode.mConnect")
     @patch("exabox.infrapatching.utils.infrapatchexecutionvalidator.InfrapatchExecutionValidator.mCheckCondition", return_value=True)
-    @patch("exabox.infrapatching.handlers.targetHandler.targethandler.TargetHandler.mValidateServiceStateOnIlom", return_value=('0x03010069', ["slcs27celadm04.us.oracle.com"]))
-    def test_mValidateServiceStateOnCells(self, mock_mCheckCondition,mock_mValidateServiceStateOnIlom):
+    def test_mValidateServiceStateOnCells_exacs(self, mock_mCheckCondition, mock_mConnect, mock_mExecuteCmd, mock_mGetCmdExitStatus, mock_mIsConnected, mock_mDisconnect):
 
         ebLogInfo("")
-        ebLogInfo("Running unit test on Cellhandler.mValidateServiceStateOnIlom")
+        ebLogInfo("Running unit test on Cellhandler.mValidateServiceStateOnIlom for ExaCS")
         _cell_list = ["slcs27celadm04.us.oracle.com"]
         _cmds = {
             self.mGetRegexDom0(): [
@@ -377,38 +409,141 @@ class ebTestCellHandler(ebTestClucontrol):
             ]
         }
         self.mPrepareMockCommands(_cmds)
+        output_mock = MagicMock()
+        output_mock.readlines.return_value = ["Target Value: enabled"]
+        mock_mExecuteCmd.return_value = (None, output_mock, MagicMock())
+
         cellHandler = CellHandler(self.__patch_args_dict)
-        cellHandler.mValidateServiceStateOnIlom(_cell_list)
+        with patch.object(cellHandler, "mIsExaCC", return_value=False):
+            _rc, _failed = cellHandler.mValidateServiceStateOnIlom(_cell_list)
+
+        self.assertEqual(_rc, self.SUCCESS_ERROR_CODE)
+        self.assertEqual(_failed, [])
+        target_connect = call(aHost=_cell_list[0], aTimeout=30)
+        self.assertIn(target_connect, mock_mConnect.mock_calls)
+        mock_mExecuteCmd.assert_any_call("ipmitool sunoem getval /SP/services/ipmi/servicestate")
+        mock_mDisconnect.assert_called()
+        ebLogInfo("")
+
+    @patch("exabox.core.Node.exaBoxNode.mDisconnect")
+    @patch("exabox.core.Node.exaBoxNode.mIsConnected", return_value=True)
+    @patch("exabox.core.Node.exaBoxNode.mGetCmdExitStatus", return_value=0)
+    @patch("exabox.core.Node.exaBoxNode.mExecuteCmd")
+    @patch("exabox.core.Node.exaBoxNode.mConnect")
+    @patch("exabox.infrapatching.utils.infrapatchexecutionvalidator.InfrapatchExecutionValidator.mCheckCondition", return_value=True)
+    def test_mValidateServiceStateOnCells_exacc(self, mock_mCheckCondition, mock_mConnect, mock_mExecuteCmd, mock_mGetCmdExitStatus, mock_mIsConnected, mock_mDisconnect):
+
+        ebLogInfo("")
+        ebLogInfo("Running unit test on Cellhandler.mValidateServiceStateOnIlom for ExaCC")
+        _cell_list = ["slcs27celadm04.us.oracle.com"]
+        _cmds = {
+            self.mGetRegexDom0(): [
+                [
+                    exaMockCommand("virsh", aStdout="scaqan03dv0208.us.oracle.com")
+                ]
+            ],
+            self.mGetRegexCell(): [
+                [
+                    exaMockCommand("ipmitool sunoem getval /SP/services/ipmi/servicestate", aRc=0,
+                                   aStdout="Target Value: enabled"),
+                    exaMockCommand("ipmitool sunoem setval /SP/services/ipmi/service state enabled", aRc=0,
+                                   aStdout="Sun OEM setval command successful."),
+                    exaMockCommand("ipmitool sunoem getval /SP/services/ipmi/servicestate", aRc=0,
+                                   aStdout="Target Value: enabled")
+                ]
+            ]
+        }
+        self.mPrepareMockCommands(_cmds)
+        output_mock = MagicMock()
+        output_mock.readlines.return_value = ["Target Value: enabled"]
+        mock_mExecuteCmd.return_value = (None, output_mock, MagicMock())
+
+        cellHandler = CellHandler(self.__patch_args_dict)
+        with patch.object(cellHandler, "mIsExaCC", return_value=True):
+            _rc, _failed = cellHandler.mValidateServiceStateOnIlom(_cell_list)
+
+        self.assertEqual(_rc, self.SUCCESS_ERROR_CODE)
+        self.assertEqual(_failed, [])
+        target_connect = call(aHost=_cell_list[0], aTimeout=30)
+        self.assertIn(target_connect, mock_mConnect.mock_calls)
+        mock_mExecuteCmd.assert_any_call("ipmitool sunoem getval /SP/services/ipmi/servicestate")
+        mock_mDisconnect.assert_called()
         ebLogInfo("")
         
+    @patch("exabox.core.Node.exaBoxNode.mDisconnect")
+    @patch("exabox.core.Node.exaBoxNode.mConnect")
+    @patch("exabox.core.Node.exaBoxNode.mGetCmdExitStatus", return_value=0)
+    @patch("exabox.core.Node.exaBoxNode.mExecuteCmd")
     @patch("exabox.infrapatching.utils.infrapatchexecutionvalidator.InfrapatchExecutionValidator.mCheckCondition", return_value=True)
-    @patch("exabox.infrapatching.handlers.targetHandler.targethandler.TargetHandler.mUpdateServiceStateOnIlom", return_value=('0x0301006A', ["slcs27celadm04.us.oracle.com"]))
-    def test_mCheckServiceStateOnCells(self, mock_mCheckCondition,mock_mUpdateServiceStateOnIlom):
+    def test_mCheckServiceStateOnCells_exacs_prepatch(self, mock_mCheckCondition, mock_mExecuteCmd, mock_mGetCmdExitStatus, mock_mConnect, mock_mDisconnect):
 
         ebLogInfo("")
-        ebLogInfo("Running unit test on Cellhandler.mUpdateServiceStateOnIlom")
+        ebLogInfo("Running unit test on Cellhandler.mUpdateServiceStateOnIlom for ExaCS prepatch")
         _cell_list = ["slcs27celadm04.us.oracle.com"]
         _cmds = {
             self.mGetRegexDom0(): [
                 [
                     exaMockCommand("virsh", aStdout="scaqan03dv0208.us.oracle.com")
                 ]
-            ],
-            self.mGetRegexCell(): [
+            ]
+        }
+        self.mPrepareMockCommands(_cmds)
+        executed_cmds, service_state = self._mock_ipmi_commands(mock_mExecuteCmd, initial_state="disabled")
+
+        cellHandler = CellHandler(self.__patch_args_dict)
+        with patch.object(cellHandler, "mIsExaCC", return_value=False):
+            cellHandler.mUpdateServiceStateOnIlom(_cell_list, "prepatch")
+
+        enable_cmds = [cmd for cmd in executed_cmds if "setval /SP/services/ipmi/servicestate enabled" in cmd]
+        disable_cmds = [cmd for cmd in executed_cmds if "setval /SP/services/ipmi/servicestate disabled" in cmd]
+
+        self.assertGreater(len(enable_cmds), 0)
+        self.assertEqual(len(disable_cmds), 0)
+        self.assertEqual(service_state["value"], "enabled")
+        ebLogInfo("")
+
+    @patch("exabox.infrapatching.handlers.targetHandler.cellhandler.CellHandler.mUpdateServiceStateOnIlom")
+    def test_mUpdateServiceStateOnIlom_only_prepatch_called(self, mock_mUpdateServiceStateOnIlom):
+
+        ebLogInfo("Running unit test to confirm Cell postpatch path is never invoked")
+
+        with patch.object(CellHandler, "mGetDomUListFromXml", return_value=[]):
+            cellHandler = CellHandler(self.__patch_args_dict)
+            cellHandler.mPreCheck()
+
+        args = [call.args[1] for call in mock_mUpdateServiceStateOnIlom.call_args_list]
+        self.assertNotIn("postpatch", args)
+
+    @patch("exabox.core.Node.exaBoxNode.mDisconnect")
+    @patch("exabox.core.Node.exaBoxNode.mConnect")
+    @patch("exabox.core.Node.exaBoxNode.mGetCmdExitStatus", return_value=0)
+    @patch("exabox.core.Node.exaBoxNode.mExecuteCmd")
+    @patch("exabox.infrapatching.utils.infrapatchexecutionvalidator.InfrapatchExecutionValidator.mCheckCondition", return_value=True)
+    def test_mCheckServiceStateOnCells_exacc_prepatch(self, mock_mCheckCondition, mock_mExecuteCmd, mock_mGetCmdExitStatus, mock_mConnect, mock_mDisconnect):
+
+        ebLogInfo("")
+        ebLogInfo("Running unit test on Cellhandler.mUpdateServiceStateOnIlom for ExaCC prepatch")
+        _cell_list = ["slcs27celadm04.us.oracle.com"]
+        _cmds = {
+            self.mGetRegexDom0(): [
                 [
-                    exaMockCommand("ipmitool sunoem getval /SP/services/ipmi/servicestate", aRc=0,
-                                   aStdout="Target Value: enabled"),
-                    exaMockCommand("ipmitool sunoem setval /SP/services/ipmi/service state enabled", aRc=0,
-                                   aStdout="Sun OEM setval command successful."),
-                    exaMockCommand("ipmitool sunoem getval /SP/services/ipmi/servicestate", aRc=0,
-                                   aStdout="Target Value: enabled")
+                    exaMockCommand("virsh", aStdout="scaqan03dv0208.us.oracle.com")
                 ]
             ]
         }
         self.mPrepareMockCommands(_cmds)
+        executed_cmds, service_state = self._mock_ipmi_commands(mock_mExecuteCmd, initial_state="disabled")
+
         cellHandler = CellHandler(self.__patch_args_dict)
-        cellHandler.mUpdateServiceStateOnIlom(_cell_list, "prepatch")
-        cellHandler.mUpdateServiceStateOnIlom(_cell_list, "postcheck")
+        with patch.object(cellHandler, "mIsExaCC", return_value=True):
+            cellHandler.mUpdateServiceStateOnIlom(_cell_list, "prepatch")
+
+        enable_cmds = [cmd for cmd in executed_cmds if "setval /SP/services/ipmi/servicestate enabled" in cmd]
+        disable_cmds = [cmd for cmd in executed_cmds if "setval /SP/services/ipmi/servicestate disabled" in cmd]
+
+        self.assertGreater(len(enable_cmds), 0)
+        self.assertEqual(len(disable_cmds), 0)
+        self.assertEqual(service_state["value"], "enabled")
         ebLogInfo("")
 
     @patch("exabox.infrapatching.handlers.targetHandler.cellhandler.CellHandler.mGetOpStyle", return_value = 'rolling')
@@ -473,6 +608,43 @@ class ebTestCellHandler(ebTestClucontrol):
         _res = _cell_handler.mGetCellPatchingTimoutInSec()
         self.assertEqual(_res, 248400)
         ebLogInfo("Unit test on Cellhandler.mGetCellPatchingTimoutInSec_with12Cells executed successfully")
+
+    #@patch("exabox.core.node.Node.mConnect", return_value=None)
+    @patch("exabox.core.Node.exaBoxNode.mConnect", return_value=None)
+    @patch("exabox.infrapatching.handlers.targetHandler.cellhandler.CellHandler.mPatchRequestRetried", return_value=True)
+    @patch("exabox.infrapatching.handlers.targetHandler.cellhandler.CellHandler.mCleanEnvironment")
+    @patch("exabox.infrapatching.handlers.targetHandler.cellhandler.CellHandler.mCellsCleanUp", return_value=0)
+    @patch("exabox.infrapatching.handlers.generichandler.GenericHandler.mGetDomUListFromXml", return_value=[])
+    @patch("exabox.infrapatching.handlers.targetHandler.cellhandler.InfraPatchManager")
+    def test_retry_cleanup_sets_hostkey(
+            self,
+            mock_patchmgr_cls,
+            mock_get_domu,
+            mock_cells_cleanup,
+            mock_clean_env,
+            mock_retry,
+            mock_connect):
+        mock_patchmgr = mock_patchmgr_cls.return_value
+        mock_patchmgr.mIsPatchMgrConsoleOutputFileExists.return_value = True
+        mock_patchmgr.mGetStatusCode.return_value = 0
+        mock_patchmgr.mCreateNodesToBePatchedFile.return_value = "nodes_file"
+        mock_patchmgr.mGetNodeListFromNodesToBePatchedFile.return_value = []
+        handler = CellHandler(self.__patch_args_dict)
+        ssh_env_mock = MagicMock()
+        handler.mSetSshEnvSetupSwitchesCell(ssh_env_mock)
+        handler.mGetCustomizedDom0List = MagicMock(return_value=['dom0'])
+        handler.mGetDom0ToPatchcellSwitches = MagicMock(return_value='dom0')
+        handler.mCheckIsCellsRolling = MagicMock(return_value=True)
+        handler.mCheckIdemPotency()
+        ssh_env_mock.mSetHostKeyComment.assert_called_with(EXAPATCHING_KEY_TAG)
+        args = ssh_env_mock.mSetHostKeyComment.call_args[0]
+        assert list(args)[0] == EXAPATCHING_KEY_TAG
+
+    def test_get_hostkey_comment_returns_cached_value(self):
+        mock_cluctrl = MagicMock()
+        ssh_setup = ebCluSshSetup(mock_cluctrl)
+        ssh_setup.mSetHostKeyComment(EXAPATCHING_KEY_TAG)
+        assert ssh_setup.mGetHostKeyComment() == EXAPATCHING_KEY_TAG
 
 if __name__ == "__main__":
     unittest.main()

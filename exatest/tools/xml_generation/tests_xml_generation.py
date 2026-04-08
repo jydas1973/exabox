@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 #
-# $Header: ecs/exacloud/exabox/exatest/tools/xml_generation/tests_xml_generation.py /main/24 2025/11/15 11:40:55 joysjose Exp $
+# $Header: ecs/exacloud/exabox/exatest/tools/xml_generation/tests_xml_generation.py /main/25 2026/01/27 05:10:28 naps Exp $
 #
 # tests_xml_generation.py
 #
-# Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_xml_generation.py - <one-line expansion of the name>
@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    naps        01/23/26 - Bug 38881811 - UT Updation.
 #    ririgoye    08/20/25 - Bug 38299487 - ECS_MAIN -> ETF -> NSLOOKUP COMMAND
 #                           IS SENDING RETURN STATUS 1 , CAUSING
 #                           TESTS_LACP_XML_GENERATION_PY.DIF AND
@@ -116,9 +117,6 @@ class TestXmlGen(ebTestClucontrol):
             self.mGetRegexDom0(): [
                 [
                     exaMockCommand(".*shared_env.*", aRc=1)
-                ],
-                [
-                    exaMockCommand("imageinfo -version", aStdout="20.2.0.0.0.200803")
                 ],
                 [
                     exaMockCommand(".*shared_env.*", aRc=1),

@@ -1,10 +1,10 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/exatest/infrapatching/core/tests_cludispatcher.py /main/4 2024/10/04 21:19:51 avimonda Exp $
+# $Header: ecs/exacloud/exabox/exatest/infrapatching/core/tests_cludispatcher.py jyotdas_bug-38824997/1 2026/02/19 05:58:59 jyotdas Exp $
 #
 # tests_cludispatcher.py
 #
-# Copyright (c) 2024, Oracle and/or its affiliates.
+# Copyright (c) 2024, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_cludispatcher.py - Unit test implemented for cludispatcher.py
@@ -16,8 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
-#    jyotdas     02/06/26 - Enh - Unit tests for LATEST targetVersion DOM0
-#                           exasplice bypass
+#    jyotdas     02/19/26 - ENH 38824997 - Support target version for dom0 and
+#                           kvm host elu
 #    avimonda    09/16/24 - Enhancement Request 36775120 - EXACLOUD TIMEOUT
 #                           MUST BE CALCULATED BASED ON THE PATCH OPERATION
 #                           AND TARGET TYPE
@@ -35,7 +35,7 @@ from unittest.mock import patch
 from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
 from exabox.log.LogMgr import ebLogInfo
 from exabox.agent.ebJobRequest import ebJobRequest
-from exabox.infrapatching.utils.utility import mGetInfraPatchingConfigParam, mIsLatestTargetVersionAllowed
+from exabox.infrapatching.utils.utility import mGetInfraPatchingConfigParam
 from exabox.infrapatching.core.cludispatcher import ebCluPatchDispatcher
 from exabox.core.MockCommand import exaMockCommand
 
@@ -65,18 +65,20 @@ class ebTestCluPatchDispatcher(ebTestClucontrol):
         _cluCtrl._exaBoxCluCtrl__kvm_enabled = True
         ebLogInfo("Ending classSetUp CellHandler")
 
+    @patch('exabox.infrapatching.core.cludispatcher.ebCluPatchDispatcher.mCheckPatchFileExistInFileSystem', return_value=SUCCESS_ERROR_CODE)
     @patch('exabox.infrapatching.core.cludispatcher.ebCluPatchDispatcher.mLockPatchCmd', return_value = True)
     @patch('exabox.infrapatching.core.cludispatcher.ebCluPatchDispatcher.mUpdateStatusFromList')
     @patch('exabox.infrapatching.core.cludispatcher.ebCluPatchDispatcher.mParsePatchJson', return_value=(SUCCESS_ERROR_CODE, ""))
     @patch('exabox.infrapatching.core.cludispatcher.ebCluPatchDispatcher.mCheckExacloudMnt', return_value = True)
     @patch('exabox.infrapatching.core.cludispatcher.ebCluPatchDispatcher.mAddDispatcherError')
     @patch('exabox.infrapatching.core.cludispatcher.ebCluPatchDispatcher.mReleasePatchCmd')
-    def test_mStartPatchRequestExecution_DispatchToExacloudForCreatingChildFailed(self, mock_mLockPatchCmd, mock_mUpdateStatusFromList, mock_mParsePatchJson, mock_mCheckExacloudMnt, mock_mAddDispatcherError, mock_mReleasePatchCmd):
+    def test_mStartPatchRequestExecution_DispatchToExacloudForCreatingChildFailed(self, mock_mLockPatchCmd, mock_mUpdateStatusFromList, mock_mParsePatchJson, mock_mCheckExacloudMnt, mock_mAddDispatcherError, mock_mReleasePatchCmd, mock_mCheckPatchFileExistInFileSystem):
         ebLogInfo("")
         ebLogInfo("Running unit test on ebCluPatchDispatcher.mStartPatchRequestExecution")
         _job = ebJobRequest("version", {})
         _options = self.mGetPayload()
         _patch_dispatcher = ebCluPatchDispatcher(aJob=_job)
+        _patch_dispatcher._ebCluPatchDispatcher__dispatcher_target_version = None
         _rc=_patch_dispatcher.mStartPatchRequestExecution(_options)
         self.assertEqual(_rc, self.EXACLOUD_CHILD_REQUEST_CREATION_FAILED)
         ebLogInfo("Unit test on ebCluPatchDispatcher.mStartPatchRequestExecution executed successfully")
@@ -148,38 +150,6 @@ class ebTestCluPatchDispatcher(ebTestClucontrol):
         _rc=_patch_dispatcher.mCalculatePatchOperationTimeout(_options)
         self.assertEqual(_rc, 169200)
         ebLogInfo("Unit test on ebCluPatchDispatcher.mCalculatePatchOperationTimeout_Rolling_Rollback executed successfully")
-
-    def test_mIsLatestTargetVersionAllowed_dom0_exasplice_yes(self):
-        """Test LATEST is allowed as literal for dom0 + exasplice=yes"""
-        ebLogInfo("")
-        ebLogInfo("Running unit test: mIsLatestTargetVersionAllowed with dom0 + exasplice=yes")
-        result = mIsLatestTargetVersionAllowed('LATEST', 'dom0', 'yes')
-        self.assertTrue(result)
-        ebLogInfo("Unit test on mIsLatestTargetVersionAllowed dom0 + exasplice=yes executed successfully")
-
-    def test_mIsLatestTargetVersionAllowed_non_dom0_returns_false(self):
-        """Test LATEST is NOT allowed for non-dom0 targets"""
-        ebLogInfo("")
-        ebLogInfo("Running unit test: mIsLatestTargetVersionAllowed with cell + exasplice=yes")
-        result = mIsLatestTargetVersionAllowed('LATEST', 'cell', 'yes')
-        self.assertFalse(result)
-        ebLogInfo("Unit test on mIsLatestTargetVersionAllowed cell + exasplice=yes executed successfully")
-
-    def test_mIsLatestTargetVersionAllowed_exasplice_no_returns_false(self):
-        """Test LATEST is NOT allowed when exasplice is not yes"""
-        ebLogInfo("")
-        ebLogInfo("Running unit test: mIsLatestTargetVersionAllowed with dom0 + exasplice=no")
-        result = mIsLatestTargetVersionAllowed('LATEST', 'dom0', 'no')
-        self.assertFalse(result)
-        ebLogInfo("Unit test on mIsLatestTargetVersionAllowed dom0 + exasplice=no executed successfully")
-
-    def test_mIsLatestTargetVersionAllowed_non_latest_version_returns_false(self):
-        """Test non-LATEST version returns False even with dom0 + exasplice=yes"""
-        ebLogInfo("")
-        ebLogInfo("Running unit test: mIsLatestTargetVersionAllowed with actual version + dom0 + exasplice=yes")
-        result = mIsLatestTargetVersionAllowed('25.1.0.0.0.250101', 'dom0', 'yes')
-        self.assertFalse(result)
-        ebLogInfo("Unit test on mIsLatestTargetVersionAllowed with actual version executed successfully")
 
 if __name__ == "__main__":
     unittest.main()

@@ -4,7 +4,7 @@
 #
 # tests_diskrebalance.py
 #
-# Copyright (c) 2020, 2025, Oracle and/or its affiliates. 
+# Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_diskrebalance.py - <one-line expansion of the name>
@@ -16,6 +16,9 @@
 #      NONE
 #
 #    MODIFIED MM/DD/YY
+#    ririgoye 03/02/26 - Bug 39025598 - ECS_MAIN -> TESTS_DISKREBALANCE_PY.DIF
+#                        AND TESTS_CLUSTORAGE_PY.DIF FROM
+#                        ECS_MAIN_LINUX.X64_260228.0900
 #    gparada  09/09/25 - 38254024 Reshape - Dynamic Storage for data reco sparse 
 #    ?        ??/??/?? - Creation
 
@@ -618,7 +621,8 @@ class TestDiskMgr(ebTestClucontrol):
         cluctrl = self.mGetClubox()
 
         _storage = ebCluManageStorage(cluctrl, _options)
-        with patch('exabox.ovm.clustorage.ebCluManageStorage.mCheckGridDisksResizedCells', return_value=True):
+        with patch('exabox.ovm.clustorage.ebCluManageStorage.mCheckGridDisksResizedCells', return_value=True), \
+             patch.object(cluctrl, 'isATPCluster', return_value=False):
             _rc = _storage.mClusterStorageResize(_options)
 
         self.assertEqual(_rc, 0)

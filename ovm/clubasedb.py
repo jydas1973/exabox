@@ -1,6 +1,6 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/ovm/clubasedb.py /main/5 2025/11/21 09:43:16 prsshukl Exp $
+# $Header: ecs/exacloud/exabox/ovm/clubasedb.py /main/6 2025/12/16 16:59:27 jzandate Exp $
 #
 # clubasedb.py
 #
@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    jzandate    12/12/25 - Enh 38754947 - safe fallback exadbxs admin info
 #    prsshukl    11/20/25 - Bug 38675257 - BASEDB PROVISIONING FAILING IN
 #                           FETCHUPDATEDXMLFROMEXACLOUD
 #    scoral      10/28/25 - Enh 38452359: Support separate "admin" network
@@ -786,8 +787,8 @@ class exaBoxBaseDB(object):
                 if "ip" in _admin_net and "hostname" in _admin_net or \
                    "natip" in _client_net and "nathostname" in _client_net:
 
-                    _domu_net_client_single_stack.mSetNatHostName(_admin_net.get('hostname', _client_net['nathostname']))
-                    _nat_host = _admin_net.get('hostname', _client_net['nathostname'])
+                    _domu_net_client_single_stack.mSetNatHostName(_admin_net.get('hostname', _client_net.get('nathostname')))
+                    _nat_host = _admin_net.get('hostname', _client_net.get('nathostname'))
 
                     _domain = ""
                     if "domainname" in _admin_net:
@@ -797,9 +798,9 @@ class exaBoxBaseDB(object):
                         _domu_net_client_single_stack.mSetNatDomainName(_client_net['natdomainname'])
                         _domain = _client_net['natdomainname']
 
-                    if _admin_net.get("ip", _client_net["natip"]) == "discover":
+                    if _admin_net.get("ip", _client_net.get("natip")) == "discover":
 
-                        _nathost = _admin_net.get('hostname', _client_net['nathostname'])
+                        _nathost = _admin_net.get('hostname', _client_net.get('nathostname'))
 
                         if _domain:
                             _nathost = f"{_nathost}.{_domain}"
@@ -815,8 +816,8 @@ class exaBoxBaseDB(object):
                                 _nat_addr = _hostname.group(1)
 
                     else:
-                        _domu_net_client_single_stack.mSetNatAddr(_admin_net.get("ip", _client_net["natip"]))
-                        _nat_addr = _admin_net.get("ip", _client_net["natip"])
+                        _domu_net_client_single_stack.mSetNatAddr(_admin_net.get("ip", _client_net.get("natip")))
+                        _nat_addr = _admin_net.get("ip", _client_net.get("natip"))
 
                     # Validate that client 'natip' is a valid ip
                     __natip = _domu_net_client_single_stack.mGetNetNatAddr()
@@ -841,8 +842,8 @@ class exaBoxBaseDB(object):
             elif _client_net.get('natvlantag'):
                 _domu_net_client_single_stack.mSetNetVlanNatId(_client_net.get('natvlantag'))
 
-            if _admin_net.get('netgateway'):
-                _domu_net_client_single_stack.mSetNetNatGateway(_admin_net.get('netgateway'))
+            if _admin_net.get('gateway'):
+                _domu_net_client_single_stack.mSetNetNatGateway(_admin_net.get('gateway'))
             elif _client_net.get('natgateway'):
                 _domu_net_client_single_stack.mSetNetNatGateway(_client_net.get('natgateway'))
 

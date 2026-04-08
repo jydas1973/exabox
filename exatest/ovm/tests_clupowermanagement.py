@@ -1,6 +1,6 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/exatest/ovm/tests_clupowermanagement.py /main/1 2025/11/21 16:11:42 abysebas Exp $
+# $Header: ecs/exacloud/exabox/exatest/ovm/tests_clupowermanagement.py /main/2 2025/12/23 09:35:23 abysebas Exp $
 #
 # tests_clupowermanagement.py
 #
@@ -78,6 +78,38 @@ JSON_ILOM_MISSING_OPERATION = {
 JSON_ILOM_MISSING_HOST_PAIR = {
     "operation": "start",
     "parallel_process": True
+}
+
+JSON_ILOM_START_STOP = {
+    "operation": "start_stop",
+    "parallel_process": False,
+    "start_host_ilom_pair": {
+        "iad103716exdd013.iad103716exd.adminiad1.oraclevcn.com": "iad103716exdd013lo.iad103716exd.adminiad1.oraclevcn.com",
+        "iad103712exdcl07.iad103712exd.adminiad1.oraclevcn.com": "iad103712exdcl07lo.iad103712exd.adminiad1.oraclevcn.com"
+    },
+    "stop_host_ilom_pair": {
+        "iad103700exddb01.iad103700exd.adminiad1.oraclevcn.com": "iad103700exddb01lo.iad103700exd.adminiad1.oraclevcn.com"
+    }
+}
+
+JSON_ILOM_START_STOP_START_ONLY = {
+    "operation": "start_stop",
+    "parallel_process": True,
+    "start_host_ilom_pair": {
+        "iad103716exdd013.iad103716exd.adminiad1.oraclevcn.com": "iad103716exdd013lo.iad103716exd.adminiad1.oraclevcn.com"
+    }
+}
+
+JSON_ILOM_START_STOP_STOP_ONLY = {
+    "operation": "start_stop",
+    "stop_host_ilom_pair": {
+        "iad103700exddb01.iad103700exd.adminiad1.oraclevcn.com": "iad103700exddb01lo.iad103700exd.adminiad1.oraclevcn.com",
+        "iad103700exddb02.iad103700exd.adminiad1.oraclevcn.com": "iad103700exddb02lo.iad103700exd.adminiad1.oraclevcn.com"
+    }
+}
+
+JSON_ILOM_START_STOP_INVALID_PAIR = {
+    "operation": "start_stop"
 }
 
 JSON_LOWPOWER_VALID = {
@@ -299,6 +331,19 @@ class ebTestClupowermanagement(ebTestClucontrol):
         super(ebTestClupowermanagement, self).setUpClass(True, True)
         warnings.filterwarnings("ignore")
 
+    def _extract_logged_payload(self, mock_trace):
+        for call in reversed(mock_trace.call_args_list):
+            args = call[0] if call[0] else call.args
+            if not args:
+                continue
+            message = args[0]
+            if isinstance(message, str):
+                try:
+                    return json.loads(message)
+                except ValueError:
+                    continue
+        self.fail("Unable to locate JSON payload logged via ebLogTrace")
+
             
     def test_mHandlerStopStartHostViaIlom_start(self):
         _cmds = {
@@ -327,6 +372,125 @@ class ebTestClupowermanagement(ebTestClucontrol):
         with patch('exabox.ovm.clucontrol.exaBoxNode.mConnectAuthInteractive'), \
                 patch("exabox.ovm.clucontrol.exaBoxNode.mExecuteCmdsAuthInteractive"):
             self.assertEqual(_ebox_local.mHandlerStopStartHostViaIlom(), None)
+
+    def test_mHandlerStopStartHostViaIlom_start_stop(self):
+        _ebox_local = copy.deepcopy(self.mGetClubox())
+        _ebox_local._exaBoxCluCtrl__options.jsonconf = JSON_ILOM_START_STOP
+        ebLogInfo("Running unit test on exaBoxCluCtrl.mHandlerStopStartHostViaIlom with start_stop payload")
+
+        call_sequence = []
+
+        def _fake_run(op_name, host_payload, aOptions, base_payload):
+            payload_copy = copy.deepcopy(host_payload) if isinstance(host_payload, dict) else host_payload
+            call_sequence.append((op_name, payload_copy))
+            if host_payload is None:
+                return None, None
+            self.assertEqual(payload_copy, JSON_ILOM_START_STOP[f"{op_name}_host_ilom_pair"])
+            result = {
+                "operation": op_name,
+                "nodes": {host: {"status": "Success"} for host in payload_copy}
+            }
+            return result, copy.deepcopy(payload_copy)
+
+        with patch('exabox.ovm.clucontrol.ebCluStartStopHostFromIlom.mRunSingleOperation', side_effect=_fake_run) as mock_run, \
+                patch('exabox.ovm.clucontrol.ebLogTrace') as mock_trace:
+            self.assertIsNone(_ebox_local.mHandlerStopStartHostViaIlom())
+
+        self.assertEqual(mock_run.call_count, 2)
+        self.assertEqual(call_sequence, [
+            ("start", JSON_ILOM_START_STOP["start_host_ilom_pair"]),
+            ("stop", JSON_ILOM_START_STOP["stop_host_ilom_pair"])
+        ])
+
+        logged_payload = self._extract_logged_payload(mock_trace)
+        self.assertEqual(logged_payload.get("operation"), "start_stop")
+        self.assertFalse(logged_payload.get("parallel_process", False))
+        self.assertEqual(logged_payload.get("start_host_ilom_pair"), JSON_ILOM_START_STOP["start_host_ilom_pair"])
+        self.assertEqual(logged_payload.get("stop_host_ilom_pair"), JSON_ILOM_START_STOP["stop_host_ilom_pair"])
+        self.assertIn("start", logged_payload.get("results", {}))
+        self.assertIn("stop", logged_payload.get("results", {}))
+
+    def test_mHandlerStopStartHostViaIlom_start_stop_start_only(self):
+        _ebox_local = copy.deepcopy(self.mGetClubox())
+        _ebox_local._exaBoxCluCtrl__options.jsonconf = JSON_ILOM_START_STOP_START_ONLY
+        ebLogInfo("Running unit test on exaBoxCluCtrl.mHandlerStopStartHostViaIlom with start_stop start-only payload")
+
+        call_sequence = []
+
+        def _fake_run(op_name, host_payload, aOptions, base_payload):
+            payload_copy = copy.deepcopy(host_payload) if isinstance(host_payload, dict) else host_payload
+            call_sequence.append((op_name, payload_copy))
+            if op_name == "start":
+                self.assertEqual(payload_copy, JSON_ILOM_START_STOP_START_ONLY["start_host_ilom_pair"])
+                result = {
+                    "operation": op_name,
+                    "nodes": {host: {"status": "Success"} for host in payload_copy}
+                }
+                return result, copy.deepcopy(payload_copy)
+            self.assertIsNone(payload_copy)
+            return None, None
+
+        with patch('exabox.ovm.clucontrol.ebCluStartStopHostFromIlom.mRunSingleOperation', side_effect=_fake_run) as mock_run, \
+                patch('exabox.ovm.clucontrol.ebLogTrace') as mock_trace:
+            self.assertIsNone(_ebox_local.mHandlerStopStartHostViaIlom())
+
+        self.assertEqual(mock_run.call_count, 2)
+        self.assertEqual(call_sequence, [
+            ("start", JSON_ILOM_START_STOP_START_ONLY["start_host_ilom_pair"]),
+            ("stop", None)
+        ])
+
+        logged_payload = self._extract_logged_payload(mock_trace)
+        self.assertEqual(logged_payload.get("operation"), "start_stop")
+        self.assertTrue(logged_payload.get("parallel_process"))
+        self.assertEqual(logged_payload.get("start_host_ilom_pair"), JSON_ILOM_START_STOP_START_ONLY["start_host_ilom_pair"])
+        self.assertNotIn("stop_host_ilom_pair", logged_payload)
+        self.assertIn("start", logged_payload.get("results", {}))
+        self.assertNotIn("stop", logged_payload.get("results", {}))
+
+    def test_mHandlerStopStartHostViaIlom_start_stop_stop_only(self):
+        _ebox_local = copy.deepcopy(self.mGetClubox())
+        _ebox_local._exaBoxCluCtrl__options.jsonconf = JSON_ILOM_START_STOP_STOP_ONLY
+        ebLogInfo("Running unit test on exaBoxCluCtrl.mHandlerStopStartHostViaIlom with start_stop stop-only payload")
+
+        call_sequence = []
+
+        def _fake_run(op_name, host_payload, aOptions, base_payload):
+            payload_copy = copy.deepcopy(host_payload) if isinstance(host_payload, dict) else host_payload
+            call_sequence.append((op_name, payload_copy))
+            if op_name == "stop":
+                self.assertEqual(payload_copy, JSON_ILOM_START_STOP_STOP_ONLY["stop_host_ilom_pair"])
+                result = {
+                    "operation": op_name,
+                    "nodes": {host: {"status": "Success"} for host in payload_copy}
+                }
+                return result, copy.deepcopy(payload_copy)
+            self.assertIsNone(payload_copy)
+            return None, None
+
+        with patch('exabox.ovm.clucontrol.ebCluStartStopHostFromIlom.mRunSingleOperation', side_effect=_fake_run) as mock_run, \
+                patch('exabox.ovm.clucontrol.ebLogTrace') as mock_trace:
+            self.assertIsNone(_ebox_local.mHandlerStopStartHostViaIlom())
+
+        self.assertEqual(mock_run.call_count, 2)
+        self.assertEqual(call_sequence, [
+            ("start", None),
+            ("stop", JSON_ILOM_START_STOP_STOP_ONLY["stop_host_ilom_pair"])
+        ])
+
+        logged_payload = self._extract_logged_payload(mock_trace)
+        self.assertEqual(logged_payload.get("operation"), "start_stop")
+        self.assertNotIn("parallel_process", logged_payload)
+        self.assertNotIn("start_host_ilom_pair", logged_payload)
+        self.assertEqual(logged_payload.get("stop_host_ilom_pair"), JSON_ILOM_START_STOP_STOP_ONLY["stop_host_ilom_pair"])
+        self.assertIn("stop", logged_payload.get("results", {}))
+        self.assertNotIn("start", logged_payload.get("results", {}))
+
+    def test_mHandlerStopStartHostViaIlom_start_stop_missing_pairs(self):
+        _ebox_local = copy.deepcopy(self.mGetClubox())
+        _ebox_local._exaBoxCluCtrl__options.jsonconf = JSON_ILOM_START_STOP_INVALID_PAIR
+        ebLogInfo("Running unit test on exaBoxCluCtrl.mHandlerStopStartHostViaIlom with start_stop missing host pairs")
+        self.assertRaises(ExacloudRuntimeError, _ebox_local.mHandlerStopStartHostViaIlom)
 
     def test_mHandlerStopStartHostViaIlom_invalid_operation(self):
         _ebox_local = copy.deepcopy(self.mGetClubox())

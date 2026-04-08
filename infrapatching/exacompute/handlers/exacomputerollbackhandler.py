@@ -1,10 +1,10 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/infrapatching/exacompute/handlers/exacomputerollbackhandler.py /main/4 2025/05/07 04:51:45 araghave Exp $
+# $Header: ecs/exacloud/exabox/infrapatching/exacompute/handlers/exacomputerollbackhandler.py sdevasek_bug-38891722/1 2026/02/09 16:53:57 sdevasek Exp $
 #
 # exacomputerollbackhandler.py
 #
-# Copyright (c) 2022, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2022, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      exacomputerollbackhandler.py
@@ -16,6 +16,10 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    sdevasek    02/09/26 - Enh 38891722 - REMOVAL OF SSH EQUIVALENCE BETWEEN
+#                           LAUNCH-NODE AND TARGET-NODES
+#    sdevasek    02/02/26 - Enh 38821433 - EXACOMPUTE FREE POOL NODE  PATCHING:
+#                           USE ONE OF THE TARGET NODE AS LAUNCHNODE
 #    araghave    03/17/25 - Enh 37713042 - CONSUME ERROR HANDLING DETAILS FROM
 #                           INFRAPATCHERROR.PY DURING EXACOMPUTE PATCHING
 #    araghave    01/27/25 - Enh 37132175 - EXACOMPUTE MUST REUSE INFRA PATCHING
@@ -72,7 +76,11 @@ class ExaRollbackHandler(ExaGenericHandler):
             self.mPatchLogInfo(f"Patch manager Log Path on Launch Node is {self.mGetPatchmgrLogPathOnLaunchNode()}")
 
             # Get customized list of nodes
-            _, _, _list_of_nodes, _already_upgraded_node_list = self.mFilterNodesToPatch(self.mGetCustomizedDom0List(), PATCH_DOM0,  TASK_ROLLBACK)
+            _ret, _sug_msg, _list_of_nodes, _already_upgraded_node_list = self.mFilterNodesToPatch(self.mGetCustomizedDom0List(), PATCH_DOM0,  TASK_ROLLBACK)
+
+            if _ret != PATCH_SUCCESS_EXIT_CODE:
+                _ret = self.mAddError(_ret, _sug_msg)
+                return _ret
 
             # Set initial Patch Status Json.
             self.mUpdatePatchProgressStatus(aNodeList=_list_of_nodes, aAlreadyUpgradedNodeList=_already_upgraded_node_list)
@@ -137,7 +145,8 @@ class ExaRollbackHandler(ExaGenericHandler):
             self.mPatchLogError(traceback.format_exc())
             _suggestion_msg = "Exception in Running Compute Node Rollback  " + str(e)
             _ret = self.mAddError(INDIVIDUAL_PATCH_REQUEST_EXCEPTION_ERROR, _suggestion_msg)
-
         finally:
+            self.mPatchLogInfo("Cleanup Environment")
+            self.mCleanUpExaComputeSSHEnv()
             self.mPatchLogInfo(f"Final return code from task : {self.mGetTask()} is {_ret} ")
             return _ret

@@ -4,7 +4,7 @@
 #
 # tests_cludiag.py
 #
-# Copyright (c) 2021, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_cludiag.py - Unit test for cludiag
@@ -16,6 +16,7 @@
 #      None
 #
 #    MODIFIED   (MM/DD/YY)
+#    hcheon      03/03/26 - 39030501 Fixed command hang
 #    hcheon      10/12/25 - 38491623 Fixed tail command hang
 #    alsepulv    12/14/21 - Creation
 #
@@ -41,7 +42,8 @@ class ebTestCludiag(ebTestClucontrol):
     def setUpClass(self):
         super().setUpClass()
 
-    def test_collect_log(self):
+    @patch('exabox.ovm.cludiag.ebGetDefaultDB')
+    def test_collect_log(self, _db_mock):
         _options = self.mGetContext().mGetArgsOptions()
         _options.diagtype = "dom0,domU,cell,switch"
         _options.jsonconf = self.mGetPayload()
@@ -119,6 +121,54 @@ class ebTestCludiag(ebTestClucontrol):
             with open(_dst, 'rb') as f:
                 _result = f.read()
             self.assertEqual(_expected, _result)
+
+    @patch('exabox.ovm.cludiag.ebLogDiag')
+    @patch('exabox.ovm.cludiag.subprocess.Popen')
+    def test_mDownloadLogFile_timeout(self, aPopenMock, aLogMock):
+        class _FakeStdout(object):
+            def close(self):
+                return None
+
+        class _FakeProc(object):
+            def __init__(self, cmd, stdout):
+                self.cmd = cmd
+                self.stdout = stdout
+                self.terminated = False
+                self.killed = False
+
+            def wait(self, timeout=None):
+                if self.killed:
+                    return 0
+                raise subprocess.TimeoutExpired(self.cmd, timeout)
+
+            def terminate(self):
+                self.terminated = True
+
+            def kill(self):
+                self.killed = True
+
+        _procs = []
+
+        def _mock_popen(cmd, stdin=None, stdout=None):
+            _stdout = stdout
+            if stdout == subprocess.PIPE:
+                _stdout = _FakeStdout()
+            _proc = _FakeProc(cmd, _stdout)
+            _procs.append(_proc)
+            return _proc
+
+        aPopenMock.side_effect = _mock_popen
+        _diag_ctrl = exaBoxDiagCtrl(self.mGetClubox())
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            _src = os.path.join(tmp_dir, 'input')
+            _dst = os.path.join(tmp_dir, 'output')
+            with open(_src, 'wb') as f:
+                f.write(b'testdata')
+            _diag_ctrl.mDownloadLogFile(None, _src, _dst, 0, 1, 'cps')
+
+        self.assertTrue(all(_proc.terminated for _proc in _procs))
+        self.assertTrue(all(_proc.killed for _proc in _procs))
+        aLogMock.assert_any_call('ERR', 'Cmd timeout while reading %s' % _src)
 
 
 if __name__ == '__main__':

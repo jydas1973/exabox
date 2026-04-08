@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 #
-# $Header: ecs/exacloud/exabox/exatest/cluctrl/vmgi_install/cs_prevmchecks/tests_dom0_resources.py /main/7 2025/11/07 18:27:15 scoral Exp $
+# $Header: ecs/exacloud/exabox/exatest/cluctrl/vmgi_install/cs_prevmchecks/tests_dom0_resources.py /main/8 2026/02/02 09:28:33 aypaul Exp $
 #
 # tests_db_delete.py
 #
-# Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_db_delete.py - <one-line expansion of the name>
@@ -16,6 +16,7 @@
 #      NONE
 #
 #    MODIFIED   (MM/DD/YY)
+#    aypaul      01/30/26 - Updating unit tests for selinux implementation
 #    naps        03/12/25 - Bug 37486891 - dom0 access inside
 #                           mCheckDom0Resources need to made in parallel.
 #    naps        01/10/23 - Bug 34884577- UT updation.
@@ -193,8 +194,8 @@ class ebTestDom0Resources(ebTestClucontrol):
 
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mRebootNodesIfNoVMExists')
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mMakeFipsCompliant', return_value=(0, "reboot_host"))
-    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mSetSeLinux', return_value=(1))
-    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetSELinuxMode', return_value=("disabled"))
+    @patch('exabox.ovm.clucontrol.ebSelinuxControls.mSetSeLinux', return_value=(1))
+    @patch('exabox.ovm.clucontrol.ebSelinuxControls.mGetSELinuxMode', return_value=("disabled"))
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetu02Size', return_value=("100G"))
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mCheckEthInterfaces')
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mCheckNumVM', return_value=(10))
@@ -250,8 +251,8 @@ class ebTestDom0Resources(ebTestClucontrol):
     #'''
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mRebootNodesIfNoVMExists')
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mMakeFipsCompliant', return_value=(0, "reboot_host"))
-    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mSetSeLinux', return_value=(1))
-    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetSELinuxMode', return_value=("disabled"))
+    @patch('exabox.ovm.clucontrol.ebSelinuxControls.mSetSeLinux', return_value=(1))
+    @patch('exabox.ovm.clucontrol.ebSelinuxControls.mGetSELinuxMode', return_value=("disabled"))
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetu02Size', return_value=("100G"))
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mCheckEthInterfaces')
     def test_002_mCheckDom0Resources_parallel_ut_lessmem(self, mock_RebootNodesIfNoVMExists, mock_mMakeFipsCompliant, mock_mSetSeLinux, mock_mGetSELinuxMode, mock_mGetu02Size, mock_mCheckEthInterfaces):
@@ -308,8 +309,8 @@ class ebTestDom0Resources(ebTestClucontrol):
 
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mRebootNodesIfNoVMExists')
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mMakeFipsCompliant', return_value=(0, "reboot_host"))
-    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mSetSeLinux', return_value=(1))
-    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetSELinuxMode', return_value=("disabled"))
+    @patch('exabox.ovm.clucontrol.ebSelinuxControls.mSetSeLinux', return_value=(1))
+    @patch('exabox.ovm.clucontrol.ebSelinuxControls.mGetSELinuxMode', return_value=("disabled"))
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetu02Size', return_value=("100G"))
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mCheckEthInterfaces')
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mCheckNumVM', return_value=(10))
@@ -367,8 +368,8 @@ class ebTestDom0Resources(ebTestClucontrol):
 
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mRebootNodesIfNoVMExists')
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mMakeFipsCompliant', return_value=(0, "reboot_host"))
-    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mSetSeLinux', return_value=(1))
-    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetSELinuxMode', return_value=("disabled"))
+    @patch('exabox.ovm.clucontrol.ebSelinuxControls.mSetSeLinux', return_value=(1))
+    @patch('exabox.ovm.clucontrol.ebSelinuxControls.mGetSELinuxMode', return_value=("disabled"))
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetu02Size', return_value=("100G"))
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mCheckEthInterfaces')
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mCheckNumVM', return_value=(10))
@@ -428,8 +429,8 @@ class ebTestDom0Resources(ebTestClucontrol):
 
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mRebootNodesIfNoVMExists')
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mMakeFipsCompliant', return_value=(0, "reboot_host"))
-    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mSetSeLinux', return_value=(1))
-    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetSELinuxMode', return_value=("disabled"))
+    @patch('exabox.ovm.clucontrol.ebSelinuxControls.mSetSeLinux', return_value=(1))
+    @patch('exabox.ovm.clucontrol.ebSelinuxControls.mGetSELinuxMode', return_value=("disabled"))
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetu02Size', return_value=("100G"))
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mCheckEthInterfaces')
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mCheckNumVM', return_value=(200))

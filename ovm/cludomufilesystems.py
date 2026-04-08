@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# $Header: ecs/exacloud/exabox/ovm/cludomufilesystems.py /main/45 2025/11/14 17:04:47 scoral Exp $
+# $Header: ecs/exacloud/exabox/ovm/cludomufilesystems.py /main/46 2025/12/16 05:28:30 pbellary Exp $
 #
 # cludomufilesystems.py
 #
@@ -18,6 +18,7 @@
 #      None.
 #
 #    MODIFIED   (MM/DD/YY)
+#    pbellary    12/10/25 - Bug 38745809 - RESIZE DOMU FILESYSTEM IS FAILING WITH EDV ENABLED CLUSTERS 
 #    scoral      11/13/25 - Bug 38648866 - Added support of EDV volumes for
 #                           Exascale clusters.
 #    rajsag      10/23/25 - bug 38484985 - exascale- exacloud: add vm to
@@ -2161,11 +2162,9 @@ def expand_domu_filesystem(
     def _resize_xs_edv(disk_path: str, new_bytes: int):
         if not disk_path.startswith('/dev/exc/'):
             return
-        vol_name = '_'.join(os.path.basename(disk_path).split('_')[:-1])
+        vol_name = "_".join(os.path.basename(disk_path).split('_')[:2])
         xs_utils.mResizeEDVVolume(vol_name, f"{new_bytes}b")
 
-
-    
     if run_in_parallel:
         _plist = ProcessManager()
         result: Dict[str, Dict[str, Dict[str, str]]] = _plist.mGetManager().dict()

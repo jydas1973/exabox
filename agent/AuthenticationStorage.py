@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2021, Oracle and/or its affiliates. 
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     AuthenticationStorage.py
@@ -99,6 +99,9 @@ class ebBasicAuthStorage(ebHTTPAuthStorage):
 
 class ebConfigAuthStorage(ebHTTPAuthStorage):
     def __init__(self, aExacloudOpts=None):
+        self.__auth_key = None
+        self.__auth = None
+
         if not aExacloudOpts:
             aExacloudOpts = get_gcontext().mGetConfigOptions()
         if "agent_authkey" in list(aExacloudOpts.keys()):

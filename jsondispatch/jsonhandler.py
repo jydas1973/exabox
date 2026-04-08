@@ -4,7 +4,7 @@
 #
 # jsondispatch.py
 #
-# Copyright (c) 2022, 2024, Oracle and/or its affiliates.
+# Copyright (c) 2022, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      jsondispatch.py - jsondispatch basic functionality
@@ -16,6 +16,7 @@
 #      None
 #
 #    MODIFIED   (MM/DD/YY)
+#    jesandov    03/13/26 - 38875952: Add mExecuteLocal function
 #    jfsaldan    10/30/24 - Bug 37202899 - EXACS:24.4.1:VMBACKUP TO OSS :
 #                           DOWNLOAD GOLD BACKUP RETURN COMPLETED/SUCCESS POST
 #                           GOLD BACKUP FAILED TO OSS
@@ -24,6 +25,8 @@
 
 import json
 import uuid
+import time
+import shlex
 from jsonschema import validate
 
 from exabox.agent.ebJobRequest import ebJobRequest
@@ -32,6 +35,7 @@ from exabox.core.DBStore import ebExacloudDB, ebGetDefaultDB
 from exabox.core.Error import ebError, ExacloudRuntimeError
 from exabox.log.LogMgr import (ebLogDebug, ebLogError, ebLogInfo, ebLogTrace,
                                ebLogWarn)
+import subprocess as sp
 
 
 class JDHandler:
@@ -91,7 +95,9 @@ class JDHandler:
                 ebLogError(_err_msg)
                 return False
 
-        with open(self.__schemaFile, "r") as _f: 
+        ebLogTrace(f"Input JSON Payload: {json.dumps(self.__options.jsonconf, indent=4, sort_keys=True)}")
+
+        with open(self.__schemaFile, "r") as _f:
             _schema = json.load(_f)
 
         _endpointPayload = self.__options.jsonconf
@@ -139,5 +145,55 @@ class JDHandler:
         """
 
         raise NotImplementedError
+
+
+    def mExecuteLocal(self, aCmd, aCurrDir=None, aStdIn=sp.PIPE, aStdOut=sp.PIPE, aStdErr=sp.PIPE, aFailOnRc=True, aShell=False, aDebug=True):
+
+        _starttime = time.time()
+
+        _args = aCmd
+        if isinstance(aCmd, str):
+            _args = shlex.split(aCmd)
+
+        # Add timeot hook of 20m
+        #_args = ["/usr/bin/timeout", "1200"] + _args
+
+        ebLogTrace(f'mExecuteLocal: {_args}')
+
+        _current_dir = aCurrDir
+        _stdin = aStdIn
+        _stdout = aStdOut
+        _stderr = aStdErr
+
+        _proc = sp.Popen(_args, stdin=_stdin, stdout=_stdout, stderr=_stderr, cwd=_current_dir, shell=aShell)
+        _stdoutP, _stderrP = _proc.communicate()
+        _rc = _proc.returncode
+
+        if _stdoutP:
+            _stdoutP = _stdoutP.decode("UTF-8").strip()
+        else:
+            _stdoutP = ""
+
+        if _stderrP:
+            _stderrP = _stderrP.decode("UTF-8").strip()
+        else:
+            _stderrP = ""
+
+        ebLogTrace(f'mExecuteLocal: RC:{_rc}')
+        ebLogTrace(f"TIME: {time.time() - _starttime} secs")
+
+        if aFailOnRc and _rc != 0:
+            _msg = f'Command execution failed: {aCmd}\n'
+            _msg = f"{_msg}RC: {_rc}\n"
+            _msg = f"{_msg}STDOUT: {_stdoutP}\n"
+            _msg = f"{_msg}STDERR: {_stderrP}\n"
+            ebLogError(_msg)
+            raise OSError(_msg)
+        else:
+            if aDebug:
+                ebLogTrace(f'STDOUT: "{_stdoutP}"')
+                ebLogTrace(f'STDERR: "{_stderrP}"')
+
+        return _rc, _stdoutP, _stderrP
 
 # end of file

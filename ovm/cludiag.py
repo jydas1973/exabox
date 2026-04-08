@@ -1,5 +1,5 @@
 """
- Copyright (c) 2017, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2017, 2026, Oracle and/or its affiliates.
 
 NAME:
     Diagnosis - Basic functionality
@@ -11,6 +11,8 @@ NOTE:
     None
 
 History:
+    byyang      03/26/2026 - 38956232 always collect full aide.log
+    hcheon      03/03/2026 - 39030501 Fixed command hang
     hcheon      10/12/2025 - 38491623 Fixed defunct tail command
     gojoseph    02/10/2025 - Bug 37521984 Add directories to exclude in aide.conf
     seha        10/19/2024 - Bug 37153945 Configure Clamav and AIDE for SELinux
@@ -82,6 +84,10 @@ from exabox.core.Node import exaBoxNode
 from exabox.core.Context import get_gcontext
 from exabox.log.LogMgr import ebLogDiag, ebSetLogDiagLvl, ebLogWarn, ebLogError
 from exabox.tools.AttributeWrapper import wrapStrBytesFunctions
+
+_CPS_LOG_READ_TIMEOUT = 20
+_CPS_LOG_READ_CLEANUP_TIMEOUT = 2
+
 
 class file_lock_manager(object):
     def __init__(self, lock_file_path):
@@ -158,7 +164,9 @@ class exaBoxDiagCtrl(object):
         self.__cps_marker='%s/diagnostic/config/cps_marker.json'%self.__root_dir
         self.__cps_marker_avfim='%s/diagnostic/config/cps_marker_avfim.json' % \
                                    self.__root_dir
+        # '/opt/oci/exacc/aide/log/aide.log' is JSON without newline at the end
         self.__cps_logs_to_copy = [
+            '/opt/oci/exacc/aide/log/aide.log',
             '/opt/oci/exacc/inventory/json/ecs_applied_tuner_patches.json',
             '/opt/oci/exacc/inventory/json/ecs_images_info.json',
             '/opt/oci/exacc/inventory/json/ecs_inventory_imgversions.json',
@@ -991,8 +999,20 @@ class exaBoxDiagCtrl(object):
                         shlex.split(_command),
                         stdin=_procs[-1].stdout if i else None,
                         stdout=subprocess.PIPE if i < len(_cmds) - 1 else _outfile))
-                for _proc in _procs:
-                    _proc.wait()
+                    if i:
+                        _procs[-2].stdout.close()
+                try:
+                    for _proc in _procs:
+                        _proc.wait(timeout=_CPS_LOG_READ_TIMEOUT)
+                except subprocess.TimeoutExpired:
+                    ebLogDiag('ERR', 'Cmd timeout while reading %s' % aSrcFile)
+                    for _proc in _procs:
+                        _proc.terminate()
+                    for _proc in _procs:
+                        try:
+                            _proc.wait(timeout=_CPS_LOG_READ_CLEANUP_TIMEOUT)
+                        except subprocess.TimeoutExpired:
+                            _proc.kill()
             except Exception as ex:
                 ebLogDiag('ERR', 'Error while downloading %s : %s' % (aSrcFile, ex))
                 _outfile.close()

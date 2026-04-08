@@ -4,7 +4,7 @@
 #
 # tests_vm_move.py
 #
-# Copyright (c) 2022, 2024, Oracle and/or its affiliates.
+# Copyright (c) 2022, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_vm_move.py - <one-line expansion of the name>
@@ -16,6 +16,9 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    avimonda    03/09/26 - Modifying tests for fix related to Bug 38951559 -
+#                           GCP: WF WAS STUCK DUE TO NFT RULES MISMATCHES ON
+#                           DIFFERENT NODES
 #    jesandov    12/06/22 - Creation
 #
 
@@ -46,6 +49,7 @@ class ebTestHugePages(ebTestClucontrol):
             self.mGetRegexVm(): [
                 [
                     # Try to find the value from other files
+                    exaMockCommand("/bin/test -e /sbin/sysctl", aRc=0, aStdout="/usr/sbin/sysctl", aPersist=True),
                     exaMockCommand("sysctl -n vm.nr_hugepages", aStdout="0"),
                     exaMockCommand("cat /etc/sysctl.conf.*", aRc=1),
                     exaMockCommand("/bin/ls /etc/sysctl.d/", aStdout="999_new_config.conf"),
@@ -57,6 +61,7 @@ class ebTestHugePages(ebTestClucontrol):
                     exaMockCommand("sysctl -p"),
 
                     # Verify new value
+                    exaMockCommand("/bin/test -e /sbin/sysctl", aRc=0, aStdout="/usr/sbin/sysctl", aPersist=True),
                     exaMockCommand("sysctl -n vm.nr_hugepages.*", aStdout="25600"),
                     exaMockCommand("cat /etc/sysctl.conf.*", aStdout="vm.nr_hugepages = 25600"),
                 ]
@@ -101,6 +106,7 @@ class ebTestHugePages(ebTestClucontrol):
             self.mGetRegexVm(): [
                 [
                     # Try to find the value from other files
+                    exaMockCommand("/bin/test -e /sbin/sysctl", aRc=0, aStdout="/usr/sbin/sysctl", aPersist=True),
                     exaMockCommand("sysctl -n vm.nr_hugepages", aStdout="100"),
                     exaMockCommand("cat /etc/sysctl.conf.*", aRc=1),
                     exaMockCommand("/bin/ls /etc/sysctl.d/", aStdout="999_new_config.conf"),
@@ -112,6 +118,7 @@ class ebTestHugePages(ebTestClucontrol):
                     exaMockCommand("sysctl -p"),
 
                     # Verify new value
+                    exaMockCommand("/bin/test -e /sbin/sysctl", aRc=0, aStdout="/usr/sbin/sysctl", aPersist=True),
                     exaMockCommand("sysctl -n vm.nr_hugepages.*", aStdout="25600"),
                     exaMockCommand("cat /etc/sysctl.conf.*", aRc=1),
                     exaMockCommand("/bin/ls /etc/sysctl.d/", aStdout="999_new_config.conf"),

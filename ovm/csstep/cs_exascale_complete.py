@@ -1,5 +1,5 @@
 """
- Copyright (c) 2019, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2019, 2026, Oracle and/or its affiliates.
 
 NAME:
     cs_exascale_complete.py - Complete step on ExaScale Provisioning
@@ -17,6 +17,9 @@ INTERNAL CLASSES:
 
 History:
        MODIFIED (MM/DD/YY)
+       aararora  03/20/26 - 39106054: Install Falcon agent during postginid
+       jfsaldan  03/10/26 - Bug 39002144 - EXADB-XS-PP: VMC PROVISION GOT STUCK
+                            AT THE STEP OF AWAIT_ADD_SSH_KEYS
        prsshukl  11/19/25 - Bug 38037088 - BASE DB -> MOVE THE DO/UNDO STEPS
                             FOR BASEDB TO A NEW FILE IN CSSTEP
        scoral    07/29/25 - 38209895 - Skip Remove ASM diskgroups during undo
@@ -86,6 +89,7 @@ from exabox.ovm.cluexascale import ebCluExaScale
 from exabox.exakms.ExaKmsEntry import ExaKmsHostType
 from exabox.ovm.bom_manager import ImageBOM
 from exabox.utils.ExaRegion import is_r1_region
+from exabox.ovm.utils.clu_utils import ebCluUtils
 
 # This class implements doExecute and undoExecute functions
 # for the ESTP_EXASCALE_COMPLETE step of create service
@@ -413,6 +417,11 @@ class csExaScaleComplete(CSBase):
                 except Exception as e: 
                     ebLogWarn(f"*** mInstallSuricataRPM failed with Exception: {str(e)}")
 
+            _clu_utils = ebCluUtils(ebox)
+
+            _falcon_domus = [domu for _, domu in ebox.mReturnDom0DomUPair()]
+            _clu_utils.mInstallFalconAgentOnDomus(_falcon_domus, "Create Service")
+
         # Reset SSH Cluster Keys
         if not imageBom.mIsSubStepExecuted(self.step, "SSH_KEY_MANAGEMENT"):
             _step_time = time.time()
@@ -565,15 +574,8 @@ class csExaScaleComplete(CSBase):
                     ebLogError(f"*** Could not modify scan name to fqdn. Error: {ex}")
 
         # UPDATE DBCS
-        if ebox.mCheckConfigOption("exadbxs_image_base_provisioning_enable",  "True"):
-            for _, _domU in ebox.mReturnDom0DomUPair():
-                with connect_to_host(_domU, get_gcontext()) as _node:
-                    ebLogInfo(f"Setup Auth DCS in {_domU}")
-                    _node.mExecuteCmdLog("/opt/oracle/dcs/bin/setupAuthDcs.py")
-                    _node.mExecuteCmdLog("service dbcsagent stop")
-                    _node.mExecuteCmdLog("service dbcsagent start")
-                    _node.mExecuteCmdLog("service dbcsadmin stop")
-                    _node.mExecuteCmdLog("service dbcsadmin start")
+        if not imageBom.mIsSubStepExecuted(self.step, "SETUP_DCS_AUTH") and imageBom.mIsGoldImageProvisioning():
+            _csu.mSetupDBCSAgentAuth(ebox.mReturnDom0DomUPair())
 
         # Print the permissions of the dbnid directory
         if not imageBom.mIsSubStepExecuted(self.step, "UPDATE_DBFILES"):

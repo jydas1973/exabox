@@ -1,10 +1,10 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/exatest/agent/tests_agent_classes.py /main/10 2025/07/04 06:37:53 aypaul Exp $
+# $Header: ecs/exacloud/exabox/exatest/agent/tests_agent_classes.py /main/11 2026/01/28 03:29:47 nisrikan Exp $
 #
 # tests_agent_classes.py
 #
-# Copyright (c) 2022, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2022, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_agent_classes.py - <one-line expansion of the name>
@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    aararora  03/03/26 - Bug 38902170: Correct resource leak issues
+#    nisrikan  01/20/26 - Bug 38702503 - NEED A MECHANISM TO ROUTE CALLS TO OPCTL IN CASE OF NODE CONNECTION FAILURES
 #    aypaul      02/26/24 - Issue#36134753 Add unit tests for changes in
 #                           AYPAUL_BUG-36120429 and AYPAUL_AGENTUNRESPONSIVEFIX
 #    aypaul      09/25/23 - Add unit test cases for 35813639
@@ -36,21 +38,23 @@ import copy
 import posix
 import errno
 from unittest.mock import patch, MagicMock, PropertyMock, mock_open
-from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
-from exabox.core.Node import exaBoxNode
-from exabox.core.MockCommand import exaMockCommand
-from exabox.core.DBStore import ebGetDefaultDB
-from exabox.agent.Agent import ebRestHttpListener, ebAgentInfo, dispatchJobToWorker, isAdditionalWorkerAllowed, ebScheduleInfo, ebAgentDaemon,\
-ebSetDefaultAgent, ebSetAgentInfo
-from exabox.log.LogMgr import ebLogInfo
-from exabox.proxy.router import Router
-from multiprocessing import Lock
-from exabox.agent.ebJobRequest import ebJobRequest
-from exabox.agent.Worker import ebWorker
-from exabox.core.Core import gCoreState, gCoreObject
-from exabox.network.HTTPSHelper import ebResponse
-from exabox.agent.HTTPResponses import JSONResponse
-from exabox.core.Context import get_gcontext
+
+with patch('multiprocessing.Lock', return_value=MagicMock()):
+    from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
+    from exabox.core.Node import exaBoxNode
+    from exabox.core.MockCommand import exaMockCommand
+    from exabox.core.DBStore import ebGetDefaultDB
+    from exabox.agent.Agent import ebRestHttpListener, ebAgentInfo, dispatchJobToWorker, isAdditionalWorkerAllowed, ebScheduleInfo, ebAgentDaemon,\
+    ebSetDefaultAgent, ebSetAgentInfo
+    from exabox.log.LogMgr import ebLogInfo, ebThreadLoggingClose
+    from exabox.proxy.router import Router
+    from multiprocessing import Lock
+    from exabox.agent.ebJobRequest import ebJobRequest
+    from exabox.agent.Worker import ebWorker
+    from exabox.core.Core import gCoreState, gCoreObject
+    from exabox.network.HTTPSHelper import ebResponse
+    from exabox.agent.HTTPResponses import JSONResponse
+    from exabox.core.Context import get_gcontext
 
 DEFAULT_RESPONSE_BODY = [f"{uuid.uuid1()}", "Done", "Sat Feb 12 10:19:12 2022", "Sat Feb 12 12:19:12 2022", "sim_install", str(dict()), \
                         "0", "Undef", "[\"body contents\"]", "patchedxml", "dummy status info", "cluster_name", "lock", "data"]
@@ -180,6 +184,25 @@ class ebTestAgentClasses(ebTestClucontrol):
              _server_class.mAgentLogDownload({"dbName":"mockdbname", "vmName":"mockvmname", "configpath":"mockconfigpath"}, _resp)
              self.assertEqual(_resp["file"], "mocklogfolder/mockclustername.tgz")
         ebLogInfo("test on ebRestHttpListener.mAgentLogDownload succeeded.")
+
+    def test_serve_forever_closes_thread_logging(self):
+        ebLogInfo("")
+        ebLogInfo("Running unit test on ebRestHttpListener.serve_forever for thread logging cleanup")
+
+        _server_class = ebRestHttpListener(aConfig=None)
+        _server_class._ebRestHttpListener__main_agent_pid = os.getpid() + 1
+        _server_class.httpd = MagicMock()
+        _server_class.httpd.serve_forever.return_value = None
+
+        with patch('exabox.agent.Agent.ebThreadLocalLog') as mock_thread_local, \
+             patch('logging.getLogger') as mock_get_logger, \
+             patch('exabox.agent.Agent.ebThreadLoggingClose') as mock_close:
+            mock_thread_local.return_value = MagicMock(activated_by=None)
+            mock_get_logger.return_value = MagicMock(handlers=[])
+            _server_class.serve_forever()
+
+        mock_close.assert_called_once()
+        ebLogInfo("test on ebRestHttpListener.serve_forever succeeded.")
 
     def test_mBDS(self):
         ebLogInfo("")
@@ -1224,7 +1247,7 @@ class ebTestAgentClasses(ebTestClucontrol):
         params = []
         db = None
         response = {}
-        with patch('exabox.ovm.opctlMgr.ExaCSExacloudWrapper.check_status_for_idemtoken', return_value=None):
+        with patch('exabox.ovm.opctlExaCSMgr.ExaCSExacloudWrapper.check_status_for_idemtoken', return_value=None):
             _response = _server_class.mCheckOpctlStatus(body, params, db, response)
 
         body = ["mockdata1","mockdata2","mockdata3","mockdata4","mockdata5",f"'idemtoken': '{uuid.uuid1()}'","mockdata7","mockdata8","mockdata9","mockdata10","mockdata11"]
@@ -1234,7 +1257,7 @@ class ebTestAgentClasses(ebTestClucontrol):
         opctljobreq = ebJobRequest("mockcmd.opctl", {})
         opctljobreq.mSetBody({"bodykey":"bodyvalue"})
         opctljobreq.mSetError("mockerror")
-        with patch('exabox.ovm.opctlMgr.ExaCSExacloudWrapper.check_status_for_idemtoken', return_value=opctljobreq):
+        with patch('exabox.ovm.opctlExaCSMgr.ExaCSExacloudWrapper.check_status_for_idemtoken', return_value=opctljobreq):
             _response = _server_class.mCheckOpctlStatus(body, params, db, response)
             self.assertEqual(_response["body"],json.dumps({"bodykey":"bodyvalue"}))
             self.assertEqual(_response["success"], "False")
@@ -1243,7 +1266,7 @@ class ebTestAgentClasses(ebTestClucontrol):
         params = {"uuid": f"{uuid.uuid1()}"}
         db = None
         response = {}
-        with patch('exabox.ovm.opctlMgr.ExaCSExacloudWrapper.check_status_for_idemtoken', side_effect=Exception("Status check exception")):
+        with patch('exabox.ovm.opctlExaCSMgr.ExaCSExacloudWrapper.check_status_for_idemtoken', side_effect=Exception("Status check exception")):
             _response = _server_class.mCheckOpctlStatus(body, params, db, response)
         
         ebLogInfo("Unit test on ebRestHttpListener.mCheckOpctlStatus completed successfully.")

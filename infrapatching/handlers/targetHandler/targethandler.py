@@ -1,9 +1,9 @@
 #
-# $Header: ecs/exacloud/exabox/infrapatching/handlers/targetHandler/targethandler.py /main/257 2025/12/02 17:57:52 ririgoye Exp $
+# $Header: ecs/exacloud/exabox/infrapatching/handlers/targetHandler/targethandler.py /main/267 2026/02/21 03:43:33 nelango Exp $
 #
 # targethandler.py
 #
-# Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      targethandler.py - Place holder for common functionalities among all
@@ -17,10 +17,40 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    kdas        03/15/26 - ER 38354388 - EXACC: INCLUDE NETWORK INTERFACE 
+#                           ALERT ON PATCHING PRE-CHECK
+#    bhpati      02/20/26 - Bug 38888691 - OCI:Update error message when
+#                           LaunchNode is the management host for patch
+#                           failures.
+#    nelango     02/19/26 - Bug 38930043 : handle ssh key cleanup in cells
+#                           during switchover
+#    remamid     02/13/26 - handle ssh cleanup errors
+#    araghave    02/12/26 - Bug 38891325 - OCI: EXACS | SMR | SMR APPLY IS
+#                           SHOWING INCORRECT TARGET VERSION , WHILE APPLYING
+#                           CORRECT VERSION
+#    nelango     02/03/26 - Bug 38901967: No ilom service state disabling
+#    araghave    01/29/26 - Bug 38892151 - PROVIDE WARNING MESSAGE WHEN THE
+#                           CONFIGURE CRYPTO POLICIES COMMAND IS NOT AVAILABLE
+#    bhpati      01/15/26 - Bug 38671311 - FAILED TO COMPLETE GUEST VM OS
+#                           UPDATE APPLY. VM PATCH EXCEPTION DETECTED
+#    nelango     01/09/26 - Bug 38676078 - Add IPMI servicestate for exacs 
+#    rbhandar    01/07/26 - Bug 38336893 - OCI: OCI1 | EXACS | QMR PATCHING
+#                           FAILED WITH LOCK WAIT TIMEOUT EXCEEDED
+#    kdas        12/17/25 - Enh 38735511 - Exacloud layer enhancements for 
+#                           SMR patching of Clusterless free nodes 
+#    araghave    12/16/25 - Enh 38766076 - CONFIGURE UPDATE-CRYPTO-POLICIES
+#                           BEFORE AND AFTER SWITCH PATCHING
+#    rbhandar    12/11/25 - Bug 37865971 - AIM4ECS:0X03010067 - COMMAND TIMED
+#                           OUT BEFORE IT COMPLETED.
+#    vikasras    11/28/25 - OCI: VALIDATE CONTENT OF DOC ID 2829056.1 & REPLACE
+#                           IT WITH KB123625 IN ALL OS PATCHING WFS FOR
+#                           EXACC/DB-D/XS
 #    ririgoye    11/26/25 - Bug 38636333 - EXACLOUD PYTHON:ADD INSTANTCLIENT TO
 #                           LD_LIBRARY_PATH
 #    remamid     11/18/25 - Modify error code for insufficient space error for
 #                           singlenode patching bug 38667536
+#    rbhandar    11/10/25 - Enh 38607688 - EXACC GEN 2 | PATCHING | OPTIMIZE
+#                           PATCH PURGING TIME ON DOMU .
 #    sdevasek    09/24/25 - Bug 38463388 - UNABLE TO SET THE IPMI SERVICESTATE
 #                           IN ILOM TO ENABLED STATE
 #    sdevasek    09/08/25 - Bug 38366221 SMR FAILED - 'EXCEPTION IN SETTING 
@@ -535,10 +565,14 @@ import time
 import datetime
 import traceback
 import types
+import re
+import paramiko
 from exabox.BaseServer.AsyncProcessing import ProcessManager, ProcessStructure
 from multiprocessing import Process
 from uuid import uuid4
 from defusedxml import ElementTree as ET
+import os
+from pathlib import Path
 from exabox.core.Context import get_gcontext
 from exabox.ovm.userutils import ebUserUtils
 from exabox.infrapatching.utils.constants import *
@@ -554,7 +588,7 @@ from exabox.infrapatching.handlers.pluginHandler.oneoffpluginhandler import OneO
 from exabox.infrapatching.handlers.pluginHandler.oneoffv2pluginhandler import OneOffV2PluginHandler
 from exabox.infrapatching.handlers.pluginHandler.pluginhandlertypes import mGetPluginHandlerType
 from exabox.infrapatching.utils.utility import PATCH_BASE, mFormatOut, mReadPatcherInfo, mGetFirstDirInZip,\
-  mReadCallback, mErrorCallback, mGetInfraPatchingKnownAlert, mIsFSEncryptedList, mIsFSEncryptedNode, mGetInfraPatchingHandler,\
+  mReadCallback, mErrorCallback, mGetInfraPatchingKnownAlert, mGetInfraPatchingKnownSoftwareAlert, mIsFSEncryptedList, mIsFSEncryptedNode, mGetInfraPatchingHandler,\
   DOMU_PATCH_BASE, runInfraPatchCommandsLocally, flocked, mCheckAndFailOnCmdTimeout, mGetSshTimeout, mGetLaunchNodeConfig,\
   mExaspliceVersionPatternMatch
 from exabox.ovm.clumisc import ebCluSshSetup, ebCluPreChecks
@@ -605,6 +639,8 @@ class TargetHandler(GenericHandler):
 
         self.__clumisc_cluprechecks = None
         self.__clumisc_cluprechecks = ebCluPreChecks(self.mGetCluControl())
+
+        self.__crypto_policy_state = None
 
         if self.mIsExacomputePatching():
             self.mPatchLogInfo(f"Exacompute patch is performed. Exiting from infrapatching targethandler init method.")
@@ -710,6 +746,136 @@ class TargetHandler(GenericHandler):
     def mGetDbnuPluginHandler(self):
         return self.__dbnu_plugin_handler
 
+    def mResolveDbserverPatchZip(self):
+        '''
+         Use mGetTargetVersion() instead of regex directory parsing and prefer
+         PatchPayloads/DBPatchFile/dbserver.patch.zip when present; otherwise
+         fall back to PatchPayloads/<targetVersion>/DBPatchFile/dbserver.patch.zip.
+         Returns tuple (dbpatch_zip_path or None, reason/message)
+        '''
+        try:
+            _patch_base = None
+            _latest_dbserver_patch_zip = None
+            _target_ver = self.mGetTargetVersion()
+            if not _target_ver:
+                return None, "Target version is not set"
+
+            if self.mIsExaCC():
+                _patch_base = self.mGetCluControl().mCheckConfigOption("ociexacc_exadata_patch_download_loc")
+                if not _patch_base:
+                    _patch_base = "/u01/downloads/exadata/"
+            else:
+                _patch_base = get_gcontext().mGetBasePath()
+
+            _patch_path = os.path.join(_patch_base, "PatchPayloads")
+            _dbserver_common_loc_zip = os.path.join(_patch_path, KEY_NAME_DBPatchFile, "dbserver.patch.zip")
+            _dbserver_by_version_zip = os.path.join(_patch_path, _target_ver, KEY_NAME_DBPatchFile, "dbserver.patch.zip")
+
+            if os.path.exists(_dbserver_common_loc_zip):
+                if os.path.exists(_dbserver_by_version_zip):
+                    # pick the newer zip by inspecting inner dbserver_patch_YYYYMMDD folder
+                    _latest_dbserver_patch_zip = self.mCompareDbserverPatchFiles(_dbserver_by_version_zip, _dbserver_common_loc_zip)
+                    self.mPatchLogInfo(f"dbserver.patch.zip chosen: {_latest_dbserver_patch_zip}")
+                    return _latest_dbserver_patch_zip, "picked newer of common vs versioned"
+                self.mPatchLogInfo(f"dbserver.patch.zip chosen (common): {_dbserver_common_loc_zip}")
+                return _dbserver_common_loc_zip, "common dbserver patch available"
+
+            # fallback to version-scoped
+            if os.path.exists(_dbserver_by_version_zip):
+                self.mPatchLogInfo(f"dbserver.patch.zip chosen (version): {_dbserver_by_version_zip}")
+                return _dbserver_by_version_zip, "version available"
+
+            return None, f"dbserver.patch.zip not found under {_patch_path}"
+        except Exception:
+            self.mPatchLogTrace(traceback.format_exc())
+            return None, "exception while resolving dbserver.patch.zip"
+
+    def mGetDbserverPatchVersionDetails(self, aDbPatchFileDir):
+        """
+         This method returns the db patch file along with version based 
+         on the input DB patch file path provided.
+
+         -bash-4.4$ /bin/unzip -l /scratch/araghave/ecra_installs/abhi/mw_home/user_projects/
+         domains/exacloud/PatchPayloads/DBPatchFile/dbserver.patch.zip | /bin/grep dbserver_ | 
+         /bin/head -1 | /bin/awk '{print $4}' | /bin/tr -d "/"
+         dbserver_patch_250119
+         -bash-4.4$
+        """
+        _version = None
+        _db_patch_file = None
+        try:
+            _cmd_list = []
+            _out = []
+            # Get Dbserver patch version details.
+            _db_patch_file = os.path.join(aDbPatchFileDir)
+            _cmd_list.append(["/bin/unzip", "-l", _db_patch_file])
+            _cmd_list.append(["/bin/grep", "dbserver_"])
+            _cmd_list.append(["/bin/head", "-1"])
+            _cmd_list.append(["/bin/awk", '{print $4}'])
+            _cmd_list.append(["/bin/tr", "-d", '/'])
+            _cmd_list.append(["/bin/cut", "-d.", "-f1"])
+            _rc, _o = runInfraPatchCommandsLocally(_cmd_list)
+            if _o:
+                _version = ((_o.split("\n"))[0]).split("_")[2]
+        except Exception as e:
+            self.mPatchLogWarn("Error in generating dbserver patch version. Error: %s" % str(e))
+            self.mPatchLogTrace(traceback.format_exc())
+        return _version
+
+    def mCompareDbserverPatchFiles(self, aOldDbPatchFile, aNewDbPatchFile):
+        """
+         This method checks for the dbserver patch files staged at common
+         and the exadata version stage locations and return the LATEST
+         based on the date format details in the file naming convention.
+
+         In the below example, 2 dbserver patch zip locations are provided
+         as input for comparison to return the LATEST patch.
+
+          [ araghave_dbserver ] bash-4.2$  unzip -l
+          PatchPayloads/DBPatchFile/dbserver.patch.zip | grep 'dbserver_patch_' | head -1
+            0  10-18-2023 00:09   dbserver_patch_231017/
+          [ araghave_dbserver ] bash-4.2$
+
+          [ araghave_dbserver ] bash-4.2$ unzip -l
+          PatchPayloads/23.1.24.0.0.250306.1/DBPatchFile/dbserver.patch.zip | grep
+          'dbserver_patch_' | head -1
+            0  03-14-2025 00:00   dbserver_patch_250313/
+          [ araghave_dbserver ] bash-4.2$
+
+          -bash-4.2$ unzip -l PatchPayloads/DBPatchFile/dbserver.patch.zip | head -4
+          Archive:  PatchPayloads/DBPatchFile/dbserver.patch.zip
+           Length      Date    Time    Name
+          ---------  ---------- -----   ----
+                0  09-18-2024 23:46   dbserver_patch_240915.1/
+          -bash-4.2$
+
+          Here dbserver_patch_250313 is LATEST compared to dbserver_patch_231017 and
+          will be consumed for patching.
+        """
+        _old_db_patch_file_date_format = None
+        _new_db_patch_file_date_format = None
+        try:
+            _old_db_patch_file_date_format = self.mGetDbserverPatchVersionDetails(aOldDbPatchFile)
+            _new_db_patch_file_date_format = self.mGetDbserverPatchVersionDetails(aNewDbPatchFile)
+
+            if _old_db_patch_file_date_format and _new_db_patch_file_date_format:
+                if int(_old_db_patch_file_date_format) > int(_new_db_patch_file_date_format):
+                    self.mPatchLogInfo(f"{aOldDbPatchFile} is the LATEST dbserver patch file available based on the date.")
+                    return aOldDbPatchFile
+                elif int(_old_db_patch_file_date_format) < int(_new_db_patch_file_date_format):
+                    self.mPatchLogInfo(f"{aNewDbPatchFile} is the LATEST dbserver patch file available based on the date.")
+                    return aNewDbPatchFile
+                else:
+                    self.mPatchLogInfo(f"Both the dbserver patch files have the same date: {_new_db_patch_file_date_format} and either of them can be used for patching.")
+                    return aNewDbPatchFile
+            else:
+                self.mPatchLogInfo("DBPatch file not found in either of the Patch Stage locations.")
+                return None
+        except Exception as e:
+            self.mPatchLogWarn("Error in generating dbserver patch version file for patching. Error: %s" % str(e))
+            self.mPatchLogTrace(traceback.format_exc())
+            return None
+
     def mGetPluginHandler(self):
         return self.__pluginHandler
 
@@ -718,6 +884,18 @@ class TargetHandler(GenericHandler):
 
     def mSetCallBacks(self, aCallBacks):
         self.__callbacks = aCallBacks
+
+    def mGetSshEnvSetupSwitchesCell(self):
+        '''
+        Returns the SSH helper used for cells/switches cleanup
+        '''
+        return self.__ssh_env_setup_switches_cell
+
+    def mSetSshEnvSetupSwitchesCell(self, ssh_env_setup_switches_cell):
+        '''
+        Sets the SSH helper used for cells/switches cleanup
+        '''
+        self.__ssh_env_setup_switches_cell = ssh_env_setup_switches_cell
 
     def mGetSSHEnvSetUp(self):
         return self.__ssh_env_setup
@@ -784,6 +962,154 @@ class TargetHandler(GenericHandler):
 
     def mSetListOfLogsCopiedToExacloudHost(self, aListOfLogsCopiedToExacloudHost):
         self.__list_of_logs_copied_to_exacloud_host.append(aListOfLogsCopiedToExacloudHost)
+
+    def mManageCryptoPolicy(self, aDom0Host, aAction):
+        """
+         Handle crypto policy update or restoration depending on action.
+         Changes applicable only to EXACC environments.
+        """
+        _success_default = aAction != "update"
+
+        if not self.mIsCryptoPolicyResetEnabled():
+            self.mPatchLogInfo("CryptoPolicy: Crypto policy reset disabled via configuration")
+            return _success_default
+
+        if not self.mIsExaCC():
+            self.mPatchLogInfo("CryptoPolicy: Crypto policy reset applicable only for ExaCC environments")
+            return _success_default
+
+        def _handle_missing_host():
+            if aAction == "update":
+                self.mPatchLogWarn("CryptoPolicy: Unable to determine host for crypto policy update")
+                self.mAddError(CRYPTO_POLICY_OPERATION_FAILED, "Failed to identify dom0 host for crypto policy update")
+            else:
+                self.mPatchLogWarn("CryptoPolicy: Unable to determine host for crypto policy restoration")
+                self.mAddError(CRYPTO_POLICY_OPERATION_FAILED, "Failed to identify dom0 host for crypto policy restoration")
+            return False
+
+        _crypto_policy_binary = CRYPTO_POLICY_SHOW_CMD.split()[0]
+
+        def _fetch_current_policy():
+            _current_policy = None
+            _node = exaBoxNode(get_gcontext())
+            try:
+                self.mSetConnectionUser(_node)
+                _node.mConnect(aHost=aDom0Host)
+                if not _node.mFileExists(_crypto_policy_binary):
+                    _msg = (
+                        f"CryptoPolicy: Required binary '{_crypto_policy_binary}' not available on dom0 host"
+                    )
+                    self.mPatchLogWarn(_msg)
+                    return None
+                _i, _o, _e = _node.mExecuteCmd(CRYPTO_POLICY_SHOW_CMD)
+                if _o:
+                    _current_policy = _o.read().strip() if hasattr(_o, 'read') else str(_o).strip()
+            except Exception as e:
+                self.mPatchLogWarn(f"CryptoPolicy: Exception fetching crypto policy state - {str(e)}")
+                self.mPatchLogTrace(traceback.format_exc())
+            finally:
+                if _node.mIsConnected():
+                    _node.mDisconnect()
+            return _current_policy
+
+        def _set_policy_to_default():
+            _node = exaBoxNode(get_gcontext())
+            try:
+                self.mSetConnectionUser(_node)
+                _node.mConnect(aHost=aDom0Host)
+                if not _node.mFileExists(_crypto_policy_binary):
+                    _msg = (
+                        f"CryptoPolicy: Required binary '{_crypto_policy_binary}' not available on dom0 host"
+                    )
+                    self.mPatchLogWarn(_msg)
+                    return True
+                _i, _o, _e = _node.mExecuteCmd(CRYPTO_POLICY_SET_CMD.format(CRYPTO_POLICY_DEFAULT))
+                if _node.mGetCmdExitStatus() != 0:
+                    self.mPatchLogWarn("CryptoPolicy: Failed to set crypto policy to DEFAULT")
+                    self.mAddError(CRYPTO_POLICY_OPERATION_FAILED, "Failed to set crypto policy to DEFAULT on dom0 host")
+                    return False
+            except Exception as e:
+                self.mPatchLogWarn(f"CryptoPolicy: Exception setting crypto policy to DEFAULT - {str(e)}")
+                self.mPatchLogTrace(traceback.format_exc())
+                self.mAddError(CRYPTO_POLICY_OPERATION_FAILED, f"Exception setting crypto policy to DEFAULT: {str(e)}")
+                return False
+            finally:
+                if _node.mIsConnected():
+                    _node.mDisconnect()
+            self.mPatchLogInfo("CryptoPolicy: Crypto policy set to DEFAULT")
+            return True
+
+        def _restore_original_policy(_original_state):
+            _restore_success = True
+            _node = exaBoxNode(get_gcontext())
+            try:
+                self.mSetConnectionUser(_node)
+                _node.mConnect(aHost=aDom0Host)
+                if not _node.mFileExists(_crypto_policy_binary):
+                    _msg = (
+                        f"CryptoPolicy: Required binary '{_crypto_policy_binary}' not available on dom0 host"
+                    )
+                    self.mPatchLogWarn(_msg)
+                    return True
+                _i, _o, _e = _node.mExecuteCmd(CRYPTO_POLICY_SET_CMD.format(_original_state))
+                if _node.mGetCmdExitStatus() != 0:
+                    self.mPatchLogWarn(f"CryptoPolicy: Failed to restore crypto policy to {_original_state}")
+                    self.mAddError(CRYPTO_POLICY_OPERATION_FAILED, "Failed to restore crypto policy to original state on dom0 host")
+                    _restore_success = False
+                else:
+                    self.mPatchLogInfo(f"CryptoPolicy: Crypto policy restored to {_original_state}")
+            except Exception as e:
+                self.mPatchLogWarn(f"CryptoPolicy: Exception restoring crypto policy to {_original_state} - {str(e)}")
+                self.mPatchLogTrace(traceback.format_exc())
+                self.mAddError(CRYPTO_POLICY_OPERATION_FAILED, f"Exception restoring crypto policy: {str(e)}")
+                _restore_success = False
+            finally:
+                if _node.mIsConnected():
+                    _node.mDisconnect()
+            return _restore_success
+
+        def _handle_update():
+            _current_policy = _fetch_current_policy()
+            if not _current_policy:
+                self.mPatchLogWarn("CryptoPolicy: Failed to fetch current crypto policy state due to update crytpo policies not present on Dom0.")
+                return True
+
+            self.__crypto_policy_state = _current_policy
+
+            if _current_policy == CRYPTO_POLICY_DEFAULT_EXADATA:
+                return _set_policy_to_default()
+
+            self.mPatchLogInfo(f"CryptoPolicy: Crypto policy change not required, current state '{_current_policy}'")
+            return True
+
+        def _handle_restore():
+            _original_state = self.__crypto_policy_state
+            if not _original_state:
+                self.mPatchLogInfo("CryptoPolicy: No crypto policy restoration needed")
+                return True
+
+            if _original_state != CRYPTO_POLICY_DEFAULT_EXADATA:
+                self.mPatchLogInfo(f"CryptoPolicy: Skipping crypto policy restoration for state '{_original_state}'")
+                return True
+
+            return _restore_original_policy(_original_state)
+
+        if not aDom0Host:
+            return _handle_missing_host()
+
+        if aAction == "update":
+            return _handle_update()
+
+        return _handle_restore()
+
+    def mUpdateCryptoPolicyIfRequired(self, aDom0Host):
+        return self.mManageCryptoPolicy(aDom0Host, "update")
+
+    def mRestoreCryptoPolicyIfRequired(self, aDom0Host):
+        success = self.mManageCryptoPolicy(aDom0Host, "restore")
+        if success:
+            self.__crypto_policy_state = None
+        return success
 
     def mGetCellSwitchesPatchBaseAfterUnzip(self):
         return self.__cells_switches_patch_base_after_unzip
@@ -1106,7 +1432,7 @@ class TargetHandler(GenericHandler):
                 if _js["StaleMount"]:
                     _return_msg += ",StaleMount:" + _js["StaleMount"]+"; "
 
-        _return_msg = _return_msg + ". Refer MOS Note 2829056.1 for more details." 
+        _return_msg = _return_msg + ". Refer KB123625 for more details." 
         self.mPatchLogInfo(f'*** Final return msg {_return_msg} ***')
         self.mPatchLogInfo(f"Total time taken to determine Stale Mounts in seconds : {str(time.time() - _starttime)} ")
         return True, _return_msg
@@ -1270,7 +1596,7 @@ class TargetHandler(GenericHandler):
 
         # Update MOS Doc also if any issues found on any of the domUs.
         if _node_error_msg:
-            _node_error_msg ["MOS_NOTE"] = "Refer MOS Note 2829056.1 for more details."
+            _node_error_msg ["MOS_NOTE"] = "Refer KB123625 for more details."
 
         self.mPatchLogInfo("***System consistency check completed.***\n")
         return _is_system_valid_state, _node_error_msg
@@ -1910,6 +2236,25 @@ class TargetHandler(GenericHandler):
 
 
 
+    def mHandleSshCleanupException(self, exception, aDom0, aNodesList, aNodeType):
+        """Translate SSH cleanup failures into consistent error codes."""
+        # Authentication-related failures get the dedicated post-patch SSH error code.
+        if isinstance(exception, paramiko.AuthenticationException):
+            _error_code = UNABLE_TO_SSH_PATCHNODE_POSTPATCH
+            message = ("Unable to establish SSH connectivity during %s cleanup between %s and %s: %s" %
+                       (aNodeType, aDom0, aNodesList, exception))
+            raise_exc = exception
+        else:
+            # Any other failure in passwordless cleanup maps to PASSWDLESS_SSH_CLEANUP_FAILED.
+            _error_code = PASSWDLESS_SSH_CLEANUP_FAILED
+            message = ("Passwordless SSH cleanup failed during %s between %s and %s: %s" %
+                       (aNodeType, aDom0, aNodesList, exception))
+            raise_exc = exception
+
+        self.mPatchLogError(message)
+        self.mAddError(_error_code, message)
+        raise raise_exc
+
     # Clean environment after any operation
     def mCleanEnvironment(self, aDom0, aNodesList, aListFilePath, aBaseDir, aLogDir, aNodeType, aPatchExitStatus):
         """
@@ -1997,10 +2342,14 @@ class TargetHandler(GenericHandler):
                 of patchmgr process.
         '''
         if self.__ssh_env_setup_switches_cell:
-            if aNodeType in [ PATCH_ROCESWITCH, PATCH_ADMINSWITCH ]:
-                self.mPatchLogInfo("Ssh keys are not revoked during roceswitch and adminswitch patching")
-            else:
-                self.__ssh_env_setup_switches_cell.mCleanSSHPasswordless(aDom0, aNodesList, aSkipRestore=True)
+            # Wrap SSH teardown in a common handler so all cleanup failures map to the same error code.
+            try:
+                if aNodeType in [ PATCH_ROCESWITCH, PATCH_ADMINSWITCH ]:
+                    self.mPatchLogInfo("Ssh keys are not revoked during roceswitch and adminswitch patching")
+                else:
+                    self.__ssh_env_setup_switches_cell.mCleanSSHPasswordless(aDom0, aNodesList, aSkipRestore=True)
+            except Exception as exc:
+                self.mHandleSshCleanupException(exc, aDom0, aNodesList, aNodeType)
 
         '''
          Below checks are applicable to Cell and Switch targets 
@@ -2014,12 +2363,16 @@ class TargetHandler(GenericHandler):
         if self.mGetCurrentTargetType() in [ PATCH_ROCESWITCH, PATCH_ADMINSWITCH ] and not self.mGetRevokeRoceswitchPasswdlessSshSettings():
             self.mPatchLogInfo("Ssh validations are not performed post roceswitch/AdminSwitch patching when revoke_roceswitch_passwdless_ssh_settings parameter in infrapathcing.conf is set to False.")
         else:
-            self.mPatchLogInfo(f"Passwordless ssh validation performed between {str(aNodesList)} and {aDom0}")
-            self.mGetCluPatchCheck().mVerifyPatchmgrSshConnectivityBetweenExadataHosts(aNodesList, aDom0,
+            # Guard the post-patch validation flow to surface SSH issues consistently.
+            try:
+                self.mPatchLogInfo(f"Passwordless ssh validation performed between {str(aNodesList)} and {aDom0}")
+                self.mGetCluPatchCheck().mVerifyPatchmgrSshConnectivityBetweenExadataHosts(aNodesList, aDom0,
                                                                         aStage="PostPatch")
-            #Bug 38299928: Restore original SSH keys in dom0 only after validating connectivity
-            #by moving the restoration step to occur after the SSH test instead of before.
-            self.__ssh_env_setup_switches_cell.mRestoreSSHKey(aDom0, aUser=None)
+                #Bug 38299928: Restore original SSH keys in dom0 only after validating connectivity
+                #by moving the restoration step to occur after the SSH test instead of before.
+                self.__ssh_env_setup_switches_cell.mRestoreSSHKey(aDom0, aUser=None)
+            except Exception as exc:
+                self.mHandleSshCleanupException(exc, aDom0, aNodesList, aNodeType)
 
         # Delete input file
         self.mDeleteNodesFile(aListFilePath, aDom0)
@@ -2386,6 +2739,58 @@ class TargetHandler(GenericHandler):
         return False
 
     # Prepare environment before any operation
+    def mPrepareDom0CryptoPolicy(self, allowed_tasks, no_action_value):
+        """Common dom0 crypto policy setup for handlers.
+
+        Returns tuple of (dom0_candidates, dom0_crypto_host, early_return)
+        where early_return is either None or (ret_code, no_action_value).
+        """
+        dom0_crypto_host = None
+        set_ret, dom0_candidates = self.mSetDom0ToPatchcellSwitches()
+        if set_ret != PATCH_SUCCESS_EXIT_CODE:
+            return dom0_candidates, dom0_crypto_host, (set_ret, no_action_value)
+
+        task_type = self.mGetTask()
+        if (
+            task_type in allowed_tasks
+            and self.mIsExaCC()
+            and dom0_candidates
+            and self.mIsCryptoPolicyResetEnabled()
+        ):
+            dom0_launch_node = self.mGetDom0ToPatchcellSwitches()
+            if dom0_launch_node:
+                if self.mUpdateCryptoPolicyIfRequired(dom0_launch_node):
+                    dom0_crypto_host = dom0_launch_node
+                elif not self.mRestoreCryptoPolicyIfRequired(dom0_launch_node):
+                    suggestion_msg = (
+                        f"CryptoPolicy: Failed to update or restore crypto policy on dom0 host '{dom0_launch_node}'"
+                    )
+                    ret = CRYPTO_POLICY_OPERATION_FAILED
+                    self.mAddError(ret, suggestion_msg)
+                    return dom0_candidates, dom0_crypto_host, (ret, no_action_value)
+
+        return dom0_candidates, dom0_crypto_host, None
+
+    def mFinalizeDom0CryptoPolicy(self, task_type, dom0_crypto_host, status):
+        """Restore crypto policy if needed before returning."""
+        if dom0_crypto_host:
+            if not self.mRestoreCryptoPolicyIfRequired(dom0_crypto_host):
+                '''
+                  In case, we are unable to reset the crypto policy values, we need
+                  to evaluate for previous patch errors and that can take precendence when
+                  crypto policies reset related errors are also found. Below error is 
+                  set only in case of previous status is PATCH_SUCCESS_EXIT_CODE and the 
+                  previous error does not get overwritten.
+                '''
+                if status == PATCH_SUCCESS_EXIT_CODE:
+                    suggestion_msg = (
+                        f"CryptoPolicy: Failed to restore crypto policy on dom0 host '{dom0_crypto_host}'"
+                    )
+                    status = CRYPTO_POLICY_OPERATION_FAILED
+                    self.mAddError(status, suggestion_msg)
+        return status
+
+
     def mPrepareEnvironment(self, aDom0, aNodesList, aBaseDir, aAdminSwitch=False):
         """
         Creates the input files and sets passwordless ssh between the dom0
@@ -2997,6 +3402,9 @@ class TargetHandler(GenericHandler):
         _real_hw_alert_found = False
         _multiple_hw_alert_found_nodes = []
         _multiple_hw_alert_found = False
+        _real_sw_alert_found = False
+        _multiple_sw_alert_found_nodes = []
+        _multiple_sw_alert_found = False
 
         
         if aTargetType not in [PATCH_IBSWITCH, PATCH_ROCESWITCH]:
@@ -3053,6 +3461,40 @@ class TargetHandler(GenericHandler):
                     self.mAddError(_ret, _suggestion_msg)
                 if len(_MS_down_nodes) > 0 or _real_hw_alert_found:
                     raise Exception(f"{_suggestion_msg}. Fix the issue and proceed.")
+
+            # Checking Software Alerts
+            if (self.mGetAdditionalOptions() and 'IgnoreAlerts' in self.mGetAdditionalOptions()[0]
+                    and self.mGetAdditionalOptions()[0]['IgnoreAlerts'] == 'yes'):
+                self.mPatchLogWarn("User specified to ignore software alert. Proceeding with patch operation.")
+            
+            # Run S/W critical alert check for all targets, but not for exasplice dom0 patch/precheck.
+            elif not (self.mIsExaSplice() and aTargetType in [PATCH_DOM0] and aTaskType in [TASK_PATCH, TASK_PREREQ_CHECK]):
+                _real_sw_alert_found, _sw_alert_details, _sw_ms_down_nodes = self.mCheckSoftwareCriticalAlert(aTargetType, _list_of_nodes)
+                _sw_suggestion_msg = ""
+                if len(_sw_ms_down_nodes) > 0:
+                    _sw_suggestion_msg = f"Management Server is down on target {aTargetType} and task {aTaskType} for {_sw_ms_down_nodes}. "
+                    _ret = MANAGEMENT_SERVER_DOWN_DETECTED
+
+                if _real_sw_alert_found:
+                    for _node, _log_buffer in _sw_alert_details.items():
+                        if len(_log_buffer) > 1 or len(_sw_alert_details) > 1:
+                            _multiple_sw_alert_found_nodes.append(_node)
+                            _multiple_sw_alert_found = True
+                        elif len(_log_buffer) == 1:
+                            _alert_output = ''.join(_log_buffer)
+                            _substr = "Critical software alert [%s] detected on %s for target %s and task %s"
+                            if len(_alert_output) <= (ERROR_MSG_TRUNCATE_LENGTH - len(_sw_suggestion_msg) - len(_substr) - len(_node) - len(aTargetType) - len(aTaskType)):
+                                _sw_suggestion_msg = _sw_suggestion_msg + _substr % (_alert_output, _node, aTargetType, aTaskType)
+                            else:
+                                _sw_suggestion_msg = _sw_suggestion_msg + f"Critical software alert detected on {_node} for target {aTargetType} and task {aTaskType}"
+                    if _multiple_sw_alert_found:
+                        _sw_suggestion_msg = _sw_suggestion_msg + f"Multiple critical software alerts detected on {_multiple_sw_alert_found_nodes} for target {aTargetType} and task {aTaskType}"
+                    _ret = CRITICAL_SOFTWARE_ALERT_DETECTED
+                    self.mAddError(_ret, _sw_suggestion_msg)
+                elif len(_sw_ms_down_nodes) > 0:
+                    self.mAddError(_ret, _sw_suggestion_msg)
+                if len(_sw_ms_down_nodes) > 0 or _real_sw_alert_found:
+                    raise Exception(f"{_sw_suggestion_msg}. Fix the issue and proceed.")
 
             _ignore_alert_flag = False
             # Check for h/w known alerts for all targets, other than dom0 exasplice precheck/patch.
@@ -3121,7 +3563,7 @@ class TargetHandler(GenericHandler):
 
         _cmd = ''
         _currentImageVersion = str(aCurrentImageVersion)
-        _srvType = EXACC_SRV if self.mIsExaCC() else EXACS_SRV
+        _srvType = self.mGetServiceTypeForAlert()
 
         if aTargetType in [ PATCH_DOM0 ]:
             _dbmcli_cmd = ''
@@ -3212,10 +3654,9 @@ class TargetHandler(GenericHandler):
         return _ignore_alert_flag
 
     def mGetHardwareCriticalAlertHistoryCmd(self, aTargetType, aCurrentImageVersion):
-
         _cmd = ''
         _currentImageVersion = str(aCurrentImageVersion)
-        _srvType = EXACC_SRV if self.mIsExaCC() else EXACS_SRV
+        _srvType = self.mGetServiceTypeForAlert()
 
         if aTargetType in [ PATCH_DOM0 ]:
             _dbmcli_cmd = ''
@@ -3247,6 +3688,49 @@ class TargetHandler(GenericHandler):
             _cmd = _cellcli_cmd + _filter_cmd 
 
         return _cmd
+
+    def mGetSoftwareCriticalAlertHistoryCmd(self, aTargetType, aCurrentImageVersion):
+        _cmd = ''
+        _currentImageVersion = str(aCurrentImageVersion)
+        _srvType = self.mGetServiceTypeForAlert()
+
+        if aTargetType in [ PATCH_DOM0 ]:
+            _dbmcli_cmd = ''
+
+            if (version_compare(_currentImageVersion, "25")) >= 1:
+              _dbmcli_cmd = "dbmcli --inline -e 'LIST ALERTHISTORY WHERE endtime=null AND alerttype=stateful and alertShortName=Software and severity=Critical'"
+            else:
+              _dbmcli_cmd = "dbmcli -e 'LIST ALERTHISTORY WHERE endtime=null AND alerttype=stateful and alertShortName=Software and severity=Critical'"
+
+            _dom0_filter_list = mGetInfraPatchingKnownSoftwareAlert(PATCH_DOM0, _srvType)
+            _dom0_filter = '|'.join(_dom0_filter for _dom0_filter in _dom0_filter_list) if _dom0_filter_list else ''
+            _filter_cmd = f" | grep -vE '{_dom0_filter}'" if _dom0_filter else ""
+            _cmd = _dbmcli_cmd + _filter_cmd
+
+        elif aTargetType in [ PATCH_DOMU ]:
+            self.mPatchLogInfo("Skipping the check for critical software alerts on DomU targets.")
+
+        elif aTargetType in [ PATCH_CELL ]:
+            _cellcli_cmd = ''
+
+            if (version_compare(_currentImageVersion, "25")) >= 1:
+                _cellcli_cmd = "cellcli --inline -e 'LIST ALERTHISTORY WHERE endtime=null AND alerttype=stateful and alertShortName=Software and severity=Critical'"
+            else:
+                _cellcli_cmd = "cellcli -e 'LIST ALERTHISTORY WHERE endtime=null AND alerttype=stateful and alertShortName=Software and severity=Critical'"
+
+            _cell_filter_list = mGetInfraPatchingKnownSoftwareAlert(PATCH_CELL, _srvType)
+            _cell_filter = '|'.join(_cell_filter for _cell_filter in _cell_filter_list) if _cell_filter_list else ''
+            _filter_cmd = f" | grep -vE '{_cell_filter}'" if _cell_filter else ""
+            _cmd = _cellcli_cmd + _filter_cmd 
+
+        return _cmd
+
+    def mGetServiceTypeForAlert(self):
+        if self.mIsExaCC():
+            return EXACC_SRV
+        if self.mIsExacomputePatching():
+            return EXACOMPUTE_SRV
+        return EXACS_SRV
 
     def mCheckHwCriticalAlert(self, aTargetType, aListOfNodes):
         """
@@ -3325,6 +3809,77 @@ class TargetHandler(GenericHandler):
         self.mPatchLogInfo("Critical hardware alerts verification completed.")
 
         return _hw_alert_flag, _hw_alert_details, _MS_down_nodes
+
+    def mCheckSoftwareCriticalAlert(self, aTargetType, aListOfNodes):
+        """
+         This method checks for the existence of real software alert on all
+         filter nodes of the specified target, and other than known and
+         specified alerts.
+         Return:
+            True  --> if genuine software alerts found
+            False --> if no genuine software alerts found
+            []    --> list of dom0/cell node names having software alerts if found
+        """
+        _cmd = ""
+        _sw_alert_flag = False
+        _MS_down_nodes = []
+        _sw_alert_details = {}
+
+        self.mPatchLogInfo("Critical software alerts verification started.")
+
+        _aTimeout = self.mGetTimeoutForDbmcliCellCliInSeconds()
+
+        # Detect S/W alert on all nodes.
+        for aNode in aListOfNodes:
+            _node = exaBoxNode(get_gcontext())
+            _node.mConnect(aHost=aNode)
+
+            _image_info_cmd = "/usr/local/bin/imageinfo -ver"
+            _i, _o, _e = _node.mExecuteCmd(_image_info_cmd)
+            _exit_code = int(_node.mGetCmdExitStatus())
+            if int(_exit_code) != 0:
+                if _node.mIsConnected():
+                    _node.mDisconnect()
+                _errmsg = f"Unable to get image info version because it is either empty or undefined on the Node: {aNode}"
+                _ret = IMAGE_INFO_STATUS_EMPTY_OR_INVALID
+                self.mAddError(_ret, _errmsg)
+                self.mPatchLogWarn(_errmsg)
+                self.mPatchLogTrace(traceback.format_exc())
+                raise Exception(_errmsg)
+
+            _o = _o.readlines()
+            _currentImageVersion = _o[0].strip()
+            self.mPatchLogInfo(f"Current image version: {_currentImageVersion}")
+
+            _cmd = self.mGetSoftwareCriticalAlertHistoryCmd(aTargetType, _currentImageVersion)
+            if _cmd == '':
+                return _sw_alert_flag, _sw_alert_details, _MS_down_nodes
+
+            _i, _o, _e = _node.mExecuteCmd(_cmd, aTimeout=_aTimeout)
+            _out = _o.readlines()
+            if _node.mIsConnected():
+                _node.mDisconnect()
+
+            if _out:
+                _log_buffer = []
+                _MS_down = False
+                for _output in _out:
+                    if "DBM-01514" in _output:
+                        _MS_down = True
+                        _MS_down_nodes.append(aNode)
+                        self.mPatchLogWarn(f"Found Management Server down on {aTargetType} {aNode}")
+                        break
+                    _log_buffer.append(_output.strip().split('\t')[-1].strip())
+
+                if not _MS_down:
+                    self.mPatchLogWarn(f"Found Software alert on {aTargetType} {aNode}:")
+                    self.mPatchLogWarn(f"{str(_out)}")
+                    _sw_alert_details.update({aNode: _log_buffer})
+                    _sw_alert_flag |= True
+
+        self.mPatchLogInfo("Critical software alerts verification completed.")
+
+        return _sw_alert_flag, _sw_alert_details, _MS_down_nodes
 
     def getExistingPatchMgrSessionLogPath(self, aNode):
 
@@ -3619,6 +4174,10 @@ class TargetHandler(GenericHandler):
                         _exit_code = PATCH_SUCCESS_EXIT_CODE
                     else:
                         _suggestion_msg = f"Patchmgr command failed on Target : {str(self.mGetTargetTypes())} for Patch Operation : {self.mGetTask()}.Patchmgr logs are available on the node : {aNode} at location : {aPatchmgLogPathLaunchNode}."
+                        if self.mGetInfrapatchExecutionValidator().mCheckCondition('mIsManagementHostLaunchNodeForDomU'):
+                            self.mPatchLogError(
+                                f"Patchmgr command failed on Target : {str(self.mGetTargetTypes())} for Patch Operation : {self.mGetTask()}.Patchmgr logs are available on the node : {aNode} at location : {aPatchmgLogPathLaunchNode}.")
+                            _suggestion_msg = f"Patchmgr command failed on Target : {str(self.mGetTargetTypes())} for Patch Operation : {self.mGetTask()}.Patchmgr logs are available on the Management Host at location : {aPatchmgLogPathLaunchNode}."
                         self.mAddError(_exit_code, _suggestion_msg)
 
                     # Dump content of PatchmgrConsole.out at the end irrespective if success/failure
@@ -3883,10 +4442,31 @@ class TargetHandler(GenericHandler):
                     self.mPatchLogWarn(
                         f"Retry ({(_retries + 1):d}/{_max_retries:d}) to copy {aPatchFile} file due to error {str(_errmsg)}.")
             except Exception as e:
-                _rc = PATCH_COPY_AND_IMAGE_CHECKSUM_VALIDATION_EXCEPTION  
-                _errmsg = e
+                _msg = str(e)
+                if 'Error while multiprocessing(Process timeout)' in _msg:
+                    _rc = PATCH_COPY_ASYNC_TIMEOUT
+
+                    _node = re.search(r"id:\s*([^,\)]+)", _msg)
+                    _pid = re.search(r"pid:\s*([^,\)]+)", _msg)
+                    _max_time = re.search(r"max_time:\s*([^,\)]+)", _msg)
+
+                    _friendly_msg = "Patch file copy timed out while multiprocessing"
+                    if _node:
+                        _friendly_msg += f" on node {_node.group(1)}"
+                    if _pid:
+                        _friendly_msg += f" (PID {_pid.group(1)})"
+                    if _max_time:
+                        _friendly_msg += f" after exceeding {_max_time.group(1)} seconds"
+
+                    _errmsg = _friendly_msg
+                    _error_log_suffix = f"{PATCH_COPY_ASYNC_TIMEOUT} : {_friendly_msg}"
+                else:
+                    _rc = PATCH_COPY_AND_IMAGE_CHECKSUM_VALIDATION_EXCEPTION
+                    _errmsg = str(e)
+                    _error_log_suffix = _errmsg
+
                 self.mPatchLogError(
-                    f'Exception encountered while retrying ({(_retries + 1):d}/{_max_retries:d}) to copy {aPatchFile} file to the destination node. Error : {str(_errmsg)}')
+                    f'Exception encountered while retrying ({(_retries + 1):d}/{_max_retries:d}) to copy {aPatchFile} file to the destination node. Error : {_error_log_suffix}')
                 self.mPatchLogTrace(traceback.format_exc())
 
             _retries += 1
@@ -4045,6 +4625,9 @@ class TargetHandler(GenericHandler):
                     _suggestion_msg = f"{_remote_node} does not have enough space in {aRemotePatchBase} to be used as the patching base. Needed {((aRemoteNecessarySpaceMb * 3) / 1024):.2f} GB({(aRemoteNecessarySpaceMb * 3):.2f} MB), got {(_patch_base_space_available / 1024):.2f} GB({(_patch_base_space_available):.2f} MB)."
                     _ret = INSUFFICIENT_SPACE_ON_PATCH_BASE
                     if self.mGetInfrapatchExecutionValidator().mCheckCondition('mIsManagementHostLaunchNodeForDomU'):
+                        _suggestion_msg = f"Management Host does not have enough space in {aRemotePatchBase} to be used as the patching base. Needed {((aRemoteNecessarySpaceMb * 3) / 1024):.2f} GB({(aRemoteNecessarySpaceMb * 3):.2f} MB), got {(_patch_base_space_available / 1024):.2f} GB({(_patch_base_space_available):.2f} MB)."
+                        self.mPatchLogError(
+                            f"{_remote_node} does not have enough space in {aRemotePatchBase} to be used as the patching base. Needed {((aRemoteNecessarySpaceMb * 3) / 1024):.2f} GB({(aRemoteNecessarySpaceMb * 3):.2f} MB), got {(_patch_base_space_available / 1024):.2f} GB({(_patch_base_space_available):.2f} MB).")
                         _ret = INSUFFICIENT_SPACE_ON_PATCH_BASE_FOR_SINGLENODE
                     self.mAddError(_ret, _suggestion_msg)
                     aStatus.append({'node': _remote_node, 'status': 'failed', 'errorcode':_ret, 'errormessage':_suggestion_msg})
@@ -4347,7 +4930,7 @@ class TargetHandler(GenericHandler):
                 if _reqobj:
                     self.mPatchLogInfo('Updating patch status JSON with Node Progressing status to Exacloud DB.')
                     _db = ebGetDefaultDB()
-                    _db.mUpdateJsonPatchReport(_reqobj.mGetUUID(), json.dumps(aJsonPatchReport))
+                    _db.mUpdateJsonPatchReportWithLock(_reqobj.mGetUUID(), json.dumps(aJsonPatchReport))
             else:
                 self.mPatchLogInfo('mUpdatePatchProgressStatus : Json Patch Report is empty. Node Progressing status Json is not updated to Exacloud DB')
 
@@ -4444,6 +5027,73 @@ class TargetHandler(GenericHandler):
             else:
                 self.mPatchLogInfo("mUpdatePatchProgressStatus - aPatchmgrXmlData is yet to be populated.")
         return patch_progressing_status_json
+
+    def mUpdatePatchProgressStatusForNodes(self, aNodeList=[], aStatus="NotStarted", aStatusDetails="Not Attempted"):
+        """
+        Update node_progressing_status entries for the provided nodes without resetting other nodes.
+        This method was primarily introduced to update node progress data on clusterless nodes that 
+        are not sent over to PatchMgr eg. due to missing target ELU version. 
+        """
+
+        if not aNodeList:
+            return
+
+        _timestamp = time.strftime("%Y-%m-%d %H:%M:%S%z")
+        _master_request_uuid, _child_request_uuid, _, _json_patch_report = self.mGetAllPatchListDetails()
+        _json_patch_report_data = {}
+        if _json_patch_report:
+            try:
+                _json_patch_report_data = json.loads(_json_patch_report)
+            except Exception as e:
+                self.mPatchLogWarn(f"mUpdatePatchProgressStatusForNodes: Unable to parse json patch report. Error: {str(e)}")
+                self.mPatchLogTrace(traceback.format_exc())
+                _json_patch_report_data = {}
+
+        if "data" not in _json_patch_report_data:
+            _json_patch_report_data["data"] = {}
+
+        _node_progressing_status = _json_patch_report_data["data"].get("node_progressing_status")
+        if not _node_progressing_status:
+            _node_progressing_status = self.mPopulateNodeProgressDataIfMissing()
+            _json_patch_report_data["data"]["node_progressing_status"] = _node_progressing_status
+
+        if "infra_patch_start_time" not in _node_progressing_status or not _node_progressing_status["infra_patch_start_time"]:
+            _node_progressing_status["infra_patch_start_time"] = _timestamp
+        if "sleep_infra_patch" not in _node_progressing_status or not _node_progressing_status["sleep_infra_patch"]:
+            _node_progressing_status["sleep_infra_patch"] = "no"
+
+        if "node_patching_progress_data" not in _node_progressing_status:
+            _node_progressing_status["node_patching_progress_data"] = []
+
+        for _node in aNodeList:
+            _entry = None
+            for _progress in _node_progressing_status["node_patching_progress_data"]:
+                if _progress.get("node_name", "").upper() == str(_node).upper():
+                    _entry = _progress
+                    break
+            if not _entry:
+                _entry = {
+                    "node_name": _node,
+                    "target_type": self.mGetCurrentTargetType(),
+                    "patchmgr_start_time": _timestamp,
+                    "last_updated_time": _timestamp,
+                    "status": "NotStarted",
+                    "status_details": "Not Attempted"
+                }
+                _node_progressing_status["node_patching_progress_data"].append(_entry)
+
+            _entry["target_type"] = self.mGetCurrentTargetType()
+            _entry["status"] = aStatus
+            _entry["status_details"] = aStatusDetails
+            _entry["last_updated_time"] = _timestamp
+            if "patchmgr_start_time" not in _entry or not _entry["patchmgr_start_time"]:
+                _entry["patchmgr_start_time"] = _timestamp
+
+        _reqobj = self.mGetCluControl().mGetRequestObj()
+        if _reqobj:
+            self.mPatchLogInfo('mUpdatePatchProgressStatusForNodes: Updating node progress status to Exacloud DB.')
+            _db = ebGetDefaultDB()
+            _db.mUpdateJsonPatchReport(_reqobj.mGetUUID(), json.dumps(_json_patch_report_data))
 
     def mPopulateNodeProgressDataIfMissing(self):
         """
@@ -4590,7 +5240,8 @@ class TargetHandler(GenericHandler):
                 # [root@sea201323exdd008 ~]# imagehistory | grep '^Version' | tail -2 | head -1 | awk '{print $3}'
                 # 24.1.8.0.0.250208
                 _cmd_get_inactive_image_version = "imagehistory | grep '^Version' | tail -2 | head -1 | awk '{print $3}'"
-                _i, _o, _e = _node.mExecuteCmd(_cmd_get_inactive_image_version)
+                _i, _o, _e = _node.mExecuteCmd(_cmd_get_inactive_image_version, aTimeout=SHELL_CMD_DEFAULT_TIMEOUT_IN_SECONDS)
+                mCheckAndFailOnCmdTimeout(aCmd=_cmd_get_inactive_image_version, aNode=_node, aHandler=self)
                 _exit_code = int(_node.mGetCmdExitStatus())
                 if int(_exit_code) == 0: 
                     _inactive_image_version = (_o.readlines()[-1]).strip()
@@ -4672,47 +5323,53 @@ class TargetHandler(GenericHandler):
          Purge Exadata patches on all target
          types and nodes in parallel. 
         """
-        _plist = ProcessManager()
-        _rc_status = _plist.mGetManager().list()
+        try:
+            _plist = ProcessManager()
+            _rc_status = _plist.mGetManager().list()
 
-        self.mPatchLogInfo("Purging of Exadata patches(if any) will be performed.")
-        for _remote_node in aLaunchNodeCandidates:
-            _p = ProcessStructure(_purge_exadata_patches, [_remote_node, _rc_status], _remote_node)
+            self.mPatchLogInfo("Purging of Exadata patches(if any) will be performed.")
+            for _remote_node in aLaunchNodeCandidates:
+                _p = ProcessStructure(_purge_exadata_patches, [_remote_node, _rc_status], _remote_node)
 
-            '''
-             Timeout parameter configurable in Infrapatching.conf
-             Currently it is set to 10 minutes
-            '''
-            self.mPatchLogInfo(
-                f"Configurable parameter for parallel execution timeout in Infrapatching.conf currently set to {str(self.mGetExadataPatchPurgeExecutionTimeoutInSeconds())} seconds")
-            _p.mSetMaxExecutionTime(self.mGetExadataPatchPurgeExecutionTimeoutInSeconds())
+                '''
+                Timeout parameter configurable in Infrapatching.conf
+                Currently it is set to 10 minutes
+                '''
+                self.mPatchLogInfo(
+                    f"Configurable parameter for parallel execution timeout in Infrapatching.conf currently set to {str(self.mGetExadataPatchPurgeExecutionTimeoutInSeconds())} seconds")
+                _p.mSetMaxExecutionTime(self.mGetExadataPatchPurgeExecutionTimeoutInSeconds())
 
-            _p.mSetJoinTimeout(PARALLEL_OPERATION_TIMEOUT_IN_SECONDS)
-            _p.mSetLogTimeoutFx(self.mPatchLogWarn)
-            _plist.mStartAppend(_p)
+                _p.mSetJoinTimeout(PARALLEL_OPERATION_TIMEOUT_IN_SECONDS)
+                _p.mSetLogTimeoutFx(self.mPatchLogWarn)
+                _plist.mStartAppend(_p)
 
-        _plist.mJoinProcess()
+            _plist.mJoinProcess()
 
-        if _plist.mGetStatus() == "killed":
-            self.mPatchLogWarn("Timeout while purging Exadata patches.")
+            if _plist.mGetStatus() == "killed":
+                self.mPatchLogWarn("Timeout while purging Exadata patches.")
 
-        # validate the return codes
-        for _rc_details in _rc_status:
-            if _rc_details['status'] == "failed":
-                self.mPatchLogWarn("Purging Exadata patches failed.")
-                if 'errorcode' in _rc_details and _rc_details['errorcode'] == PATCHING_CONNECT_FAILED:
-                    _connect_failed_node_list.append(_rc_details['node'])
-                    _suggestion_msg = f"Connect to Node : {_connect_failed_node_list} failed with Error : {_rc_details['errorstr']}"
-                    _error_status[_rc_details['errorcode']] = _suggestion_msg
-                else:
-                    _ret = EXADATA_PATCHES_CLEANUP_FAILED
-                    _cleanup_failed_node_list.append(_rc_details['node'])
-                    _suggestion_msg = f"Exadata patches cleanup failed on Node : {_cleanup_failed_node_list}."
-                    _error_status[_ret] = _suggestion_msg
-
-        if len(_error_status) > 0:
-            _return_status = _error_status
-        return _return_status
+            # validate the return codes
+            for _rc_details in _rc_status:
+                if _rc_details['status'] == "failed":
+                    self.mPatchLogWarn("Purging Exadata patches failed.")
+                    if 'errorcode' in _rc_details and _rc_details['errorcode'] == PATCHING_CONNECT_FAILED:
+                        _connect_failed_node_list.append(_rc_details['node'])
+                        _suggestion_msg = f"Connect to Node : {_connect_failed_node_list} failed with Error : {_rc_details['errorstr']}"
+                        _error_status[_rc_details['errorcode']] = _suggestion_msg
+                    else:
+                        _ret = EXADATA_PATCHES_CLEANUP_FAILED
+                        _cleanup_failed_node_list.append(_rc_details['node'])
+                        _suggestion_msg = f"Exadata patches cleanup failed on Node : {_cleanup_failed_node_list}."
+                        _error_status[_ret] = _suggestion_msg
+        except Exception as e:
+            self.mPatchLogWarn(f"Purging Exadata patches failed with exception : {str(e)}")
+            _ret = EXADATA_PATCHES_CLEANUP_FAILED
+            _suggestion_msg = f"Exadata patches cleanup failed on Nodes : {str(aLaunchNodeCandidates)}"
+            _error_status[_ret] = _suggestion_msg
+        finally:
+            if len(_error_status) > 0:
+                _return_status = _error_status
+            return _return_status
 
     def mCheckFileExistsOnRemoteNodes(self, aNodeList, aFile):
         """
@@ -5310,12 +5967,10 @@ class TargetHandler(GenericHandler):
     def mUpdateServiceStateOnIlom(self, aNodeList, aPhase):
         """
          This method takes care of enabling the
-         servicestate prior to patching and disabling
-         the same post patching. It is applicable to
-         dom0 and cells and is currently applicable
-         to EXACC environments. Irrespective of the
-         impact of patch results, values are reset at
-         the end of patching.
+         servicestate prior to patching. For EXACC
+         environments, it also disables servicestate
+         after patching. It is applicable to dom0 and
+         cells.
 
          ipmitool servicestate commands sample snippets :
 
@@ -5375,6 +6030,8 @@ class TargetHandler(GenericHandler):
                         _val_failed_nodes.append(_node_name)
 
                 elif aPhase == "postpatch":
+                    #This postpatch part of the code disable servicestate is currently 
+                    #not used for both exacs and exacc. Retained for future implementations.
                     _in, _out, _err = _node.mExecuteCmd(_cmd_ipmi_geteval)
                     if _out:
                         _o = _out.readlines()
@@ -5981,7 +6638,13 @@ class TargetHandler(GenericHandler):
         _precheck_data = {}
         _patchMgrObj = None
 
-        self.mSetDom0ToPatchcellSwitches()
+        _task_type = self.mGetTask()
+
+        _dom0_candidates, _dom0_crypto_host, _crypto_setup_result = self.mPrepareDom0CryptoPolicy(
+            (TASK_PATCH, TASK_PREREQ_CHECK), _no_action_taken
+        )
+        if _crypto_setup_result:
+            return _crypto_setup_result, _no_action_taken
 
         if len(self.mGetListOfAdminSwitches()) > 0:
             # Prepare environment: passwordless between dom0 and cells, create input file
@@ -5999,6 +6662,7 @@ class TargetHandler(GenericHandler):
                 _suggestion_msg = f"Launch node is either down or patches are not staged, unable to proceed with {PATCH_ADMINSWITCH} operation on {self.mGetTask()} target."
                 _ret = SWITCH_PATCH_FILES_MISSING
                 self.mAddError(_ret, _suggestion_msg)
+                _ret = self.mFinalizeDom0CryptoPolicy(_task_type, _dom0_crypto_host, _ret)
                 return _ret, _no_action_taken
 
             # create patchmgr object with bare minimum arguments
@@ -6012,6 +6676,7 @@ class TargetHandler(GenericHandler):
             _ret, _patchmgr_active_node = _patchMgrObj.mCheckForPatchMgrSessionExistence()
 
             if _ret == PATCHMGR_SESSION_ALREADY_EXIST:
+                _ret = self.mFinalizeDom0CryptoPolicy(_task_type, _dom0_crypto_host, _ret)
                 return _ret, _no_action_taken
 
             # create patchmgr nodes file
@@ -6035,6 +6700,7 @@ class TargetHandler(GenericHandler):
             _ret = PATCH_SUCCESS_EXIT_CODE
             self.mAddError(_ret, _suggestion_msg)
 
+        _ret = self.mFinalizeDom0CryptoPolicy(_task_type, _dom0_crypto_host, _ret)
         return _ret, _no_action_taken
 
     def mPatchAdminswitchesRolling(self, aListOfNodes, aPatchMgrObj):

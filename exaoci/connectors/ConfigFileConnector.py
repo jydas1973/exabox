@@ -4,7 +4,7 @@
 #
 # ConfigFileConnector.py
 #
-# Copyright (c) 2022, 2023, Oracle and/or its affiliates.
+# Copyright (c) 2022, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      ConfigFileConnector.py - <one-line expansion of the name>
@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    prsshukl    03/12/26 - Bug 38900158 - EXACLOUD: ISSUES FOUND BY VOXIO
+#                           CODEV AGENT IN DIR EXABOX/EXAOCI
 #    jfsaldan    04/26/23 - Enh 35207526 - Adding support in
 #                           ConfigFileConnector to receive a config dict in the
 #                           constructor
@@ -64,6 +66,7 @@ class ConfigFileConnector(OCIConnector):
                 # in case the from_file function fails return and empty
                 # dictionary
                 _config = {}
+                ebLogTrace("ConfigFileConnector using empty dictionary")
         self.__config_file = _config
 
     def get_connector_type(self) -> str:

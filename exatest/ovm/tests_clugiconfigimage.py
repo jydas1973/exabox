@@ -1,10 +1,10 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/exatest/ovm/tests_clugiconfigimage.py /main/14 2025/08/19 08:39:20 akkar Exp $
+# $Header: ecs/exacloud/exabox/exatest/ovm/tests_clugiconfigimage.py /main/15 2026/02/16 06:49:10 joysjose Exp $
 #
 # test_clugiconfigimage.py
 #
-# Copyright (c) 2023, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2023, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      test_clugiconfigimage.py - Test cases for ebCluGiConfigImage methods
@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    joysjose    02/13/26 - Bug 38922572: Incremental upgrade check fix
 #    akkar       07/23/25 - Bug 38227428: Add more test cases
 #    akkar       05/19/25 - Bug 37964965: Fix image name in inventory.json for
 #                           multigi
@@ -2646,6 +2647,84 @@ class ebTestCluGiConfigImage(ebTestClucontrol):
         self.assertEqual(len(versions), 4)
         _added_image = os.path.join(self.exacs_dir, "grid-klone-Linux-x86-64-192200240116.zip")
         os.remove(_added_image)
+
+    def test_mGetOlderVersionFiles_returns_oldest_files(self):
+        inventory_data = {
+            "grid-klones": [
+                {
+                    "files": [
+                        {"path": "EXACS/grid-klone-Linux-x86-64-191700230418.zip"}
+                    ],
+                    "service": ["EXACS"],
+                    "version": "19.17.0.0.230418",
+                },
+                {
+                    "files": [
+                        {"path": "EXACS/grid-klone-Linux-x86-64-191800230418.zip"}
+                    ],
+                    "service": ["EXACS"],
+                    "version": "19.18.0.0.230418",
+                },
+                {
+                    "files": [
+                        {"path": "EXACS/grid-klone-Linux-x86-64-191900230418.zip"}
+                    ],
+                    "service": ["EXACS"],
+                    "version": "19.19.0.0.230418",
+                },
+                {
+                    "files": [
+                        {"path": "EXACS/grid-klone-Linux-x86-64-192000230418.zip"}
+                    ],
+                    "service": ["EXACS"],
+                    "version": "19.20.0.0.230418",
+                },
+                {
+                    "files": [
+                        {"path": "EXACS/grid-klone-Linux-x86-64-192100230418.zip"}
+                    ],
+                    "service": ["EXACS"],
+                    "version": "19.21.0.0.230418",
+                },
+                {
+                    "files": [
+                        {"path": "EXACS/grid-klone-Linux-x86-64-192200240116.zip"}
+                    ],
+                    "service": ["EXACS"],
+                    "version": "19.22.0.0.240116",
+                },
+                {
+                    "files": [
+                        {"path": "ADBD/grid-klone-Linux-x86-64-191800230418.zip"}
+                    ],
+                    "service": ["ATP"],
+                    "version": "19.18.0.0.230418",
+                },
+            ]
+        }
+        inventory_json_path = os.path.join(self.latest_dir, "inventory.json")
+        with open(inventory_json_path, "w") as file:
+            json.dump(inventory_data, file)
+
+        gContext = self.mGetContext()
+        gConfigOptions = gContext.mGetConfigOptions()
+        writableGConfigOptions = copy.deepcopy(gConfigOptions)
+        writableGConfigOptions["repository_root"] = self.latest_dir
+        writableGConfigOptions["gi_multi_image_count"] = 4
+        gContext.mSetConfigOptions(writableGConfigOptions)
+
+        cluCtrl_obj = exaBoxCluCtrl(aCtx=gContext)
+        gi_repo_update = ebCluGiRepoUpdate(cluCtrl_obj)
+        gi_repo_update.service_type = "EXACS"
+        gi_repo_update.major_version = "19"
+
+        files_to_remove = gi_repo_update.mGetOlderVersionFiles()
+
+        expected_files = [
+            "EXACS/grid-klone-Linux-x86-64-191700230418.zip",
+            "EXACS/grid-klone-Linux-x86-64-191800230418.zip",
+        ]
+        self.assertEqual(files_to_remove, expected_files)
 
     @mock.patch("exabox.ovm.clugiconfigimage.mComputeSha256sum", return_value="55c6a6bcee5751b503dfb494009b05d6acf5240c9e57b0664f0b1313dc4de340")  
     def test_add_new_image_and_delete_old_image(self, mMockSha256):  

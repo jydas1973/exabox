@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     ExasshManager - Basic functionality
@@ -71,6 +71,7 @@ class ebExasshLogger:
         self.__logLocation = aLogLocation
         self.__consoleLog = aConsoleLog
         self.__fileLog = aFileLog
+        self.__fileHandler = None
 
     def mGetLog(self, aConsoleLog=True, aFileLog=False):
 
@@ -97,6 +98,7 @@ class ebExasshLogger:
                     _formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
                     _fh.setFormatter(_formatter)
                     _logger.addHandler(_fh)
+                    self.__fileHandler = _fh
 
                 if self.__consoleLog:
 
@@ -120,6 +122,22 @@ class ebExasshLogger:
             self.__logger = _logger
 
         return self.__logger
+
+    def mAttachToParamiko(self):
+
+        if not self.__fileHandler:
+            self.mGetLog()
+
+        if not self.__fileHandler:
+            return
+
+        _paramiko_logger = logging.getLogger("paramiko")
+
+        if self.__fileHandler not in _paramiko_logger.handlers:
+            _paramiko_logger.addHandler(self.__fileHandler)
+
+        if _paramiko_logger.level > logging.DEBUG:
+            _paramiko_logger.setLevel(logging.DEBUG)
 
 class ExasshManager:
 
@@ -146,6 +164,9 @@ class ExasshManager:
 
         if not self.__silent and self.__debug:
             logging.getLogger("paramiko").setLevel(logging.DEBUG)
+        
+        if self.__debug and aFileLog:
+            self.__logger.mAttachToParamiko()
 
     def mGetLog(self):
         return self.__logger.mGetLog()

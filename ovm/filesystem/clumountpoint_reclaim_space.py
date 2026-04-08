@@ -4,7 +4,7 @@
 #
 # clumountpoint_reclaim_space.py
 #
-# Copyright (c) 2023, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2023, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      clumountpoint_reclaim_space.py - <one-line expansion of the name>
@@ -34,13 +34,16 @@
 #
 # {
 #         "mountpoint": "/u01/app/19.0.0.0/grid",
-#         "gridVersion": "19.25.0.0.241015"
+#         "gridVersion": "19.25.0.0.0"
 # }
 #
 #    NOTES
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    aararora    03/17/26 - Bug 39076664: Reclaim GI - First 4 digits of gi
+#                           version sent in payload to be read for DOM0
+#                           unmounting
 #    aararora    10/29/25 - Bug 38591105: Read grid version using gridVersion
 #                           from payload
 #    aararora    08/28/25 - ER 38335598: Address additional requirement for
@@ -161,6 +164,24 @@ class ebCluMountpointReclaimSpace(object):
                 _msg = f"{_grid_img_file} file could not be removed on "\
                        f"DOM0 {aDOM0}. Please remove the file manually."
                 ebLogWarn(_msg)
+
+    def mGetDom0MatchVersion(self, aVersion):
+        """
+        Return the first SEGMENTS_TO_MATCH dot-separated components of the grid version for
+        DOM0 matching. If fewer than SEGMENTS_TO_MATCH components exist, log a warning and
+        return the original version.
+        """
+        _segments = aVersion.split('.')
+        SEGMENTS_TO_MATCH = 4
+        if len(_segments) >= SEGMENTS_TO_MATCH:
+            _dom0_version = '.'.join(_segments[:SEGMENTS_TO_MATCH])
+            if _dom0_version != aVersion:
+                ebLogTrace(f"Using grid version prefix {_dom0_version} for "
+                           f"DOM0 matching instead of full version {aVersion}.")
+            return _dom0_version
+        ebLogWarn(f"Grid version {aVersion} does not contain {SEGMENTS_TO_MATCH} components; "
+                  "continuing with provided version for DOM0 matching.")
+        return aVersion
 
     def mRemoveDeviceEntryVMCfg(self, aNode, aDOMU, aDevice):
         """
@@ -350,6 +371,7 @@ class ebCluMountpointReclaimSpace(object):
         self.mPerformPayloadValidations(_payload)
         _mountpoint = _payload["mountpoint"]
         _version = _payload["gridVersion"]
+        _dom0_version = self.mGetDom0MatchVersion(_version)
         _dpairs = self.__cluctrl.mReturnDom0DomUPair()
         # Perform a precheck
         for _, _domu in _dpairs:
@@ -367,11 +389,11 @@ class ebCluMountpointReclaimSpace(object):
             if _hypervisor == HVIT_KVM:
                 _p = ProcessStructure(
                     self.mExecuteKVMSteps,
-                    [_dom0,_domu,_mountpoint,_version, _rc_status], _domu)
+                    [_dom0,_domu,_mountpoint,_dom0_version, _rc_status], _domu)
             elif _hypervisor == HVIT_XEN:
                 _p = ProcessStructure(
                     self.mExecuteXenSteps,
-                    [_dom0,_domu,_mountpoint,_version, _rc_status], _domu)
+                    [_dom0,_domu,_mountpoint,_dom0_version, _rc_status], _domu)
             else:
                 continue
             _p.mSetMaxExecutionTime(7200) # 2 hours should be sufficient

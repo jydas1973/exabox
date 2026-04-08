@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     OVM - Resource Management Functionality
@@ -1531,7 +1531,7 @@ class ebCluResManager(object):
                 _clusterplist = _inputjson[_clusterplan]
                 ebLogInfo(f"clusterlist from input payload: {_clusterplist}")
                 for _clusterp in _clusterplist:
-                    if 'name' not in list(_clusterp.keys()) or not _clusterp['dbname']:
+                    if 'name' not in list(_clusterp.keys()) or not _clusterp['name']:
                         return self.mRecordError("831")
                     elif 'share' not in list(_clusterp.keys()) or not _clusterp['share']:
                         return self.mRecordError("832")
@@ -1547,10 +1547,10 @@ class ebCluResManager(object):
 
                 #this part takes care of appending the new clusterplan from payload to the existing clusterplan
                 #while replacing the old clusterplan with new clusterplan if the new clusterplan contains the same name as in old clusterplan
-                _existing_clusterplan_dict = {_clup['dbname']:_clup for _clup in _existing_cluster_plan}
+                _existing_clusterplan_dict = {_clup['name']:_clup for _clup in _existing_cluster_plan}
                 _new_cluster_plan = []
                 for _cluplan in _clusterplist:
-                    name = _cluplan['dbname']
+                    name = _cluplan['name']
                     if name in _existing_clusterplan_dict:
                         _existing_clusterplan_dict[name] = _cluplan
                     else:
@@ -1566,7 +1566,7 @@ class ebCluResManager(object):
                 _clusterpstring = "clusterplan=("
                 for _clusterp in _new_cluster_plan:
 
-                    _clusterpstring = _clusterpstring + "(name=" + _clusterp['dbname'] + ","
+                    _clusterpstring = _clusterpstring + "(name=" + _clusterp['name'] + ","
                     _clusterpstring = _clusterpstring + " share=" + _clusterp['share'] + "),"
                         
                 # Remove trailing comma and complete command string

@@ -1,7 +1,7 @@
 """
 $Header:
 
- Copyright (c) 2015, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2015, 2026, Oracle and/or its affiliates.
 
 NAME:
     LogMgr - Log Manager
@@ -23,6 +23,9 @@ CRITICAL : This is a serious error, and some kind of application meltdown might 
 History:
 
     MODIFIED   (MM/DD/YY)
+       shapatna 03/21/26 - Bug 38900262: Fix for issues reported by Codev Agent
+                           in Exabox/Log
+       aararora 02/27/26 - Bug 38902170: Correct resource leak issues
        jesandov 11/24/25 - 38677852: Change inspect by traceback in logging format
        jesandov 03/25/24 - 36442769: Improve mSimpleExecuteCmd and mConnect
        ririgoye 07/18/23 - Bug 35113955 - INCORRECT FILE NAME IN EXACLOUD LOGS
@@ -108,26 +111,28 @@ class ebFileFormatter(logging.Formatter):
         _stack))
 
         _currentLogId = 0
+        _frame = None
+        
         for i in range(0, len(_stack)):
             _frame = _stack[i]
-            if "ebLog" in _frame.line:
+            if _frame and "ebLog" in _frame.line:
                 _currentLogId = i
                 break
-        if "mAppendLog" in _frame:
+        if _frame and "mAppendLog" in _frame:
             _currentLogId += 1
 
-        if "mPatchLog" in _frame:
+        if _frame and "mPatchLog" in _frame:
             _currentLogId -= 1
 
         _frame = _stack[_currentLogId]
         _extra = ""
 
-        if "mSimpleExecuteCmd" in _frame:
+        if _frame and "mSimpleExecuteCmd" in _frame:
             _currentLogId = _currentLogId-8
             _frame = _stack[_currentLogId]
             _extra = "mSimpleExecuteCmd"
 
-        if "mConnect" in _frame:
+        if _frame and "mConnect" in _frame:
             _currentLogId = _currentLogId-8
             _frame = _stack[_currentLogId]
             _extra = "mConnect"
@@ -574,6 +579,16 @@ def ebThreadLogging(aString,aPfx=None):
         _outbuf.write(aPfx + str(aString) + '\n')
         return True
     return False
+
+@check_is_log_initialized
+def ebThreadLoggingClose():
+    _ebt_local = ebThreadLocalLog()
+    _outbuf = getattr(_ebt_local, 'output_buffer', None)
+    if _outbuf is not None:
+        try:
+            _outbuf.close()
+        finally:
+            _ebt_local.output_buffer = None
 
 @check_is_log_initialized
 def ebLogDB(aType,aString):

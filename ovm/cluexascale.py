@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 #
-# $Header: ecs/exacloud/exabox/ovm/cluexascale.py /main/144 2025/12/02 17:57:52 ririgoye Exp $
+# $Header: ecs/exacloud/exabox/ovm/cluexascale.py /main/149 2026/02/10 17:09:05 scoral Exp $
 #
 # cluexascale.py
 #
-# Copyright (c) 2022, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2022, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      cluexascale.py - ExaCloud utilities to set up/configure ExaScale envs.
@@ -17,6 +17,19 @@
 #      None.
 #
 #    MODIFIED   (MM/DD/YY)
+#    scoral      03/27/26 - Enh 39115978 - Now we mark the GCVs that are part
+#                           of ongoing VM moves so that they are not
+#                           recognized as stale EDVs.
+#    scoral      03/20/26 - Bug 39108712 - Skip cleaning stale bridges during
+#                           VM move pre-checks.
+#                           Don't re-create GCV monutpoint during bonding setup
+#                           during VM move.
+#    scoral      02/03/26 - Bug 38906210 - Avoid cleaning stale GCV mountpoints
+#                           during VM move pre-checks.
+#    nelango     01/22/26 - Bug 38835177 : Handle target busy during vm move
+#    scoral      12/19/25 - Enh 38784925 - Avoid re-creation of NAT routing
+#                           table after VM move on 25.X Exadata Dom0s.
+#    siyarlag    12/14/25 - 38519296: liveM: call nft rules setup before move
 #    ririgoye    11/26/25 - Bug 38636333 - EXACLOUD PYTHON:ADD INSTANTCLIENT TO
 #                           LD_LIBRARY_PATH
 #    prsshukl    11/19/25 - Bug 38037088 - BASE DB -> MOVE THE DO/UNDO STEPS
@@ -224,6 +237,7 @@ from ipaddress import IPv4Network
 from typing import List, Sequence, Set
 from exabox.core.Context import get_gcontext
 from exabox.core.Node import exaBoxNode
+from exabox.utils.common import version_compare
 from exabox.globalcache.GlobalCacheFactory import GlobalCacheFactory
 from exabox.log.LogMgr import ebLogError, ebLogInfo, ebLogWarn, ebLogTrace, ebLogJson
 from exabox.ovm.clubonding import get_bond_monitor_installed, REMOTE_MONITOR_CONFIG_FILE_FMT, REMOTE_MONITOR_CONFIG_VM_FILE_FMT, REMOTE_VM_CUSTOM_VIP_FILE_FMT, REMOTE_VM_CUSTOM_VIP_VM_FILE_FMT, restart_bond_monitor, add_remove_entry_monitor_admin_conf
@@ -249,6 +263,7 @@ from exabox.exadbxs.edv import get_hosts_edv_from_cs_payload, get_hosts_edv_stat
 
 GUEST_IMAGES = '/EXAVMIMAGES/GuestImages'
 VM_MAKER = '/opt/exadata_ovm/vm_maker'
+UNDER_MIGRATION_VM_GCV = 'under_migration'
 
 ##########################
 ### CALLBACK FUNCTIONS ###
@@ -347,6 +362,8 @@ def mRemoveVMmount(aCluObj, aDom0, aVMName, aStrict=False):
         _cmd = f"/sbin/fuser -muv /EXAVMIMAGES/GuestImages/{aVMName}"
         ebLogTrace("******")
         _node.mExecuteCmdLog(_cmd)
+        _fuser_info = node_exec_cmd(_node, _cmd)
+        _fuser_output = _fuser_info.stdout or ""
         ebLogTrace("******")
 
         ebLogTrace(f"dmesg dev{_gcv_minor} in {aDom0} BEFORE umount ...")
@@ -356,7 +373,31 @@ def mRemoveVMmount(aCluObj, aDom0, aVMName, aStrict=False):
         ebLogTrace("******")
 
         _cmd = f"/usr/bin/umount /EXAVMIMAGES/GuestImages/{aVMName}"
-        node_exec_cmd_callback(_node, _cmd)
+        try:
+            node_exec_cmd_callback(_node, _cmd)
+        except ExacloudRuntimeError as _error:
+            _msg = _error.mGetErrorMsg()
+            if 'target is busy' in _msg:
+                _mount = f"/EXAVMIMAGES/GuestImages/{aVMName}"
+                _busy = None
+                if _fuser_output:
+                    _lines = [
+                        ' '.join(_raw_line.split())
+                        for _raw_line in _fuser_output.splitlines()
+                        if _raw_line.strip()
+                        and not _raw_line.rstrip().endswith(':')
+                        and not _raw_line.lstrip().startswith(('kernel', 'USER '))
+                    ]
+                    if _lines:
+                        _busy = '; '.join(_lines)
+                if _busy:
+                    _error_msg = (
+                        f"Unmount of {_mount} for VM {aVMName} in source host {aDom0} "
+                        f"failed because PID(s) \"{_busy}\" are still accessing it."
+                    )
+                    ebLogError(_error_msg)
+                    raise ExacloudRuntimeError(_error.mGetErrorCode(), _error.mGetErrorType(), _error_msg) from _error
+            raise
 
         ebLogTrace(f"fuser {_srcGCV} in {aDom0} AFTER umount...")
         _cmd = f"/sbin/fuser -muv {_srcGCV}"
@@ -378,7 +419,7 @@ def mRemoveVMmount(aCluObj, aDom0, aVMName, aStrict=False):
         _cmd = f"/usr/bin/rm -f /EXAVMIMAGES/GuestImages/{aVMName}/monitor*"
         node_exec_cmd_callback(_node, _cmd)
 
-        _cmd = f"/usr/bin/rm -rf /EXAVMIMAGES/GuestImages/{aVMName}"
+        _cmd = f"/usr/bin/rmdir /EXAVMIMAGES/GuestImages/{aVMName}"
         node_exec_cmd_callback(_node, _cmd)
 
         _cmd = f'/bin/sed -i "/{aVMName}/d" /etc/fstab'
@@ -1640,6 +1681,9 @@ class ebCluExaScale:
         _srcDom0 = aOptions.jsonconf["source_dom0_name"]
         _newNatHostname = aOptions.jsonconf["new_admin_hostname"]
         _newNatDomainName = aOptions.jsonconf["new_admin_domainname"]
+        _live = str(aOptions.jsonconf.get('mode')).lower() == 'live'
+
+        ebLogInfo('*** EXASCALE: Post VM move Steps')
 
         # Get the client & backup VLAN IDs
         _oldClientVlan = ""
@@ -1654,12 +1698,14 @@ class ebCluExaScale:
             if _net_type == 'backup':
                 _oldBackupVlan = _netConf.mGetNetVlanId()
 
-        _live = str(aOptions.jsonconf.get('mode')).lower() == 'live'
+        # Post live migration cleanup Nft rules on source dom0
         if _live:
-            _netInfo = self.mPrepareNetInfo(aOptions)
-            self.mUmountVolumesVmMove(_netInfo["source_dom0_name"], aOptions.jsonconf["vm_name"], _netInfo, aStrict=False)
+            try:
+                ebIpTablesRoCE.mRemoveSecurityRulesExaBM(self.__ebox, aDom0s=[_srcDom0])
+            except Exception as _exc:
+                ebLogWarn(f"Failed to remove nft security rules on {_srcDom0}: {_exc}")
 
-        # Verify there is not stale GCV EDV in the soruce host
+        # Verify there is no stale GCV EDV in the soruce host
         if not _force:
             _tgtGCV = self.mGetGcvDevicePath(aOptions)
             with connect_to_host(_srcDom0, get_gcontext()) as _srcNode:
@@ -1682,7 +1728,9 @@ class ebCluExaScale:
 
         with connect_to_host(_tgtDom0, get_gcontext()) as _tgtNode:
             # Migrate the NAT routing tables/rules
-            add_kvm_guest_nat_routing(_tgtNode, _vmName)
+            _dom0_version = self.__ebox.mGetImageVersion(_tgtDom0)
+            if version_compare(_dom0_version, "25.1") < 0:
+                add_kvm_guest_nat_routing(_tgtNode, _vmName)
 
             """
             # Attach u02 again
@@ -1745,16 +1793,15 @@ class ebCluExaScale:
             ebLogInfo(f"Copying VM maker XML {_srcXml} => {_dstXml}")
             node_exec_cmd(_tgtNode, _cmd, log_warning=True)
 
+        # setup nft rules on target host for cold migration.
+        # for live migration they were setup prior to the move.
+        if not _live:
+            self.mSetupNftRules(aOptions)
 
-        # Make sure the target Dom0 has the updated firewall rules
-        _hasNFTables: bool = False
+        # Manage VM snapshots on target host
         with connect_to_host(_tgtDom0, get_gcontext()) as _tgtNode:
-            _hasNFTables = _tgtNode.mFileExists('/etc/nftables/exadata.nft')
-            _, _out, _ = node_exec_cmd(_tgtNode, f"/usr/sbin/nft add table ip filter")
-            _, _out, _ = node_exec_cmd(_tgtNode, f"/usr/sbin/nft add table bridge filter")
-
-            _, _out, _ = node_exec_cmd(_tgtNode, f"ls /EXAVMIMAGES/GuestImages/{_vmName}/snapshots/*u01*xml")                                             
             #  If snapshot of u01 is present then attach it to the VM in the new dom0 as well                                                    
+            _, _out, _ = node_exec_cmd(_tgtNode, f"ls /EXAVMIMAGES/GuestImages/{_vmName}/snapshots/*u01*xml")                                             
             if _out:                                
                 _dev = _out.split('/')[-1].split('.')[0]                                                                                        
                 ebLogInfo(f"Create logical volume for {_dev}")
@@ -1771,83 +1818,92 @@ class ebCluExaScale:
                 _json = {"storageType": "EXASCALE", "snapshot_device_name": _dev, "dom0": _tgtDom0, "vm": _vmName}                               
                 self.mMountVolume(aOptions, _json, aLive=False)                                                                                  
 
-        if _hasNFTables:
-            self.__ebox.mSetupNatNfTablesOnDom0v2(aDom0s=[_tgtDom0])
-            ebIpTablesRoCE.mSetNfTablesExaBM(self.__ebox, aDom0s=[_tgtDom0])
-            if 'cluster_status' in aOptions.jsonconf and aOptions.jsonconf['cluster_status'] != 'SUSPENDED':
-                with connect_to_host(_tgtDom0, get_gcontext()) as _tgtNode:
-                    start_domu(_tgtNode, _vmName, wait_for_connectable=False)
+            # Remove temporary file in GCV
+            _cmd = f"/usr/bin/rm -f {GUEST_IMAGES}/{_vmName}/{UNDER_MIGRATION_VM_GCV}"
+            node_exec_cmd(_tgtNode, _cmd)
 
-                try:
-                    _consoleobj = serialConsole(self.mGetCluCtrl(), aOptions)
-                    _consoleobj.mRunContainer(_tgtDom0, _vmName)
-                    _consoleobj.mRestartContainer(_tgtDom0, _vmName, aMode="start")
-                except Exception as e:
-                    _detail_error = f'Failed to start serial console connection: "{e}"'
-                    ebLogWarn(_detail_error)
-            return # below code will take care of IPTables
+        # setup serial console on target host
+        try:
+            _consoleobj = serialConsole(self.mGetCluCtrl(), aOptions)
+            _consoleobj.mRunContainer(_tgtDom0, _vmName)
+            _consoleobj.mRestartContainer(_tgtDom0, _vmName, aMode="start")
+        except Exception as e:
+            _detail_error = f'Failed to start serial console connection: "{e}"'
+            ebLogWarn(_detail_error)
         
-        self.__ebox.mSetupNATIptablesOnDom0v2(aDom0s=[_tgtDom0])
+    def mSetupNftRules(self, aOptions):
+        """Performs nft rules setup on target host.
+        :param aOptions: Exacloud options object. 
+        """     
 
-        # Move the dynamic iptables
-        _clientBridge, _backupBridge = cluctrlGetDom0Bridges(self.__ebox, _vmName)
-        if _clientBridge and _backupBridge:
-            _bridgesTypesMap = {
-                _clientBridge: "client",
-                _backupBridge: "backup"
-            }   
-        elif _backupBridge is None:
-            _bridgesTypesMap = {
-                _clientBridge: "client"
-            }
+        _force = str(aOptions.jsonconf.get('force')).lower() == 'true'
+        _vmName = aOptions.jsonconf["vm_name"]
+        _tgtDom0 = aOptions.jsonconf["target_dom0_name"]
+        _srcDom0 = aOptions.jsonconf["source_dom0_name"]
+        _newNatHostname = aOptions.jsonconf["new_admin_hostname"]
+        _newNatDomainName = aOptions.jsonconf["new_admin_domainname"]
+        _live = str(aOptions.jsonconf.get('mode')).lower() == 'live'
 
-        _domuXmlSchemasDict = ebIpTablesRoCE.mGetKVMSchemaFromDom0(
-            _tgtDom0, _vmName)
-        _interfacesAlias = ebIpTablesRoCE._mGetInterfacesAlias(
-            _domuXmlSchemasDict["local"], _bridgesTypesMap)
+        # Temporarliy update the Dom0/DomU pairs to add the
+        #  client & backup rules in the target host only.
+        # Take a backup of dom0/domU pairs to restore after updating the nft rules
+        _oldDom0sDomUs: List[List[str]] = self.__ebox.mReturnDom0DomUPair()
+        _oldDom0sDomUsNAT: List[List[str]] = self.__ebox.mReturnDom0DomUNATPair()
 
-        for _ifType, _ifAlias in _interfacesAlias.items():
-            _environment = "exabm"
-            _netFilterName = "-".join([_vmName, _ifAlias, _environment])
+        _mappingApplied = False
+        try:
+            _newDom0sDomUs: List[List[str]] = [[_tgtDom0, _vmName]]
+            _newDom0sDomUsNAT: List[List[str]] = [[_tgtDom0, _newNatHostname]]
+            if self.__ebox.isBaseDB() or self.__ebox.isExacomputeVM():
+                self.__ebox.mSetDomUsDom0s(_vmName, sorted(_newDom0sDomUs))
+            else:
+                # Update the Dom0-DomU pairs
+                _clusterId = self.__ebox.mGetClusters().mGetCluster().mGetCluId()
+                self.__ebox.mSetDomUsDom0s(_clusterId, sorted(_newDom0sDomUs))
+            self.__ebox._exaBoxCluCtrl__domus_dom0s_nat = sorted(_newDom0sDomUsNAT)
+            _mappingApplied = True
 
-            ebLogInfo("*** Getting network filter:{0} schema ***"\
-                .format(_netFilterName))
-            _nwfilterXmlSchemasDict = ebIpTablesRoCE.mGetKVMSchemaFromDom0(
-                _srcDom0, _netFilterName, aSchemaType="nwfilter")
+            # Make sure the target Dom0 has the updated firewall rules
+            _hasNFTables: bool = False
+            with connect_to_host(_tgtDom0, get_gcontext()) as _tgtNode:
+                try:
+                    _hasNFTables = _tgtNode.mFileExists('/etc/nftables/exadata.nft')
+                except ExacloudRuntimeError as _exc:
+                    ebLogWarn(f"Unable to check nftables presence on {_tgtDom0}: {_exc}")
+                    _hasNFTables = False
 
-            ebLogInfo("*** Defining kvm resource on dom0:{0}".format(_tgtDom0))
-            ebIpTablesRoCE.mDefineKVMResourceInDom0(
-                _tgtDom0, _nwfilterXmlSchemasDict["local"],
-                _nwfilterXmlSchemasDict["remote"], aSchemaType="nwfilter")
-
-            ebIpTablesRoCE.mAddNetFilterToVMSchema(
-                _domuXmlSchemasDict["local"], _ifAlias, _netFilterName)
-
-            try:
-                ebIpTablesRoCE.mRemoveNetFilter(_srcDom0, _netFilterName)
-            except ExacloudRuntimeError:
-                ebLogError("*** Unable to undefine existing network filter:"
-                           "{0}. Process will continue ***"\
-                            .format(_netFilterName))
-
-        ebLogInfo("*** Applying network filter changes to domU schema ***")
-        ebIpTablesRoCE.mDefineKVMResourceInDom0(_tgtDom0,
-            _domuXmlSchemasDict["local"], _domuXmlSchemasDict["remote"])
-
-        ebLogInfo("*** Rebooting machine via vm_maker reboot to apply schema "
-                  "changes ***")
-        with connect_to_host(_tgtDom0, get_gcontext()) as _tgtNode:
-            shutdown_domu(_tgtNode, _vmName)
-            _cmd = f"{VM_MAKER} --start-domain {_vmName}"
-            node_exec_cmd_check(_tgtNode, _cmd)
-
-            try:
-                _consoleobj = serialConsole(self.mGetCluCtrl(), aOptions)
-                _consoleobj.mRunContainer(_tgtDom0, _vmName)
-                _consoleobj.mRestartContainer(_tgtDom0, _vmName, aMode="start")
-            except Exception as e:
-                _detail_error = f'Failed to start serial console connection: "{e}"'
-                ebLogWarn(_detail_error)
+                if _hasNFTables:
+                    ebLogInfo(f"Setting up nft rules on host {_tgtDom0}")
+                    try:
+                        node_exec_cmd(_tgtNode, "/usr/sbin/nft add table ip filter")
+                        node_exec_cmd(_tgtNode, "/usr/sbin/nft add table bridge filter")
+                        self.__ebox.mSetupNatNfTablesOnDom0v2(aDom0s=[_tgtDom0])
+                        ebIpTablesRoCE.mSetNfTablesExaBM(self.__ebox, aDom0s=[_tgtDom0])
+                    except Exception as _exc:
+                        ebLogWarn(f"Failed to program nftables on {_tgtDom0}: {_exc}")
+                    else:
+                        if (not _live and ('cluster_status' in aOptions.jsonconf and
+                                           aOptions.jsonconf['cluster_status'] != 'SUSPENDED')):
+                            try:
+                                start_domu(_tgtNode, _vmName, wait_for_connectable=False)
+                            except Exception as _exc:
+                                ebLogWarn(f"start_domu failed on {_tgtDom0}: {_exc}")
+        except ExacloudRuntimeError as _exc:
+            _error_msg = f"Exception during nft rules setup on {_tgtDom0}"
+            ebLogError(f"{_error_msg}: {_exc}")
+            raise ExacloudRuntimeError(0x0811, 0xA, _error_msg) from _exc
+        finally:
+            if _mappingApplied:
+                try:
+                    if self.__ebox.isBaseDB() or self.__ebox.isExacomputeVM():
+                        self.__ebox.mSetDomUsDom0s(_vmName, sorted(_oldDom0sDomUs))
+                    else:
+                        # Update the Dom0-DomU pairs
+                        _clusterId = self.__ebox.mGetClusters().mGetCluster().mGetCluId()
+                        self.__ebox.mSetDomUsDom0s(_clusterId, sorted(_oldDom0sDomUs))
+                    self.__ebox._exaBoxCluCtrl__domus_dom0s_nat = sorted(_oldDom0sDomUsNAT)
+                except ExacloudRuntimeError as _exc:
+                    ebLogWarn(f"Failed to restore dom0/domU mapping: {_exc}")
 
     def mReturnListEdvDevicePath(self, aDom0, aVMName) -> list:
         """
@@ -2155,27 +2211,21 @@ class ebCluExaScale:
             # Verify there are no stale VM files
             _cmd = "/bin/ls /EXAVMIMAGES/GuestImages"
             _VMFiles = set(node_exec_cmd_check(_tgtNode, _cmd).stdout.split())
-            if _tgtVMs != _VMFiles:
-
-                for _staleVm in _VMFiles - _tgtVMs:
-
-                    _cmd = f"/bin/ls /EXAVMIMAGES/GuestImages/{_staleVm}/vm*.xml"
-                    _ret = node_exec_cmd(_tgtNode, _cmd).exit_code
-                    if _ret == 0:
-                        self.fail(
-                            "STALE_VM_FILES",
-                            aCausePlaceholders={
-                                "host": _tgtDom0,
-                                "stale_vm_files": _VMFiles - _tgtVMs
-                            }
-                        )
-                    else:
-                        ebLogInfo(f"Found stale vm in GuestImages but not XML present: {_staleVm}")
-                        ebLogInfo(f"Dumping all the files before cleanup")
-                        _tgtNode.mExecuteCmdLog(f"/bin/ls -lthr /EXAVMIMAGES/GuestImages/{_staleVm}/")
-                        ebLogInfo(f"Perfoming cleanup")
-                        _tgtNode.mExecuteCmdLog(f"/bin/rm -rf /EXAVMIMAGES/GuestImages/{_staleVm}")
-
+            # VMs moving should not have their files considered as stale
+            _VMFilesMigrating = set()
+            for _vm in _VMFiles:
+                _flag = f"{GUEST_IMAGES}/{_vm}/{UNDER_MIGRATION_VM_GCV}"
+                if _tgtNode.mFileExists(_flag):
+                    _VMFilesMigrating.add(_vm)
+            _vm_files_considered = _VMFiles - _VMFilesMigrating
+            if _tgtVMs != _vm_files_considered:
+                self.fail(
+                    "STALE_VM_FILES",
+                    aCausePlaceholders={
+                        "host": _tgtDom0,
+                        "stale_vm_files": _vm_files_considered - _tgtVMs
+                    }
+                )
             ebLogInfo("PASSED: No stale VM files in Dom0.")
 
             # Verify there are no corrupted GCV EDVs mounted
@@ -2184,14 +2234,11 @@ class ebCluExaScale:
                     _cmd = f"/bin/ls /EXAVMIMAGES/GuestImages/{_vm}/vm*.xml"
                     node_exec_cmd_check(_tgtNode, _cmd)
                 except:
-                    ebLogError(f"Broken EDV for {_vm}")
-                    """
                     self.fail(
                         "BROKEN_EDV",
                         aCausePlaceholders={"host": _tgtDom0, "vm": _vm},
                         aSuggestionPlaceholders={"vm": _vm}
                     )
-                    """
             ebLogInfo("PASSED: All GCV EDVs mounted look healthy.")
 
             # Verify there is no volume descriptor for the VM GCV EDV
@@ -3020,6 +3067,9 @@ class ebCluExaScale:
             else:
                 node_exec_cmd_check(_tgtNode, _cmd)
 
+            _cmd = f"/usr/bin/touch {GUEST_IMAGES}/{_vmName}/{UNDER_MIGRATION_VM_GCV}"
+            node_exec_cmd_check(_tgtNode, _cmd)
+
             _cmd = f"/bin/cat /etc/fstab | grep '{_gcvVolDevicePath}'"
             _tgtNode.mExecuteCmd(_cmd)
 
@@ -3424,11 +3474,15 @@ class ebCluExaScale:
                 _monitorJsonPathNewVm = REMOTE_MONITOR_CONFIG_VM_FILE_FMT\
                     .format(_vmName, _newNatHostname)
 
-                node_exec_cmd(_tgtNode, f"mkdir -p {GUEST_IMAGES}/{_vmName}")
+                _gcvMounted = _tgtNode.mFileExists(
+                    f"{GUEST_IMAGES}/{_vmName}/{_vmName}.xml")
                 node_write_text_file(
                     _tgtNode, _monitorJsonPathNew, _monitorJson)
-                node_write_text_file(
-                    _tgtNode, _monitorJsonPathNewVm, _monitorJson)
+                if _gcvMounted:
+                    ebLogInfo("*** Copied Bondmonitor configuration to "
+                              f"{_tgtDom0}:{_monitorJsonPathNewVm}")
+                    node_write_text_file(
+                        _tgtNode, _monitorJsonPathNewVm, _monitorJson)
 
                 ebLogInfo(f"*** {_bondingOp}:{_monitorJsonPathOld} to "
                           f"{_tgtDom0}:{_monitorJsonPathNew}")
@@ -3440,8 +3494,11 @@ class ebCluExaScale:
                         .format(_vmName, _newNatHostname)
                     node_write_text_file(
                         _tgtNode, _customVipsPathNew, _customVips)
-                    node_write_text_file(
-                        _tgtNode, _customVipsPathNewVm, _customVips)
+                    if _gcvMounted:
+                        ebLogInfo("*** Copied Custom VIPs configuration to "
+                                  f"{_tgtDom0}:{_customVipsPathNewVm}")
+                        node_write_text_file(
+                            _tgtNode, _customVipsPathNewVm, _customVips)
 
                     ebLogInfo(f"*** {_bondingOp}:{_customVipsPathOld} to "
                         f"{_tgtDom0}:{_customVipsPathNew}")
@@ -3614,7 +3671,9 @@ class ebCluExaScale:
                         node_exec_cmd(_srcNode, _cmd)
                         ebLogInfo(f"Bridge {_bridge} removed from {_srcDom0}")
 
-            self.mUmountVolumesVmMove(_srcDom0, _vmName, _netInfo, aStrict=False)
+            if self.mIsGCVMounted(_srcDom0, _vmName):
+                self.mUmountVolumesVmMove(_srcDom0, _vmName, _netInfo, aStrict=True)
+
             return
 
         if _live:
@@ -3627,13 +3686,18 @@ class ebCluExaScale:
                     _olddummyNATIP = _out.stdout.split(' ')[-1].strip() 
                     _data["olddummyNATIP"] = _olddummyNATIP
 
+        # for live migration setup nft rules prior to the move.
+        if _live:
+            self.mSetupNftRules(aOptions)
+
         # Remove the client & backup firewall rules from the source Dom0
         # before OEDA changes the VLANs.
         if aForce:
             ebLogWarn(f"Cannot connect to {_srcDom0}, skipping NFTables cleanup...")
+        elif _live:
+            ebLogInfo(f"Keep the client/backup NFTables rules on source host for live migration")
         else:
             ebIpTablesRoCE.mRemoveSecurityRulesExaBM(self.__ebox, aDom0s=[_srcDom0])
-
 
         def mInternalMountInterfaceCallback(aOedacliCmd, aArgs):
             if "CREATE_BRIDGES" in aOedacliCmd:
@@ -3729,8 +3793,9 @@ class ebCluExaScale:
                     aArgs["aUndo"],
                     aArgs["aForce"]
                 )
-                aArgs["exascale_obj"].mUmountVolumesVmMove(
-                    aArgs["dom0"], aArgs["vm_name"], aArgs["net_info"], aStrict=False)
+                if aArgs["exascale_obj"].mIsGCVMounted(aArgs["dom0"], aArgs["vm_name"]):
+                    aArgs["exascale_obj"].mUmountVolumesVmMove(
+                    aArgs["dom0"], aArgs["vm_name"], aArgs["net_info"], aStrict=True)
 
         if _live:
             _actions = [                    
@@ -3844,6 +3909,16 @@ class ebCluExaScale:
                 _db = ebGetDefaultDB()
                 _db.mUpdateRequest(_reqobj)
 
+    def mIsGCVMounted(self, aDom0, aVMName):
+        with connect_to_host(aDom0, get_gcontext()) as _node:
+
+            _cmd = f"/bin/df -h | /bin/grep /EXAVMIMAGES/GuestImages/{aVMName}"
+            _node.mExecuteCmdLog(_cmd)
+            _ret = _node.mGetCmdExitStatus()
+            if _ret == 0:
+                return True
+            else:
+                return False
 
     def mExecuteVmMoveOEDA(self, aActions, aOptions, aSrcDom0, aTgtDom0, aVMName, aCallbacks=[], aUndo=False):
 
@@ -4259,6 +4334,7 @@ class ebCluExaScale:
         _tgtDom0 = aOptions.jsonconf["target_dom0_name"]
         _srcDom0 = aOptions.jsonconf["source_dom0_name"]
         _vmName = aOptions.jsonconf["vm_name"]
+        _live = str(aOptions.jsonconf.get('mode')).lower() == 'live'
 
         if _action == 'moveSanityCheck':
             ebLogInfo('*** EXASCALE: Performing VM move Sanity Checks')
@@ -4267,7 +4343,7 @@ class ebCluExaScale:
                 try:
                     _lock.acquire()
                     #Clear if any stale bridge exist, before VM move
-                    csUtil().mDeleteStaleDummyBridge(self.__ebox, [[_tgtDom0, _vmName]])
+                    #csUtil().mDeleteStaleDummyBridge(self.__ebox, [[_tgtDom0, _vmName]])
 
                     self.mPerformVmMoveSanityChecksOEDA(aOptions, _exascaleOpts)
                 finally:
@@ -4283,6 +4359,7 @@ class ebCluExaScale:
 
 
         self.__ebox.mDom0UpdateCurrentOpLog(aOptions, "VM-Move", "started", [[_tgtDom0, _vmName]])
+
         # Perform the VM move
         if _vmMoveApi == 'exacloud':
             ebLogInfo('*** EXASCALE: Performing VM move with Exacloud API')

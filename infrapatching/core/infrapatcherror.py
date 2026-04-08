@@ -1,8 +1,8 @@
-# $Header: ecs/exacloud/exabox/infrapatching/core/infrapatcherror.py /main/78 2025/12/03 05:30:07 sdevasek Exp $
+# $Header: ecs/exacloud/exabox/infrapatching/core/infrapatcherror.py remamid_bug-38894017/1 2026/02/17 15:31:29 remamid Exp $
 #
 # infrapatcherror.py
 #
-# Copyright (c) 2021, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      infrapatcherror.py - Contains methods and error code details
@@ -15,6 +15,21 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    kdas        03/15/26 - ER 38354388 - EXACC: INCLUDE NETWORK INTERFACE 
+#                           ALERT ON PATCHING PRE-CHECK
+#    bhpati      03/06/26 - Bug 38932171 - AIM4ECS:0X03030006 - DB SERVICES
+#                           WERE NOT UP ON DOM0
+#    rbhandar    02/21/26 - Bug 38453227 - AIM4ECS:0X03030012 - INDIVIDUAL 
+#                           PATCH REQUEST EXCEPTION DETECTED 
+#    remamid     02/13/26 - handle ssh cleanup errors
+#    araghave    12/16/25 - Enh 38766076 - CONFIGURE UPDATE-CRYPTO-POLICIES
+#                           BEFORE AND AFTER SWITCH PATCHING
+#    bhpati      12/12/25 - Bug 38671457 - Errormessage Improvement if CRS is
+#                           disabled on Domu
+#    rbhandar    12/11/25 - Bug 37865971 - AIM4ECS:0X03010067 - COMMAND TIMED OUT BEFORE IT COMPLETED.
+#    vikasras    11/28/25 - OCI: VALIDATE CONTENT OF DOC ID 2829056.1 & REPLACE
+#                           IT WITH KB123625 IN ALL OS PATCHING WFS FOR
+#                           EXACC/DB-D/XS
 #    remamid     11/18/25 - Add new error code for singlenode patch failure due
 #                           to base node space issue bug 38667536
 #    mirrodri    10/14/25 - Bug 38264211 INFRA-PATCH:NON-ROLLING CELL PATCHING 
@@ -197,6 +212,7 @@ MASTER_PATCH_REQUEST_ERROR                                  = "0x0301000E"
 PATCH_OPERATION_DID_NOT_START                               = "0x0301000F"
 INFRA_PATCHING_TASK_HANDLER_PATCH_REQUEST_EXCEPTION         = "0x03010010"
 CRITICAL_HARDWARE_ALERT_DETECTED                            = "0x03010032"
+CRITICAL_SOFTWARE_ALERT_DETECTED                            = "0x03010076"
 PARALLEL_PATCHING_IB_NON_IB_TARGET_NOT_ALLOWED              = "0x03010033"
 EXADATA_INVALID_SLEEP_TIME_FOR_COMPUTES_IN_EXABOX_CONF      = "0x03010034"
 INSUFFICIENT_SPACE_ON_PATCH_BASE                            = "0x03010035"
@@ -227,6 +243,8 @@ CURRENT_REQUEST_MARKER_NOT_FOUND_IN_PATCH_BASE              = "0x0301005A"
 LAUNCH_NODE_PASSED_FOR_PATCH_OPERATION_SHOULD_NOT_BE_TARGET = "0x0301005B"
 LAUNCH_NODE_PASSED_FOR_PATCH_OPERATION_SHOULD_NOT_BE_CELL   = "0x0301005C"
 PATCH_COPY_AND_IMAGE_CHECKSUM_VALIDATION_EXCEPTION          = "0x0301005D"
+PATCH_COPY_ASYNC_TIMEOUT                                    = "0x03010074"
+UNABLE_TO_SSH_PATCHNODE_POSTPATCH                           = "0x03010075"
 PRECHECK_OPERATION_FAILED_ON_COMPUTE_NODES                  = "0x0301005E"
 UNABLE_TO_PING_CONNECT_TO_EXTERNAL_LAUNCH_NODE              = "0x0301005F"
 MANAGEMENT_SERVER_DOWN_DETECTED                             = "0x03010060"
@@ -307,6 +325,9 @@ TARGET_VERSION_NOT_SPECIFIED                                = "0x03030032"
 JSON_CONF_FILE_NOT_SPECIFIED                                = "0x03030033"
 PATCH_ZIP_FILE_NOT_FOUND                                    = "0x03030034"
 UNABLE_TO_FIND_ELIGIBLE_LAUNCH_NODE                         = "0x03030035"
+CRYPTO_POLICY_OPERATION_FAILED                              = "0x03030036"
+SSH_AUTHENTICATION_FAILED                                   = "0x03030037"
+SSH_CONNECTION_TIMEOUT                                      = "0x03030038"
 
 # Cells
 
@@ -411,6 +432,7 @@ INSUFFICIENT_LAUNCH_NODES_AVAILABLE_TO_PATCH_ON_DOMU        = "0x03050016"
 DOMU_PATCHMGR_COMMAND_FAILED                                = "0x03050017"
 FAILURE_IN_READING_PRE_PLUGIN_STATE                         = "0x03050018"
 DOMU_HEARTBEAT_VALIDATION_EXCEPTION_ENCOUNTERED             = "0x03050019"
+DOMU_CRS_AUTOSTARTUP_DISABLED                               = "0x03050020"
 DOMU_ENCRYPT_KEY_API_FAILED                                 = "0x0305001A"
 DOMU_CRS_RESOURCES_ARE_DOWN                                 = "0x0305001B"
 PDB_FETCH_DETAILS_ERROR                                     = "0x0305001C"
@@ -507,6 +529,7 @@ gPatchGenericError = {
     "0x0301000F" : ("Patch operation did not start","FAIL_DONTSHOW_PAGE_ONCALL"),
     "0x03010010" : ("Task handler patch request exception detected.","FAIL_DONTSHOW_PAGE_ONCALL"),
     "0x03010032" : ("Detected Critical Hardware alert on specified Target.","FAIL_DONTSHOW_PAGE_ONCALL"),
+    "0x03010076" : ("Detected Critical Software alert on specified Target.","FAIL_DONTSHOW_PAGE_ONCALL"),
     "0x03010033" : ("In a shared IBFabric environment, combination of an IBSwitch/Non-IBSwitch target patch cannot be run in parallel","FAIL_DONTSHOW_PAGE_ONCALL"),
     "0x03010034" : ("Invalid sleep time specified which is less than zero or more than the maximum limit.","FAIL_DONTSHOW_PAGE_ONCALL"),
     "0x03010035" : ("Insufficient space on the target node patch base location.","FAIL_DONTSHOW_PAGE_ONCALL"),
@@ -535,6 +558,8 @@ gPatchGenericError = {
     "0x0301005B" : ("Launch node passed should not be one of the target nodes to be patched.","FAIL_DONTSHOW_PAGE_ONCALL"),
     "0x0301005C" : ("Launch node passed should not be a cell node.","FAIL_DONTSHOW_PAGE_ONCALL"),
     "0x0301005D" : ("Patch copy and image checksum validation exception detected.","FAIL_DONTSHOW_PAGE_ONCALL"),
+    "0x03010074" : ("Patch file copy timed out after exceeding the allowed duration on the remote node.","FAIL_DONTSHOW_PAGE_ONCALL"),
+    "0x03010075" : ("Unable to establish SSH connectivity to patch node during post-patch steps.","FAIL_DONTSHOW_PAGE_ONCALL"),
     "0x0301005E" : ("Precheck operation failed on compute nodes.","FAIL_DONTSHOW_PAGE_ONCALL"),
     "0x0301005F" : ("Unable to ping or connect to external launch nodes", "FAIL_DONTSHOW_PAGE_ONCALL"),
     "0x03010060" : ("Management Server down.","FAIL_DONTSHOW_PAGE_ONCALL"),
@@ -560,7 +585,7 @@ gPatchGenericError = {
 #All Generic Errors are FAIL_DONTSHOW_PAGE_ONCALL for infra targets. However, for Domu , some generic errors are FAIL_AND_SHOW as defined in the list below
 #Based on Ops dicussion on Nov 7 2023 and email reference with
 #Subject "MOM - RE: Exacs - DomU OS Prechecks getting stuck in Production - errorAction List for Domu Generic Errors"
-gDomUGenericErrorAsFailAndShow = ["0x03010005", "0x03010032", "0x03010035", "0x03010036", "0x0301003A", "0x03010040", "0x03010041", "0x03010045", "0x03010046", "0x0301004F", "0x03010054", "0x03010055", "0x03010056"]
+gDomUGenericErrorAsFailAndShow = ["0x03010005", "0x03010032", "0x03010035", "0x03010036", "0x0301003A", "0x03010040", "0x03010041", "0x03010045", "0x03010046", "0x0301004F", "0x03010054", "0x03010055", "0x03010056", "0x03010076"]
 
 gPrecheckDom0Error = {
     "0x03020000" : ("Unable to establish Heartbeat on the cells. Not all CRS/DB services are up on DomU.","FAIL_DONTSHOW_PAGE_ONCALL"),
@@ -575,7 +600,7 @@ gPatchDom0Error = {
     "0x03030003"  : ("Dom0 rollback was requested but the version seems to be unchanged","FAIL_DONTSHOW_PAGE_ONCALL"),
     "0x03030004"  : ("Dom0 is not at the requested upgrade, cannot proceed further.","FAIL_DONTSHOW_PAGE_ONCALL"),
     "0x03030005"  : ("Expected all of the following domus to be up. But one or more DomU are still down.","FAIL_DONTSHOW_PAGE_ONCALL"),
-    "0x03030006"  : ("DB services were not up on dom0","FAIL_DONTSHOW_PAGE_ONCALL"),
+    "0x03030006"  : ("DBServerd services were not up on dom0","FAIL_DONTSHOW_PAGE_ONCALL"),
     "0x03030007"  : ("DomUs are not running on dom0 while dom0 rollback requested","FAIL_DONTSHOW_PAGE_ONCALL"),
     "0x03030008"  : ("Unable to establish Heartbeat on the cells. Not all CRS/DB services are up on DomU.","FAIL_DONTSHOW_PAGE_ONCALL"),
     "0x03030009"  : ("Changes detected done to the DOMU after last DOM0 upgrade. Rollback of DOM0 not allowed.","FAIL_DONTSHOW_PAGE_ONCALL"),
@@ -622,43 +647,47 @@ gPatchDom0Error = {
     "0x03030032": ("ExaCompute Target Version not specified.", "FAIL_DONTSHOW_PAGE_ONCALL"),
     "0x03030033": ("ExaCompute Json Configuration File not specified.", "FAIL_DONTSHOW_PAGE_ONCALL"),
     "0x03030034": ("Exacompute patch zip file not found.", "FAIL_DONTSHOW_PAGE_ONCALL"),
-    "0x03030035": ("Unable to find eligible launch node on the Exacompute environment.", "FAIL_DONTSHOW_PAGE_ONCALL")
+    "0x03030035": ("Unable to find eligible launch node on the Exacompute environment.", "FAIL_DONTSHOW_PAGE_ONCALL"),
+    "0x03030036": ("Infra patching failed to update or restore crypto policy on dom0 host.", "FAIL_DONTSHOW_PAGE_ONCALL"),
+    "0x03030037": ("SSH authentication to the target host was rejected.", "FAIL_DONTSHOW_PAGE_ONCALL"),
+    "0x03030038": ("SSH connection to the target host timed out.", "FAIL_DONTSHOW_PAGE_ONCALL")
 }
 
 gPrecheckDomuError = {
     "0x03040000" : ("Patchmgr precheck on VM failed.","FAIL_AND_SHOW"),
     "0x03040001" : ("Exception detected during VM OS precheck operation.","FAIL_AND_SHOW"),
     "0x03040002" : ("Exception detected during VM OS postcheck operation.","FAIL_AND_SHOW"),
-    "0x03040003" : ("Infra patching image backup command on VM failed with errors. Refer MOS Note 2829056.1 for more details.","FAIL_AND_SHOW")
+    "0x03040003" : ("Infra patching image backup command on VM failed with errors. Refer KB123625 for more details.","FAIL_AND_SHOW")
 }
 
 gPatchDomuError = {
     "0x03050000" : ("Exacloud plugin run on VM failed.","FAIL_AND_SHOW"),
-    "0x03050001" : ("Critical services on VM down. Refer MOS Note 2829056.1 for more details.","FAIL_AND_SHOW"),
+    "0x03050001" : ("Critical services on VM down. Refer KB123625 for more details.","FAIL_AND_SHOW"),
     "0x03050002" : ("Infra patching upgrade command on VM failed with errors.","FAIL_AND_SHOW"),
     "0x03050003" : ("Exception detected during VM OS patch operation.","FAIL_AND_SHOW"),
     "0x03050004" : ("VM rollback exception detected.","FAIL_AND_SHOW"),
-    "0x03050005" : ("Rollback cannot be performed on a newly provisioned VM. Refer MOS Note 2829056.1 for more details.","FAIL_AND_SHOW"),
+    "0x03050005" : ("Rollback cannot be performed on a newly provisioned VM. Refer KB123625 for more details.","FAIL_AND_SHOW"),
     "0x03050006" : ("Infra patching image backup command on VM failed with errors.","FAIL_AND_SHOW"),
     "0x03050007" : ("VM backup request exception detected.","FAIL_AND_SHOW"),
-    "0x03050008" : ("Unable to set system attributes, specific to ADB-CC environments during VM Patch operation. Refer MOS Note 2829056.1 for more details.","FAIL_AND_SHOW"),
-    "0x03050009" : ("VM patch retry failed. Refer MOS Note 2829056.1 for more details.","FAIL_AND_SHOW"),
-    "0x0305000A" : ("Plugin run post patch operation on VM failed. Refer MOS Note 2829056.1 for more details.","FAIL_AND_SHOW"),
-    "0x0305000B" : ("VM startup failed post patching activity. Refer MOS Note 2829056.1 for more details.","FAIL_AND_SHOW"),
-    "0x0305000C" : ("VM image status failed. Refer MOS Note 2829056.1 for more details.","FAIL_AND_SHOW"),
+    "0x03050008" : ("Unable to set system attributes, specific to ADB-CC environments during VM Patch operation. Refer KB123625 for more details.","FAIL_AND_SHOW"),
+    "0x03050009" : ("VM patch retry failed. Refer KB123625 for more details.","FAIL_AND_SHOW"),
+    "0x0305000A" : ("Plugin run post patch operation on VM failed. Refer KB123625 for more details.","FAIL_AND_SHOW"),
+    "0x0305000B" : ("VM startup failed post patching activity. Refer KB123625 for more details.","FAIL_AND_SHOW"),
+    "0x0305000C" : ("VM image status failed. Refer KB123625 for more details.","FAIL_AND_SHOW"),
     "0x0305000D" : ("VM current version lower than expected version.","FAIL_AND_SHOW"),
     "0x0305000E" : ("VM version not at the expected version.","FAIL_AND_SHOW"),
-    "0x0305000F" : ("CRS services down on VM. Refer MOS Note 2829056.1 for more details.","FAIL_DONTSHOW_PAGE_ONCALL"), #CRS check failed on domu during dom0 patching hence FAIL_DONTSHOW_PAGE_ONCALL
-    "0x03050010" : ("Plugin run during pre patch operation on VM failed. Refer MOS Note 2829056.1 for more details.","FAIL_AND_SHOW"),
-    "0x03050011" : ("Stale mount(s) detected on VM. Refer MOS Note 2829056.1 for more details.","FAIL_AND_SHOW"),
-    "0x03050012" : ("System is in partially updated state on VM. Image backup cannot be performed. Refer MOS Note 2829056.1 for more details.","FAIL_AND_SHOW"),
-    "0x03050013" : ("VM OS patching precheck command failed. Refer MOS Note 2829056.1 for more details.","FAIL_AND_SHOW"),
-    "0x03050014" : ("VM OS patching image backup command exception encountered. Refer MOS Note 2829056.1 for more details.","FAIL_AND_SHOW"),
-    "0x03050015" : ("Patchmgr session on VM already exists. Refer MOS Note 2829056.1 for more details.","FAIL_AND_SHOW"),
-    "0x03050016" : ("Insufficient launch nodes(VM) found on the environment to patch. There must be one launch node apart from the target node for patching to operate. Refer MOS Note 2829056.1 for more details.","FAIL_AND_SHOW"),
-    "0x03050017" : ("Patchmgr command on VM failed. Refer MOS Note 2829056.1 for more details.","FAIL_AND_SHOW"),
+    "0x0305000F" : ("CRS services down on VM. Refer KB123625 for more details.","FAIL_DONTSHOW_PAGE_ONCALL"), #CRS check failed on domu during dom0 patching hence FAIL_DONTSHOW_PAGE_ONCALL
+    "0x03050010" : ("Plugin run during pre patch operation on VM failed. Refer KB123625 for more details.","FAIL_AND_SHOW"),
+    "0x03050011" : ("Stale mount(s) detected on VM. Refer KB123625 for more details.","FAIL_AND_SHOW"),
+    "0x03050012" : ("System is in partially updated state on VM. Image backup cannot be performed. Refer KB123625 for more details.","FAIL_AND_SHOW"),
+    "0x03050013" : ("VM OS patching precheck command failed. Refer KB123625 for more details.","FAIL_AND_SHOW"),
+    "0x03050014" : ("VM OS patching image backup command exception encountered. Refer KB123625 for more details.","FAIL_AND_SHOW"),
+    "0x03050015" : ("Patchmgr session on VM already exists. Refer KB123625 for more details.","FAIL_AND_SHOW"),
+    "0x03050016" : ("Insufficient launch nodes(VM) found on the environment to patch. There must be one launch node apart from the target node for patching to operate. Refer KB123625 for more details.","FAIL_AND_SHOW"),
+    "0x03050017" : ("Patchmgr command on VM failed. Refer KB123625 for more details.","FAIL_AND_SHOW"),
     "0x03050018" : ("Invalid patch state found during non-rolling patch on launch Node VM.","FAIL_AND_SHOW"),
     "0x03050019" : ("Exception encountered while validating DomU heartbeat on cells.","FAIL_DONTSHOW_PAGE_ONCALL"), #HB check failed on domu during dom0 patching hence FAIL_DONTSHOW_PAGE_ONCALL
+    "0x03050020" : ("CRS Autostart is disabled on VM.","FAIL_AND_SHOW"),
     "0x0305001A" : ("Error locating the encryption key api script.","FAIL_AND_SHOW"),
     "0x0305001B" : ("One or more Clusterware resources (like database, service or listener) are down on VM.", "FAIL_AND_SHOW"),
     "0x0305001C" : ("Error occurred while reading and validating PDB metadata to detect if PDB is in a degraded state.", "FAIL_AND_SHOW"),
@@ -687,12 +716,12 @@ gPatchCellError = {
     "0x0307000A"  : ("Current version on the cell is expected to be lower than that of Patch target version.","FAIL_DONTSHOW_PAGE_ONCALL"),
     "0x0307000B"  : ("Current version on the cell is expected to be equal to original version.","FAIL_DONTSHOW_PAGE_ONCALL"),
     "0x0307000C"  : ("Cell Image Status not successful.","FAIL_DONTSHOW_PAGE_ONCALL"),
-    "0x0307000D"  : ("ASM mode status of griddisks on cell servers are in Syncing state. Refer MOS Note 2829056.1 for more details.","FAIL_DONTSHOW_PAGE_ONCALL"),
-    "0x0307000E"  : ("ASM mode status of griddisks on cell servers are in Unused state. Refer MOS Note 2829056.1 for more details.","FAIL_DONTSHOW_PAGE_ONCALL"),
+    "0x0307000D"  : ("ASM mode status of griddisks on cell servers are in Syncing state. Refer KB123625 for more details.","FAIL_DONTSHOW_PAGE_ONCALL"),
+    "0x0307000E"  : ("ASM mode status of griddisks on cell servers are in Unused state. Refer KB123625 for more details.","FAIL_DONTSHOW_PAGE_ONCALL"),
     "0x0307000F"  : ("Failed to shutdown VMs during cell upgrade.","FAIL_DONTSHOW_PAGE_ONCALL"),
     "0x03070010"  : ("Failed to bring up VMs during cell upgrade.","FAIL_DONTSHOW_PAGE_ONCALL"),
-    "0x03070011"  : ("ASM mode status of griddisks on cell servers are in Offline state. Refer MOS Note 2829056.1 for more details.","FAIL_DONTSHOW_PAGE_ONCALL"),
-    "0x03070012"  : ("ASM mode status of griddisks on cell servers are in Online state. Cannot do non-rolling upgrade with this state. Refer MOS Note 2829056.1 for more details.","FAIL_DONTSHOW_PAGE_ONCALL"),
+    "0x03070011"  : ("ASM mode status of griddisks on cell servers are in Offline state. Refer KB123625 for more details.","FAIL_DONTSHOW_PAGE_ONCALL"),
+    "0x03070012"  : ("ASM mode status of griddisks on cell servers are in Online state. Cannot do non-rolling upgrade with this state. Refer KB123625 for more details.","FAIL_DONTSHOW_PAGE_ONCALL"),
     "0x03070013"  : ("Rollback is not possible on cell due to error encountered : Rollback to the inactive partitions: Impossible.","FAIL_DONTSHOW_PAGE_ONCALL"),
     "0x03070014"  : ("Error executing DBMCLI command on the Dom0 node, resulting in services not starting or stopping correctly during the patching process.","FAIL_DONTSHOW_PAGE_ONCALL")
 }
@@ -732,20 +761,20 @@ gDomUPatchPluginError = {
     "0x030B0000" : ("Exacloud plugin directory missing.","FAIL_AND_SHOW"),
     "0x030B0001" : ("Exacloud parent plugin files missing.","FAIL_AND_SHOW"),
     "0x030B0002" : ("Exacloud plugin exception error encountered on Dom0.","FAIL_AND_SHOW"),
-    "0x030B0003" : ("Execution of custom plugin script for Guest VM failed. Refer MOS Note 2829056.1 for more details.","FAIL_AND_SHOW"),
+    "0x030B0003" : ("Execution of custom plugin script for Guest VM failed. Refer KB123625 for more details.","FAIL_AND_SHOW"),
     "0x030B0004" : ("Exacloud parent plugin files on Dom0 target stage location are missing.","FAIL_AND_SHOW"),
-    "0x030B0005" : ("Exacloud parent plugin files on Guest VM stage location are missing. Refer MOS Note 2829056.1 for more details.","FAIL_AND_SHOW"),
-    "0x030B0006" : ("Exacloud plugin exception error encountered on DomU. Refer MOS Note 2829056.1 for more details.","FAIL_AND_SHOW"),
+    "0x030B0005" : ("Exacloud parent plugin files on Guest VM stage location are missing. Refer KB123625 for more details.","FAIL_AND_SHOW"),
+    "0x030B0006" : ("Exacloud plugin exception error encountered on DomU. Refer KB123625 for more details.","FAIL_AND_SHOW"),
     "0x030B0007" : ("Exacloud plugin file copy error exception encountered on Dom0.","FAIL_AND_SHOW"),
-    "0x030B0008" : ("Exacloud plugin file copy error exception encountered on DomU. Refer MOS Note 2829056.1 for more details.","FAIL_AND_SHOW"),
+    "0x030B0008" : ("Exacloud plugin file copy error exception encountered on DomU. Refer KB123625 for more details.","FAIL_AND_SHOW"),
     "0x030B0009" : ("Exacloud plugin execution error exception encountered on Dom0.","FAIL_AND_SHOW"),
-    "0x030B000A" : ("Exacloud plugin execution error exception encountered on DomU. Refer MOS Note 2829056.1 for more details.","FAIL_AND_SHOW"),
+    "0x030B000A" : ("Exacloud plugin execution error exception encountered on DomU. Refer KB123625 for more details.","FAIL_AND_SHOW"),
     "0x030B000B" : ("Exacloud plugin file missing error exception encountered on Dom0.","FAIL_AND_SHOW"),
-    "0x030B000C" : ("Exacloud plugin file missing error exception encountered on DomU. Refer MOS Note 2829056.1 for more details.","FAIL_AND_SHOW"),
+    "0x030B000C" : ("Exacloud plugin file missing error exception encountered on DomU. Refer KB123625 for more details.","FAIL_AND_SHOW"),
     "0x030B000D" : ("Exacloud plugin Apply error exception encountered on Dom0.","FAIL_AND_SHOW"),
-    "0x030B000E" : ("Exacloud plugin Apply error exception encountered on DomU. Refer MOS Note 2829056.1 for more details.","FAIL_AND_SHOW"),
+    "0x030B000E" : ("Exacloud plugin Apply error exception encountered on DomU. Refer KB123625 for more details.","FAIL_AND_SHOW"),
     "0x030B000F" : ("Exception encountered while reading plugin console logs on Dom0.","FAIL_AND_SHOW"),
-    "0x030B0010" : ("Exception encountered while reading plugin console logs on DomU. Refer MOS Note 2829056.1 for more details.","FAIL_AND_SHOW"),
+    "0x030B0010" : ("Exception encountered while reading plugin console logs on DomU. Refer KB123625 for more details.","FAIL_AND_SHOW"),
     "0x030B0011" : ("Custom plugin script missing.","FAIL_AND_SHOW"),
     "0x030B0012" : ("Plugin metadata based exacloud plugin execution failed on dom0 target.","FAIL_DONTSHOW_PAGE_ONCALL"),
     "0x030B0013" : ("Plugin metadata based exacloud plugin execution failed on domu target.","FAIL_AND_SHOW"),
@@ -759,7 +788,7 @@ gDomUPatchPluginError = {
 
 # ASM/DB Specific Error codes
 gAsmError = {
-    "0x030C0000" : ("ASM Deactivation outcome is not set to yes on cells. Please refer MOS Note 2829056.1 for more details or contact Oracle support for assistance.","FAIL_DONTSHOW_PAGE_ONCALL")
+    "0x030C0000" : ("ASM Deactivation outcome is not set to yes on cells. Please refer KB123625 for more details or contact Oracle support for assistance.","FAIL_DONTSHOW_PAGE_ONCALL")
 }
 
 # Oneoff Specific Error codes

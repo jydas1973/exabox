@@ -1,7 +1,7 @@
 """
 $Header:
 
- Copyright (c) 2015, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2015, 2026, Oracle and/or its affiliates.
 
 NAME:
     Worker - Worker process handling Agent client request
@@ -14,10 +14,18 @@ NOTE:
 
 History:
    MODIFIED (MM/DD/YY)
+   aypaul    03/16/26 - ER#38277507 Add selinux operation response to ec data.
+   prsshukl  03/13/26 - Bug 39077070 - EXACS:25.4.1 ONE OFF3 RC4: DELETE
+                        STORAGE: 'DELETE_CELL_CHECK' EXACLOUD LOG HAS A SPACE
+                        IN THE MIDDLE OF THE NAME
+   aypaul    03/03/26 - Bug#38900084 Fix code issues from codev
+   ecejacru  01/23/26 - 38874938:skip OEDA in mock mode
+   pbellary  12/09/25 - Bug 38740441 - EXACLOUD: ADD COMPUTE WF DID NOT ENABLE QINQ IN ELASTIC NODE
    ririgoye  11/26/25 - Bug 38636333 - EXACLOUD PYTHON:ADD INSTANTCLIENT TO
                         LD_LIBRARY_PATH
    ririgoye  11/20/25 - Bug 38667586 - EXACS: MAIN: PYTHON3.11: SUPRASS ALL
                         PYTHON WARNINGS
+   remamid   11/19/25 - Provide absolute path for xml location bug 38631342
    aypaul    10/22/25 - Bug#38503013 Resolve worker shutdown issue due to
                         listener not starting up.
    rajsag    09/17/25 - enh 38389132 - exacloud: autoencryption support for
@@ -1559,7 +1567,13 @@ class ebWorkerDaemon(object):
                             get_gcontext().mSetRegEntry("workflow_id", "00000000-0000-0000-0000-000000000000")
 
                     if "steplist" in _params.keys() and _params["steplist"] is not None:
-                        _str_steps = str(_params["steplist"])
+                        _raw_steps = _params["steplist"]
+                        if isinstance(_raw_steps, (list, tuple, set)):
+                            _tokens = [str(step).strip() for step in _raw_steps if str(step).strip()]
+                        else:
+                            #By default the steplist param should be str type
+                            _tokens = [token.strip() for token in str(_raw_steps).split(",") if token.strip()]
+                        _str_steps = ",".join(_tokens) if _tokens else ""
                         if len(_str_steps) > 63:
                             #IF step list is too large, File too long error occurs
                             _str_steps = _str_steps.replace("ESTP_","")
@@ -1673,9 +1687,9 @@ class ebWorkerDaemon(object):
                         elif _job.mGetType() == "elastic_shape":
 
                             # Run the endpoind command
-                            os.makedirs("log/xmlgen", exist_ok=True)
-                            os.makedirs("log/xmlgen/{0}".format(_uuid))
-                            _savedir = "log/xmlgen/{0}/".format(_uuid)
+                            os.makedirs("{0}/log/xmlgen".format(os.getcwd()), exist_ok=True)
+                            os.makedirs("{0}/log/xmlgen/{1}".format(os.getcwd(), _uuid))
+                            _savedir = "{0}/log/xmlgen/{1}/".format(os.getcwd(), _uuid)
 
                             _payload = _job.mGetOptions().jsonconf
 
@@ -1726,7 +1740,7 @@ class ebWorkerDaemon(object):
                                     _wf = get_gcontext().mGetRegEntry("workflow_id")
 
                                 _exaunit = ""
-                                if get_gcontext().mCheckRegEntry("workflow_id"):
+                                if get_gcontext().mCheckRegEntry("exaunit_id"):
                                     _exaunit = get_gcontext().mGetRegEntry("exaunit_id")
 
                                 _status = aClient.mMakeCluctrlRequest(
@@ -1757,10 +1771,11 @@ class ebWorkerDaemon(object):
 
                                 vmhandle = exaBoxCluCtrl(aCtx=get_gcontext(), aNode=_node,aOptions=_job.mGetOptions())
                                 vmhandle.mSetRequestObj(_job)
-                                if _job.mGetCmd() in ['validate_elastic_shapes', 'xsvault', 'infra_vm_states', 'xsput', 'xsget']:
+                                if _job.mGetCmd() in ['validate_elastic_shapes', 'xsvault', 'infra_vm_states', 'xsput', 'xsget', 'enable_qinq']:
                                     _rc  = vmhandle.mDispatchNonXMLCluster(_job.mGetCmd(), _job.mGetOptions(), aJob=_job)
                                 else:
                                     _rc  = vmhandle.mDispatchCluster(_job.mGetCmd(), _job.mGetOptions(), aJob=_job)
+                                    vmhandle.mCompileSelinuxResponse()
                                     _xml = vmhandle.mGetPatchConfig()
 
                             '''
@@ -2027,9 +2042,10 @@ class ebWorkerDaemon(object):
 
                 #OEDA request directory Archiving if it is enabled in exabox.conf.
                 if self.__config_opts.get("oeda_archive_requests") and self.__config_opts.get("oeda_archive_requests") == "True":
-                    ebLogTrace("*** Proceeding with Archive OEDA request directory operation")
-                    self.mArchiveOEDARequests(vmhandle, _job)
-
+                    
+                    if not self.__config_opts.get("mock_mode") or self.__config_opts.get("mock_mode") != "True":
+                        ebLogTrace("*** Proceeding with Archive OEDA request directory operation")
+                        self.mArchiveOEDARequests(vmhandle, _job)
                 #
                 # Remove Worker log handler
                 #
@@ -2137,6 +2153,9 @@ class ebWorkerDaemon(object):
                 ebLogTrace(f"ExaCC Env detected. Skipping mArchiveOEDARequests")
                 return
             _vmhandle = aVMHandle
+            if _vmhandle is None:
+                ebLogTrace(f"VmHandle is None, skipping OEDA Archive request...")
+                return
             _oeda_request_path = _vmhandle.mGetOEDARequestsPath()
             ebLogTrace(f"*** OEDA Request_path = {_oeda_request_path}")
             ebLogTrace(f"*** Basepath: {get_gcontext().mGetBasePath()}")

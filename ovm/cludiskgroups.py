@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     OVM - Diskgroup/Griddisk Management
@@ -16,6 +16,28 @@ NOTE:
     None
 
 History:
+    zpallare  12/19/25 - Bug 38955623 - EXACC:BB:25.3.1.1.0:ability to change data, reco, sparse 
+                         percentage:adding sparse manual operation failed:error create_dg: error 
+                         creating diskgroup sprc8 using sql create diskgroup sprc8 high redundancy disk
+    jfsaldan  02/06/25 - Bug 38879285 - EXACC:EXACLOUD: ASM RESHAPE FAILING WITH 'CELL-02894:
+                         REQUESTED GRID DISK SIZE IS SMALLER THAN ASM DISK SIZE'
+    zpallare  12/19/25 - Bug 38890053 - EXACS:25.4.1 ONEOFF2:26.1.1 Dbaas:custom data-reco-sparse: 
+                         even when reshape fails, exacloud passes as success
+    zpallare  12/19/25 - Bug 38776681 - EXACS:25.4.1:Custom data/reco/sparse disk groups: reshape to 
+                         remove sparse diskgroups fails: execmodule: could not drop diskgroup sprc1
+    jfsaldan  12/15/25 - Bug 38755861 - EXACS:25.4.1:CUSTOM
+                         DATA/RECO/SPARSE DISK GROUPS: RESHAPE WITH SPACE
+                         UTILIZATION FAILS: EXACLOUD IS TRYING TO RESHAPE
+                         SPARSE DISK GROUPS EVEN WHEN THE ASSIGNED SPACE HAS
+                         NOT CHANGED
+    scoral    12/15/25 - Bug 38749326 - Add failgroup_list in payload for mResizeDg.
+    zpallare  12/11/25 - Bug 38733412 - EXACC: Ability to change data, reco, sparse percentage:Adding sparse 
+                         during reshape is marked as success in ui/cps but sparse is not added
+    jfsaldan  12/15/25 - Bug 38755861 - EXACS:25.4.1:CUSTOM
+                         DATA/RECO/SPARSE DISK GROUPS: RESHAPE WITH SPACE
+                         UTILIZATION FAILS: EXACLOUD IS TRYING TO RESHAPE
+                         SPARSE DISK GROUPS EVEN WHEN THE ASSIGNED SPACE HAS
+                         NOT CHANGED
     nelango   11/20/25 - Bug 38483116 - Skip celldisk freespace check if freespace available in griddisks
     shapatna  09/29/25 - Bug 38449773 - FIX FOR ISSUES WITH REBALANCE PERCENTAGE PROGRESS UPDATE IN EXACLOUD DB
     gparada   08/15/25 - 38254024 Reshape - Dynamic Storage for data reco sparse 
@@ -348,6 +370,12 @@ class ebCluManageDiskgroup(object):
         
     def mGetOutJson(self):
         return self._outJson
+
+    def mGetOutFile(self):
+        return self._outFile
+    
+    def mSetOutFile(self, aOutFile):
+        self._outFile = aOutFile
     
     def mSetOutJson(self, aOutJson):
         self._outJson = aOutJson
@@ -910,6 +938,7 @@ class ebCluManageDiskgroup(object):
             indent=4, sort_keys=True))
 
         self.mSetOutJson(_outJson)
+        self.mSetOutFile(_outfile)
             
         with open(_input_file_lcopy, 'w') as infile:
             json.dump(_injson, infile, default=universal_converter, 
@@ -960,6 +989,7 @@ class ebCluManageDiskgroup(object):
                 # Wait for step to complete
                 _infileName = _opTarget + _uniqStr + "." + "status" + ".json"
                 _outfile = "/var/opt/oracle/log/" + _constantsObj._dbname_value + "/" + _opTarget + _uniqStr + "." + "status" + ".out"
+                self.mSetOutFile(_outfile)
                 
                 _status = _dbaasobj.mWaitForJobComplete(_options, _dbName, _domU, _jobid, _diskgroupData,
                                                          _injson[_constantsObj._operation_key], _infileName,
@@ -1115,22 +1145,23 @@ class ebCluManageDiskgroup(object):
 
             ebLogInfo("*** ebCluManageDiskgroup:mClusterDgrpCreate - Updating Diskgroupdata complete. Attempting to resize DGs and Griddisks")
 
-            if _shrink_existing_dgs:
-                _eBoxCluCtrl.mUpdateStatusOEDA(True, _step_list[2], _step_list, "Attempting to resize DGs and Griddisks")
-                # We need to compare current and new diskgroup sizes to determine whether to resize dgs first, or the diskgroups first
-                _rc = self.mResizeDgAndGriddisks(_options, _datadg_name, _new_dg_sizes[_constantsObj._data_dg_rawname],
-                    _cur_dg_sizes[_constantsObj._data_dg_rawname], _rollback_stack, _diskgroupData)
-                if _rc == 0:
-                    _rc = self.mResizeDgAndGriddisks(_options, _recodg_name, _new_dg_sizes[_constantsObj._reco_dg_rawname],
-                        _cur_dg_sizes[_constantsObj._reco_dg_rawname], _rollback_stack, _diskgroupData)
-                    if _rc:
-                        return _rc
+            _eBoxCluCtrl.mUpdateStatusOEDA(True, _step_list[2], _step_list, "Attempting to resize DGs and Griddisks")
 
-                else:
-                    return _rc
+            _dg_mappings = [
+                (_constantsObj._data_dg_rawname, _datadg_name),
+                (_constantsObj._reco_dg_rawname, _recodg_name)
+            ]
 
-            else:
-                _eBoxCluCtrl.mUpdateStatusOEDA(True, _step_list[2], _step_list, "Shrink is set to false. Skipping dg and griddisk resize")
+            _rc = self.mExecuteOrderedResizes(
+                _options,
+                _dg_mappings,
+                _new_dg_sizes,
+                _cur_dg_sizes,
+                _rollback_stack,
+                _diskgroupData
+            )
+            if _rc:
+                return _rc
             
             ebLogInfo("*** Diskgroup and Griddisk resize completed; Attempting to create Griddisks sparse diskgroup")
             _eBoxCluCtrl.mUpdateStatusOEDA(True, _step_list[3], _step_list, "Creating sparse griddisks")
@@ -1172,6 +1203,71 @@ class ebCluManageDiskgroup(object):
         return _rc
 
     # end
+
+    def mExecuteOrderedResizes(self, aOptions, aDgMappings, aNewSizes, aCurrentSizes, aRollbackStack, aDiskgroupData=None, aDeleteSparse=False):
+
+        ebLogInfo("*** ebCluManageDiskgroup:mExecuteOrderedResizes >>>")
+
+        _options = aOptions
+        _dg_mappings = aDgMappings or []
+        _new_sizes = aNewSizes or {}
+        _current_sizes = aCurrentSizes or {}
+        _rollback_stack = aRollbackStack
+        _delete_sparse = aDeleteSparse
+
+        if aDiskgroupData is None:
+            _diskgroupData = self.mGetDiskGroupOperationData()
+        else:
+            _diskgroupData = aDiskgroupData
+
+        _resize_plan = []
+
+        for _dg_key, _dg_name in _dg_mappings:
+            if _dg_key not in _new_sizes or _dg_key not in _current_sizes:
+                continue
+
+            _new_size = _new_sizes[_dg_key]
+            _current_size = _current_sizes[_dg_key]
+
+            if _new_size is None or _current_size is None:
+                continue
+
+            _delta = _new_size - _current_size
+
+            if _delta == 0:
+                continue
+
+            _resize_plan.append({
+                "dg_name": _dg_name,
+                "new_size": _new_size,
+                "cur_size": _current_size,
+                "delta": _delta
+            })
+
+        if not _resize_plan:
+            ebLogInfo("*** ebCluManageDiskgroup:mExecuteOrderedResizes - No resize operations required")
+            ebLogInfo("*** ebCluManageDiskgroup:mExecuteOrderedResizes <<<")
+            return 0
+
+        _resize_plan.sort(key=lambda entry: (0 if entry["delta"] < 0 else 1, -abs(entry["delta"])))
+
+        for _entry in _resize_plan:
+            _rc = self.mResizeDgAndGriddisks(
+                _options,
+                _entry["dg_name"],
+                _entry["new_size"],
+                _entry["cur_size"],
+                _rollback_stack,
+                _diskgroupData,
+                _delete_sparse
+            )
+            if _rc:
+                ebLogError(f"*** ebCluManageDiskgroup:mExecuteOrderedResizes - Resize failed for {_entry['dg_name']}")
+                ebLogInfo("*** ebCluManageDiskgroup:mExecuteOrderedResizes <<<")
+                return _rc
+
+        ebLogInfo("*** ebCluManageDiskgroup:mExecuteOrderedResizes <<<")
+        return 0
 
     # Method to execute resizeDG and resizeGridDisk methods on the basis of current and new sizes
     def mResizeDgAndGriddisks(self, aOptions, aDgName, aNewDgSize, aCurrentDgSize, aRollbackStack, aDiskgroupData=None, aDeleteSparse=False):
@@ -1381,7 +1477,8 @@ class ebCluManageDiskgroup(object):
         # Append to stack only if we are not in rollback mode            
         _rc = self.mHandleDbaasapiSynchronousCall(_options, _injson, False)
         if _rc:
-            return _rc
+            return self.mRecordError(gDiskgroupError['DgOperationError'], "*** Could not\
+                             drop sparse disk group")
         
         # Start update xml file
         _cluster = _eBoxCluCtrl.mGetClusters().mGetCluster()
@@ -1409,13 +1506,43 @@ class ebCluManageDiskgroup(object):
         _constantsObj = self.mGetConstantsObj()
         _dgrp_properties = []
         _dgrp_properties.append(_constantsObj._propkey_storage)
+        _dbaasObj = self.mGetDbaasObj()
         # Get DATA Diskgroup properties
         _rc = self.mClusterDgrpInfo2(aOptions, aDgName, _dgrp_properties)
-        if _rc == 0:
-            ebLogInfo("*** ebCluManageDiskgroup:mCheckDgExist is True<<<")
-            return True
-        ebLogInfo("*** ebCluManageDiskgroup:mCheckDgExist is False<<<")
-        return False 
+        _outObj = _dbaasObj.mReadStatusFromDomU(aOptions, \
+            self.mGetLastDomUused(), self.mGetOutFile())
+        ebLogInfo(f"*** ebCluManageDiskgroup:mCheckDgExist outObj: {_outObj}")
+        if _outObj != None and "status" in _outObj.keys():
+            if _outObj['status'] == 'Success':
+                # Validate dg info
+                if "infofile_content" in _outObj.keys() \
+                    and _outObj["infofile_content"]:
+                    _infoObj = _outObj["infofile_content"]
+                    if aDgName in _infoObj.keys():
+                        ebLogInfo("*** ebCluManageDiskgroup:mCheckDgExist is True<<<")
+                        return True 
+                    else:
+                        raise ExacloudRuntimeError(0x0825, 0xA, \
+                            f'DG: {aDgName} not present in dbaaas info response')
+                else:
+                    ebLogInfo(f"*** ebCluManageDiskgroup:mCheckDgExist - \
+                        infofile_content not present in dbaaas response")
+                    raise ExacloudRuntimeError(0x0825, 0xA, \
+                        f'infofile_content not present in dbaaas response')
+                
+            else:
+                # Validate errmsg
+                _noDgMessage = "Could not fetch attributes for the diskgroup"
+                if "errmsg" in _outObj.keys() and _outObj["errmsg"] \
+                    and _noDgMessage in _outObj["errmsg"]:
+                    ebLogInfo("*** ebCluManageDiskgroup:mCheckDgExist is False<<<")
+                    return False
+                else:
+                    raise ExacloudRuntimeError(0x0825, 0xA, \
+                        f'Failure in dbaaas info request')
+                
+        else:
+            raise ExacloudRuntimeError(0x0825, 0xA, f'Failed to get Dg details from agent')
     
     # It's just for Sparse diskgroup right now
     def mClusterDgrpDrop(self, aOptions, aDiskgroupData=None):
@@ -1569,12 +1696,20 @@ class ebCluManageDiskgroup(object):
         _eBoxCluCtrl.mUpdateStatusOEDA(True, _step_list[3], _step_list, "Resizing of RECO and DATA GridDisk and diskgroups")
         ebLogInfo("*** Resizing RECO and DATA griddisks and diskgroups")
 
-        # We need to compare current and new diskgroup sizes to determine whether to resize dgs first, or the diskgroups first
-        _rc = self.mResizeDgAndGriddisks(_options, _datadg_name, _new_dg_sizes[_constantsObj._data_dg_rawname],
-            _cur_dg_sizes[_constantsObj._data_dg_rawname], _rollback_stack, _diskgroupData, True)
-        if _rc == 0:
-            _rc = self.mResizeDgAndGriddisks(_options, _recodg_name, _new_dg_sizes[_constantsObj._reco_dg_rawname],
-                _cur_dg_sizes[_constantsObj._reco_dg_rawname], _rollback_stack, _diskgroupData, True)
+        _dg_mappings = [
+            (_constantsObj._data_dg_rawname, _datadg_name),
+            (_constantsObj._reco_dg_rawname, _recodg_name)
+        ]
+
+        _rc = self.mExecuteOrderedResizes(
+            _options,
+            _dg_mappings,
+            _new_dg_sizes,
+            _cur_dg_sizes,
+            _rollback_stack,
+            _diskgroupData,
+            True
+        )
 
         ebLogInfo("*** Resizing of DiskGroup and Griddisks completed; Checking rebalancing")
         _rollback_stack.append({self.mEnsureDgsRebalanced:(_options, None, _diskgroupData)})
@@ -1647,11 +1782,13 @@ class ebCluManageDiskgroup(object):
             _rc = self._extract_cell_vs_griddisks_map(_dgName, _fgrp_prop_dict, _cell_vs_griddisks_map)
             ## Save the celldisk type (harddisk or flashdisk)
             _one_of_the_griddisks = _cell_vs_griddisks_map[(list(_cell_vs_griddisks_map.keys())[0])][0]
-            _pattern = re.compile("^(FD)_0[0-1].*")
+            ebLogInfo(f"*** one_of_the_griddisks[{_one_of_the_griddisks}]")
+            _pattern = re.compile("^(FD|CF)_0[0-9].*")# Regex to validate if diskType is flashdisk
             if _pattern.match(_one_of_the_griddisks):
                 _diskgroupData[_constantsObj._celldisk_type] = "flashdisk"
             else:
                 _diskgroupData[_constantsObj._celldisk_type] = "harddisk"
+            ebLogInfo(f"*** celltype is [{_diskgroupData[_constantsObj._celldisk_type]}]")
 
         if _rc != 0:    # Issue at some point above while parsing info
             return self.mRecordError(gDiskgroupError['ErrorReadingPayload'], "*** Could not read\
@@ -1836,7 +1973,7 @@ class ebCluManageDiskgroup(object):
         _options = aOptions
         _dgMap = aDGMap
         _rc = 0
-        _precheck_dict = {"currentMB": 0, "osMB": 0, "newMB": 0}
+        _precheck_dict = {"currentMB": 0, "osMB": 0, "newMB": 0, "growMB": 0, "shrinkMB": 0}
 
         for key in _dgMap:
             value = _dgMap[key]
@@ -1855,36 +1992,46 @@ class ebCluManageDiskgroup(object):
     def mPrecheckDgSizeAvailableCells(self, aPrecheckDict):
         """
         Precheck for checking if the cells have available capacity for resize
+        :returns:
+            int(0): if the precheck succeeds
+            int(1): if the precheck fails
         """
         _rc = 0
         _precheck_dict = aPrecheckDict
         _newMB = _precheck_dict["newMB"]
         _currentMB = _precheck_dict["currentMB"]
         _osMB = _precheck_dict["osMB"]
+        _growMB = _precheck_dict.get("growMB", 0)
+        _shrinkMB = _precheck_dict.get("shrinkMB", 0)
+        _net_growth = _growMB - _shrinkMB
+        _baselineMB = _currentMB - _shrinkMB if (_currentMB - _shrinkMB) > 0 else _currentMB
         _eBox = self.mGetEbox()
-        if _eBox.mCheckConfigOption('precheck_cell_disk_free_space', "True") and _newMB > _currentMB:
+        if (_eBox.mCheckConfigOption('precheck_cell_disk_free_space', "True") and
+                _net_growth > 0 and _newMB > _currentMB):
             _free_space_output_MB = self.mCalculateFreeSpaceCelldisk()
             _cell_disk_list = self.mGetCelldisks()
             if _free_space_output_MB is not None and _cell_disk_list is not None:
                 # The below sizes are in MB
                 _cell_disk_count = len(_cell_disk_list)
                 _cell_count = len(_eBox.mReturnCellNodes())
-                _current_dg_slice =  _currentMB/(_cell_count * _cell_disk_count)
+                _current_dg_slice =  _baselineMB/(_cell_count * _cell_disk_count)
                 if _osMB:
                     _current_dg_slice =  _osMB
                 _current_dg_slice = math.floor(_current_dg_slice / 16) * 16
                 _new_dg_slice =  _newMB/(_cell_count * _cell_disk_count)
                 _new_dg_slice = math.floor(_new_dg_slice / 16) * 16
-                if (_new_dg_slice - _current_dg_slice) > _free_space_output_MB:
+                _slice_delta = _new_dg_slice - _current_dg_slice
+                if _slice_delta > _free_space_output_MB:
                     _msg = f"The free storage - {_free_space_output_MB} MB on each cell disk is less than the requested storage. "\
                            f"The current slice size for each grid disk is {_current_dg_slice} and requested slice size for "\
-                           f"each grid disk is {_new_dg_slice}. Please retry the resize operation within the free space available "\
-                            "on cells."
+                           f"each grid disk is {_new_dg_slice}. Net growth after shrink is {_net_growth} MB."\
+                           " Please retry the resize operation within the free space available on cells."
                     ebLogError(_msg)
                     _rc = 1
                 else:
                     ebLogInfo(f"Precheck passed for free space check on cell disk. Current DG slice size is {_current_dg_slice} MB."\
-                              f" New DG slice size is {_new_dg_slice} MB. Free space on cell disk is {_free_space_output_MB} MB.")
+                              f" New DG slice size is {_new_dg_slice} MB. Free space on cell disk is {_free_space_output_MB} MB."\
+                              f" Net growth evaluated was {_net_growth} MB (shrink contribution {_shrinkMB} MB).")
         return _rc
 
     #Method to check if all diskgroups resize is permitted for the given value
@@ -1964,6 +2111,7 @@ class ebCluManageDiskgroup(object):
             
             _injson[_constantsObj._action_key] = "resize"
             _injson[_constantsObj._params_key][_constantsObj._newsizeMB_key] = int(_size)
+            _injson[_constantsObj._params_key][_constantsObj._failgroup_list] = self.mGetFailGroupList(_dg)
 
             _rc = self.mHandleDbaasapiSynchronousCall(_options, _injson, True)
             ebLogInfo("*** ebCluManageDiskgroup:mResizeDg:_resizeDG <<<")
@@ -2310,11 +2458,13 @@ class ebCluManageDiskgroup(object):
             _rc = self._extract_cell_vs_griddisks_map(_dgName, _fgrp_prop_dict, _cell_vs_griddisks_map)
             ## Save the celldisk type (harddisk or flashdisk)
             _one_of_the_griddisks = _cell_vs_griddisks_map[(list(_cell_vs_griddisks_map.keys())[0])][0]
-            _pattern = re.compile("^(FD)_0[0-1].*")
+            ebLogInfo(f"*** one_of_the_griddisks[{_one_of_the_griddisks}]")
+            _pattern = re.compile("^(FD|CF)_0[0-9].*")# Regex to validate if diskType is flashdisk
             if _pattern.match(_one_of_the_griddisks):
                 _diskgroupData[_constantsObj._celldisk_type] = "flashdisk"
             else:
                 _diskgroupData[_constantsObj._celldisk_type] = "harddisk"
+            ebLogInfo(f"*** celltype is [{_diskgroupData[_constantsObj._celldisk_type]}]")
 
         if _rc != 0:    # Issue at some point above while parsing info
             return self.mRecordError(gDiskgroupError['ErrorReadingPayload'], "*** Could not read\
@@ -2547,8 +2697,9 @@ class ebCluManageDiskgroup(object):
             ebLogInfo('*** ebCluManageDiskgroup:mCreateSparseDg: Saved patched Cluster Config: ' + _eBoxCluCtrl.mGetPatchConfig())
 
         else:
-            ebLogInfo("*** ebCluManageDiskgroup:mCreateSparseDg Failed.")    
-            return 1
+            ebLogInfo("*** ebCluManageDiskgroup:mCreateSparseDg Failed.")
+            return self.mRecordError(gDiskgroupError['DgOperationError'], "*** Could not\
+                             create sparse disk group")
         
         ebLogInfo("*** ebCluManageDiskgroup:mCreateSparseDg <<<")    
         return _rc
@@ -2916,13 +3067,8 @@ class ebCluManageDiskgroup(object):
                     _injson[_constantsObj._action_key] = "resize"
                     _newsizeGB = _inparams[_constantsObj._newsizeGB_key]
                     _newsizeMB = int(_newsizeGB) * 1024
-                    # If there are 12 grid disks and 3 cells, this value = 36
-                    _dg_griddisks_count_all_cells = self.mGetGridDiskCountRetryResize(_dg_name)
-                    # The below calculations is based on the calculations done in
-                    # case of _op == "ResizeDiskgroup" operation.
-                    _dg_slice =  _newsizeMB/(_dg_griddisks_count_all_cells)
-                    _dg_slice = int(_dg_slice / 16) * 16  ## Round to multiple of 16
-                    _newsizeMB = _dg_slice * (_dg_griddisks_count_all_cells)
+                    ebLogInfo("*** New MB size to resize griddisks {_newsizeMB}")
+
                     # This is the old size of diskgroup on cells currently,
                     # which couldn't be resized to correct size in previous resize attempt.
                     # It is set in clustorage when checking, if the grid disk size is different
@@ -2952,8 +3098,6 @@ class ebCluManageDiskgroup(object):
                 _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_UPDATING_DG'], _detail_error)
                 _rc = self.mRecordError(gDiskgroupError['UpdateError'],\
                                    "*** Error updating diskgroup " + _dg_name)
-            _stepSpecificDetails = _clu_utils.mStepSpecificDetails("reshapeDetails", 'DONE', "ASM reshape is completed", "","ASM")
-            _clu_utils.mUpdateTaskProgressStatus([], 100, "ASM Reshape", "DONE", _stepSpecificDetails)
             return _rc
     # end
 
@@ -3282,6 +3426,12 @@ class ebCluManageDiskgroup(object):
 
 
     def mCheckIfDgResizable(self, aOptions, aDgName, aNewDgSizeMb=None, aNewDgRelativeSize=None, aNewSizesDict=None, aDiskgroupData=None, aPrecheckDict=None):
+        """
+
+        returns:
+            int(0) if DG is resizable.
+            ebError() if DG is not resizable
+        """
         
         _options = aOptions
         _dgName = aDgName
@@ -3314,7 +3464,7 @@ class ebCluManageDiskgroup(object):
         _dgrp_properties.append(_constantsObj._propkey_storage)
         _stor_prop_dict = {}
 
-        # Get DATA Diskgroup properties to check if DGs are re-sizable
+        # Get Diskgroup properties to check if DGs are re-sizable
         _rc = self.mClusterDgrpInfo2(_options, _dgName, _dgrp_properties)
         if _rc != 0:
             return self.mRecordError(gDiskgroupError['ErrorFetchingDetails'], "*** Could not\
@@ -3347,6 +3497,8 @@ class ebCluManageDiskgroup(object):
 
             ebLogInfo("*** %s DG: (Current Size, Used Space, New Size) : (%s, %s, %s)" %\
                        (_dgName, _dg_total_mb, _dg_used_mb, _newSize))
+            _delta_mb = int(_newSize) - _dg_total_mb
+
             if  int(_newSize) < _dg_total_mb:
                 _rc = self.mUtilCheckIfDgResizable(_dg_used_mb, _newSize)
                 if _rc == 0:
@@ -3354,27 +3506,35 @@ class ebCluManageDiskgroup(object):
                 else:
                     return self.mRecordError(gDiskgroupError['NonModifiable'],
                         f"***DG does not qualify for resizing: {_dgName} as it does not fulfill the free space percentage criteria")
+                if _precheck_dict is not None:
+                    _precheck_dict["currentMB"] += _dg_total_mb
+                    _precheck_dict["newMB"] += int(_newSize)
+                    _precheck_dict["osMB"]  += _dg_os_mb
+                    _precheck_dict["shrinkMB"] += abs(_delta_mb)
             else:
                 _rc = 0
-                if _precheck_dict:
-                    #Bug 38483116: If freespcce is available in gridisks, skip addition of 
-                    #space details to _precheck_dict thereby freespace for this dg is not checked
-                    #in celldisks level later in mCalculateFreeSpaceCelldisk
-                    ebLogInfo(f"*** Checking if Griddisks are already resized")
-                    _rc = self.mCheckGriddiskSize(_dgName,_newSize)
-                    if _rc == 0:
-                        if "currentMB" in list(_precheck_dict.keys()):
-                            _precheck_dict["currentMB"] += _dg_total_mb
-                        if "newMB" in list(_precheck_dict.keys()):
-                            _precheck_dict["newMB"] += int(_newSize)
-                        if "osMB"  in list(_precheck_dict.keys()):
-                            _precheck_dict["osMB"]  += _dg_os_mb
-                        ebLogInfo(f"*** {_dgName} DG qualifies for resizing as it is upsize operation. "\
-                                   "Precheck will be done now for checking free space on cells.")
+                if _precheck_dict is not None:
+                    if _delta_mb == 0:
+                        _precheck_dict["currentMB"] += _dg_total_mb
+                        _precheck_dict["newMB"] += int(_newSize)
+                        _precheck_dict["osMB"]  += _dg_os_mb
                     else:
-                        ebLogInfo(f"*** Griddisks of dg: {_dgName} are already resized to accomodate new dg size. "
-                                   "Freespace check at celldisk level is skipped for this diskgroup.")
-                        _rc = 0
+                        #Bug 38483116: If freespcce is available in gridisks, skip addition of 
+                        #space details to _precheck_dict thereby freespace for this dg is not checked
+                        #in celldisks level later in mCalculateFreeSpaceCelldisk
+                        ebLogInfo(f"*** Checking if Griddisks are already resized")
+                        _rc = self.mCheckGriddiskSize(_dgName,_newSize)
+                        if _rc == 0:
+                            _precheck_dict["currentMB"] += _dg_total_mb
+                            _precheck_dict["newMB"] += int(_newSize)
+                            _precheck_dict["osMB"]  += _dg_os_mb
+                            _precheck_dict["growMB"] += _delta_mb
+                            ebLogInfo(f"*** {_dgName} DG qualifies for resizing as it is upsize operation. "
+                                       "Precheck will be done now for checking free space on cells.")
+                        else:
+                            ebLogInfo(f"*** Griddisks of dg: {_dgName} are already resized to accomodate new dg size. "
+                                       "Freespace check at celldisk level is skipped for this diskgroup.")
+                            _rc = 0
         return _rc
     # end
     

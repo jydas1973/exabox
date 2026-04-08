@@ -1,0 +1,117 @@
+{
+    "type": "object",
+    "properties": {
+        "usercmd": {
+            "type": "string",
+            "enum": [
+                "assign",
+                "create_user",
+                "delete_user"
+            ]
+        },
+        "resourceType": {
+            "type": "string",
+            "enum": [
+                "cloudexadatainfrastructure"
+            ]
+        },
+        "idemtoken": {
+            "type": "string"
+        },
+        "hostInfo": {
+            "type": "object",
+            "properties": {
+                "dom0s" : {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "cells": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }                    
+                }
+            }
+        },
+        "operation": {
+            "type": "string",
+            "enum": ["install", "deploy", "upgrade", "undeploy", "collectDebugLog", "getVersion"],
+            "description": "Specifies the opctl operation to perform."
+        },
+        "assignInfo": {
+            "type": "object",
+            "properties": {
+                "rpmVersion": {
+                    "type": "string"
+                },
+                "parUrl": {
+                    "type": "string"
+                }
+            },
+            "required": []
+        },
+        "username": {
+            "type": "string"
+        },
+        "accessRequestId": {
+            "type": "string"
+        },
+        "auditType": {
+            "type": "string"
+        },
+        "publicKey": {
+            "type": "string"
+        },
+        "acpRequestList": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
+        "rpmVersion": {
+            "type": "string"
+        }
+    },
+    "required": [
+        "usercmd",
+        "idemtoken",
+        "resourceType",
+        "hostInfo"
+    ],
+    "allOf": [
+        {
+            "if": {
+                "properties": { "usercmd": { "const": "assign" } }
+            },
+            "then": {
+                "required": ["assignInfo"]
+            }
+        },
+        {
+            "if": {
+                "properties": { "usercmd": { "const": "create_user" } }
+            },
+            "then": {
+                "required": ["username", "accessRequestId", "auditType", "publicKey", "acpRequestList", "rpmVersion"]
+            }
+        },
+        {
+            "if": {
+                "properties": { "usercmd": { "const": "delete_user" } }
+            },
+            "then": {
+                "required": ["username", "rpmVersion"]
+            }
+        },
+        {
+            "if": {
+                "required": ["assignInfo"]
+            },
+            "then": {
+                "required": ["operation"]
+            }
+        }
+    ]
+}

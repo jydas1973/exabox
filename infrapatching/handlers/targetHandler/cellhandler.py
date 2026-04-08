@@ -1,9 +1,9 @@
 #
-# $Header: ecs/exacloud/exabox/infrapatching/handlers/targetHandler/cellhandler.py /main/86 2025/11/17 18:10:28 jyotdas Exp $
+# $Header: ecs/exacloud/exabox/infrapatching/handlers/targetHandler/cellhandler.py /main/90 2026/02/21 03:43:32 nelango Exp $
 #
 # cellhandler.py
 #
-# Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      cellhandler.py - Patch - Cell Basic Functionality
@@ -17,6 +17,13 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    nelango     02/19/26 - Bug 38930043 : ssh key removal in cells during ecra
+#                           switchover
+#    nelango     02/01/26 - Bug 38901967: No ilom service state disabling
+#    nelango     01/09/26 - Bug 38676078 - Add IPMI servicestate for exacs  
+#    mirrodri    11/06/25 - Bug 38626221 - NON-ROLLING START UP ESNP AND EDV
+#                           SERVICES IN COMPUTE AFTER PATCHING ONLY WHEN 
+#                           EXASCALE IS ENABLE IN THE INFRA.
 #    jyotdas     10/31/25 - Bug 38575316 - Parallelise the dom0 shutdown across
 #                           all nodes while non-rolling qmr patching.
 #    mirrodri    10/28/25 - Bug 38513100 - CHECK EDV AND ESNP STATUS BEFORE
@@ -617,6 +624,9 @@ class CellHandler(TargetHandler):
             if _ret == PATCH_CELL_CLEANUP_FAILED:
                 _suggestion_msg = f"Cell cleanup failed even after retry on list of cells : {str(_list_of_cells_retry_case)}."
                 self.mAddError(_ret, _suggestion_msg)
+
+        #Ensure the correct key comment before cleanup
+        self.mGetSshEnvSetupSwitchesCell().mSetHostKeyComment(EXAPATCHING_KEY_TAG)
 
         # Clean the environment: Delete passwordless, delete input file
         self.mCleanEnvironment(self.mGetDom0ToPatchcellSwitches(), _list_of_cells_retry_case,
@@ -1238,14 +1248,32 @@ class CellHandler(TargetHandler):
                                 continue
                             _list_done.append(_dom0)
                             _node.mConnect(aHost=_dom0)
-                            _node.mExecuteCmdLog("dbmcli -e 'alter dbserver startup services esnp'")
-                            if _node.mGetCmdExitStatus() != 0:
-                                self.mPatchLogWarn("Error occurred in dbmcli during ESNP service startup for non-rolling cell patching.")
-                            _node.mExecuteCmdLog("dbmcli -e 'alter dbserver startup services edv'")
-                            if _node.mGetCmdExitStatus() != 0:
-                                self.mPatchLogWarn("Error occurred in dbmcli during EDV service startup for non-rolling cell patching.")
-                        except Exception as e:
+
+                            # Only Exascale environment has ESNP and EDV services and
+                            # hence we first check for the service existence
+                            _edv_status_cmd = "dbmcli -e 'list dbserver attributes edvStatus' | grep stopped"
+                            _esnp_status_cmd = "dbmcli -e 'list dbserver attributes esnpStatus' | grep stopped"
+
+                            _i,_o,_e = _node.mExecuteCmd(_edv_status_cmd)
+                            if _o:
+                                _outEdv = _o.read()
+
+                            _i,_o,_e =_node.mExecuteCmd(_esnp_status_cmd)
+                            if _o:
+                                _outEsnp = _o.read()
+
+                            if _outEsnp and ("stopped" in _outEsnp):
+                                _node.mExecuteCmdLog("dbmcli -e 'alter dbserver startup services esnp'")
+                                if _node.mGetCmdExitStatus() != 0:
+                                    self.mPatchLogWarn("Error occurred in dbmcli during ESNP service startup for non-rolling cell patching.")
+                            if _outEdv and ("stopped" in _outEdv):
+                                _node.mExecuteCmdLog("dbmcli -e 'alter dbserver startup services edv'")
+                                if _node.mGetCmdExitStatus() != 0:
+                                    self.mPatchLogWarn("Error occurred in dbmcli during EDV service startup for non-rolling cell patching.")
+                        
+                        except Exception as e:  
                             self.mPatchLogWarn(f"Exception in dbmcli while starting up EDV or ESNP services for non-rolling cell patching {e}")
+                        
                         finally:
                             if _node.mIsConnected():
                                 _node.mDisconnect()
@@ -1589,9 +1617,6 @@ class CellHandler(TargetHandler):
                 self.mAddError(ret, _suggestion_msg)
 
         finally:
-            # Disable ServiceState on ilom post upgrade.
-            if _task_type in [TASK_PATCH, TASK_ROLLBACK]:
-                self.mUpdateServiceStateOnIlom(self.__patchable_cells, "postpatch")
             self.mPatchLogInfo(f"Log files are in {self.mGetLogPath()}")
             self.mPatchLogInfo(f"Final return code from task : {self.mGetTask()} is {ret} ")
             self.mPatchLogInfo(
@@ -2066,4 +2091,3 @@ class CellHandler(TargetHandler):
 
         self.mPatchLogInfo("Listening Interface complete")
         return _rc
-

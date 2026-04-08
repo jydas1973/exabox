@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2024, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     Connection - Basic functionality for Node Connection
@@ -88,11 +88,11 @@ class exaBoxConnection(object):
     def mIsConnectable(self, aHost, aTimeout = None, aKeyOnly=None):
 
         _isConnectable = False
-        if self.__state != ebConnInitialized:
-            raise Exception('ebConnection::mIsConnectable : Connection already connected')
-
         if self.__state == ebConnConnected:
-            return
+            return True
+
+        if self.__state == ebConnDisconnected:
+            self.__state = ebConnInitialized
 
         if aHost != None:
             self.__host = aHost
@@ -117,9 +117,9 @@ class exaBoxConnection(object):
 
         _isConnectable = self.__ssh_conn.mIsConnectable(aTimeout, aKeyOnly)
         if _isConnectable:
-            self.__state = ebConnConnected
-        else:
             self.__state = ebConnDisconnected
+        else:
+            self.__state = ebConnInitialized
 
         return _isConnectable
 
@@ -139,15 +139,15 @@ class exaBoxConnection(object):
 
     def mConnect(self, aHost = None, aKeyOnly=None):
 
-        self.mConnectTimed(aHost, aKeyOnly)
+        self.mConnectTimed(aHost, aTimeout=None, aKeyOnly=aKeyOnly)
 
     def mConnectAuthInteractive(self, aHost, aTimeout=None):
 
-        if self.__state != ebConnInitialized:
+        if self.__state == ebConnConnected:
             raise Exception('ebConnection::mConnect : Connection already connected')
 
-        if self.__state == ebConnConnected:
-            return
+        if self.__state == ebConnDisconnected:
+            self.__state = ebConnInitialized
 
         if aHost != None:
             self.__host = aHost
@@ -176,11 +176,11 @@ class exaBoxConnection(object):
 
     def mConnectTimed(self, aHost, aTimeout = None, aKeyOnly=None):
 
-        if self.__state != ebConnInitialized:
+        if self.__state == ebConnConnected:
             raise Exception('ebConnection::mConnect : Connection already connected')
 
-        if self.__state == ebConnConnected:
-            return
+        if self.__state == ebConnDisconnected:
+            self.__state = ebConnInitialized
 
         if aHost != None:
             self.__host = aHost

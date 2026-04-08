@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2024, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2025, Oracle and/or its affiliates.
 
 NAME:
     Context - Basic functionality
@@ -11,6 +11,7 @@ NOTE:
     None
 
 History:
+    llmartin  12/12/25 - Enh 38754528 - provide RPMs info on /Version endpoint
     ririgoye    11/06/2024 - Bug 37229020 - EXACS EXACLOUD - OEDA_BUILD IS 
                              UPDATED ONLY WHEN EXACLOUD IS RESTARTED
     joserran    04/27/2021 - Bug 32394314 - Propagate options to agent
@@ -19,7 +20,7 @@ History:
 """
 
 __version__ = '1.0.0'
-__revision__ = "$Id: Context.py /main/26 2024/11/08 21:39:18 ririgoye Exp $"
+__revision__ = "$Id: Context.py /main/27 2025/12/23 21:56:29 llmartin Exp $"
 
 version_info = (1, 0, 0, 'beta', 0)
 
@@ -28,9 +29,12 @@ __all__ = ['exaBoxContext', 'get_gcontext', 'set_gcontext']
 
 import copy
 import sys
+import subprocess
 import time
 import os
 import re
+
+from exabox.tools.AttributeWrapper import wrapStrBytesFunctions
 
 try:
     from collections import Mapping
@@ -341,6 +345,50 @@ class exaBoxContext(object):
                     ebLogWarn("Unable to get OEDA BUILDBRANCH")
 
         return _oeda_build
+
+    def mComputeRpmVersion(self):
+        rpm_files = [
+            ('images/dbaastools_exadbxs_main.rpm', 'dbaas_exadbxs_version'),
+            ('images/dbcs-agent.OL6.x86_64.rpm', 'dbcs_agent_ol6'),
+            ('images/dbcs-agent.OL7.x86_64.rpm', 'dbcs_agent_ol7'),
+            ('images/dbaastools_exa_main.rpm', 'dbaas_version')
+        ]
+
+        result = {}
+        for rpm_path, key in rpm_files:
+            params = ['/bin/rpm', '-qip', rpm_path]
+            sp = subprocess
+            try:
+                p = sp.Popen(params, stdout=sp.PIPE, stderr=sp.PIPE)
+                stdout, stderr = wrapStrBytesFunctions(p).communicate()
+                if p.returncode != 0:
+                    # rpm command failed, skip or set to None/empty string
+                    result[key] = ''
+                    continue
+                # stdout may be bytes or str, handle accordingly
+                if isinstance(stdout, bytes):
+                    stdout = stdout.decode('utf-8', errors='ignore')
+
+                # Extract Name, Version, Release
+                name, version, release = None, None, None
+                for line in stdout.splitlines():
+                    if line.startswith('Name'):
+                        name = line.split(':', 1)[1].strip()
+                    elif line.startswith('Version'):
+                        version = line.split(':', 1)[1].strip()
+                    elif line.startswith('Release'):
+                        release = line.split(':', 1)[1].strip()
+
+                if name and version and release:
+                    result[key] = f"{name}-{version}-{release}"
+                else:
+                    result[key] = ''  # or handle missing info
+
+            except Exception as e:
+                # Optional: log exception if needed
+                result[key] = ''
+
+        return result
 
     def mGetPropagateProcOptions(self) -> List[str]:
         """

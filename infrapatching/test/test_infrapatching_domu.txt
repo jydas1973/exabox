@@ -1,9 +1,9 @@
 #
-# $Header: ecs/exacloud/exabox/infrapatching/test/test_infrapatching_domu.txt /main/54 2025/12/04 04:10:46 araghave Exp $
+# $Header: ecs/exacloud/exabox/infrapatching/test/test_infrapatching_domu.txt /main/56 2025/12/23 14:45:08 vikasras Exp $
 #
 # test_infrapatching_domu.py
 #
-# Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      test_infrapatching_domu.py - Unit test case script for all DomU operations.
@@ -15,6 +15,13 @@
 #      Unit test case script for all DomU operations.
 #
 #    MODIFIED   (MM/DD/YY)
+#    sdevasek    02/26/26 - Bug 39008110 - REMOVE ELUOPTIONS FROM ADDITIONAL
+#                           OPTIONS IN DOMU TEST SETUP
+#    araghave    12/05/25 - Bug 38723453 - OCI: OC35 | DTZ | SMR ROLLBACK
+#                           OPERATION TOOK NON-ROLLING METHOD
+#    vikasras    11/28/25 - OCI: VALIDATE CONTENT OF DOC ID 2829056.1 & REPLACE
+#                           IT WITH KB123625 IN ALL OS PATCHING WFS FOR
+#                           EXACC/DB-D/XS
 #    araghave    10/03/25 - Enhancement Request 38444755 - INFRAPATCHING TEST
 #                           AUTOMATION - TEST ADDITION TO PERFORM DOMU ELU
 #                           PATCH OPERATIONS
@@ -200,6 +207,7 @@ class Test_domu_class(unittest.TestCase):
         mUpdateAdditionalOptionsInPayload("OneoffCustomPluginFile", "none")
         mUpdateAdditionalOptionsInPayload("OneoffScriptArgs", "none")
         mUpdateAdditionalOptionsInPayload("exasplice", "no")
+        mDeleteAdditionalOptionsFromPayload("ELUOptions")
         mUpdateInfraPatchingTestConfigParam("node_selection_method", "IncludeNodeList")
         mUpdateInfraPatchingTestConfigParam("single_node_vm_cluster_patching", "False")
         mUpdateParamInPayload("BackupMode", "yes")
@@ -213,6 +221,9 @@ class Test_domu_class(unittest.TestCase):
     def tearDown(self):
         #Reset sshd config settings
         mExecuteRemoteExasshCmd("/bin/sed  \\'s/ClientAliveInterval.*/ClientAliveInterval 600/\\' -i /etc/ssh/sshd_config",Test_domu_class.__domu_list_with_nathostnames)
+        # Exasplice flag need to be reverted to 'no' at the end of an
+        # exasplice operation is complete.
+        mUpdateAdditionalOptionsInPayload("exasplice", "no")
 
     @pytest.mark.domu_patch_prereq_check_retry_failure
     def test_domU_patch_prereq_check_retry_failure(self):
@@ -561,7 +572,7 @@ class Test_domu_class(unittest.TestCase):
 
         _result, _msg = mRunPatchRetryScenario(
             PATCH_DOMU, TASK_PATCH, _patch_node_list,
-            _failure_cmd, _restore_cmd, aErrorCode="0x03050017", aErrorMsg="Patchmgr command on VM failed. Refer MOS Note 2829056.1 for more details."
+            _failure_cmd, _restore_cmd, aErrorCode="0x03050017", aErrorMsg="Patchmgr command on VM failed. Refer KB123625 for more details."
         )
         self.assertTrue(_result, _msg)
 
@@ -676,7 +687,7 @@ class Test_domu_class(unittest.TestCase):
                   "master_request_uuid": "a7e6ee4e-397f-11ed-b89a-fa163e80f45e",
                   "child_request_uuid": "c4a392b2-397f-11ed-b89a-fa163e80f45e",
                   "error_code": "0x03050017",
-                  "error_message": "Patchmgr command on VM failed. Refer MOS Note 2829056.1 for more details.",
+                  "error_message": "Patchmgr command on VM failed. Refer KB123625 for more details.",
                   "error_detail": "Patch Prereq check failed on multiple Guest VMs. Refer patchmgr logs : \\/u02\\/dbserver.patch.zip_exadata_ol7_21.2.14.0.0.220830_Linux-x86-64.zip\\/dbserver_patch_220810\\/patchmgr_log_f49fb046-7eb8-4099-826f-002079b617b5 on the Patch driving Guest VM Launch nodes : slcs27dv0305m.us.oracle.com,slcs27dv0405m.us.oracle.com for more details.",
                   "time_profile_data": {
                     "node_patching_time_stats": [
@@ -759,7 +770,7 @@ class Test_domu_class(unittest.TestCase):
           "ec_details": "Undef",
           "last_heartbeat_update": "2022-09-21T07:33:14+0000",
           "status": 500,
-          "message": "Patchmgr command on VM failed. Refer MOS Note 2829056.1 for more details.",
+          "message": "Patchmgr command on VM failed. Refer KB123625 for more details.",
           "ecra_error": "Patch Prereq check failed on multiple Guest VMs. Refer patchmgr logs : /u02/dbserver.patch.zip_exadata_ol7_21.2.14.0.0.220830_Linux-x86-64.zip/dbserver_patch_220810/patchmgr_log_f49fb046-7eb8-4099-826f-002079b617b5 on the Patch driving Guest VM Launch nodes : slcs27dv0305m.us.oracle.com,slcs27dv0405m.us.oracle.com for more details.",
           "op": "PATCHING",
           "completion_percentage": 0,
@@ -1024,7 +1035,7 @@ class Test_domu_class(unittest.TestCase):
         mUpdateAdditionalOptionsInPayload("exasplice", "yes")
         mUpdateAdditionalOptionsInPayload("ELUOptions", "full")
         mUpdateParamInPayload("TargetVersion", _target_elu_version)
-        _include_node_list = ",".join(_domus[:1)
+        _include_node_list = ",".join(_domus[:1])
         mUpdateAdditionalOptionsInPayload("IncludeNodeList", _include_node_list)
         _result, _status_output = mExecuteInfraPatchCommandWithRetry(TASK_PATCH, PATCH_DOMU, OP_STYLE_ROLLING)
         self.assertTrue(_result, "DomU ELU patch operation failed.")

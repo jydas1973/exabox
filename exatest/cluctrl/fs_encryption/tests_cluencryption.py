@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 #
-# $Header: ecs/exacloud/exabox/exatest/cluctrl/fs_encryption/tests_cluencryption.py /main/29 2025/08/08 21:50:09 jfsaldan Exp $
+# $Header: ecs/exacloud/exabox/exatest/cluctrl/fs_encryption/tests_cluencryption.py jfsaldan_bug-38496061/1 2026/02/21 00:10:03 jfsaldan Exp $
 #
 # tests_cluencryption.py
 #
-# Copyright (c) 2021, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_cluencryption.py - <one-line expansion of the name>
@@ -17,6 +17,8 @@
 #
 #
 #    MODIFIED   (MM/DD/YY)
+#    jfsaldan    02/19/26 - Adding wait between u01 and u02 encryption in add
+#                           node
 #    jfsaldan    08/05/25 - Bug 38268596 - EXACLOUD FEDRAMP PREVENT PROV
 #                           PROBLEM | FS_ENCRYPTION FILE SHREDDING FAILS
 #                           CAUSING INSTALL CLUSTERS TO FAIL
@@ -2478,6 +2480,8 @@ class ebTestClusterEncryption(ebTestClucontrol):
                             "/dev/mapper/VGExaDbDisk.u02_extra_encrypted.img-LVDBDisk-crypt          /u02    ext4    defaults 0 0\n"
 
                             )),
+                    exaMockCommand("test.*pvscan"),
+                    exaMockCommand("sync;sync;sync;/sbin/pvscan --cache"),
                 ],
             ],
             self.mGetRegexDom0(): [

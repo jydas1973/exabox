@@ -1,5 +1,5 @@
 """
- Copyright (c) 2019, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2019, 2026, Oracle and/or its affiliates.
 
 NAME:
     cs_postginid.py - Create Service POST GI NID
@@ -17,6 +17,10 @@ INTERNAL CLASSES:
 
 History:
        MODIFIED (MM/DD/YY)
+       aararora  03/20/26 - 39106054: Install Falcon agent during postginid
+       aararora  01/27/26 - Bug 38723384: Add retry/force logic for crs restart
+       prsshukl  03/04/25 - Bug 38828221: Copy customer Root CA for SSL Inspection enabled infra
+       pbellary  12/17/25 - Bug 38755509 - EXACS:TIW:25.4.1.1.0:PROVISIONING IS FAILING IN POSTGINID STEP
        remamid   11/26/25 - exacc natfilesystem ip different for vms in the
                             cluster bug 38581933
        joalcala  10/27/25 - Bug38397386: avoid 3rd nic setup in ADBD since
@@ -192,7 +196,7 @@ from exabox.BaseServer.AsyncProcessing import ProcessManager, ProcessStructure
 from exabox.ovm.cluexascale import ebCluExaScale
 from exabox.exakms.ExaKmsEntry import ExaKmsHostType
 from exabox.ovm.cluencryption import exacc_fsencryption_requested, mSetLuksPassphraseOnDom0Exacc
-from exabox.ovm.utils.clu_utils import ebCluUtils
+from exabox.ovm.utils.clu_utils import ebCluUtils, mRunCrsCommandsWithRetry
 from exabox.ovm.adbs_elastic_service import mCreateADBSSiteGroupConfig
 
 from exabox.ovm.cludbaas import mUpdateListenerPort
@@ -531,6 +535,8 @@ class csPostGINID(CSBase):
             # ER 32161016: Copy DBCS/CPS agent wallets
             ebox.mAddAgentWallet()
 
+            _clu_utils.mSetupCustomerRootCACertificates(aOptions)
+
         #
         # ER 27371691: Install DBCS agent rpm
         #
@@ -673,6 +679,9 @@ class csPostGINID(CSBase):
                 ebox.mInstallSuricataRPM(_domUs_list,"domu")
             except Exception as e: 
                 ebLogWarn(f"*** mInstallSuricataRPM failed with Exception: {str(e)}")
+
+        _falcon_domus = [domu for _, domu in ebox.mReturnDom0DomUPair()]
+        _clu_utils.mInstallFalconAgentOnDomus(_falcon_domus, "Create Service")
 
         # Reset SSH Cluster Keys
         _step_time = time.time()
@@ -904,12 +913,6 @@ class csPostGINID(CSBase):
             configmgmt = ebConfigCollector(dom0_domu_pairs, _cell_list, ebox)
             configmgmt.mCollectAllConfigs()
 
-        # Remove DomU Access
-        if aOptions and aOptions.jsonconf and \
-           "delete_domu_keys" in aOptions.jsonconf and \
-           aOptions.jsonconf['delete_domu_keys'].lower() == "true":
-            ebox.mHandlerRemoveDomUsKeys()
-
         # Bug34266093: StarterDB removal changes for ADBD
         # This script will be executed inside the domU 
         # to perform tasks that were previously executed in starterDB flow.
@@ -962,7 +965,13 @@ class csPostGINID(CSBase):
                 _data["voting_files"] = configmgmt.mGetVotingDiskConfig(_node, _first_domU)    
         except Exception as e:
             ebLogInfo(f"There was an error in adding voting files during postginid step: {e}")
-            
+
+        # Remove DomU Access
+        if aOptions and aOptions.jsonconf and \
+           "delete_domu_keys" in aOptions.jsonconf and \
+           aOptions.jsonconf['delete_domu_keys'].lower() == "true":
+            ebox.mHandlerRemoveDomUsKeys()
+
         ebLogInfo('*** Exacloud Operation Successful : POST GI Install')
         ebLogInfo('csPostGINID: Completed doExecute Successfully')
         _stepSpecificDetails = _clu_utils.mStepSpecificDetails("createServiceDetails", 'DONE', "Post GI NID Completed", 'ESTP_POSTGI_NID')
@@ -1047,9 +1056,18 @@ class csPostGINID(CSBase):
                     _out = _o.readlines()
                     if _out:
                         _ret = _out[0].strip()
+                        # The original behaviour of not raising exception is preserved
+                        # Below will retry the stop crs command 3 times if initial ones
+                        # fail. There is also a 10 seconds delay in running each retry.
                         if _ret == '1':
-                            _cmd_str = _cmd_pfx + '$ORACLE_HOME/bin/srvctl stop asm -proxy -force'
-                            _node.mExecuteCmd("/bin/su - " + _user + " -c \'" + _cmd_str + "\'")
+                            _cmd_stop = _cmd_pfx + '$ORACLE_HOME/bin/srvctl stop asm -proxy -force'
+                            _su_stop = f"/bin/su - {_user} -c '{_cmd_stop}'"
+                            mRunCrsCommandsWithRetry(
+                                _node,
+                                [_su_stop],
+                                aLabel=f"ASM proxy stop on {_domU}",
+                                aRaiseOnFailure=False
+                            )
 
                             _cmd_str = _cmd_pfx + '$ORACLE_HOME/bin/srvctl disable asm -proxy'
                             _node.mExecuteCmd("/bin/su - " + _user + " -c \'" + _cmd_str + "\'")

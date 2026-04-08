@@ -2,7 +2,7 @@
 """
 $Header:
 
- Copyright (c) 2014, 2025, Oracle and/or its affiliates. 
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates. 
 
 NAME:
     test_DBStore.py - Base Class for DBStore testing
@@ -16,6 +16,7 @@ NOTE:
 History:
 
     MODIFIED   (MM/DD/YY)
+    rbhandar    01/08/26 - Add test for json patch report lock
     aypaul      07/07/25 - Enh#38105150 Increase code coverage for dbstore3.
     avimonda    09/26/24 - Added test for mGetChildRequestError()
     avimonda    10/11/23 - Added tests for mUpdateStatusRequestWithLock()
@@ -29,6 +30,7 @@ import datetime
 import unittest
 import uuid
 import pymysql
+import json
 from unittest.mock import MagicMock, Mock, patch, mock_open
 
 from exabox.agent.DBService import get_mysql_id
@@ -40,7 +42,7 @@ from exabox.core.dbpolicies.TimeBasedTrigger import ebTimeBasedTrigger
 from exabox.core.dbpolicies.Base import ebDBPolicy,ebDBFilter
 from exabox.core.DBStore import get_db_version
 from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
-from exabox.log.LogMgr import ebLogDebug
+from exabox.log.LogMgr import ebLogDebug, ebLogInfo
 from exabox.core.DBStore import ebGetDefaultDB
 from exabox.core.DBStore3 import ebMysqlDBlite
 from exabox.core.DBStore3 import ebMysqlDB
@@ -276,6 +278,61 @@ class TestDBStore(ebTestClucontrol):
 
         self._db.mExecute("DELETE FROM requests")
         self._db.mExecute("DELETE FROM registry")
+
+    def test_mUpdateJsonPatchReportWithLock(self):
+
+        self._db.mExecute("DELETE FROM patchlist")
+
+        child_uuid = six.text_type(uuid.uuid4())
+        master_uuid = six.text_type(uuid.uuid4())
+
+        ebLogInfo("TRACE test_mUpdateJsonPatchReportWithLock start child_uuid=%s master_uuid=%s" % (child_uuid, master_uuid))
+
+        self._db.mInsertChildRequestToPatchList(master_uuid, child_uuid, "Pending")
+
+        initial = self._db.mFetchOne(
+            """SELECT json_report FROM patchlist WHERE child_uuid=:1""",
+            [child_uuid]
+        )
+        self.assertIsNone(initial[0])
+
+        payload = {"data": {"progress": "in-progress"}}
+        self._db.mUpdateJsonPatchReportWithLock(child_uuid, json.dumps(payload))
+
+        updated = self._db.mFetchOne(
+            """SELECT json_report FROM patchlist WHERE child_uuid=:1""",
+            [child_uuid]
+        )
+        self.assertEquals(json.dumps(payload), updated[0])
+
+        ebLogInfo("TRACE test_mUpdateJsonPatchReportWithLock updated payload=%s" % json.dumps(payload))
+
+        self._db.mExecute("DELETE FROM patchlist")
+
+    def test_mUpdateJsonPatchReportWithLock_overwrite(self):
+
+        self._db.mExecute("DELETE FROM patchlist")
+
+        child_uuid = six.text_type(uuid.uuid4())
+        master_uuid = six.text_type(uuid.uuid4())
+
+        ebLogInfo("TRACE test_mUpdateJsonPatchReportWithLock_overwrite start child_uuid=%s master_uuid=%s" % (child_uuid, master_uuid))
+
+        self._db.mInsertChildRequestToPatchList(master_uuid, child_uuid, "Pending")
+        self._db.mUpdateJsonPatchReportWithLock(child_uuid, json.dumps({"data": {"progress": "in-progress"}}))
+
+        updated_payload = {"data": {"progress": "complete"}}
+        self._db.mUpdateJsonPatchReportWithLock(child_uuid, json.dumps(updated_payload))
+
+        persisted = self._db.mFetchOne(
+            """SELECT json_report FROM patchlist WHERE child_uuid=:1""",
+            [child_uuid]
+        )
+        self.assertEquals(json.dumps(updated_payload), persisted[0])
+
+        ebLogInfo("TRACE test_mUpdateJsonPatchReportWithLock_overwrite persisted payload=%s" % json.dumps(updated_payload))
+
+        self._db.mExecute("DELETE FROM patchlist")
 
     def test_mUpdateStatusRequestWithLock_Pending_Done(self):
 
@@ -992,6 +1049,8 @@ def suite():
     suite.addTest(TestDBStore('test_mUpdateStatusRequestWithLock_Processing_Done'))
     suite.addTest(TestDBStore('test_mUpdateStatusRequestWithLock_Pending_Done'))
     suite.addTest(TestDBStore('test_mUpdateStatusRequestWithLock_Executing_Done'))
+    suite.addTest(TestDBStore('test_mUpdateJsonPatchReportWithLock'))
+    suite.addTest(TestDBStore('test_mUpdateJsonPatchReportWithLock_overwrite'))
     suite.addTest(TestDBStore('test_mGetUIRequests'))
     suite.addTest(TestDBStore('test_unicode'))
     #suite.addTest(TestDBStore('test_mysql_down'))

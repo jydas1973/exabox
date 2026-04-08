@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     Incident file module implementation
@@ -16,6 +16,7 @@ Changelog:
 
 History:
     MODIFIED (MM/DD/YY)
+    aypaul   01/16/26 - ER#38277264 SELinux fleet exacloud implementation
     aypaul   01/30/25 - ER#36802805 Add support for generating tfactl logs for
                         reshape failures.
     akkar    09/05/24 - Bug 36477144: Remove addb install
@@ -53,6 +54,7 @@ from exabox.ovm.exawatcher import exaBoxExaWatcher
 from exabox.config.Config import ebCluCmdCheckOptions, ebCsSubCmdCheckOptions
 
 from exabox.core.DBStore import ebGetDefaultDB
+from exabox.ovm.selinuxcontrols import ebSelinuxControls
 
 TFACTL_PREFIX = "Tfactl_"
 
@@ -74,6 +76,7 @@ class ebIncidentNode(object):
                     os.makedirs(_tfactl_log_path)
                 self._zipPathTfactl = os.path.join(_tfactl_log_path, f"{TFACTL_PREFIX}{self._uuid}.zip")
                 self._zipfTfactl = None
+                self.__selinux_controls = ebSelinuxControls(self._cluctrl)
 
                 try:
                         self._zipF = zipfile.ZipFile(self._zipPath, 'w', zipfile.ZIP_DEFLATED)
@@ -347,7 +350,7 @@ class ebIncidentNode(object):
                 if not os.path.exists(self._zipPath):
                        return None
 
-                self._cluctrl.mGenerateCustomPolicyFileForThisRequest()
+                self.__selinux_controls.mGenerateCustomPolicyFileForThisRequest()
                 err = self.__process_log()
                 # Even if Incident zip file creation errored out, tfactl log
                 # collection should still happen

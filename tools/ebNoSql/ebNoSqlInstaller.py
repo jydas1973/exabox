@@ -1,7 +1,7 @@
 """
 $Header:
 
- Copyright (c) 2019, Oracle and/or its affiliates. All rights reserved.
+ Copyright (c) 2019, 2026, Oracle and/or its affiliates.
 
 NAME:
     ebNoSqlInstaller - installer for nosql
@@ -15,6 +15,7 @@ NOTE:
 History:
 
     MODIFIED   (MM/DD/YY)
+    aararora    04/01/26 - Bug 38900321: Fix issues identified by codev
     agarrido    06/24/19 - Create file
 """
 from exabox.core.Node import exaBoxNode
@@ -43,7 +44,7 @@ class ebNoSqlInstaller(object):
         if len(_domUlist) < 4:
             return _domUlist
         else:
-            return list(_domUlist[0], _domUlist[1], _domUlist[-1])
+            return [_domUlist[0], _domUlist[1], _domUlist[-1]]
 
     # mInstallNoSql:
     # Install NoSql on participant nodes

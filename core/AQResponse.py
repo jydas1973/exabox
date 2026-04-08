@@ -1,10 +1,10 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/core/AQResponse.py /main/3 2025/11/26 09:02:40 kanmanic Exp $
+# $Header: ecs/exacloud/exabox/core/AQResponse.py /main/4 2026/01/28 05:39:43 kanmanic Exp $
 #
 # AQResponse.py
 #
-# Copyright (c) 2025, Oracle and/or its affiliates.
+# Copyright (c) 2025, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      AQResponse.py - <one-line expansion of the name>
@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    kanmanic    01/16/26 - 38854724 - Remove duplicate log printing of AQ
+#                           status flag
 #    kanmanic    11/19/25 - 37764703 - Add AQ Correlation Id and Message Id
 #    aypaul      08/11/25 - Enh#37732728 Update AQ response seding flow with
 #                           latest APIs.
@@ -130,14 +132,9 @@ def mUpdateResponseToEcra(func):
     def wrapper(*args, **kwargs):
         # Step 1 - Call the function which is wrapped first
         func(*args, **kwargs)
-        # Step 2 - Check for pushstatus support from exabox.conf
-        if get_gcontext().mCheckConfigOption('ociexacc', 'True'):
-            ebLogWarn("AQ support is disabled for ExaCC deployments.")
+        # Step 2 - Combined guard: skip for ExaCC or when pushstatus support disabled (no logs)
+        if get_gcontext().mCheckConfigOption('ociexacc', 'True') or not (get_gcontext().mGetConfigOptions().get('enable_pushstatus_support') == 'True'):
             return
-        if not (get_gcontext().mGetConfigOptions()['enable_pushstatus_support'] == 'True'):
-            ebLogWarn("AQ support for pushing status from exacloud to ecra is disabled")
-            return
-        ebLogTrace("AQ support for pushing status from exacloud to ecra is enabled")
         _ebExacloudDB_obj = args[0]
         # The argument at position 1 is either a request object OR the request uuid
         _request = args[1]

@@ -2,7 +2,7 @@
 
  $Header: 
 
- Copyright (c) 2020, 2024, Oracle and/or its affiliates.
+ Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 
  NAME:
       tests_kvmvmmgr.py - Unitest for kvmvmmgr.py module
@@ -16,6 +16,7 @@
  History:
 
     MODIFIED   (MM/DD/YY)
+       aararora 03/03/26 - Bug 38902170: Correct resource leak issues
        bhpati   09/09/24 - EXACS: PROVISIONING FAILED WITH EXACLOUD ERROR CODE:
                            16 HYPERVISOR STOPPED ON DOM0.
        naps     03/07/22 - remove virsh layer dependency.
@@ -24,14 +25,16 @@
 """
 
 import unittest
+from unittest.mock import MagicMock, patch
 
 from random import shuffle
 
-from exabox.core.Node import exaBoxNode
-from exabox.core.MockCommand import exaMockCommand
-from exabox.ovm.kvmvmmgr import ebKvmVmMgr
-from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
-from exabox.exatest.common.ebExacloudUtil import *
+with patch('multiprocessing.Lock', return_value=MagicMock()):
+    from exabox.core.Node import exaBoxNode
+    from exabox.core.MockCommand import exaMockCommand
+    from exabox.ovm.kvmvmmgr import ebKvmVmMgr
+    from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
+    from exabox.exatest.common.ebExacloudUtil import *
 
 _vmid_out = """Id:             8
 Name:           scaqae14dv0105.us.oracle.com
@@ -76,6 +79,16 @@ class ebTestNode(ebTestClucontrol):
                 _mem = str(int(_mem))
             self.assertEqual("189440", _mem)
             break
+
+    def test_dom0Mem_disconnects_on_empty_output(self):
+        mock_node = MagicMock()
+        mock_stream = MagicMock()
+        mock_stream.readlines.return_value = []
+        mock_node.mExecuteCmd.return_value = (None, mock_stream, None)
+        with patch('exabox.ovm.kvmvmmgr.exaBoxNode', return_value=mock_node):
+            _kvmmgr = ebKvmVmMgr({'hostname': 'dom0'})
+            self.assertEqual(0, _kvmmgr.getDom0FreeMem(aVirshMode=True))
+        mock_node.mDisconnect.assert_called_once()
 
     def test_dom0TotalMem(self):
 

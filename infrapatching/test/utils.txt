@@ -1,10 +1,10 @@
 #
-# $Header: ecs/exacloud/exabox/infrapatching/test/utils.txt /main/77 2025/12/04 04:10:46 araghave Exp $
+# $Header: ecs/exacloud/exabox/infrapatching/test/utils.txt sdevasek_bug-38971433/1 2026/02/24 05:38:05 sdevasek Exp $
 #
 #
 # utils.py
 #
-# Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      utils.py - Contains all the common modules to be used in test cases.
@@ -16,6 +16,14 @@
 #      This module contains common methods for each of the Test target handlers.
 #
 #    MODIFIED   (MM/DD/YY)
+#    sdevasek    02/24/26 - Bug 38971433 - FIX PLUGIN LOG VERIFICATION FOR 
+#                           LOWERCASE STAGE NAMES
+#    sdevasek    01/22/26 - Enh 38821433 - EXACOMPUTE FREE POOL NODE PATCHING:
+#                           USE ONE OF THE TARGET NODE AS LAUNCH NODE
+#    araghave    01/07/26 - Bug 38822533 - TEST AUTOMATION CHANGES TO HANDLE
+#                           APPLY PENDING SCENARIO POST A FULL/HIGHCVSS ELU
+#                           UPDATE
+#    sdevasek    01/06/26 - Enh 38854805 - USE DELETE API TO USE QUERY PARAMS
 #    araghave    10/03/25 - Enhancement Request 38444755 - INFRAPATCHING TEST
 #                           AUTOMATION - TEST ADDITION TO PERFORM DOMU ELU
 #                           PATCH OPERATIONS
@@ -592,13 +600,22 @@ def mInvokeInfrapatchCurlCmd(aOperationStyle):
     _oneoff_script_alias_str = '"OneoffScriptAlias":  "%s",' % mGetParamValueFromPayLoadJson("OneoffScriptAlias")
 
     if _is_exacompute == "True":
+        _launch_nodes_value = mGetParamValueFromPayLoadJson("LaunchNodes")
+        if isinstance(_launch_nodes_value, str) and _launch_nodes_value:
+            _launch_nodes = [_launch_nodes_value]
+        elif isinstance(_launch_nodes_value, list):
+            _launch_nodes = _launch_nodes_value
+        else:
+            _launch_nodes = []
+
         _payload_cmd = '{ "Operation": "%s", ' \
-                       '"LaunchNodes": [ "%s" ],' \
+                       '"LaunchNodes": %s,' \
                        '"NodeList": %s,' \
                        '"TargetVersion": %s,' \
                        '"exasplice": "%s"}' % (
                            _operation,
-                           mGetParamValueFromPayLoadJson("LaunchNodes"), mGetParamValueFromPayLoadJson("NodeList"),
+                           json.dumps(_launch_nodes),
+                           mGetParamValueFromPayLoadJson("NodeList"),
                            mGetParamValueFromPayLoadJson("TargetVersion"),
                            _additional_options[0]["exasplice"])
         _patch_cmd = "%s '%s' '%s/exacompute/patching'" % (_curl_cmd, _payload_cmd, _ecra_url)
@@ -701,13 +718,22 @@ def mGetInfrapatchCurlCmd(aEcraInstallFolder, aOperation, aTarget, aOperationSty
     mPatchLogInfo(f"\n_additional_options_str = \n{_additional_options_str}\n")
 
     if _is_exacompute == "True":
+        _launch_nodes_value = mGetParamValueFromPayLoadJson("LaunchNodes")
+        if isinstance(_launch_nodes_value, str) and _launch_nodes_value:
+            _launch_nodes = [_launch_nodes_value]
+        elif isinstance(_launch_nodes_value, list):
+            _launch_nodes = _launch_nodes_value
+        else:
+            _launch_nodes = []
+
         _payload_cmd = '{ "Operation": "%s", ' \
-                       '"LaunchNodes": [ "%s" ],' \
+                       '"LaunchNodes": %s,' \
                        '"NodeList": %s,' \
                        '"TargetVersion": %s,' \
                        '"exasplice": "%s"}' % (
                            aOperation,
-                           mGetParamValueFromPayLoadJson("LaunchNodes"),mGetParamValueFromPayLoadJson("NodeList"),
+                           json.dumps(_launch_nodes),
+                           mGetParamValueFromPayLoadJson("NodeList"),
                            mGetParamValueFromPayLoadJson("TargetVersion"),
                            _additional_options[0]["exasplice"])
         _patch_cmd = "%s '%s' '%s/exacompute/patching'" % (_curl_cmd, _payload_cmd, _ecra_url)
@@ -3323,10 +3349,13 @@ def mParseStatusCallReportForEluDetails(aOperation, aStatusDetails, aEluoptions)
                     mPatchLogError(f"Error: 'exadata_live_update_has_outstanding_work' is not 'yes' for elu_type '{aEluoptions}'")
                     _ret = False
             elif aEluoptions == 'applypending':
-                if has_outstanding_work != 'no exadata live update active':
-                    mPatchLogInfo("has_outstanding_work should be 'no exadata live update active' after upgrade for applypending.")
-                    mPatchLogError(f"Error: 'exadata_live_update_has_outstanding_work' is not 'no' for elu_type '{aEluoptions}'")
+                _normalized_outstanding_work = has_outstanding_work.strip().lower()
+                if _normalized_outstanding_work == 'yes':
+                    mPatchLogInfo("has_outstanding_work should not be 'yes' after upgrade for applypending.")
+                    mPatchLogError(f"Error: 'exadata_live_update_has_outstanding_work' is 'yes' for elu_type '{aEluoptions}'")
                     _ret = False
+                else:
+                    mPatchLogInfo("has_outstanding_work indicates no outstanding work after upgrade for applypending.")
             else:
                 mPatchLogInfo(f"Invalid elu_type after upgrade: {elu_type}")
                 mPatchLogError(f"Invalid elu_type: {elu_type}")
@@ -3993,7 +4022,7 @@ class ExacloudPluginScriptExecutionValidator(PluginScriptExecutionValidator):
             for _node in _dom0s:
                 for _stage in _patch_stages:
                     _plugin_console_log_path = "%s/%s_patch_%s_script_%s_exacloud_%s.log" % (
-                        _patch_mgr_logs_path_from_exacloud_requests_dir, _stage, _node, _target_type, _stage.lower())
+                        _patch_mgr_logs_path_from_exacloud_requests_dir, _stage.lower(), _node, _target_type, _stage.lower())
                     if not os.path.exists(_plugin_console_log_path):
                         mPatchLogError("Plugin console log file path %s does not exist." % (_plugin_console_log_path))
                         _ret = False
@@ -4458,4 +4487,27 @@ class InfrapatchPluginMetadataHandler(object):
 
         return _ret, _output
 
+    def mDeleteRegisteredInfrapatchPluginMetadataScriptsByQuery(self, aScriptAlias, aPluginTarget,
+                                                                aPluginType):
+        """
+        :param aScriptAlias: script_alias of the script
+        :param aPluginTarget: PluginTarget, it can be dom0,domu,cell, dom0domu
+        :param aPluginType: PluginType, it can be exacloud, oneoff and dbnu
+        :return: Upon success returns 0 along success response otherwise returns 1 along with failure response
+        """
+        _plugin_type_directory_mapping = {"oneoff": "oneoff_patch", "exacloud": "exacloud_plugins",
+                                          "dbnu": "dbnu_plugins"}
+        _query = f"PluginType={aPluginType}&PluginTarget={aPluginTarget}"
+        _endpoint = "infrapatchpluginscripts/registration/%s/deleteByQuery?%s" % (aScriptAlias, _query)
+        _ret, _output = self.__curl_executor.mExecute(_endpoint, "DELETE")
 
+        _output = _output.strip().splitlines()[-1]
+        mPatchLogInfo("mDeleteRegisteredInfrapatchPluginMetadataScriptsByQuery : command response is %s " % _output)
+        if _ret == 0:
+            _output = _output.strip().splitlines()[-1]
+            _cmd = "rm -rf %s/exadataPrePostPlugins/%s/%s" % (
+                mGetExacloudInstallPath(), _plugin_type_directory_mapping.get(aPluginType), "script*")
+            mPatchLogInfo("mDeleteRegisteredInfrapatchPluginMetadataScriptsByQuery : Executing the command %s " % _cmd)
+            _, _stat = mExecuteLocal(_cmd)
+
+        return _ret, _output

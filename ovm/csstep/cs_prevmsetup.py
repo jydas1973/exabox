@@ -1,5 +1,5 @@
 """
- Copyright (c) 2019, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2019, 2026, Oracle and/or its affiliates.
 
 NAME:
     cs_prevmsetup.py - Create Service PRE VM Setup
@@ -18,6 +18,10 @@ INTERNAL CLASSES:
 History:
 
     MODIFIED (MM/DD/YY)
+    pbellary    02/24/26 - Bug 38972840 - DELETE-SERVICE WF FAILED TO VERIFY ACL USER ID
+    pbellary    02/24/26 - Bug 38858318 - IF CHACL COMMAND FAILS CREATE SERVICE FLOW SHOULD FAIL
+    pbellary    02/24/26 - Bug 38883255 - VM BACKUP OPERATION IS NOT TAKING BACKUP OF 3RD NODE
+    pbellary  11/30/25 - Enh 38708130 - EXASCALE: DELETE SERVICE SHOULD DELETE ADDITIONAL ACFS FILESYSTEMS
     prsshukl  11/19/25 - Bug 38037088 - BASE DB -> MOVE THE DO/UNDO STEPS FOR
                          BASEDB TO A NEW FILE IN CSSTEP
     jfsaldan  08/20/25 - Bug 38210429 - OCI: EXADB-D | EXACLOUD IS NOT CLEANING
@@ -480,13 +484,18 @@ class csPreVMSetup(CSBase):
         self.mPostVMDeleteSteps(aExaBoxCluCtrlObj, aOptions, aStepList)
 
         if _ebox.mIsXS():
+            _utils = ebExascaleUtils(_ebox)
             try:
-                _utils = ebExascaleUtils(_ebox)
+                _utils.mRemoveDefaultAcfsVolume(aOptions)
                 _utils.mDetachAcfsVolume(aOptions, aForce=True)
-                _utils.mDeleteFilesInDbVault(aOptions)
+                _utils.mRemoveACFS(aOptions)
                 _utils.mUpdateACL(aOptions, aAclPriv="none")
+                _utils.mRemoveUser(aOptions)
             except Exception as e:
-                ebLogWarn(f"*** mDeleteFilesInDbVault failed with Exception: {str(e)}")
+                ebLogWarn(f"*** Remove ACFS Volumes failed with Exception: {str(e)}")
+
+            # Raise an exception when files in DB Vault are not removed
+            _utils.mDeleteFilesInDbVault(aOptions)
 
         ebLogInfo('csPreVMSetup: Completed undoExecute Successfully')
         _stepSpecificDetails = _clu_utils.mStepSpecificDetails("deleteServiceDetails", 'DONE', "Undo Pre VM setup completed", 'ESTP_PREVM_SETUP')

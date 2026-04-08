@@ -4,7 +4,7 @@
 #
 # tests_sopexecutescripts.py
 #
-# Copyright (c) 2025, Oracle and/or its affiliates.
+# Copyright (c) 2025, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_sopexecutescripts.py - <one-line expansion of the name>
@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    aararora    03/03/26 - Bug 38902170: Correct resource leak issues
 #    aypaul      03/18/25 - Creation
 #
 import uuid
@@ -33,8 +34,10 @@ from exabox.sop.sopscripts import SOPScript, SOPScriptsRepo, SCRIPT_VERSION
 from exabox.sop.soputils import process_sop_request, sop_execute_scripts, sop_delete_requests_onhost, sop_list_scripts
 from exabox.log.LogMgr import ebLogInfo, ebLogError
 from exabox.core.Error import ExacloudRuntimeError
-from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
 from exabox.core.MockCommand import exaMockCommand
+
+with patch('multiprocessing.Lock', return_value=MagicMock()):
+    from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
 
 ILOM_PAYLOAD1 = {
   "cmd": "start",
@@ -166,6 +169,29 @@ class ebTestSOPExecution(ebTestClucontrol):
         result = fetch_ilom_password(STORAGE_ILOM)
 
         ebLogInfo("Unit test on fetch_ilom_password succeeded.")
+
+    def test_mProcessRequest_reads_return_json_and_cleans_temp(self):
+        with patch('exabox.sop.sopexecutescripts.SOPScriptsRepo'):
+            exec_obj = SOPExecution("uuid", ["node1"], "script.sh", "--arg", {}, "1", "compute")
+        exec_obj._SOPExecution__scripts_metadata = {
+            "script.sh": {SCRIPT_EXEC: "/bin/bash", SCRIPT_RETURN_JSON_SUPPORT: True}
+        }
+        exec_obj._SOPExecution__requests_dir = "/tmp"
+
+        fake_node = MagicMock()
+        fake_node.mFileExists.return_value = True
+        fake_node.mCopy2Local.return_value = None
+        fake_node.__enter__.return_value = fake_node
+        fake_node.__exit__.return_value = False
+
+        with patch('exabox.sop.sopexecutescripts.connect_to_host', return_value=fake_node), \
+             patch('exabox.sop.sopexecutescripts.node_exec_cmd', return_value=MagicMock(exit_code=0, stdout='out', stderr='err')), \
+             patch('builtins.open', mock_open(read_data='{}')) as _open, \
+             patch('os.path.exists', return_value=True), \
+             patch('os.unlink') as unlink:
+            exec_obj.mProcessRequest()
+
+        unlink.assert_not_called()
 
 class ebTestSOPScript(ebTestClucontrol):
     @classmethod

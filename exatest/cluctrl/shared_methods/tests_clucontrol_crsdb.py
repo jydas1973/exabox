@@ -2,7 +2,7 @@
 
  $Header: 
 
- Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 
  NAME:
       tests_clucontrol_crsdb.py - Unitest for CRS/DB related funcs in clucontrl
@@ -32,6 +32,7 @@ from exabox.core.Node import exaBoxNode
 from exabox.core.MockCommand import exaMockCommand
 from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
 from exabox.exatest.common.ebExacloudUtil import *
+from exabox.core.Error import ExacloudRuntimeError
 from unittest.mock import patch, MagicMock, PropertyMock, mock_open
 
 _aDBAASCliOut = """DBAAS CLI version MAIN
@@ -120,7 +121,14 @@ class ebTestCluControlCrsDB(ebTestClucontrol):
 
         _domU = self.mGetClubox().mReturnDom0DomUPair()[0][1]
         return self.mGetClubox().mCheckDBIsUp(_domU)
-      
+
+    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mCheckCrsUp', return_value=True)
+    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mCheckDBIsUp', return_value=False)
+    @patch('exabox.ovm.utils.clu_utils.ebCluUtils.getNotUpDbsList', return_value=["DB1"])
+    def test_mCheckIfCrsDbsUp(self, aMockCrsUp, aMockDBUp, aMockActiveDB):
+        with self.assertRaises(ExacloudRuntimeError):
+            _domU = self.mGetClubox().mReturnDom0DomUPair()[0][1]
+            self.mGetClubox().mCheckIfCrsDbsUp(_domU)
       
     def _checkgetOracleBaseDir(self):
 

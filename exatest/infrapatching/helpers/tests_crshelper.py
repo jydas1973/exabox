@@ -1,10 +1,10 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/exatest/infrapatching/helpers/tests_crshelper.py /main/10 2025/10/28 09:43:01 rbhandar Exp $
+# $Header: ecs/exacloud/exabox/exatest/infrapatching/helpers/tests_crshelper.py /main/12 2026/01/26 16:39:32 remamid Exp $
 #
 # tests_clupatchhealthcheck.py
 #
-# Copyright (c) 2024, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2024, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_clupatchhealthcheck.py - <one-line expansion of the name>
@@ -16,6 +16,10 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    remamid     01/21/26 - Adjust unit test for CRS guard
+#    remamid     01/16/26 - Add unit test for CRS start guard
+#    bhpati      12/15/25 - Bug 38671457 - Errormessage Improvement if CRS is
+#                           disabled on Domu
 #    rbhandar    10/09/25 - Bug 38510857 - NON ROLLING PATCHING OPERATION POST
 #                           PATCH HAS DUPLICATE CELLS IN LIST
 #    avimonda    06/23/25 - Bug 37899705 - DOMU IMAGE UPDATE PRECHECK IS NOT
@@ -317,7 +321,7 @@ class ebTestCluPatchHealthCheck(ebTestClucontrol):
 
         with patch.object(_crsHelper, 'mCheckandRestartCRSonDomU', return_value = CRS_IS_DISABLED):
             _result = _crsHelper.mCheckandRestartCRSonAllDomUWithinCluster()
-            self.assertEqual(_result, "0x0305000F")
+            self.assertEqual(_result, "0x03050020")
 
         _rc_status = [{'domu': 'iad123456exddu1.oraclecloud.internal', 'ret': PATCH_SUCCESS_EXIT_CODE}, {'domu': 'iad123456exddu2.oraclecloud.internal', 'ret': PATCH_SUCCESS_EXIT_CODE}]
 
@@ -327,6 +331,35 @@ class ebTestCluPatchHealthCheck(ebTestClucontrol):
 
         ebLogInfo("Executed test for mCheckandRestartCRSonAllDomUWithinCluster()")
 
+    @patch("exabox.infrapatching.handlers.generichandler.GenericHandler.mGetDomUCustomerNameforDomuNatHostName", return_value="iad123456exdd001nat01.oraclecloud.internal")
+    @patch("exabox.infrapatching.helpers.crshelper.CrsHelper.mGenCrsctlCmd", return_value=(PATCH_SUCCESS_EXIT_CODE, "crsctl check crs"))
+    @patch("exabox.infrapatching.helpers.crshelper.CrsHelper.mCheckCrsInitResourcesonDomU")
+    @patch("exabox.infrapatching.helpers.crshelper.CrsHelper.mRunCrsctlCheckCrsCommand")
+    @patch("exabox.infrapatching.helpers.crshelper.CrsHelper.mGetHandlerInstance")
+    def test_mStartupCrsOnDomU_returns_failure_when_no_stdout(self, _mock_mGetHandlerInstance, _mock_mRunCrsctlCheckCrsCommand, _mock_mCheckCrsInitResourcesonDomU, _mock_mGenCrsctlCmd, _mock_mGetDomUCustomerNameforDomuNatHostName):
+        ebLogInfo("Executing test for mStartupCrsOnDomU when start crs emits no stdout")
+
+        _mock_handler = MagicMock()
+        _mock_handler.mGetTask.return_value = "patch"
+        _mock_mGetHandlerInstance.return_value = _mock_handler
+
+        _mock_node = MagicMock()
+        _mock_stdout = io.StringIO("")
+        _mock_stdin = io.StringIO("")
+        _mock_stderr = io.StringIO("")
+        _mock_node.mExecuteCmd.return_value = (_mock_stdin, _mock_stdout, _mock_stderr)
+        _mock_node.mIsConnected.return_value = False
+
+        _cluctrl = self.mGetClubox()
+        _crsHelper = CrsHelper(GenericHandler)
+
+        _ret = _crsHelper.mStartupCrsOnDomU("iad123456exdd001nat01.oraclecloud.internal", _mock_node)
+        DOMU_CRS_SERVICES_DOWN = "0x0305000F"
+        self.assertEqual(_ret, DOMU_CRS_SERVICES_DOWN)
+        _mock_mRunCrsctlCheckCrsCommand.assert_not_called()
+        _mock_mCheckCrsInitResourcesonDomU.assert_not_called()
+
+        ebLogInfo("Executed test for mStartupCrsOnDomU when start crs emits no stdout")
+
 if __name__ == "__main__":
     unittest.main()
-

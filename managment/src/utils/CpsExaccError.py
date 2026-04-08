@@ -4,7 +4,7 @@
 #
 # CpsExaccError.py
 #
-# Copyright (c) 2022, 2024, Oracle and/or its affiliates.
+# Copyright (c) 2022, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      CpsExaccError.py - <one-line expansion of the name>
@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    shapatna    02/09/26 - Bug: 38900266 - Fix for issues pointed by Codev 
+#                             in exabox/management directory
 #    hgaldame    11/08/24 - enh 37236624 - oci/exacc: remote manager endpoint
 #                           for execute cps software oel 7 to oel 8 migration
 #    hgaldame    05/16/24 - 36612813 - oci/exacc gen2 | cpssw fleet upgrade |
@@ -98,7 +100,7 @@ def mGetErrorMessageByRange(aCodeRange):
     """
     Get error Message by code error Message
     Args:
-        aCodeRange(CpsMessageRangeEnum): Code error message. Default:  CpsMessageRangeEnum.G_ERROR_RANGE_CPS_SW_UPGRADE
+        aCodeRange(string): Code error message. Default:  CpsMessageRangeEnum.G_ERROR_RANGE_CPS_SW_UPGRADE
 
     Returns:
        (str): Error Message
@@ -110,7 +112,7 @@ def mGetDetailCatalogueByRange(aCodeRange):
     """
     Get catalogue of details error by code error range
     Args:
-        aCodeRange(CpsMessageRangeEnum): Code error message. Default:  CPS_SW_UPGRADE_DETAIL
+        aCodeRange(string): Code error message. Default:  CPS_SW_UPGRADE_DETAIL
 
     Returns:
         (dict) : Catalogue of details, each catalogue is defined in form "error_code" : "error message",

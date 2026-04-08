@@ -3,7 +3,7 @@
 #
 # exacloudpluginhandler.py
 #
-# Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      exacloudpluginhandler.py - This module contains methods to run exacloud plugin on Dom0 and Domu targets.
@@ -15,6 +15,9 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    sdevasek    03/09/26 - Bug 39053714 - INFRAPATCH REGISTERED PLUGINS: REUSE
+#                           CACHED VALIDATION RESULTS ACROSS NODES FOR THE
+#                           SCRIPTBUNDLE VALIDATION
 #    sdevasek    10/10/25 - ENH 38437135 - IMPLEMENT ADDITION OF SCRIPTNAME
 #                           SCRIPTBUNLDENAME AND SCRIPTBUNDLEHASH ATTRIBUTES
 #                           TO ECRA REGISTERED PLUGINS METADATA REGISTRATION
@@ -561,13 +564,23 @@ class ExacloudPluginHandler(PluginHandler):
 
     def mRunExacloudPluginV2inRolling(self, aNodeList, aStage):
         """
-        This method executes Exacloud plugins
-        in rolling fashion.
-        :return: PATCH_SUCCESS_EXIT_CODE in case of successful patch execution
-                or FailOnError flag was set to false
-            else
-                return error code as per error details returned
-                from below execution flow.
+        Execute Exacloud metadata-based plugins in rolling fashion.
+
+        For each plugin metadata entry and for each node in the given node list:
+          1. Filter to Exacloud plugins for the requested phase (aStage).
+          2. If plugin target matches current target type (dom0/cell):
+             * Validate the script bundle (once per script alias).
+             * Copy the script bundle to the node.
+             * Execute the plugin on the node.
+             * Cleanup the plugin artifacts on the node.
+          3. If plugin target is dom0domu and dom0domu plugins are enabled:
+             * Delegate to dom0/domU plugin flow (rolling only).
+
+        Behavior:
+          - Returns PATCH_SUCCESS_EXIT_CODE if all enabled plugins complete successfully,
+            or if failures occur only for plugins where FailOnError is set to "no".
+          - Returns an appropriate non-success error code for the first failing
+            plugin where FailOnError is "yes", and stops further processing.
         """
         _ret = PATCH_SUCCESS_EXIT_CODE
         _rc = PATCH_SUCCESS_EXIT_CODE
@@ -576,34 +589,47 @@ class ExacloudPluginHandler(PluginHandler):
 
         self.mPatchLogInfo(
             f"Starting execution of Exacloud plugins in rolling fashion for nodes: {aNodeList} and stage: {aStage}")
-        # Step 1. Copy Plugin metadata based exacloud plugins.
-        for _node_name in aNodeList:
-            for _exacloud_plugin_data in self.mGetPluginMetadata():
-                _plugin_type = mGetPluginType(_exacloud_plugin_data)
+        # Cache validation results per plugin (keyed by script_alias)
+        _validation_cache = {}  # { script_alias: rc }
+
+        # Iterate over each plugin metadata entry first, then over each node.
+        # This means we fully process a given plugin for all nodes before
+        # moving to the next plugin.
+        for _exacloud_plugin_data in self.mGetPluginMetadata():
+            _plugin_type = mGetPluginType(_exacloud_plugin_data)
+            _script_alias = mGetScriptAlias(_exacloud_plugin_data)
+            _fail_on_error = mGetFailonError(_exacloud_plugin_data)
+            _stage = mGetPhase(_exacloud_plugin_data)
+
+            for _node_name in aNodeList:
                 if (_plugin_type).lower() != "exacloud":
                     self.mPatchLogInfo(
                         f"Only exacloud plugins will be run, current Plugin target type is : {_plugin_type}")
                     continue
 
-                _stage = mGetPhase(_exacloud_plugin_data)
                 if (aStage).lower() != _stage.lower():
                     continue
                 else:
                     self.mPatchLogInfo(
-                        f"Current exacloud plugin scripts will be run with the following input : {json.dumps(_exacloud_plugin_data, indent=4)}")
+                        f"exacloud plugin scripts will be run with the following input : {json.dumps(_exacloud_plugin_data, indent=4)} on node {_node_name}")
 
                 if mGetPluginTargetV2(_exacloud_plugin_data).lower() in [ "dom0", "cell" ] and str(mGetPluginTargetV2(_exacloud_plugin_data).lower()) in str(self.mGetTargetTypes()[0].lower()):
-
-                    # Validate the script bundle on exacloud node only once for the first node
-                    if _node_name == aNodeList[0]:
+                    # Validate the script bundle on exacloud node only once for the first node,cache result
+                    if _script_alias not in _validation_cache:
+                        # First time we see this plugin
                         # Step1. Validate the script bundle
-                        self.mPatchLogInfo(f"Validating exacloud plugin script bundle for node {_node_name}")
+                        self.mPatchLogInfo(f"Validating exacloud v2 plugin script bundle for node {_node_name}")
                         _rc = self.mValidateExacloudPluginScriptBundle(_exacloud_plugin_data)
-                        if _rc != PATCH_SUCCESS_EXIT_CODE and mGetFailonError(_exacloud_plugin_data):
-                            self.mAddError(_rc,"")
+                        _validation_cache[_script_alias] = _rc
                     else:
-                        # Assume validation is successful for subsequent nodes
-                        _rc = PATCH_SUCCESS_EXIT_CODE
+                        # Reuse previously cached validation result for this plugin
+                        _rc = _validation_cache[_script_alias]
+
+                    # If validation failed and FailOnError is enabled, record and break.
+                    if _rc != PATCH_SUCCESS_EXIT_CODE and _fail_on_error:
+                        self.mAddError(_rc, "")
+                        _ret = _rc
+                        break
 
                     if _rc == PATCH_SUCCESS_EXIT_CODE:
                         # Step 2. Copy exacloud plugins.
@@ -629,8 +655,16 @@ class ExacloudPluginHandler(PluginHandler):
                         '''
                         _rc = self.mRunDom0DomuPluginsFromInfraPatchMetadata(_node_name, _exacloud_plugin_data, aStage)
 
+                # If a node-level error occurred and FailOnError is set, propagate
+                # the error for this plugin and stop processing further nodes.
                 if _rc != PATCH_SUCCESS_EXIT_CODE and mGetFailonError(_exacloud_plugin_data):
                     _ret = _rc
+
+            # If any plugin-level error was set (_ret != success), stop processing
+            # further plugin metadata entries.
+            if _ret != PATCH_SUCCESS_EXIT_CODE:
+                break
+
         self.mPatchLogInfo(f"Completed execution of exacloud plugins with return code {_ret}")
         return _ret
 

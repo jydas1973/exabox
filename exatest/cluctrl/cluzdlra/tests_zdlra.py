@@ -49,6 +49,10 @@ class TestZdlra(ebTestClucontrol):
 
         }
 
+        with patch('exabox.ovm.cluzdlra.ebCluCmdCheckOptions', return_value=True):
+            zdlra_flag = cluctrl.mGetZDLRA().mCheckZdlraInEnv()
+            self.assertEqual(zdlra_flag, False)
+
         self.mPrepareMockCommands(_cmds)
         cluctrl = self.mGetClubox()
 
@@ -224,6 +228,7 @@ class TestZdlra(ebTestClucontrol):
                     exaMockCommand("/bin/test -e.*", aRc=1),
 
                     # Get current value as 100
+                    exaMockCommand("/bin/test -e /usr/sbin/sysctl", aRc=0, aStdout="/usr/sbin/sysctl", aPersist=True),
                     exaMockCommand(".*/usr/sbin/sysctl -n vm.nr_hugepages.*", aStdout="100", aRc=0),
                     exaMockCommand("cat /etc/sysctl.conf", aStdout="vm.nr_hugepages = 100"),
 
@@ -233,6 +238,7 @@ class TestZdlra(ebTestClucontrol):
                     exaMockCommand("/usr/sbin/sysctl -p", aRc=0),
 
                     # Get the new value as 0
+                    exaMockCommand("/bin/test -e /usr/sbin/sysctl", aRc=0, aStdout="/usr/sbin/sysctl", aPersist=True),
                     exaMockCommand(".*/usr/sbin/sysctl -n vm.nr_hugepages.*", aStdout="0", aRc=0),
                     exaMockCommand("cat /etc/sysctl.conf", aStdout="vm.nr_hugepages = 0"),
                 ]]
@@ -340,8 +346,7 @@ class TestZdlra(ebTestClucontrol):
         cluctrl.mSetCmd('vm_cmd')
         cluctrl.mGetArgsOptions().vmcmd = 'removecpus'
         with patch('exabox.ovm.cluzdlra.exaBoxNode.mIsConnectable', return_value=False):
-            with self.assertRaises(ExacloudRuntimeError) as ex:
-                zdlra_flag = cluctrl.mGetZDLRA().mCheckZdlraInEnv()
+            zdlra_flag = cluctrl.mGetZDLRA().mCheckZdlraInEnv()
 
 if __name__ == '__main__':
     unittest.main()

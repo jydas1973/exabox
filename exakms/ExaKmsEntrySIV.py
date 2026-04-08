@@ -4,7 +4,7 @@
 #
 # ExaKmsEntrySIVRSA.py
 #
-# Copyright (c) 2022, 2023, Oracle and/or its affiliates.
+# Copyright (c) 2022, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      ExaKmsEntrySIVRSA.py - <one-line expansion of the name>
@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    gsundara    03/21/26 - Bug 38900137 - EXACLOUD: ISSUES FOUND BY VOXIO
+#                           CODEV AGENT IN DIR EXABOX/EXAKMS (Guard encData without keyId)
 #    jesandov    04/27/23 - 35141575: Add support of ECDSA key type
 #    alsepulv    05/06/22 - Creation
 #
@@ -102,6 +104,9 @@ class ExaKmsEntrySIV(ExaKmsEntry):
 
     def mSetEncData(self, aEncData: str) -> None:
         self.__encData = aEncData
+
+        if not self.__keyId:
+            return
 
         self.mSetPublicKey(self.mCalculatePublicKey())
         self.mSetHash(self.mCalculateHash())

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (c) 2014, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #     DNSConfig.py
@@ -348,7 +348,7 @@ class ebDNSConfig(object):
         return ["/usr/bin/sudo", "/usr/bin/sed", "-i", "--follow-symlinks", "$a " + aDNSEntry, aFilename]
 
     def mBuildDeleteCmd(self, aHostname, aFilename):
-        return ["/usr/bin/sudo", "/usr/bin/sed", "-i", "--follow-symlinks", "/" + aHostname + "/d", aFilename]
+        return ["/usr/bin/sudo", "/usr/bin/sed", "-i", "--follow-symlinks", "/(^|[[:space:]])" + aHostname + "([[:space:]]|$)/d", aFilename]
 
 
     def mRemoveHostEntries(self, aHostname):

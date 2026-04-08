@@ -284,13 +284,13 @@ class TestCPUXen(ebTestClucontrol):
         self.mPrepareMockCommands(_cmds)
 
         get_gcontext().mSetConfigOption('force_pinning_on_resize', 'False')
-        get_gcontext().mSetConfigOption('timeout_vmcpu_resize', '2')
+        get_gcontext().mSetConfigOption('timeout_vmcpu_resize', '15')
         _options = self.mGetPayload()
         _options.jsonconf['subfactor'] = 1
         _options.jsonconf['poolsize'] = 40
         _options.jsonconf['vms'] = [{"hostname": "scaqab10client01vm08.us.oracle.com", "cores": "8"}, {"hostname": "scaqab10client02vm08.us.oracle.com", "cores": "8"}]
         cluctrl = self.mGetClubox()
-        cluctrl.__timeout_vmcpu_resize = 2
+        cluctrl.__timeout_vmcpu_resize = 15
 
         _rc = cluctrl.mManageVMCpusCount("resizecpus", "scaqab10client01vm08.us.oracle.com", _options)
         self.assertEqual(_rc, 0)

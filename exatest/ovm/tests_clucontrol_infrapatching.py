@@ -1,10 +1,10 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/exatest/ovm/tests_clucontrol_infrapatching.py /main/2 2025/09/02 17:58:33 ajayasin Exp $
+# $Header: ecs/exacloud/exabox/exatest/ovm/tests_clucontrol_infrapatching.py /main/3 2026/02/16 17:28:04 ririgoye Exp $
 #
 # tests_clucontrol_infrapatching.py
 #
-# Copyright (c) 2025, Oracle and/or its affiliates.
+# Copyright (c) 2025, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_clucontrol_infrapatching.py - <one-line expansion of the name>
@@ -16,6 +16,9 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    ririgoye    02/10/26 - Enh 38337110 - CLUSTERLESS PATCHING SHOULD CONNECT
+#                           TO FREE NODES FROM PAYLOAD FOR EXACS SERVICE FOR
+#                           EXACLOUD VALIDATION
 #    ajayasin    08/05/25 - moving handler function from clucontrol.py
 #                           clucommandhandler.py to reduce the clucontrol.py
 #                           size
@@ -105,6 +108,257 @@ class ebTestClucontrolClasses(ebTestClucontrol):
         ebLogInfo("Running unit test on mReturnSwitches")
         _list_of_switches = self.mGetClubox().mReturnSwitches(True, True)
         ebLogInfo("Unit test on mReturnSwitches succeeded.")
+
+    def test_clusterless_dom0_filtering_respects_payload(self):
+        ebLogInfo("Running unit test on clusterless dom0 filtering.")
+        _clubox = self.mGetClubox()
+        _original_options = getattr(_clubox, '_exaBoxCluCtrl__options', None)
+
+        _options = testOptions()
+        _options.jsonconf = {
+            "ComputeNodeList": [
+                "dom0a.example.com",
+                "dom0b.example.com"
+            ],
+            "StorageNodeList": [
+                "cell1.example.com",
+                "cell2.example.com"
+            ],
+            "AdditionalOptions": [
+                {
+                    "ExcludedNodeList": [
+                        "dom0b.example.com",
+                        "cell2.example.com"
+                    ]
+                }
+            ]
+        }
+
+        setattr(_clubox, '_exaBoxCluCtrl__options', _options)
+
+        try:
+            with patch.object(
+                _clubox,
+                'mReadComputes',
+                return_value=[
+                    "dom0a.example.com",
+                    "dom0b.example.com",
+                    "dom0c.example.com"
+                ]
+            ), patch.object(
+                _clubox,
+                'mIsClusterLessXML',
+                return_value=True
+            ):
+                _filtered_nodes = _clubox.mReturnDom0DomUPair(
+                    aIsClusterLessXML=True,
+                    aRetDummyDomu=False
+                )
+
+            self.assertEqual(_filtered_nodes, [["dom0a.example.com", ""]])
+        finally:
+            setattr(_clubox, '_exaBoxCluCtrl__options', _original_options)
+        ebLogInfo("Unit test on clusterless dom0 filtering succeeded.")
+
+    def test_clusterless_cell_filtering_respects_payload(self):
+        ebLogInfo("Running unit test on clusterless cell filtering.")
+        _clubox = self.mGetClubox()
+        _original_options = getattr(_clubox, '_exaBoxCluCtrl__options', None)
+
+        _options = testOptions()
+        _options.jsonconf = {
+            "ComputeNodeList": [
+                "dom0a.example.com",
+                "dom0b.example.com"
+            ],
+            "StorageNodeList": [
+                "cell1.example.com",
+                "cell2.example.com"
+            ],
+            "AdditionalOptions": [
+                {
+                    "ExcludedNodeList": [
+                        "dom0b.example.com",
+                        "cell2.example.com"
+                    ]
+                }
+            ]
+        }
+
+        setattr(_clubox, '_exaBoxCluCtrl__options', _options)
+
+        try:
+            with patch.object(
+                _clubox,
+                'mReadCellMachines',
+                return_value=[
+                    "cell1.example.com",
+                    "cell2.example.com",
+                    "cell3.example.com"
+                ]
+            ), patch.object(
+                _clubox,
+                'mIsClusterLessXML',
+                return_value=True
+            ):
+                _filtered_cells = _clubox.mReturnCellNodes(
+                    aIsClusterLessXML=True
+                )
+
+            self.assertEqual(
+                set(_filtered_cells.keys()),
+                {"cell1.example.com"}
+            )
+        finally:
+            setattr(_clubox, '_exaBoxCluCtrl__options', _original_options)
+        ebLogInfo("Unit test on clusterless cell filtering succeeded.")
+
+    def test_clusterless_dom0_no_payload_returns_all_nodes(self):
+        ebLogInfo("Running clusterless patching with no payload")
+        _clubox = self.mGetClubox()
+        _original_options = getattr(_clubox, '_exaBoxCluCtrl__options', None)
+
+        _options = testOptions()
+        _options.jsonconf = {}
+        setattr(_clubox, '_exaBoxCluCtrl__options', _options)
+
+        try:
+            with patch.object(
+                _clubox,
+                'mReadComputes',
+                return_value=[
+                    "dom0a.example.com",
+                    "dom0b.example.com"
+                ]
+            ), patch.object(
+                _clubox,
+                'mIsClusterLessXML',
+                return_value=True
+            ):
+                _filtered_nodes = _clubox.mReturnDom0DomUPair(
+                    aIsClusterLessXML=True,
+                    aRetDummyDomu=False
+                )
+
+            ebLogInfo(f"[UT] clusterless_dom0_no_payload result={_filtered_nodes}")
+            self.assertEqual(
+                _filtered_nodes,
+                [
+                    ["dom0a.example.com", ""],
+                    ["dom0b.example.com", ""]
+                ]
+            )
+        finally:
+            setattr(_clubox, '_exaBoxCluCtrl__options', _original_options)
+
+    def test_clusterless_dom0_all_filtered_out_returns_empty(self):
+        ebLogInfo("Running clusterless patching with all dom0s filtered out")
+        _clubox = self.mGetClubox()
+        _original_options = getattr(_clubox, '_exaBoxCluCtrl__options', None)
+
+        _options = testOptions()
+        _options.jsonconf = {
+            "ComputeNodeList": ["dom0a.example.com"],
+            "AdditionalOptions": [
+                {"ExcludedNodeList": ["dom0a.example.com"]}
+            ]
+        }
+        setattr(_clubox, '_exaBoxCluCtrl__options', _options)
+
+        try:
+            with patch.object(
+                _clubox,
+                'mReadComputes',
+                return_value=[
+                    "dom0a.example.com",
+                    "dom0b.example.com"
+                ]
+            ), patch.object(
+                _clubox,
+                'mIsClusterLessXML',
+                return_value=True
+            ):
+                _filtered_nodes = _clubox.mReturnDom0DomUPair(
+                    aIsClusterLessXML=True,
+                    aRetDummyDomu=False
+                )
+
+            ebLogInfo(f"[UT] clusterless_dom0_all_filtered_out result={_filtered_nodes}")
+            self.assertEqual(_filtered_nodes, [])
+        finally:
+            setattr(_clubox, '_exaBoxCluCtrl__options', _original_options)
+
+    def test_clusterless_cell_no_allow_list_returns_all(self):
+        ebLogInfo("Running clusterless patching with empty allow list: start")
+        _clubox = self.mGetClubox()
+        _original_options = getattr(_clubox, '_exaBoxCluCtrl__options', None)
+
+        _options = testOptions()
+        _options.jsonconf = {}
+        setattr(_clubox, '_exaBoxCluCtrl__options', _options)
+
+        try:
+            with patch.object(
+                _clubox,
+                'mReadCellMachines',
+                return_value=[
+                    "cell1.example.com",
+                    "cell2.example.com"
+                ]
+            ), patch.object(
+                _clubox,
+                'mIsClusterLessXML',
+                return_value=True
+            ):
+                _filtered_cells = _clubox.mReturnCellNodes(
+                    aIsClusterLessXML=True
+                )
+
+            ebLogInfo(f"[UT] clusterless_cell_no_allow_list result={list(_filtered_cells.keys())}")
+            self.assertEqual(
+                set(_filtered_cells.keys()),
+                {"cell1.example.com", "cell2.example.com"}
+            )
+        finally:
+            setattr(_clubox, '_exaBoxCluCtrl__options', _original_options)
+
+    def test_clusterless_cell_all_filtered_out_returns_empty(self):
+        ebLogInfo("Running clusterless patching with all cells filtered out")
+        _clubox = self.mGetClubox()
+        _original_options = getattr(_clubox, '_exaBoxCluCtrl__options', None)
+
+        _options = testOptions()
+        _options.jsonconf = {
+            "StorageNodeList": ["cell1.example.com"],
+            "AdditionalOptions": [
+                {"ExcludedNodeList": ["cell1.example.com"]}
+            ]
+        }
+        setattr(_clubox, '_exaBoxCluCtrl__options', _options)
+
+        try:
+            with patch.object(
+                _clubox,
+                'mReadCellMachines',
+                return_value=[
+                    "cell1.example.com",
+                    "cell2.example.com"
+                ]
+            ), patch.object(
+                _clubox,
+                'mIsClusterLessXML',
+                return_value=True
+            ):
+                _filtered_cells = _clubox.mReturnCellNodes(
+                    aIsClusterLessXML=True
+                )
+
+            ebLogInfo(f"[UT] clusterless_cell_all_filtered_out result={list(_filtered_cells.keys())}")
+            self.assertEqual(_filtered_cells, {})
+        finally:
+            setattr(_clubox, '_exaBoxCluCtrl__options', _original_options)
+
+
 
 if __name__ == "__main__":
     unittest.main(warnings='ignore')

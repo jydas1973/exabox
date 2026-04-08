@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 #
-# $Header: ecs/exacloud/exabox/exatest/ovm/tests_vmcontrol.py /main/11 2025/09/30 13:23:58 remamid Exp $
+# $Header: ecs/exacloud/exabox/exatest/ovm/tests_vmcontrol.py /main/12 2026/02/12 08:50:07 dekuckre Exp $
 #
 # tests_vmcontrol.py
 #
-# Copyright (c) 2021, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_vmcontrol.py
@@ -263,8 +263,11 @@ class ebTestexaBoxOVMCtrl(ebTestClucontrol):
                                     exaMockCommand("/bin/test -e *", aRc=0, aPersist=True),
                                     exaMockCommand("/bin/touch *", aRc=0, aPersist=True)
                                 ]
+        dom0Instance3Commands = [   
+                                    exaMockCommand("/bin/uname -r", aRc=0, aStdout="", aPersist=True)
+                                ]
         mockCommands = {
-                           self.mGetRegexDom0(): [dom0Instance0Commands,dom0Instance1Commands,dom0Instance2Commands, dom0Instance0Commands,dom0Instance1Commands],
+                           self.mGetRegexDom0(): [dom0Instance0Commands,dom0Instance1Commands,dom0Instance2Commands, dom0Instance3Commands, dom0Instance0Commands,dom0Instance1Commands],
                            self.mGetRegexLocal(): [
                                [exaMockCommand("/bin/ping", aRc=0, aStdout="Node type: DOM0", aPersist=True)]
                            ]
@@ -286,7 +289,7 @@ class ebTestexaBoxOVMCtrl(ebTestClucontrol):
         vmHandle.mSetOVMCtrl(aCtx=self.mGetContext(), aNode=currentNode)
         self.assertEqual(vmHandle.mDispatchEvent(aCmd= 'create', aVMId="scaqab10client01vm01.us.oracle.com"), 0x412)
         _start_time = time.time()
-        vmHandle.mDispatchEvent(aCmd= 'shutdown', aOptions=_options, aVMId="scaqab10client01vm02.us.oracle.com")
+        vmHandle.mDispatchEvent(aCmd= 'shutdown', aOptions=_options, aVMId="scaqab10client01vm02.us.oracle.com", aCluCtrlObj=cluctrl)
         _stop_time = time.time()
         print(_stop_time-_start_time)
         self.assertLessEqual(_stop_time-_start_time, 400)

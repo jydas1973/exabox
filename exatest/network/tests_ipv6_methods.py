@@ -1,10 +1,10 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/exatest/network/tests_ipv6_methods.py /main/6 2025/09/23 07:26:34 aararora Exp $
+# $Header: ecs/exacloud/exabox/exatest/network/tests_ipv6_methods.py /main/7 2026/01/21 09:00:53 jesandov Exp $
 #
 # tests_ipv6_methods.py
 #
-# Copyright (c) 2024, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2024, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_ipv6_methods.py - <one-line expansion of the name>
@@ -328,9 +328,9 @@ class ebTestIPv6MethodsCustomResources(ebTestClucontrol):
         _cluctrl = self.mGetClubox()
         _options = copy.deepcopy(self.mGetClubox().mGetArgsOptions())
         _node_recovery = NodeRecovery(_cluctrl, _options)
-        self.assertEqual(_node_recovery.mFetchNetworkInfo("iad103716exdd011.iad103716exd.adminiad1.oraclevcn.com",
-                                         "c3716n11c1.clientsubnet.devx8melastic.oraclevcn.com",
-                                         True), mFetchNetworkInfo_OUT)
+        _input = _node_recovery.mFetchNetworkInfo("iad103716exdd011.iad103716exd.adminiad1.oraclevcn.com", \
+                "c3716n11c1.clientsubnet.devx8melastic.oraclevcn.com", True)
+        self.assertEqual(_input, mFetchNetworkInfo_OUT)
 
     def tests_mRemoveNodeFromCRS(self):
         _cluctrl = self.mGetClubox()

@@ -1,5 +1,5 @@
 """
- Copyright (c) 2019, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2019, 2026, Oracle and/or its affiliates.
 
 NAME:
     cs_postvm_gold_config.py - Complete step on Gold Image Provisioning
@@ -17,6 +17,7 @@ INTERNAL CLASSES:
 
 History:
        MODIFIED (MM/DD/YY)
+       jesandov  02/11/26 - 38934422: Install exacloud rpm in case of missing.
        jesandov  09/23/25 - 38437673: Add Bom file with minimal information
        jesandov  05/26/25 - 37265202: Add Bom file to DomU
        jesandov  03/14/25 - Bug 37675172 - File Creation
@@ -28,6 +29,7 @@ import operator
 import tempfile
 import json
 import copy
+import glob
 
 from exabox.core.Error import ebError, ExacloudRuntimeError
 from exabox.core.Context import get_gcontext
@@ -49,6 +51,25 @@ from exabox.ovm.csstep.cs_postvminstall import csPostVMInstall
 class csPostVmGoldConfig(CSBase):
     def __init__(self):
         self.step = 'ESTP_POSTVM_GOLD_CONFIG'
+
+    def mInstallExacloudRpm(self, aExaBoxCluCtrlObj, aOptions):
+
+        for _, _domU in aExaBoxCluCtrlObj.mReturnDom0DomUPair():
+            with connect_to_host(_domU, get_gcontext()) as _node:
+
+                _node.mExecuteCmd(f"/usr/bin/rpm -qa | /bin/grep exacloud")
+                if _node.mGetCmdExitStatus() != 0:
+
+                    _exacloudRpm = glob.glob("images/exacloud-gold-config*.x86_64.rpm")
+                    if not _exacloudRpm:
+                        _msg = "Missing exacloud gold rpm from exacloud images"
+                        raise ExacloudRuntimeError(0x0130, 0xA, _msg)
+                    _exacloudRpm = _exacloudRpm[0]
+
+                    _node.mCopyFile(_exacloudRpm, "/tmp/exacloud.rpm")
+                    _node.mExecuteCmd(f"/usr/bin/rpm -ivh /tmp/exacloud.rpm")
+                    _node.mExecuteCmd(f"/bin/rm /tmp/exacloud.rpm")
+
 
     def mSaveBomFileDomU(self, aExaBoxCluCtrlObj, aOptions):
 
@@ -83,11 +104,15 @@ class csPostVmGoldConfig(CSBase):
 
 
     def doExecute(self, aExaBoxCluCtrlObj, aOptions, steplist):
+
         ebLogInfo('csGoldComplete: Entering doExecute')
         _ebox = aExaBoxCluCtrlObj
         _ebox.mUpdateStatus('createservice step '+self.step)
         _imageBom = ImageBOM(_ebox)
         _newStepList = steplist
+
+        # Review exacloud rpm first
+        self.mInstallExacloudRpm(_ebox, aOptions)
 
         if not _imageBom.mIsSubStepExecuted(self.step, "USER_CONFIG"):
             if _imageBom.mIsGoldImageProvisioning() or _imageBom.mIsBaseDbProvisioning():

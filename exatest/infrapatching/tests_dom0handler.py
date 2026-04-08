@@ -1,10 +1,10 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/exatest/infrapatching/tests_dom0handler.py /main/26 2025/10/28 14:13:31 bhpati Exp $
+# $Header: ecs/exacloud/exabox/exatest/infrapatching/tests_dom0handler.py /main/28 2026/02/03 08:57:52 nelango Exp $
 #
 # tests_dom0handler.py
 #
-# Copyright (c) 2022, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2022, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_dom0handler.py - Class for testing dom0 precheck, patch and rollback
@@ -17,6 +17,13 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    avimonda    03/17/26 - Unit tests for bug 38969712
+#    rbhandar    03/27/26 - Bug 38453227 - AIM4ECS:0X03030012 - INDIVIDUAL
+#                           PATCH REQUEST EXCEPTION DETECTED
+#    bhpati      03/02/26 - Bug 38932171 - AIM4ECS:0X03030006 - DB SERVICES
+#                           WERE NOT UP ON DOM0
+#    nelango     01/30/26 - Bug 38901967: No ilom service state disabling
+#    nelango     01/09/26 - Bug 38676078 - update ipmi tests
 #    bhpati      10/23/25 - Display an Exadata Live Update (ELU) specific error
 #                           message when nodes are registered with an invalid
 #                           version.
@@ -67,17 +74,24 @@
 #
 import copy
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock, call
 from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
 from exabox.infrapatching.helpers.crshelper import CrsHelper
 from exabox.log.LogMgr import ebLogInfo
 from exabox.infrapatching.handlers.targetHandler.dom0handler import Dom0Handler
 from exabox.core.MockCommand import exaMockCommand
+from exabox.infrapatching.core.infrapatcherror import (
+    INDIVIDUAL_PATCH_REQUEST_EXCEPTION_ERROR,
+    SSH_AUTHENTICATION_FAILED,
+    SSH_CONNECTION_TIMEOUT,
+)
 
 class ebTestDom0Handler(ebTestClucontrol):
     SUCCESS_ERROR_CODE = "0x00000000"
     DBSERVER_DOWN_ERROR_CODE = "0x03010060"
     ELUVERSION_NOTFOUND_ERROR_CODE = "0x0301006F"
+    UNABLE_TO_STARTUP_VM_ON_DOM0 = "0x03030021"
+    PATCHMGR_COMMAND_FAILED = "0x03010045"
     OP_STYLE_NON_ROLLING = "non-rolling"
     crsHelper = CrsHelper(None)
 
@@ -390,38 +404,120 @@ class ebTestDom0Handler(ebTestClucontrol):
         _dom0handler = Dom0Handler(self.__patch_args_dict)
         _dom0handler.mSetEnvironment()
 
+    def _mock_ipmi_commands(self, mock_execute_cmd, initial_state="enabled"):
+        executed_cmds = []
+        service_state = {"value": initial_state}
+
+        def _execute_side_effect(command):
+            executed_cmds.append(command)
+            stdout = MagicMock()
+            if "setval /SP/services/ipmi/servicestate enabled" in command:
+                service_state["value"] = "enabled"
+                stdout.readlines.return_value = ["Sun OEM setval command successful."]
+            elif "setval /SP/services/ipmi/servicestate disabled" in command:
+                service_state["value"] = "disabled"
+                stdout.readlines.return_value = ["Sun OEM setval command successful."]
+            elif "getval" in command:
+                stdout.readlines.return_value = [f"Target Value: {service_state['value']}"]
+            else:
+                stdout.readlines.return_value = []
+            return None, stdout, MagicMock()
+
+        mock_execute_cmd.side_effect = _execute_side_effect
+        return executed_cmds, service_state
+
+    @patch("exabox.core.Node.exaBoxNode.mDisconnect")
+    @patch("exabox.core.Node.exaBoxNode.mConnect")
+    @patch("exabox.core.Node.exaBoxNode.mGetCmdExitStatus", return_value=0)
+    @patch("exabox.core.Node.exaBoxNode.mExecuteCmd")
     @patch("exabox.infrapatching.utils.infrapatchexecutionvalidator.InfrapatchExecutionValidator.mCheckCondition", return_value=True)
-    @patch("exabox.infrapatching.handlers.targetHandler.targethandler.TargetHandler.mUpdateServiceStateOnIlom", return_value=('0x0301006A', ["slcs27adm04.us.oracle.com", "slcs27adm05.us.oracle.com"]))
-    def test_mCheckServiceStateOnDom0s(self, mock_mCheckCondition,mock_mUpdateServiceStateOnIlom):
+    def test_mCheckServiceStateOnDom0s_exacs_prepatch(self, mock_mCheckCondition, mock_mExecuteCmd, mock_mGetCmdExitStatus, mock_mConnect, mock_mDisconnect):
 
         ebLogInfo("")
-        ebLogInfo("Running unit test on Dom0Handler.mUpdateServiceStateOnIlom")
+        ebLogInfo("Running unit test on Dom0Handler.mUpdateServiceStateOnIlom for ExaCS prepatch")
         _dom0_list = ["slcs27adm04.us.oracle.com", "slcs27adm05.us.oracle.com"]
         _cmds = {
             self.mGetRegexDom0(): [
                 [
-                    exaMockCommand("ipmitool sunoem getval /SP/services/ipmi/servicestate", aRc=0,
-                                   aStdout="Target Value: enabled"),
-                    exaMockCommand("ipmitool sunoem setval /SP/services/ipmi/service state enabled", aRc=0,
-                                   aStdout="Sun OEM setval command successful."),
-                    exaMockCommand("ipmitool sunoem getval /SP/services/ipmi/servicestate", aRc=0,
-                                   aStdout="Target Value: enabled"),
                     exaMockCommand("virsh", aRc=0)
                 ]
             ]
         }
         self.mPrepareMockCommands(_cmds)
+        executed_cmds, service_state = self._mock_ipmi_commands(mock_mExecuteCmd, initial_state="disabled")
+
         dom0handler = Dom0Handler(self.__patch_args_dict)
-        dom0handler.mUpdateServiceStateOnIlom(_dom0_list, "prepatch")
-        dom0handler.mUpdateServiceStateOnIlom(_dom0_list, "postcheck")
-        ebLogInfo("")
-        
+        with patch.object(dom0handler, "mIsExaCC", return_value=False):
+            dom0handler.mUpdateServiceStateOnIlom(_dom0_list, "prepatch")
+
+        enable_cmds = [cmd for cmd in executed_cmds if "setval /SP/services/ipmi/servicestate enabled" in cmd]
+        disable_cmds = [cmd for cmd in executed_cmds if "setval /SP/services/ipmi/servicestate disabled" in cmd]
+
+        self.assertGreater(len(enable_cmds), 0)
+        self.assertEqual(len(disable_cmds), 0)
+        self.assertEqual(service_state["value"], "enabled")
+
+    @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.Dom0Handler.mUpdateServiceStateOnIlom")
+    def test_mUpdateServiceStateOnIlom_only_prepatch_called(self, mock_mUpdateServiceStateOnIlom):
+
+        ebLogInfo("Running unit test to confirm Dom0 postpatch path is never invoked")
+        _cmds = {
+            self.mGetRegexDom0(): [
+                [
+                    exaMockCommand("virsh", aRc=0)
+                ]
+            ]
+        }
+        self.mPrepareMockCommands(_cmds)
+
+        dom0handler = Dom0Handler(self.__patch_args_dict)
+        dom0handler.mPreCheck()
+
+        phases = [call.args[1] for call in mock_mUpdateServiceStateOnIlom.call_args_list]
+        self.assertNotIn("postpatch", phases)
+
+    @patch("exabox.core.Node.exaBoxNode.mDisconnect")
+    @patch("exabox.core.Node.exaBoxNode.mConnect")
+    @patch("exabox.core.Node.exaBoxNode.mGetCmdExitStatus", return_value=0)
+    @patch("exabox.core.Node.exaBoxNode.mExecuteCmd")
     @patch("exabox.infrapatching.utils.infrapatchexecutionvalidator.InfrapatchExecutionValidator.mCheckCondition", return_value=True)
-    @patch("exabox.infrapatching.handlers.targetHandler.targethandler.TargetHandler.mValidateServiceStateOnIlom", return_value=('0x03010069', ["slcs27adm04.us.oracle.com", "slcs27adm05.us.oracle.com"]))
-    def test_mValidateServiceStateOnDom0s(self, mock_mCheckCondition,mock_mValidateServiceStateOnIlom):
-        
+    def test_mCheckServiceStateOnDom0s_exacc_prepatch(self, mock_mCheckCondition, mock_mExecuteCmd, mock_mGetCmdExitStatus, mock_mConnect, mock_mDisconnect):
+
         ebLogInfo("")
-        ebLogInfo("Running unit test on Dom0Handler.mValidateServiceStateOnIlom")
+        ebLogInfo("Running unit test on Dom0Handler.mUpdateServiceStateOnIlom for ExaCC prepatch")
+        _dom0_list = ["slcs27adm04.us.oracle.com", "slcs27adm05.us.oracle.com"]
+        _cmds = {
+            self.mGetRegexDom0(): [
+                [
+                    exaMockCommand("virsh", aRc=0)
+                ]
+            ]
+        }
+        self.mPrepareMockCommands(_cmds)
+        executed_cmds, service_state = self._mock_ipmi_commands(mock_mExecuteCmd, initial_state="disabled")
+
+        dom0handler = Dom0Handler(self.__patch_args_dict)
+        with patch.object(dom0handler, "mIsExaCC", return_value=True):
+            dom0handler.mUpdateServiceStateOnIlom(_dom0_list, "prepatch")
+
+        enable_cmds = [cmd for cmd in executed_cmds if "setval /SP/services/ipmi/servicestate enabled" in cmd]
+        disable_cmds = [cmd for cmd in executed_cmds if "setval /SP/services/ipmi/servicestate disabled" in cmd]
+
+        self.assertGreater(len(enable_cmds), 0)
+        self.assertEqual(len(disable_cmds), 0)
+        self.assertEqual(service_state["value"], "enabled")
+
+    @patch("exabox.infrapatching.handlers.generichandler.GenericHandler.mGetDomUListFromXml", return_value=[])
+    @patch("exabox.core.Node.exaBoxNode.mDisconnect")
+    @patch("exabox.core.Node.exaBoxNode.mIsConnected", return_value=True)
+    @patch("exabox.core.Node.exaBoxNode.mGetCmdExitStatus", return_value=0)
+    @patch("exabox.core.Node.exaBoxNode.mExecuteCmd")
+    @patch("exabox.core.Node.exaBoxNode.mConnect")
+    @patch("exabox.infrapatching.utils.infrapatchexecutionvalidator.InfrapatchExecutionValidator.mCheckCondition", return_value=True)
+    def test_mValidateServiceStateOnDom0s_exacs(self, mock_mCheckCondition, mock_mConnect, mock_mExecuteCmd, mock_mGetCmdExitStatus, mock_mIsConnected, mock_mDisconnect, mock_mGetDomUListFromXml):
+
+        ebLogInfo("")
+        ebLogInfo("Running unit test on Dom0Handler.mValidateServiceStateOnIlom for ExaCS")
         _dom0_list = ["slcs27adm04.us.oracle.com", "slcs27adm05.us.oracle.com"]
         _cmds = {
             self.mGetRegexDom0(): [
@@ -438,7 +534,60 @@ class ebTestDom0Handler(ebTestClucontrol):
         }
         self.mPrepareMockCommands(_cmds)
         dom0handler = Dom0Handler(self.__patch_args_dict)
-        dom0handler.mValidateServiceStateOnIlom(_dom0_list)
+        output_mock = MagicMock()
+        output_mock.readlines.return_value = ["Target Value: enabled"]
+        mock_mExecuteCmd.return_value = (None, output_mock, MagicMock())
+
+        with patch.object(dom0handler, "mIsExaCC", return_value=False):
+            _rc, _failed = dom0handler.mValidateServiceStateOnIlom(_dom0_list)
+
+        self.assertEqual(_rc, self.SUCCESS_ERROR_CODE)
+        self.assertEqual(_failed, [])
+        target_connect = call(aHost=_dom0_list[0], aTimeout=30)
+        self.assertIn(target_connect, mock_mConnect.mock_calls)
+        mock_mExecuteCmd.assert_any_call("ipmitool sunoem getval /SP/services/ipmi/servicestate")
+        self.assertGreater(len(mock_mDisconnect.mock_calls), 0)
+
+    @patch("exabox.infrapatching.handlers.generichandler.GenericHandler.mGetDomUListFromXml", return_value=[])
+    @patch("exabox.core.Node.exaBoxNode.mDisconnect")
+    @patch("exabox.core.Node.exaBoxNode.mIsConnected", return_value=True)
+    @patch("exabox.core.Node.exaBoxNode.mGetCmdExitStatus", return_value=0)
+    @patch("exabox.core.Node.exaBoxNode.mExecuteCmd")
+    @patch("exabox.core.Node.exaBoxNode.mConnect")
+    @patch("exabox.infrapatching.utils.infrapatchexecutionvalidator.InfrapatchExecutionValidator.mCheckCondition", return_value=True)
+    def test_mValidateServiceStateOnDom0s_exacc(self, mock_mCheckCondition, mock_mConnect, mock_mExecuteCmd, mock_mGetCmdExitStatus, mock_mIsConnected, mock_mDisconnect, mock_mGetDomUListFromXml):
+
+        ebLogInfo("")
+        ebLogInfo("Running unit test on Dom0Handler.mValidateServiceStateOnIlom for ExaCC")
+        _dom0_list = ["slcs27adm04.us.oracle.com", "slcs27adm05.us.oracle.com"]
+        _cmds = {
+            self.mGetRegexDom0(): [
+                [
+                    exaMockCommand("ipmitool sunoem getval /SP/services/ipmi/servicestate", aRc=0,
+                                   aStdout="Target Value: enabled"),
+                    exaMockCommand("ipmitool sunoem setval /SP/services/ipmi/service state enabled", aRc=0,
+                                   aStdout="Sun OEM setval command successful."),
+                    exaMockCommand("ipmitool sunoem getval /SP/services/ipmi/servicestate", aRc=0,
+                                   aStdout="Target Value: enabled"),
+                    exaMockCommand("virsh", aRc=0)
+                ]
+            ]
+        }
+        self.mPrepareMockCommands(_cmds)
+        dom0handler = Dom0Handler(self.__patch_args_dict)
+        output_mock = MagicMock()
+        output_mock.readlines.return_value = ["Target Value: enabled"]
+        mock_mExecuteCmd.return_value = (None, output_mock, MagicMock())
+
+        with patch.object(dom0handler, "mIsExaCC", return_value=True):
+            _rc, _failed = dom0handler.mValidateServiceStateOnIlom(_dom0_list)
+
+        self.assertEqual(_rc, self.SUCCESS_ERROR_CODE)
+        self.assertEqual(_failed, [])
+        target_connect = call(aHost=_dom0_list[0], aTimeout=30)
+        self.assertIn(target_connect, mock_mConnect.mock_calls)
+        mock_mExecuteCmd.assert_any_call("ipmitool sunoem getval /SP/services/ipmi/servicestate")
+        self.assertGreater(len(mock_mDisconnect.mock_calls), 0)
 
     @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.mGetFirstDirInZip", return_value="patch_switch_21.2.11.0.0.220414.1/")
     @patch("exabox.infrapatching.handlers.targetHandler.targethandler.TargetHandler.mSetSSHEnvSetUp")
@@ -492,6 +641,231 @@ class ebTestDom0Handler(ebTestClucontrol):
         self.mPrepareMockCommands(_cmds)
         _dom0handler = Dom0Handler(patch_args_dict)
         self.assertEqual(_dom0handler.mPatch(), (self.DBSERVER_DOWN_ERROR_CODE, 0))
+
+    @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.Dom0Handler.mValidateVIFBridgeInDom0", return_value="0x00000000")
+    @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.Dom0Handler.mValidateDomUHeartBeatRdsAndCrsPostPatching", return_value="0x00000000")
+    @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.Dom0Handler.mStartIptablesService", return_value="0x00000000")
+    @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.Dom0Handler.mGetFedRamp", return_value="DISABLED")
+    @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.Dom0Handler.mGetOpStyle", return_value="rolling")
+    @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.Dom0Handler.mGetTimeoutForDom0DomuStartupInSeconds", return_value=5)
+    @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.Dom0Handler.mIsExaSplice", return_value=True)
+    @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.Dom0Handler.mGetInfrapatchExecutionValidator")
+    @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.Dom0Handler.mGetCluPatchCheck")
+    def test_mPostDom0PatchCheck_skips_db_service_for_exasplice(self,
+                                                                mock_get_clu_patch,
+                                                                mock_get_validator,
+                                                                mock_is_exasplice,
+                                                                mock_timeout,
+                                                                mock_get_op_style,
+                                                                mock_get_fedramp,
+                                                                mock_start_iptables,
+                                                                mock_validate_hb,
+                                                                mock_validate_vif):
+        dom0handler = Dom0Handler(copy.deepcopy(self.__patch_args_dict))
+
+        validator = MagicMock()
+        validator.mCheckCondition.return_value = False
+        mock_get_validator.return_value = validator
+
+        clu_patch = MagicMock()
+        clu_patch.mPingNode.return_value = True
+        clu_patch.mCheckImageSuccess.return_value = True
+        clu_patch.mCheckTargetVersion.return_value = 0
+        clu_patch.mValidateAndEnableDomuAutoStartup.return_value = "0x00000000"
+        clu_patch.mCheckVMsUp.return_value = True
+        mock_get_clu_patch.return_value = clu_patch
+
+        rc = dom0handler.mPostDom0PatchCheck(
+            aDom0="test-dom0",
+            aDomUList=["domu1"],
+            aPrePatchVersion="25.1.10.0.0.251020",
+            aPostPatchTargetVersion="25.1.13.0.0.260117",
+            aRollback=False,
+            aTaskType="patch"
+        )
+
+        self.assertEqual(rc, "0x00000000")
+        clu_patch.mCheckDBServices.assert_not_called()
+
+    @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.ProcessStructure")
+    @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.ProcessManager")
+    @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.Dom0Handler.mGetVmExecutionTimeoutInSeconds", return_value=30)
+    @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.Dom0Handler.mGetCluPatchCheck")
+    @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.Dom0Handler.mListOfDomusWithAutoStartEnabled")
+    @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.Dom0Handler.mIsExaSplice", return_value=False)
+    def test_mStartupVMsIfAutoStartEnabled_suppress_error(self, mock_mIsExaSplice, mock_mListOfDomusWithAutoStartEnabled, mock_mGetCluPatchCheck, mock_mGetVmExecutionTimeoutInSeconds, mock_ProcessManager, mock_ProcessStructure):
+
+        ebLogInfo("")
+        ebLogInfo("Running unit test on Dom0Handler.mStartupVMsIfAutoStartEnabled error handling")
+
+        mock_mListOfDomusWithAutoStartEnabled.return_value = ['domu1']
+        _cmds = {
+            self.mGetRegexDom0(): [
+                [
+                    exaMockCommand("virsh", aRc=0)
+                ]
+            ]
+        }
+        self.mPrepareMockCommands(_cmds)
+
+        _clu_patch = MagicMock()
+        _clu_patch.mCheckVMsUp.return_value = []
+        mock_mGetCluPatchCheck.return_value = _clu_patch
+
+        _rc_status = [{'status': 'failed', 'domu': 'domu1'}]
+        _manager_mock = MagicMock()
+        _manager_mock.list.return_value = _rc_status
+        _process_manager = MagicMock()
+        _process_manager.mGetManager.return_value = _manager_mock
+        mock_ProcessManager.return_value = _process_manager
+        mock_ProcessStructure.return_value = MagicMock()
+
+        dom0handler = Dom0Handler(copy.deepcopy(self.__patch_args_dict))
+        dom0handler.mAddError = MagicMock()
+
+        _ret = dom0handler.mStartupVMsIfAutoStartEnabled("slcs27adm03.us.oracle.com", aSupressError=True)
+
+        self.assertEqual(_ret, self.UNABLE_TO_STARTUP_VM_ON_DOM0)
+        dom0handler.mAddError.assert_not_called()
+
+        dom0handler.mAddError.reset_mock()
+        _ret = dom0handler.mStartupVMsIfAutoStartEnabled("slcs27adm03.us.oracle.com")
+
+        self.assertEqual(_ret, self.UNABLE_TO_STARTUP_VM_ON_DOM0)
+        dom0handler.mAddError.assert_called_once_with(self.UNABLE_TO_STARTUP_VM_ON_DOM0, "Unable to startup VMs on Dom0 : slcs27adm03.us.oracle.com")
+
+    @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.ebPatchFormatBuildError", return_value=(PATCHMGR_COMMAND_FAILED, "patchmgr command failed with non-zero status.", None))
+    @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.Dom0Handler.mStartupVMsIfAutoStartEnabled", return_value=UNABLE_TO_STARTUP_VM_ON_DOM0)
+    @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.Dom0Handler.mGetCluPatchCheck")
+    @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.Dom0Handler.mGetComputeNodeListSortedByAlias", return_value=["slcs27adm03.us.oracle.com"])
+    @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.Dom0Handler.mGetComputeNodeListFromPayload", return_value=["slcs27adm03.us.oracle.com"])
+    @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.Dom0Handler.mGetOpStyle", return_value="non-rolling")
+    def test_mStartupVMsUponNonRollingPatchFailure_reports_original_status(self, mock_mGetOpStyle, mock_mGetComputeNodeListFromPayload, mock_mGetComputeNodeListSortedByAlias, mock_mGetCluPatchCheck, mock_mStartupVMsIfAutoStartEnabled, mock_ebPatchFormatBuildError):
+
+        ebLogInfo("")
+        ebLogInfo("Running unit test on Dom0Handler.mStartupVMsUponNonRollingPatchFailure for failure propagation")
+
+        _cmds = {
+            self.mGetRegexDom0(): [
+                [
+                    exaMockCommand("virsh", aRc=0)
+                ]
+            ]
+        }
+        self.mPrepareMockCommands(_cmds)
+
+        _clu_patch = MagicMock()
+        _clu_patch.mCheckImageSuccess.return_value = True
+        mock_mGetCluPatchCheck.return_value = _clu_patch
+
+        dom0handler = Dom0Handler(copy.deepcopy(self.__patch_args_dict))
+        dom0handler.mAddError = MagicMock()
+        dom0handler.mPatchLogWarn = MagicMock()
+
+        dom0handler.mStartupVMsUponNonRollingPatchFailure(aStatus=self.PATCHMGR_COMMAND_FAILED)
+
+        mock_mStartupVMsIfAutoStartEnabled.assert_called_once_with("slcs27adm03.us.oracle.com", aSupressError=True)
+        dom0handler.mPatchLogWarn.assert_called_once()
+        mock_ebPatchFormatBuildError.assert_called_once_with(self.PATCHMGR_COMMAND_FAILED)
+        dom0handler.mAddError.assert_called_once_with(self.PATCHMGR_COMMAND_FAILED, "patchmgr command failed with non-zero status.")
+
+
+    @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.ebPatchFormatBuildError")
+    @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.Dom0Handler.mStartupVMsIfAutoStartEnabled", return_value=UNABLE_TO_STARTUP_VM_ON_DOM0)
+    @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.Dom0Handler.mGetCluPatchCheck")
+    @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.Dom0Handler.mGetComputeNodeListSortedByAlias", return_value=["slcs27adm03.us.oracle.com"])
+    @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.Dom0Handler.mGetComputeNodeListFromPayload", return_value=["slcs27adm03.us.oracle.com"])
+    @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.Dom0Handler.mGetOpStyle", return_value="non-rolling")
+    def test_mStartupVMsUponNonRollingPatchFailure_skips_error_for_success_status(self, mock_mGetOpStyle, mock_mGetComputeNodeListFromPayload, mock_mGetComputeNodeListSortedByAlias, mock_mGetCluPatchCheck, mock_mStartupVMsIfAutoStartEnabled, mock_ebPatchFormatBuildError):
+
+        ebLogInfo("")
+        ebLogInfo("Running unit test on Dom0Handler.mStartupVMsUponNonRollingPatchFailure for success status")
+        _cmds = {
+            self.mGetRegexDom0(): [
+                [
+                    exaMockCommand("virsh", aRc=0)
+                ]
+            ]
+        }
+        self.mPrepareMockCommands(_cmds)
+
+        _clu_patch = MagicMock()
+        _clu_patch.mCheckImageSuccess.return_value = True
+        mock_mGetCluPatchCheck.return_value = _clu_patch
+
+        dom0handler = Dom0Handler(copy.deepcopy(self.__patch_args_dict))
+        dom0handler.mAddError = MagicMock()
+        dom0handler.mPatchLogWarn = MagicMock()
+
+        dom0handler.mStartupVMsUponNonRollingPatchFailure(aStatus=self.SUCCESS_ERROR_CODE)
+
+        mock_mStartupVMsIfAutoStartEnabled.assert_called_once_with("slcs27adm03.us.oracle.com", aSupressError=True)
+        dom0handler.mPatchLogWarn.assert_not_called()
+        dom0handler.mAddError.assert_not_called()
+        mock_ebPatchFormatBuildError.assert_not_called()
+
+
+
+class Dom0HandlerSshMappingTests(unittest.TestCase):
+
+    class _Dom0HandlerSshDummy(Dom0Handler):
+        def __init__(self, error_msg):
+            self._error_msg = error_msg
+            self.mGetErrorCodeFromChildRequest = lambda: (None, False)
+            self.mPatchLogError = MagicMock()
+            self.mPatchLogTrace = MagicMock()
+            self.mPatchLogInfo = ebLogInfo
+            self.mAddError = MagicMock()
+
+        def exercise(self):
+            is_ssh_error, ssh_code = self.isSSHConnectivityError(self._error_msg)
+            if is_ssh_error:
+                code = ssh_code
+                suggestion = self.mBuildSshSuggestion(code, self._error_msg)
+            else:
+                code = INDIVIDUAL_PATCH_REQUEST_EXCEPTION_ERROR
+                suggestion = f"Exception in Running DOM0 Patch {self._error_msg}"
+            self.mAddError(code, suggestion)
+            return code, suggestion
+
+    def test_non_ssh_message_uses_generic_fallback(self):
+        message = "Unexpected failure reading metadata file"
+        dummy = self._Dom0HandlerSshDummy(message)
+        code, suggestion = dummy.exercise()
+        dummy.mAddError.assert_called_once_with(code, suggestion)
+        self.assertEqual(code, INDIVIDUAL_PATCH_REQUEST_EXCEPTION_ERROR)
+        self.assertTrue(suggestion.startswith("Exception in Running DOM0 Patch"))
+        self.assertIn(message.lower(), suggestion.lower())
+        ebLogInfo(
+            f"Dom0HandlerSshMappingTests.test_non_ssh_message_uses_generic_fallback mapped {code} "
+            f"with suggestion: {suggestion}")
+
+    def test_authentication_failure_message(self):
+        message = (
+            "Exception in Running DOM0 Patch Error: Bad authentication type; allowed types: ['publickey'] "
+            "occurred while trying to read the patch states JSON file from the target node: "
+            "vcp166901exdd001.oraclecloud.internal."
+        )
+        dummy = self._Dom0HandlerSshDummy(message)
+        code, suggestion = dummy.exercise()
+        dummy.mAddError.assert_called_once_with(code, suggestion)
+        self.assertEqual(code, SSH_AUTHENTICATION_FAILED)
+        self.assertIn("authentication", suggestion.lower())
+        self.assertIn("vcp166901exdd001", suggestion)
+        ebLogInfo(f"Dom0HandlerSshMappingTests.test_authentication_failure_message mapped {code} with suggestion: {suggestion}")
+
+    def test_connection_timeout_message(self):
+        message = (
+            "Exception in Running DOM0 Patch [Errno 110] Connection timed out while contacting dom0. "
+            "Check service logs from the target node: phx3dom0.example.internal"
+        )
+        dummy = self._Dom0HandlerSshDummy(message)
+        code, suggestion = dummy.exercise()
+        dummy.mAddError.assert_called_once_with(code, suggestion)
+        self.assertEqual(code, SSH_CONNECTION_TIMEOUT)
+        self.assertIn("timed out", suggestion.lower())
+        self.assertIn("phx3dom0", suggestion)
+        ebLogInfo(f"Dom0HandlerSshMappingTests.test_connection_timeout_message mapped {code} with suggestion: {suggestion}")
         
 if __name__ == "__main__":
     unittest.main()

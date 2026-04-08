@@ -1,7 +1,7 @@
 #
 # dom0handlerclusterless.py
 #
-# Copyright (c) 2020, 2025, Oracle and/or its affiliates. 
+# Copyright (c) 2020, 2026, Oracle and/or its affiliates. 
 #
 #    NAME
 #      dom0handlerclusterless.py - Clusterless Dom0 Patching Functionality
@@ -19,6 +19,10 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    kdas        03/16/26 - Bug 39086345: CLUSTERLESS:SMR:DOM0 PRECHECK FAILING WITH
+#                           "[ERRNO 21] IS A DIRECTORY" 
+#    kdas        12/17/25 - Enh 38735511 - Exacloud layer enhancements for 
+#                           SMR patching of Clusterless free nodes 
 #    antamil     07/29/25 - Bug 38221892 Cleanup known_host file at the end of patch
 #    antamil     01/31/25 - Enh 37300427 -Creation: Enable clusterless dom0 patching
 #                           using management host
@@ -29,6 +33,7 @@ import os, sys
 import time
 import json
 import traceback
+import re
 from exabox.core.Context import get_gcontext
 from exabox.core.Node import exaBoxNode
 from exabox.infrapatching.handlers.targetHandler.infrapatchmgrhandler import InfraPatchManager
@@ -133,8 +138,9 @@ class Dom0HandlerClusterless(Dom0Handler):
     def mGetSSHEnvSetUp(self):
         return self.__ssh_env_setup
 
+    def mSetEnvironment(self, aListOfEluNodes=[]):
 
-    def mSetEnvironment(self):
+        _ret = PATCH_SUCCESS_EXIT_CODE
 
         # self.__dom0_patch_zip2_name: is of the format shown below
         # domains/exacloud/PatchPayloads/19.3.6.0.0.200317/Dom0YumRepository/exadata_ol7_19.3.6.0.0.200317_Linux-x86-64.zip,
@@ -156,17 +162,80 @@ class Dom0HandlerClusterless(Dom0Handler):
                         self.__dom0_local_patch_zip2 = _file
                         break
 
+            if self.mIsElu():
+                '''
+                 Patch directory need to be modified below to reflect the current payload
+                 passed as part of self.__elu_target_version_to_node_mappings json
+                 For Example - if the patch path passed is /scratch/araghave/ecra_installs/abhi/mw_home/user_projects/domains/exacloud/PatchPayloads/231103/ExaspliceRepository/exadata_exasplice_update_231103_Linux-x86-64.zip
+                 and the ELU version is - 24.1.14.0.0.250706 
+                 It has to be modified to /scratch/araghave/ecra_installs/abhi/mw_home/user_projects/domains/exacloud/PatchPayloads/24.1.14.0.0.250706/Dom0YumRepository/exadata_ovs_24.1.14.0.0.250706_Linux-x86-64.zip
+                 to pick the current ELU patch path.
+                '''
+                try:
+                    # Resolve the patch payload base to real artifacts under PatchPayloads directory.
+                    _target_version = self.mGetTargetVersion()
+                    if _target_version and _target_version.upper() == "LATEST":
+                    #target version LATEST here means that this is ELU
+                        _elu_mappings = self.mGetEluTargetVersiontoNodeMappings() or {}
+                        if not _elu_mappings:
+                            _ret = MISSING_PATCH_FILES
+                            _suggestion_msg = "Unable to resolve actual ELU target version for LATEST payload."
+                            self.mAddError(_ret, _suggestion_msg)
+                            return _ret
+                        _resolved_version = None
+                        for _candidate_version in _elu_mappings.keys():
+                            if _candidate_version not in INVALID_REGISTERED_PATCH_VERSIONS:
+                                _resolved_version = _candidate_version
+                                break
+                        if not _resolved_version:
+                            _ret = MISSING_PATCH_FILES
+                            _suggestion_msg = "Unable to resolve actual ELU target version for LATEST payload."
+                            self.mAddError(_ret, _suggestion_msg)
+                            return _ret
+                        self.mPatchLogInfo(f"Resolved LATEST target version to {_resolved_version} using ELU mappings.")
+                        self.mSetTargetVersion(_resolved_version)
+                        _target_version = _resolved_version
+
+                    _patch_stage_path = self.mGetPatchPayLoadDirectory()
+                    if not _patch_stage_path:
+                        _ret = MISSING_PATCH_FILES
+                        _suggestion_msg = "Unable to determine patch payload directory for ELU computation."
+                        self.mAddError(_ret, _suggestion_msg)
+                        return _ret
+
+                    self.mPatchLogInfo(f"ELU patching detected. Computing paths from standardized structure.")
+                    _dom0_zip, _dom0_zip2 = self.mComputeEluPatchPaths(_target_version, _patch_stage_path)
+                    self.__dom0_local_patch_zip = _dom0_zip
+                    self.__dom0_local_patch_zip2 = _dom0_zip2
+                except Exception as e:
+                    self.mPatchLogTrace(traceback.format_exc())
+                    self.mPatchLogError(f"Failed to compute ELU patch paths: {str(e)}")
+                    _ret = MISSING_PATCH_FILES
+                    _suggestion_msg = f"ELU patch files not found or inaccessible: {str(e)}"
+                    if self.mGetTask() in [ TASK_PATCH, TASK_ROLLBACK ]:
+                        self.mAddError(_ret, _suggestion_msg)
+                    return _ret
+
             # Set collect time stats flag
             self.mSetCollectTimeStatsFlag(self.mGetCollectTimeStatsParam(PATCH_DOM0))
 
             self.mPatchLogInfo(f"Dom0 local patch zip file name {self.__dom0_local_patch_zip}")
             self.mPatchLogInfo(f"Dom0 local patch zip-2 file name {self.__dom0_local_patch_zip2}")
 
-            if not self.__dom0_local_patch_zip2:
+            if not self.mIsElu() and not os.path.exists(self.__dom0_local_patch_zip2):
                 self.mPatchLogError("Dom0 Patch Zip file not found")
                 raise Exception("Dom0 Patch Zip file not found")
 
             _no_action_taken = 0
+
+            # Picks the latest dbserver patch zip from the available patches under PatchPayloads.
+            _dbzip_file, _msg = self.mResolveDbserverPatchZip()
+            if _dbzip_file and self.mGetDom0DomUPatchZipFile():
+                _patch_list = list(self.mGetDom0DomUPatchZipFile())
+                if len(_patch_list) >= 1:
+                    _patch_list[0] = _dbzip_file
+                    self.mPatchLogInfo("Dom0 dbserver.patch.zip resolved during mSetEnvironment: " + str(_dbzip_file) + " (" + str(_msg) + ")")
+                    self.__dom0_local_patch_zip = _patch_list[0]
 
             _ret = PATCH_SUCCESS_EXIT_CODE
             # Dom0 patching needs 2 zip files. first one has the patchmgr, second one is the actual patch
@@ -187,7 +256,7 @@ class Dom0HandlerClusterless(Dom0Handler):
             self.mSetCurrentTargetType(PATCH_DOM0)
             self.__clusterless_helper  = ClusterlessPatchHelper(aHandler=self)
 
-            _ret, _launchNodes = self.mSetLaunchNodeToPatchOtherDom0Nodes()
+            _ret, _launchNodes = self.mSetLaunchNodeToPatchOtherDom0Nodes(aListOfEluNodes=aListOfEluNodes)
             if _ret != PATCH_SUCCESS_EXIT_CODE:
                 return _ret
             try:
@@ -210,11 +279,15 @@ class Dom0HandlerClusterless(Dom0Handler):
                 ./PatchPayloads/19.3.2.0.0.191119/Dom0YumRepository/exadata_ovs_19.3.2.0.0.191119_Linux-x86-64.zip
             Monthly:
                 ./PatchPayloads/201015/ExaspliceRepository/exadata_exasplice_update_201015_Linux-x86-64.zip
+
+            - Since target version is already set at the start of elu patch and precheck
+              operation, below section can be skipped in case of ELU operations.
             '''
-            if "ExaspliceRepository" in self.mGetDom0LocalPatchZip2():
-                self.mSetTargetVersion(self.mGetDom0LocalPatchZip2().split("/")[-1].split("_")[3])
-            else:
-                self.mSetTargetVersion(self.mGetDom0LocalPatchZip2().split("/")[-1].split("_")[2])
+            if not self.mIsElu():
+                if "ExaspliceRepository" in self.mGetDom0LocalPatchZip2():
+                    self.mSetTargetVersion(self.mGetDom0LocalPatchZip2().split("/")[-1].split("_")[3])
+                else:
+                    self.mSetTargetVersion(self.mGetDom0LocalPatchZip2().split("/")[-1].split("_")[2])
 
             # Add to executed targets
             self.mGetExecutedTargets().append(PATCH_DOM0)
@@ -228,8 +301,12 @@ class Dom0HandlerClusterless(Dom0Handler):
              on all nodes and are used during ssh validation, patchmgr existence 
              check and for performing a few config changes during CNS monitor start.
             '''
-            _nodes_to_patch_except_initial = list(
-                set(self.mGetCustomizedDom0List()) - set([self.__dom0_to_patch_dom0s]))
+            if len(aListOfEluNodes) > 0:
+                _nodes_to_patch_except_initial = list(
+                    set(aListOfEluNodes) - set([self.__dom0_to_patch_dom0s]))
+            else:
+                _nodes_to_patch_except_initial = list(
+                    set(self.mGetCustomizedDom0List()) - set([self.__dom0_to_patch_dom0s]))
             _initial_node_list = [self.__dom0_to_patch_dom0s]
             _initial_node = self.__dom0_to_patch_dom0s
             _next_node = self.mGetDom0ToPatchInitialDom0()
@@ -452,8 +529,8 @@ class Dom0HandlerClusterless(Dom0Handler):
             self.mPatchLogTrace(traceback.format_exc())
         return
 
-
-    def mCheckIdemPotency(self, aDiscarded):
+    
+    def mCheckIdemPotency(self, aDiscarded, aListOfEluNodes=[]):
 
         _ret = PATCH_SUCCESS_EXIT_CODE
         _no_action_taken = 0
@@ -468,8 +545,12 @@ class Dom0HandlerClusterless(Dom0Handler):
         try:
             if not self.mPatchRequestRetried():
                 self.mCreateDirOnNodes(_launch_nodes, self.mGetPatchStatesBaseDir())
-                mWritePatchInitialStatesToLaunchNodes(PATCH_DOM0, self.mGetCustomizedDom0List(),
-                                                      _launch_nodes, self.mGetMetadataJsonFile(), _launch_node_user)
+                if len(aListOfEluNodes) > 0:
+                    mWritePatchInitialStatesToLaunchNodes(PATCH_DOM0, aListOfEluNodes,
+                                                          _launch_nodes, self.mGetMetadataJsonFile(), _launch_node_user)
+                else:
+                    mWritePatchInitialStatesToLaunchNodes(PATCH_DOM0, self.mGetCustomizedDom0List(),
+                                                          _launch_nodes, self.mGetMetadataJsonFile(), _launch_node_user)
         except Exception as e:
             self.mPatchLogWarn(f"Create Dir Error {str(e)} ")
             self.mPatchLogTrace(traceback.format_exc())
@@ -598,4 +679,3 @@ class Dom0HandlerClusterless(Dom0Handler):
                                 return ret, _no_action_taken
         self.mPatchLogInfo("Finished Check for IdemPotency in Patch Manager session")
         return _ret, _no_action_taken
-

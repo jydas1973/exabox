@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "properties": {
+    "cells": {
+      "type": "array"
+    }
+  },
+  "required": [
+    "cells"
+  ]
+}

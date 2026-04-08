@@ -1,10 +1,10 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/ovm/csstep/exabasedb/cs_createvm.py /main/2 2025/12/02 14:16:21 dekuckre Exp $
+# $Header: ecs/exacloud/exabox/ovm/csstep/exabasedb/cs_createvm.py /main/5 2026/01/07 22:19:36 zpallare Exp $
 #
 # cs_createvm.py
 #
-# Copyright (c) 2025, Oracle and/or its affiliates.
+# Copyright (c) 2025, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      cs_createvm.py - <one-line expansion of the name>
@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    scoral      12/22/25 - Re-added cleanup_bonding_if_enabled for cleaning
+#                           monitor_admin.json entry in non-eth0 envs.
 #    prsshukl    11/19/25 - Creation
 #
 
@@ -85,5 +87,10 @@ class csCreateVM(CSBase):
                     _exascale.mUnmountVolume(aOptions, _json) 
 
         self.mDeleteVM(_ebox, aOptions, aStepList)
+
+        # Deconfigure bondmonitor.
+        clubonding.cleanup_bonding_if_enabled(
+            _ebox, payload=aOptions.jsonconf, cleanup_bridge=False,
+            cleanup_monitor=True)
 
         ebLogInfo('csCreateVM: Completed undoExecute Successfully')

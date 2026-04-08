@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     Bm - Functionality of Bare Metal Commands
@@ -12,6 +12,9 @@ NOTE:
 
 History:
     MODIFIED   (MM/DD/YY)
+    shapatna    01/23/26   - Bug 38874520: Reverse txn: 38680797
+    shapatna    12/04/25   - Bug 38680797: Rectifying Fortify Issues in 
+                             Exacloud Files 
     ririgoye    05/28/25   - Bug 38007283 - CHANGE PYTHON 3.11 ISSUES DURING
                              MAIN WORKFLOWS
     ririgoye    06/18/24   - Bug 36746656 - PYTHON 3.11 - EXACLOUD NEEDS TO
@@ -161,6 +164,7 @@ class OedaProcessor(object):
                   + cmd
         cmdStr = ' '.join(cmdArgs)
         self.logger.info('oedacli cmd: %s' % cmdStr)
+        
         try:
             p = subprocess.Popen(
                 shlex.split(cmdArgs),

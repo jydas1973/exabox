@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2021, Oracle and/or its affiliates. 
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates. 
 
 NAME:
     ExaClient - Allows to call a Exacloud endpoint
@@ -90,9 +90,7 @@ def main() -> bool:
 
     args: Namespace = _parser.parse_args()
 
-    if "help" in args:
-        help()
-    elif args.host and args.port:
+    if args.host and args.port:
         call(args.config, args.host, args.port, args.endpoint)
     else:
         print("Invalid option.\n")

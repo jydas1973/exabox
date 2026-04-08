@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     managmentServer - Basic functionality
@@ -11,6 +11,8 @@ NOTE:
     None    
 
 History:
+    shapatna    02/09/26 - Bug: 38900266 - Fix for issues pointed by Codev
+                           in exabox/management directory
     aararora    07/10/25 - Bug 38029254: Support tls 1.3 by default and reject tls 1.0 and 1.1 connections
     abysebas    12/11/24 - BUG 35647508 - OCI-EXACC: REMOTEEC TO PROVIDE MECHANISM TO ROTATE THE REMOTEEC SERVER CERTIFICATES
     ndesanto    07/24/20 - EXACC bug installation issue fix
@@ -54,6 +56,7 @@ class ManagmentServer(BaseServer):
             _rootca_certificate = None
             _client_certificate = None
             _client_privatekey = None
+            app_cfg = None
             # Refer https://github.com/benoitc/gunicorn/issues/1933 and https://docs.python.org/3/library/ssl.html#id9
             # For now, to support TLS 1.3 - we can pass ssl version as ssl.PROTOCOL_TLS.
             # TODO : It looks like there is no dedicated constant defined for TLS 1.3, and moving forward instead of using

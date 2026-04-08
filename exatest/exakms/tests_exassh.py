@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 #
-# $Header: ecs/exacloud/exabox/exatest/exakms/tests_exassh.py /main/10 2025/01/07 14:09:31 jesandov Exp $
+# $Header: ecs/exacloud/exabox/exatest/exakms/tests_exassh.py /main/11 2026/02/05 19:38:13 bhpati Exp $
 #
 # tests_exassh.py
 #
-# Copyright (c) 2021, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_exassh.py - <one-line expansion of the name>
@@ -16,6 +16,9 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    bhpati      01/27/26 - Enh 38820677 - EXASSH WITH DEBUG FLAG SHOULD WRITE
+#                           THE ENTRIES TO THE LOG FILE WHEN IT IS RAN WITH -FL
+#                           FLAG
 #    ririgoye    08/03/23 - Enh 35637033 - Added unit test for remote file
 #                           execution
 #    jesandov    05/31/22 - Add ExaKms KeyValue Info
@@ -27,9 +30,11 @@
 import os
 import unittest
 import stat
+import logging
 
 from random import shuffle
 from unittest.mock import patch
+from unittest import mock
 
 from exabox.core.Context import get_gcontext, set_gcontext
 from exabox.core.Node import exaBoxNode
@@ -456,6 +461,36 @@ class ebTestExaKms(ebTestClucontrol):
             self.assertEqual(_commandRc, 0)
         finally:
             _exassh.mDisconnect()
+
+    @patch("logging.FileHandler")
+    @patch("os.makedirs")
+    @patch("os.getcwd", return_value="/tmp/exacloud/test")
+    @patch("exabox.exassh.ExasshManager.ExasshManager.mInitExacloud", return_value=None)
+    @patch("logging.getLogger")
+    def test_paramiko_logger_gets_file_handler(self, mock_get_logger, mock_init, mock_getcwd,
+                                                mock_makedirs, mock_file_handler):
+
+        file_handler = mock.Mock(name="file_handler")
+        mock_file_handler.return_value = file_handler
+
+        exassh_logger = mock.Mock(name="exassh_logger")
+        exassh_logger.handlers = []
+        exassh_logger.addHandler.side_effect = lambda handler: exassh_logger.handlers.append(handler)
+
+        paramiko_logger = mock.Mock(name="paramiko_logger")
+        paramiko_logger.handlers = []
+        paramiko_logger.addHandler.side_effect = lambda handler: paramiko_logger.handlers.append(handler)
+        paramiko_logger.level = logging.INFO
+        paramiko_logger.setLevel.side_effect = lambda level: setattr(paramiko_logger, "level", level)
+
+        mock_get_logger.side_effect = lambda name: exassh_logger if name == "exassh" else paramiko_logger
+
+        manager = ExasshManager(aConsoleLog=True, aFileLog=True, aSilent=True, aDebug=True)
+        manager.mGetLog()
+
+        self.assertIn(file_handler, exassh_logger.handlers)
+        self.assertIn(file_handler, paramiko_logger.handlers)
+        self.assertEqual(logging.DEBUG, paramiko_logger.level)
 
 
 if __name__ == '__main__':
