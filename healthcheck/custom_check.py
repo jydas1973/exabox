@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2022, Oracle and/or its affiliates. 
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates. 
 
 NAME:
     custom_check.py - execute scripts or command directly giving through profile  
@@ -11,6 +11,7 @@ NOTE:
     None
 
 History:
+    joysjose    03/06/2026 - Bug 38900203 - EXACLOUD: ISSUES FOUND BY VOXIO CODEV AGENT IN DIR EXABOX/HEALTHCHECK
     bhuvnkum    02/19/2018 - Creation
 
 """
@@ -59,6 +60,9 @@ class CustomCheck(ebCluCheck):
         
         _chkParam["cmd"] = aCmd
          
+        _rc = None
+        _o = None
+        _e = None
         try:
             _rc, _i, _o, _e = _ebox.mExecuteLocal(_cmd_str)
             if _rc == 0:

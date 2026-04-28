@@ -23,4 +23,4 @@ class ebTimeBasedTrigger(ebDbTrigger):
             return False
             
     def mRollover(self):
-        self._next_backup = self._next_backup + self._wait_time
+        self._next_backup = datetime.datetime.now() + self._wait_time

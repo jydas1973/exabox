@@ -4,7 +4,7 @@
 #
 # tests_kms_module.py
 #
-# Copyright (c) 2025, Oracle and/or its affiliates.
+# Copyright (c) 2025, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_kms_module.py - <one-line expansion of the name>
@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    aypaul      04/16/26 - Bug#38900303 Fix unit tests for codev identified issues
 #    shapatna    11/11/25 - Enh 38574081: Add unit tests to improve the
 #                           coverage using Cline
 #    shapatna    11/11/25 - Creation
@@ -35,9 +36,25 @@ import tempfile
 from unittest import mock
 from unittest.mock import Mock, patch, call
 
+import six
 from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
 from exabox.log.LogMgr import ebLogInfo
 from exabox.scheduleJobs.kms_module import ebKmsObjectStore
+
+if not hasattr(six, "ensure_binary"):
+    def _ensure_binary(value, encoding='utf-8', errors='strict'):
+        if isinstance(value, bytes):
+            return value
+        return str(value).encode(encoding, errors)
+
+    def _ensure_text(value, encoding='utf-8', errors='strict'):
+        if isinstance(value, bytes):
+            return value.decode(encoding, errors)
+        return str(value)
+
+    six.ensure_binary = _ensure_binary
+    six.ensure_text = _ensure_text
+    six.ensure_str = _ensure_text
 
 
 def _make_ctx(config=None):
@@ -366,6 +383,141 @@ class ebTestKmsModule(ebTestClucontrol):
                     mock_put.assert_not_called()
                     mock_del.assert_called_once()
         ebLogInfo("Unit test on ebKmsObjectStore.mExportKeys executed successfully")
+
+    @patch("exabox.scheduleJobs.kms_module.ExaOCIFactory")
+    def test_helper_accessors(self, mock_factory_cls):
+        ebLogInfo("")
+        ebLogInfo("Running unit test on ebKmsObjectStore helper accessors")
+
+        factory, _, _ = _make_factory_mocks()
+        mock_factory_cls.return_value = factory
+
+        ctx = _make_ctx()
+        kms = ebKmsObjectStore(ctx)
+
+        aes = kms.mGetAES()
+        keys_dir = kms.mGetClusterKeyDir()
+        self.assertIsNotNone(aes)
+        self.assertTrue(keys_dir.endswith("/clusters/keys/"))
+        ebLogInfo("Helper accessor test executed successfully")
+
+    @patch("exabox.scheduleJobs.kms_module.wrapStrBytesFunctions")
+    @patch("exabox.scheduleJobs.kms_module.Popen")
+    @patch("exabox.scheduleJobs.kms_module.ExaOCIFactory")
+    def test_mExecuteLocal_invokes_subprocess(self, mock_factory_cls, mock_popen, mock_wrap):
+        ebLogInfo("")
+        ebLogInfo("Running unit test on ebKmsObjectStore.mExecuteLocal")
+
+        factory, _, _ = _make_factory_mocks()
+        mock_factory_cls.return_value = factory
+
+        proc = Mock()
+        proc.returncode = 7
+        mock_popen.return_value = proc
+        mock_wrap.return_value.communicate.return_value = ("stdout", "stderr")
+
+        ctx = _make_ctx()
+        kms = ebKmsObjectStore(ctx)
+
+        rc, stdout, stderr = kms.mExecuteLocal("echo hi", aCurrDir="/tmp")
+        self.assertEqual(rc, 7)
+        self.assertEqual(stdout, "stdout")
+        self.assertEqual(stderr, "stderr")
+        mock_popen.assert_called_once()
+        mock_wrap.assert_called_once()
+        ebLogInfo("mExecuteLocal executed successfully")
+
+    @patch("exabox.scheduleJobs.kms_module.ExaOCIFactory")
+    def test_mDeleteOndiskKeys_invokes_execute_local(self, mock_factory_cls):
+        ebLogInfo("")
+        ebLogInfo("Running unit test on ebKmsObjectStore.mDeleteOndiskKeys")
+
+        factory, _, _ = _make_factory_mocks()
+        mock_factory_cls.return_value = factory
+
+        ctx = _make_ctx()
+        kms = ebKmsObjectStore(ctx)
+        cluster_dir = kms.mGetClusterKeyDir()
+
+        with patch.object(ebKmsObjectStore, "mExecuteLocal") as mock_exec:
+            kms.mDeleteOndiskKeys("id_rsa.test.root")
+            self.assertEqual(mock_exec.call_count, 2)
+            self.assertEqual(mock_exec.call_args_list[0].kwargs["aCurrDir"], cluster_dir)
+            self.assertIn("id_rsa.test.root", mock_exec.call_args_list[0].args[0])
+            self.assertIn("id_rsa.test.root.pub", mock_exec.call_args_list[1].args[0])
+        ebLogInfo("mDeleteOndiskKeys executed successfully")
+
+    @patch("exabox.scheduleJobs.kms_module.ExaOCIFactory")
+    def test_mListObjects_success_and_failure(self, mock_factory_cls):
+        ebLogInfo("")
+        ebLogInfo("Running unit test on ebKmsObjectStore.mListObjects")
+
+        factory, obj_client, _ = _make_factory_mocks()
+        mock_factory_cls.return_value = factory
+
+        ctx = _make_ctx()
+        kms = ebKmsObjectStore(ctx)
+
+        rc, objects = kms.mListObjects()
+        self.assertEqual(rc, 0)
+        self.assertEqual(len(objects), 2)
+
+        obj_client.list_objects.side_effect = Exception("boom")
+        rc, msg = kms.mListObjects()
+        self.assertEqual(rc, 1)
+        self.assertIn("boom", msg)
+        ebLogInfo("mListObjects executed successfully")
+
+    @patch.object(ebKmsObjectStore, "mUploadObject", return_value=(0, "OK"))
+    @patch.object(ebKmsObjectStore, "mEncryptKey", return_value={"key": {"encDEK": "a", "encData": "b"}})
+    @patch("exabox.scheduleJobs.kms_module.ExaOCIFactory")
+    def test_mPutKey_uploads_encrypted_payload(self, mock_factory_cls, mock_encrypt, mock_upload):
+        ebLogInfo("")
+        ebLogInfo("Running unit test on ebKmsObjectStore.mPutKey")
+
+        factory, _, _ = _make_factory_mocks()
+        mock_factory_cls.return_value = factory
+
+        ctx = _make_ctx()
+        kms = ebKmsObjectStore(ctx)
+        rc, resp = kms.mPutKey("object", "/tmp/key")
+        self.assertEqual(rc, 0)
+        self.assertEqual(resp, "OK")
+        mock_encrypt.assert_called_once()
+        mock_upload.assert_called_once()
+        ebLogInfo("mPutKey executed successfully")
+
+    @patch.object(ebKmsObjectStore, "mGetKey", return_value=(0, None))
+    @patch("exabox.scheduleJobs.kms_module.ExaOCIFactory")
+    def test_mImportKeys_invokes_get_key(self, mock_factory_cls, mock_get_key):
+        ebLogInfo("")
+        ebLogInfo("Running unit test on ebKmsObjectStore.mImportKeys")
+
+        factory, _, _ = _make_factory_mocks()
+        mock_factory_cls.return_value = factory
+
+        ctx = _make_ctx()
+        kms = ebKmsObjectStore(ctx)
+        kms.mImportKeys("host.example.com", aDir="/tmp")
+        mock_get_key.assert_called_once_with("host.example.com", "/tmp")
+        ebLogInfo("mImportKeys executed successfully")
+
+    @patch.object(ebKmsObjectStore, "mDeleteObject", return_value=(0, "deleted"))
+    @patch("exabox.scheduleJobs.kms_module.ExaOCIFactory")
+    def test_mDeleteKeys_invokes_delete_object(self, mock_factory_cls, mock_delete):
+        ebLogInfo("")
+        ebLogInfo("Running unit test on ebKmsObjectStore.mDeleteKeys")
+
+        factory, _, _ = _make_factory_mocks()
+        mock_factory_cls.return_value = factory
+
+        ctx = _make_ctx()
+        kms = ebKmsObjectStore(ctx)
+        rc, resp = kms.mDeleteKeys("cluster")
+        self.assertEqual(rc, 0)
+        self.assertEqual(resp, "deleted")
+        mock_delete.assert_called_once_with("cluster")
+        ebLogInfo("mDeleteKeys executed successfully")
 
 
 if __name__ == '__main__':

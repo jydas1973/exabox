@@ -14,6 +14,8 @@ NOTE:
 
 History:
    MODIFIED (MM/DD/YY)
+    dekuckre   04/02/26 - Make agent listener lock initialization robust for
+                          unit tests
     aypaul     03/03/26 - Bug#38900084 Fix code issues from codev
     aararora   02/27/26 - Bug 38902170: Correct resource leak issues
     rajsag     02/17/26 - 38857796 - exacc:bb:exacloud: progress percentage
@@ -281,6 +283,18 @@ class RouterManager(BaseManager):
     pass
 
 RouterManager.register('routerObject', Router)
+
+
+def _create_listener_lock():
+    """
+    Some test/sandbox environments deny POSIX semaphore creation used by
+    multiprocessing.Lock(). Fall back to threading.Lock() so module import
+    remains functional for unit tests.
+    """
+    try:
+        return Lock()
+    except (PermissionError, OSError):
+        return threading.Lock()
 
 
 def ebGetDefaultAgent():
@@ -747,7 +761,7 @@ def dispatchJobToWorker(aReq, _workerLock=None):
 
 class ebRestHttpListener(ExaHTTPRequestHandler):
 
-    plock = Lock()
+    plock = _create_listener_lock()
 
     def __init__(self, aConfig, aRouterInstance=None, aLock=None, *args):
 

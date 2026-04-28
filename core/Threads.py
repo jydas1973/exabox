@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2020, Oracle and/or its affiliates. 
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     Threads - Basic functionality
@@ -39,7 +39,7 @@ class exaBoxTimeout(object):
         signal.alarm( self.__timeout)
 
     def mStop(self):
-        pass
+        signal.alarm(0)
 #
 # Thread hang detection facility
 #
@@ -97,7 +97,7 @@ def ebThreadMonitor():
                frame_list != old_threads[thread_id][0]:
                 new_threads[thread_id] = (frame_list, now)
             elif old_threads[thread_id][1] < then:
-                print_frame_list(frame_list, frame_id)
+                print_frame_list(frame_list, thread_id)
             else:
                 new_threads[thread_id] = old_threads[thread_id]
         old_threads = new_threads

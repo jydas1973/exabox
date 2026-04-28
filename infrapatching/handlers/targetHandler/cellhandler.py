@@ -17,6 +17,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    sdevasek    04/08/26 - Enh 39143076 - ADDRESS VOXIO CODEV AGENT SCAN
+#                           ISSUES OBSERVED IN TARGETHANLDER FILES
 #    nelango     02/19/26 - Bug 38930043 : ssh key removal in cells during ecra
 #                           switchover
 #    nelango     02/01/26 - Bug 38901967: No ilom service state disabling
@@ -839,15 +841,17 @@ class CellHandler(TargetHandler):
                     _edv_status_cmd = "dbmcli -e 'list dbserver attributes edvStatus' | grep running"
                     _esnp_status_cmd = "dbmcli -e 'list dbserver attributes esnpStatus' | grep running"
 
+                    # Always reset per iteration
+                    _outEdv = None
+                    _outEsnp = None
+
                     _i,_o,_e = _node.mExecuteCmd(_edv_status_cmd)
-                    
-                    if _o:
-                        _outEdv = _o.read()
+                   
+                    _outEdv = _o.read() if _o else None 
                     
                     _i,_o,_e =_node.mExecuteCmd(_esnp_status_cmd)
-              
-                    if _o:
-                        _outEsnp = _o.read()
+             
+                    _outEsnp = _o.read() if _o else None 
 
                     if _outEdv and ("running" in _outEdv):
                         _node.mExecuteCmdLog("dbmcli -e 'alter dbserver shutdown services edv'")

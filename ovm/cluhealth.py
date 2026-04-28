@@ -13,6 +13,8 @@ NOTE:
 History:
     MODIFIED (MM/DD/YY)
     scoral    03/31/26 - Bug 39147565 - Fix ipconf.pl path for multi-platform support.
+    dekuckre  03/24/26 - Fix duplicate-IP recommendation logging in network XML
+                         check
     aypaul    07/10/25 - Bug#38161432 Support multiprocessing update for shared
                          dictionary.
     aararora  05/28/25 - Bug 37981919: cellcli alerthistory command output is
@@ -1678,11 +1680,15 @@ class ebCluHealthCheck(object):
             if _tvmmem == None:
                 _tvmmem = "0gb"
             if (int(float(_totaldom0mem)) <= int(_tvmmem[:-2])) and (int(_cluhealth.mGetVmNum()) == 0):
-                _recommend.append("WARNING: Total memory on %s is %sGB while VM memory requirement is %sGB" %(_host, _totaldom0mem, _tvmmem[:-2]))
-                _loglist.append(_recommend[-1])
-                self.mUpdateJSON(['Cluster', 'hostCheck', _host, 'logs'], 'Pass', '0104010007', _recommend[-1])
+                _mem_warn = ("WARNING: Total memory on %s is %sGB while VM memory requirement is %sGB"
+                             %(_host, _totaldom0mem, _tvmmem[:-2]))
+                _recommend.append(_mem_warn)
+                _loglist.append(_mem_warn)
+                self.mUpdateJSON(['Cluster', 'hostCheck', _host, 'logs'], 'Pass', '0104010007', _mem_warn)
             else:
-                self.mUpdateJSON(['Cluster', 'hostCheck', _host, 'logs'], 'Pass', '0104010007', _recommend[-1])
+                _mem_pass = ("INFO: Total memory on %s is %sGB while VM memory requirement is %sGB"
+                             %(_host, _totaldom0mem, _tvmmem[:-2]))
+                self.mUpdateJSON(['Cluster', 'hostCheck', _host, 'logs'], 'Pass', '0104010007', _mem_pass)
 
             ebLogHealth('NFO', '***                  ovmutils version: \t %s' %(_cluhealth.mGetOvmutilsVer()))
             ebLogHealth('NFO', '***                      perl version: \t %s' %(_cluhealth.mGetPerlVer()))
@@ -3725,12 +3731,19 @@ class ebCluHealthCheck(object):
             else:
 
                 ebLogHealth('NFO','*** Invalid network information, ips duplicated')
+                _duplicated_ips = []
                 for _uniqIp in _uniqIps:
                     _count = _ipList.count(_uniqIp)
                     if _count >= 2:
                         ebLogHealth('NFO',f'*** Duplicated IP: {_uniqIp}')
+                        _duplicated_ips.append(_uniqIp)
 
-                _jsonMap['XML']['networkCheck']['logs'].append(_recommend[-1])
+                _dup_ip_msg = (
+                    "ERROR: Duplicate IP address(es) found in XML network "
+                    f"configuration: {', '.join(_duplicated_ips)}"
+                )
+                _recommend.append(_dup_ip_msg)
+                _jsonMap['XML']['networkCheck']['logs'].append(_dup_ip_msg)
                 _jsonMap['XML']['networkCheck']['TestResult'] = "Fail"
 
 

@@ -4,7 +4,7 @@
 #
 # infraoperations_script_validator.py
 #
-# Copyright (c) 2022, 2024, Oracle and/or its affiliates.
+# Copyright (c) 2022, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      infraoperations_script_validator.py - <one-line expansion of the name>
@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    kdas        04/09/26 - Clarify CoDev scan false positive:
+#                           mysql wrapper syntax (ENH 39145008)
 #    araghave    07/15/24 - Enh 36830077 - CLEANUP KSPLICE CODE FROM
 #                           INFRAPATCHING FILES
 #    abherrer    10/06/22 - ENH 33115324 - Integration test for shell script that checks current infra operations in CPS
@@ -34,6 +36,8 @@ command_exit_val = os.system("/opt/oci/exacc/exacloud/bin/mysql --status > /dev/
 assert command_exit_val == 0, "Mysql is down"
 
 # Check if there are infra operations going on
+# Scanner false positive: ExaCloud mysql wrapper expects "--execute <db> <sql>",
+# so this argument order is intentional.
 result = subprocess.run(["/opt/oci/exacc/exacloud/bin/mysql", "--execute", "requests", "SELECT uuid FROM requests WHERE status='Pending' AND cmdtype IN ('cluctrl.patch_prereq_check', 'cluctrl.postcheck', 'cluctrl.patch', 'cluctrl.rollback', 'cluctrl.rollback_prereq_check')"], stdout=subprocess.PIPE)
 cmd_output = result.stdout.decode('utf-8')
 assert len(cmd_output) == 0, "Theres a patching operation executing. Cant test."

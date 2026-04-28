@@ -3,7 +3,7 @@
 #
 # roceswitchmockhandler.py
 #
-# Copyright (c) 2020, 2024, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      roceswitchmockhandler.py - Patch - RoCE Switch Basic Functionality.
@@ -15,6 +15,9 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    mirrodri    04/08/26 - ENH 39144876 - ADDRESS CODEV SCAN ISSUE IN
+#                           ROCESWITCHMOCKHANDLER.PY: MISSING OS/SYS IMPORTS 
+#                           CAUSING MODULE LOAD FAILURE
 #    emekala     10/25/24 - ENH 37070223 - SYNC MOCK HANLDERS WITH LATEST CODE
 #                           FROM CORE INFRAPATCHING HANDLERS AND ADD SUPPORT
 #                           FOR CUSTOM RESPONSE AND RACK DETAILS
@@ -266,6 +269,8 @@ History:
     marrorod    04/28/2016 - Lock changes. Master request acquires the lock before sending a request
 """
 import traceback
+import os
+import sys
 from exabox.core.Context import get_gcontext
 from exabox.core.Node import exaBoxNode
 from exabox.infrapatching.handlers.mockTargetHandler.targetmockhandler import TargetMockHandler

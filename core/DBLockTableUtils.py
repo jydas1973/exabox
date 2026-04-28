@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2023, Oracle and/or its affiliates. 
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     DBLockTableUtils.py
@@ -73,16 +73,24 @@ def sDBLockCleanAllLeftoverLocks(aMock=False):
 
     _node = None
     _results = []
+    _locks_cleaned = []
 
     # groupby output is ((dom0A,[LockA1,LockA2]), (dom0B,[LockB]),...)
     # Cleanup all locks, dom0 by dom0 in sorted order
-    for _host,_lock_list in groupby(sorted(_allLocks, key=_sort_key),key=_sort_key):
+    for _host,_lock_iter in groupby(sorted(_allLocks, key=_sort_key),key=_sort_key):
+        _lock_list = list(_lock_iter)
         if not aMock:
             try:
                 with connect_to_host(_host, get_gcontext()) as _node:
                     # Here we are connected to host (in non Mock), cleanup all locks
                     for _lock in _lock_list:
-                        _results.append(sDBLockCleanLockOnHost(_node, _lock, aMock))
+                        _result = sDBLockCleanLockOnHost(_node, _lock, aMock)
+                        _results.append(_result)
+                        if _result in (0, None):
+                            _locks_cleaned.append(_lock)
+                        else:
+                            ebLogWarn('Cleanup command for lock {} on host {} returned {}. Skipping DB removal.'
+                                      .format(_lock['uuid'], _host, _result))
             except Exception as e:
                 ebLogWarn('Cannot connect to host: {} for lock cleanup:({})'
                           .format(_host, e))
@@ -90,9 +98,16 @@ def sDBLockCleanAllLeftoverLocks(aMock=False):
         else:
             # Here we are connected to host (in Mock), cleanup all locks
             for _lock in _lock_list:
-                _results.append(sDBLockCleanLockOnHost(_node, _lock, aMock))
+                _result = sDBLockCleanLockOnHost(_node, _lock, aMock)
+                _results.append(_result)
+                _locks_cleaned.append(_lock)
 
-    _db.mDeleteAllLocks()
+    for _lock in _locks_cleaned:
+        try:
+            _db.mDeleteLock(_lock['uuid'], _lock['lock_type'], _lock['lock_hostname'])
+        except Exception as e:
+            ebLogWarn('Failed to remove lock {} for host {} from DB after cleanup: {}'
+                      .format(_lock['uuid'], _lock['lock_hostname'], e))
     return _results
            
 
@@ -130,4 +145,3 @@ class ebDBLockCleanup(object):
         ebLogInfo('Cleaning up Pending Lock on {}'.format(aLockDict['lock_hostname']))
         aNode.mExecuteCmdLog(_cmd)
         return aNode.mGetCmdExitStatus()
-

@@ -4,7 +4,7 @@
 #
 # exacomputehandlertypes.py
 #
-# Copyright (c) 2022, 2024, Oracle and/or its affiliates.
+# Copyright (c) 2022, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      exacomputehandlertypes.py
@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    sdevasek    04/08/26 - Enh 39143069 - ADDRESS VOXIO CODEV AGENT SCAN
+#                           ISSUES OBSERVED IN EXACOMPUTE PATCHING
 #    araghave    08/27/24 - Enh 36971710 - PERFORM STRING INTERPOLATION USING
 #                           F-STRINGS FOR ALL THE EXACOMPUTE FILES
 #    jyotdas     07/22/22 - ENH 34350151 - Exacompute Infrapatching
@@ -44,6 +46,15 @@ def getExaComputeHandlerInstance(aDictionary):
             _handler_class = getattr(importlib.import_module(_module_name), _class_name)
         except ImportError:
             ebLogError(f"Module {_module_name} does not exist")
+
+    else:
+        ebLogError(f"No handler mapping found for task '{_taskType}'")
+
+    if _handler_class is None:
+        ebLogError(f"No handler class could be resolved for task '{_taskType}' "
+                   f"(handler_name={_handler_name}).")
+        return None
+
     _handler_instance = _handler_class(aDictionary)
     if _handler_instance:
         return _handler_instance

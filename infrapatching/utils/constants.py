@@ -14,6 +14,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    sdevasek    04/08/26 - Enh 39181872 - REMOVE
+#                           MFIXINVALIDELUVERSIONENTRIES FROM ECS_MAIN
 #    sdevasek    03/18/26 - Bug 39051493 - SMR PATCHING FAILED WITH ERROR :
 #                           "PATCH FILES MISSING ON TH EXACLOUD HOST AND ELU
 #                           PATCHING CANNOT CONTINUE FOR THE CURRENT PATCH
@@ -557,4 +559,3 @@ ELU_TYPE_STR ="Exadata Live Update Type"
 ELU_APPLIED_REBOOT_MESSAGE = "(Live Update applied. Reboot at any time to finalize outstanding items.)"
 ELU_HAS_OUTSTANDING_WORK_STR = "Exadata Live Update Has Outstanding Work"
 CURRENT_QMR_VERSION_STR = "Image version"
-IMAGE_VER_NOT_FOUND_STR = "ImageVersion not Found"

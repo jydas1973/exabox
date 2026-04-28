@@ -4,7 +4,7 @@
 #
 # clubonding_migration.py
 #
-# Copyright (c) 2022, Oracle and/or its affiliates.
+# Copyright (c) 2022, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      clubonding_migration.py - Bonding migration utilities.
@@ -101,7 +101,7 @@ def valid_cell_griddisks(node: exaBoxNode) -> bool:
         asm_deactivable: Optional[str] = \
             properties.get('ASMDeactivationOutcome')
 
-        if asm_status.upper() in ('ONLINE', 'SYNC'):
+        if asm_status and asm_status.upper() in ('ONLINE', 'SYNC'):
             continue
 
         msg: str = (
@@ -109,7 +109,7 @@ def valid_cell_griddisks(node: exaBoxNode) -> bool:
             f'ASMModeStatus is {asm_status}'
         )
 
-        if asm_deactivable.upper() == 'YES':
+        if asm_deactivable and asm_deactivable.upper() == 'YES':
             ebLogWarn(f'{msg}.')
         else:
             ebLogError(

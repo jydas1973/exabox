@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    araghave    03/12/26 - Enh 38932829 - PROVIDE A PLUGIN SUPPORT DURING DOM0
+#                           EXACOMPUTE PATCHING
 #    sdevasek    01/16/26 - Enh 38821433 - EXACOMPUTE FREE POOL NODE
 #                           PATCHING: USE ONE OF THE TARGET NODE AS LAUNCH
 #                           NODE
@@ -355,6 +357,13 @@ class ebCluExaComputePatch(LogHandler):
                 ebCluExaComputePatch.mUpdateRequestData(self.__eboxCluCtrl.mGetRequestObj(), aData=_data, aOptions=self.__options, aStatusObj=_errObj)
                 return _ret
 
+
+            # Pass through InfraPatchPluginMetaData if present; Exacompute supports only PluginMetadata-based flow
+            _plugins_metadata = []
+            if "InfraPatchPluginMetaData" in _jconf and _jconf["InfraPatchPluginMetaData"]:
+                _plugins_metadata = _jconf["InfraPatchPluginMetaData"]
+                self.mPatchLogInfo("PluginMetadata detected: {} entries".format(len(_plugins_metadata)))
+
             _patch_args_dict = {
                 "CluControl": self.__eboxCluCtrl,
                 "RequestObj": self.__eboxCluCtrl.mGetRequestObj(),
@@ -370,7 +379,11 @@ class ebCluExaComputePatch(LogHandler):
                 "isExaComputePatching": _is_exacompute_patching,
                 "TargetType": _target_type,
                 "AdditionalOptions": _additional_options,
-                "RackName": _rack_name
+                "RackName": _rack_name,
+                "InfraPatchPluginMetaData": _plugins_metadata
+                ,# Ensure PluginHandler sees a valid type; ExaCompute is Dom0 only
+                "PluginTypes": "dom0",
+                "EnablePlugins": "yes" if _plugins_metadata else "no"
             }
 
             _exaHandlerInstance = getExaComputeHandlerInstance(_patch_args_dict)

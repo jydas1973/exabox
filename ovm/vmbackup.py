@@ -13,6 +13,8 @@ NOTE:
 History:
 
     MODIFIED   (MM/DD/YY)
+       arturjim 03/26/26 - Enh 39029904 - ECRA:VMBACKUP: ADD SUPPORT TO
+                           RUN VM BACKUP PER CLUSTER
        aararora 02/27/26 - Bug 38902170: Correct resource leak issues
        arturjim 02/27/26 - Enh 39017726 - ECRA:VMBACKUP: ADD OPTIONAL PARAM
                            'VMNAME' FOR GRANULAR VM BACKUPS PER VM BASIS
@@ -1295,11 +1297,20 @@ class ebCluManageVMBackup(object):
     def mVMbackupAll(self, aOptions):
         _dpairs = self.__ebox.mReturnDom0DomUPair()
 
-        _target_dom0 = None
-        _vm_name = None
+        _allowed_pairs = None
         if aOptions.jsonconf is not None:
-            _target_dom0 = aOptions.jsonconf.get("dom0")
-            _vm_name = aOptions.jsonconf.get("vm_name")
+            _nodes = aOptions.jsonconf.get("nodes")
+            if isinstance(_nodes, list) and len(_nodes) > 0:
+                _allowed_pairs = set()
+                for _node in _nodes:
+                    if not isinstance(_node, dict):
+                        continue
+                    _node_dom0 = _node.get("dom0")
+                    _node_vm = _node.get("vm_name")
+                    if _node_dom0 and _node_vm:
+                        _allowed_pairs.add((_node_dom0, _node_vm))
+                if len(_allowed_pairs) == 0:
+                    _allowed_pairs = None
 
         # If the payload has a non-empty vmboss section, we proceeed with the VMBackup
         # OCI cache file update, and credentials population
@@ -1346,14 +1357,11 @@ class ebCluManageVMBackup(object):
 
         # Add tasks to parallel processing manager
         for _dom0, _domu in _dpairs:
-            if _target_dom0 and _dom0 != _target_dom0:
-                continue
-            if _vm_name and _domu != _vm_name:
-                continue
-
-            _args = [_dom0, _procDict]  
-            if _vm_name:
-                _args.append(_vm_name)
+            _args = [_dom0, _procDict]
+            if _allowed_pairs:
+                if (_dom0, _domu) not in _allowed_pairs:
+                    continue
+                _args.append(_domu)
 
             _task = ProcessStructure(self.mRunVMBackup, aArgs=_args, aId=_dom0)
             _task.mSetMaxExecutionTime(int(_maxTime))

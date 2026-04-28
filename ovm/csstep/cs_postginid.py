@@ -17,6 +17,8 @@ INTERNAL CLASSES:
 
 History:
        MODIFIED (MM/DD/YY)
+       aararora  04/13/26 - 39200237: Issues observed for ca signed certs being
+                            copied to domus for exacc
        aararora  03/20/26 - 39106054: Install Falcon agent during postginid
        aararora  01/27/26 - Bug 38723384: Add retry/force logic for crs restart
        prsshukl  03/04/25 - Bug 38828221: Copy customer Root CA for SSL Inspection enabled infra
@@ -526,7 +528,7 @@ class csPostGINID(CSBase):
         #
         if ebox.mIsOciEXACC():
             # Enh 35823972: COPY DOM-U CERTIFICATE INTO DOM-U DURING CS
-            if ebox.mIsFedramp():
+            if ebox.mIsFedramp() or ebox.mIsCaSignedCerts():
                 ebox.mSetupDomUsForSecurePatchServerCommunication()
             else:
                 ebox.mSetupDomUsForSecureDBCSCommunication()

@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2024, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     Monitor - Basic functionality
@@ -701,7 +701,7 @@ def build_requests_html_page(auto_refresh=True, aParams=None):
         else:
             _link_s = "/AgentCtrl?file=log/threads/"+_log_filename+".log"
 
-        _uuid_s = '<a href="{}">{}</a>'.format(_uuid_n, _link_s)
+        _uuid_s = '<a href="{}">{}</a>'.format(_link_s, _uuid_n)
 
         _cluster_name = _row[11]
 
@@ -745,7 +745,7 @@ def build_requests_html_page(auto_refresh=True, aParams=None):
 
         # change and reorder row contents
 
-        _row = [ _uuid_s, _row[1], _row[10], _row[2], _row[3], _elapsed_s, _cmdt_s, _cluster_conf_s, _row[6], _row[7] ]
+        _row = [ _uuid_s, _row[1], _row[10], _row[2], _row[3], _elapsed_s, _cmdt_s, _cluster_conf_s, _row[8], _row[9] ]
 
         # Error / Error Info
 

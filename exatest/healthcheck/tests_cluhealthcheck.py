@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    joysjose    03/24/26 - Bug 38900203 :Codev fixes for exabox/healtcheck
 #    aararora    03/03/26 - Bug 38902170: Correct resource leak issues
 #    shapatna    01/05/26 - Creation
 #
@@ -31,6 +32,7 @@ from exabox.healthcheck.cluhealthcheck import (
     ebCluHealth,
     LOG_TYPE,
 )
+from exabox.healthcheck.hcutil import mReadConfigFile
 
 
 class _DummyEbox(object):
@@ -168,6 +170,13 @@ class TestEbCluHealth(unittest.TestCase):
              mock.patch('json.load', return_value={}):
             health.mReadHcConfig()
         handle.__exit__.assert_called_once()
+
+    def test_mReadConfigFile_returns_none_and_logs_error(self):
+        missing_path = os.path.join(tempfile.gettempdir(), "missing_healthcheck_profile.json")
+        with mock.patch("exabox.healthcheck.hcutil.ebLogError") as log_error:
+            self.assertIsNone(mReadConfigFile(missing_path))
+        log_error.assert_called_once()
+        self.assertIn(missing_path, log_error.call_args[0][0])
 
     def test_mDoHealthCheck_update_network_mismatch_sets_error(self):
         # Auto-generated test for mDoHealthCheck

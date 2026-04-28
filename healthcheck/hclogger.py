@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2023, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     hclogger.py - Refactored from cluhealth to provide common logging support
@@ -11,6 +11,7 @@ NOTE:
     None
 
 History:
+    joysjose    03/06/2026 - Bug 38900203 - EXACLOUD: ISSUES FOUND BY VOXIO CODEV AGENT IN DIR EXABOX/HEALTHCHECK
     bhuvnkum    02/19/2018 - Creation
 
 """
@@ -149,7 +150,13 @@ class HcLogger(object):
 #                     ebLogHealth(LOG_TYPE.reverse_mapping[LOG_TYPE.WARNING].upper(), 'JsonMap should be passed with healthcheck loglevel >= LOG_TYPE.RECOMMEND')
             
         
-    def mUpdateResult(self, aResult , aMsgDetail = {}, aCheckParam = {}):
+    def mUpdateResult(self, aResult , aMsgDetail = None, aCheckParam = None):
+
+        if aMsgDetail is None:
+            aMsgDetail = {}
+
+        if aCheckParam is None:
+            aCheckParam = {}
         
         if(self.__hc == None):
             return aResult
@@ -232,4 +239,3 @@ class HcLogger(object):
                 self._jsonMap[nodeSummary][aResult[nodeName]]["testsFailed"].append(custDisplayTag)
             else:
                 self._jsonMap[nodeSummary][aResult[nodeName]]["testsPassed"].append(custDisplayTag)
-

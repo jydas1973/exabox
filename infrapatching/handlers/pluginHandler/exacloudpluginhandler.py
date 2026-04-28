@@ -15,6 +15,10 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    araghave    04/11/26 - Enhancement Request 39143049 - FIX PLUGIN HANDLER
+#                           RELATED CODE ISSUES REPORTED BY CODEV
+#    araghave    03/12/26 - Enh 38932829 - PROVIDE A PLUGIN SUPPORT DURING DOM0
+#                           EXACOMPUTE PATCHING
 #    sdevasek    03/09/26 - Bug 39053714 - INFRAPATCH REGISTERED PLUGINS: REUSE
 #                           CACHED VALIDATION RESULTS ACROSS NODES FOR THE
 #                           SCRIPTBUNDLE VALIDATION
@@ -142,7 +146,7 @@ class ExacloudPluginHandler(PluginHandler):
                 _suggestion_msg = f"No exadata parent plugins to run from {('DomU' if (aNodeType == PATCH_DOMU) else 'DOM0')} '{(aNode if (aNodeType == PATCH_DOM0) else self.mGetDomUCustomerNameforDomuNatHostName(aNode))}'. Please ensure to have parent plugins script. Plugins location: '{_plugins_to_run}'"
                 ret = EXACLOUD_PARENT_PLUGINS_MISSING
                 self.mAddError(ret, _suggestion_msg)
-                return ret
+                return ret, None
         except Exception as e:
             _rc, _child_request_error_already_exists_in_db = self.mGetErrorCodeFromChildRequest()
             if _child_request_error_already_exists_in_db:
@@ -613,7 +617,7 @@ class ExacloudPluginHandler(PluginHandler):
                     self.mPatchLogInfo(
                         f"exacloud plugin scripts will be run with the following input : {json.dumps(_exacloud_plugin_data, indent=4)} on node {_node_name}")
 
-                if mGetPluginTargetV2(_exacloud_plugin_data).lower() in [ "dom0", "cell" ] and str(mGetPluginTargetV2(_exacloud_plugin_data).lower()) in str(self.mGetTargetTypes()[0].lower()):
+                if (mGetPluginTargetV2(_exacloud_plugin_data).lower() in [ "dom0", "cell" ] and str(mGetPluginTargetV2(_exacloud_plugin_data).lower()) in str(self.mGetTargetTypes()[0].lower())) or str(mGetPluginTargetV2(_exacloud_plugin_data).lower()) == "exacompute":
                     # Validate the script bundle on exacloud node only once for the first node,cache result
                     if _script_alias not in _validation_cache:
                         # First time we see this plugin
@@ -688,7 +692,7 @@ class ExacloudPluginHandler(PluginHandler):
 
             self.mPatchLogInfo(f"Executing exacloud plugins on Node : {aNode}.")
             try:
-                if str(mGetPluginTargetV2(_exacloud_plugin_data).lower()) in str(self.mGetTargetTypes()[0].lower()):
+                if str(mGetPluginTargetV2(_exacloud_plugin_data).lower()) in str(self.mGetTargetTypes()[0].lower()) or str(mGetPluginTargetV2(_exacloud_plugin_data).lower()) == "exacompute":
                     # Step1. Validate the script bundle
                     self.mPatchLogInfo(f"Validating exacloud plugin script bundle for node {aNode}")
                     _ret = self.mValidateExacloudPluginScriptBundle(_exacloud_plugin_data)

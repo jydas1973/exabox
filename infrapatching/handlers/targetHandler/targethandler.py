@@ -17,8 +17,12 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    avimonda    04/07/26 - Bug 39128684: Fix missing patchmgr notification local
+#                           initialization
 #    kdas        03/15/26 - ER 38354388 - EXACC: INCLUDE NETWORK INTERFACE 
 #                           ALERT ON PATCHING PRE-CHECK
+#    araghave    03/12/26 - Enh 38932829 - PROVIDE A PLUGIN SUPPORT DURING DOM0
+#                           EXACOMPUTE PATCHING
 #    bhpati      02/20/26 - Bug 38888691 - OCI:Update error message when
 #                           LaunchNode is the management host for patch
 #                           failures.
@@ -642,8 +646,17 @@ class TargetHandler(GenericHandler):
 
         self.__crypto_policy_state = None
 
+        # Initialize PluginHandler . Exacloud, oneoff - all plugins will be automatically enabled
+        if self.isADBDImplicitPluginEnabled() == True:
+            self.mPatchLogInfo("ADBD Implicit Plugin will run")
+            _domU_autonomous_list = self.mGetAutonomousVMList()
+            self.__pluginHandler = mGetPluginHandlerType(*initial_data, autonomousVMList=_domU_autonomous_list)
+        else:
+            self.mPatchLogInfo("ADBD Implicit Plugin will not run")
+            self.__pluginHandler = mGetPluginHandlerType(*initial_data, **kwargs)
+
         if self.mIsExacomputePatching():
-            self.mPatchLogInfo(f"Exacompute patch is performed. Exiting from infrapatching targethandler init method.")
+            self.mPatchLogInfo("Exacompute patch is performed. Exiting from infrapatching targethandler init method.")
             return
 
         # Cell and Switch Related  Variables , since they are common for both
@@ -668,15 +681,6 @@ class TargetHandler(GenericHandler):
         # Same reason applicable for __dom0_to_patch_initial_dom0 as well
         self.__domu_to_patch_initial_domu = None
         self.__dom0_to_patch_initial_dom0 = None
-
-        # Initialize PluginHandler . Exacloud, oneoff - all plugins will be automatically enabled
-        if self.isADBDImplicitPluginEnabled() == True:
-            self.mPatchLogInfo("ADBD Implicit Plugin will run")
-            _domU_autonomous_list = self.mGetAutonomousVMList()
-            self.__pluginHandler = mGetPluginHandlerType(*initial_data, autonomousVMList=_domU_autonomous_list)
-        else:
-            self.mPatchLogInfo("ADBD Implicit Plugin will not run")
-            self.__pluginHandler = mGetPluginHandlerType(*initial_data, **kwargs)
 
         #Initialize NODE_SLEEP_MAX_LIMIT_IN_SECONDS timeout parameter.
         NODE_SLEEP_MAX_LIMIT_IN_SECONDS = self.mGetNodeSleepMaxLimitInSeconds()
@@ -2051,6 +2055,7 @@ class TargetHandler(GenericHandler):
             self.mSetConnectionUser(_node)
             _node.mConnect(aHost=aDom0)
             _patchmgr_xml_data = None
+            _patch_notification_file = None
             
             try:
                 if _node.mFileExists(_notifications_dir):
@@ -2059,7 +2064,7 @@ class TargetHandler(GenericHandler):
                     _i, _o, _e = _node.mExecuteCmd(_cmd_notification_file_cmd)
                     _out = _o.readlines()
                     if len(_out) > 0:
-                        _patch_notification_file = _out[0]
+                        _patch_notification_file = _out[0].strip()
 
                     if _patch_notification_file:
                         _notification_file_path = os.path.join(_notifications_dir, _patch_notification_file)

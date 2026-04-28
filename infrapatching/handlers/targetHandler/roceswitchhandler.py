@@ -15,6 +15,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    sdevasek    04/08/26 - Enh 39143076 - ADDRESS VOXIO CODEV AGENT SCAN
+#                           ISSUES OBSERVED IN TARGETHANLDER FILES
 #    araghave    12/16/25 - Enh 38766076 - CONFIGURE UPDATE-CRYPTO-POLICIES
 #                           BEFORE AND AFTER SWITCH PATCHING
 #    ajayasin    08/05/25 - moving handler function from clucontrol.py
@@ -286,6 +288,8 @@ History:
     bmartin     04/26/2016 - Added target version check
     marrorod    04/28/2016 - Lock changes. Master request acquires the lock before sending a request
 """
+import os
+import sys
 import traceback
 from exabox.core.Context import get_gcontext
 from exabox.core.Node import exaBoxNode

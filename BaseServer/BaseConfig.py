@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2021, Oracle and/or its affiliates. 
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     BaseConfig - Basic functionality
@@ -11,6 +11,7 @@ NOTE:
     None    
 
 History:
+    aypaul      04/06/2026 - 8900091 - Fix codev issues from AI static code analysis
     jesandov    26/03/2019 - File Creation
 """
 
@@ -50,11 +51,17 @@ class BaseConfig(object):
 
         if self.__path == "":
             _path = sys.argv[0]
-            _path = _path[0: _path.find("{0}/".format(self.__prefix))+len(self.__prefix)+1]
+            _marker = _path.find("{0}/".format(self.__prefix))
+            if _marker == -1:
+                raise Exception(f"Prefix: {self.__prefix} is absent in {_path}")
+            _path = _path[0 : _marker + len(self.__prefix) + 1]
             self.__path = _path
 
         _exapath = self.mGetPath()
-        self.__exapath = os.path.abspath(_exapath[0: _exapath.find("exabox")] )
+        if "exabox" in _exapath:
+            self.__exapath = os.path.abspath(_exapath[0: _exapath.find("exabox")] )
+        else:
+            raise Exception(f"exabox folder not present in {_exapath}")
 
         with open(self.__path + "config/basic.conf") as _f:
             self.__config = json.loads(_f.read())

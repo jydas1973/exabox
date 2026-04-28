@@ -1,7 +1,7 @@
 """
 $Header:
 
- Copyright (c) 2014, 2023, Oracle and/or its affiliates. 
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     cleanup_workers.py - Basic functionality
@@ -16,6 +16,7 @@ NOTE:
 History:
 
        MODIFIED (MM/DD/YY)
+       aypaul      04/16/26 - Bug#38900303 Fix codev identified issues.
        pbellary    09/22/22 - Creation
 """
 
@@ -25,12 +26,14 @@ import optparse, argparse
 import psutil
 import shlex
 import subprocess
+import json
+import ast
 from  subprocess import PIPE
 
 from exabox.core.DBStore3 import *
 from exabox.core.Context import get_gcontext
 from exabox.core.Core import exaBoxCoreInit
-from exabox.log.LogMgr import ebLogInit, ebLogInfo
+from exabox.log.LogMgr import ebLogInit, ebLogInfo, ebLogWarn
 from exabox.agent.Agent import ebGetRequestObj
 from exabox.scheduleJobs.utils import mExecuteLocal
 
@@ -109,15 +112,17 @@ class CleanUpWorkers():
                 pidlist.append(int(w[8])) #insert PID of every row into list
         
         worker_types = ['-w', '--supervisor']
+        refined_pids = list()
         for pid in pidlist:
             if pid and psutil.pid_exists(pid):
                 _process = psutil.Process(pid).cmdline()
                 if not any(worker in _process for worker in worker_types): #check if PID is NOT an open worker
-                    pidlist.remove(pid)
+                    continue
             else:
-                pidlist.remove(pid)
+                continue
+            refined_pids.append(pid)
 
-        return pidlist
+        return refined_pids
 
 def ebLoadProgramArguments():
     """

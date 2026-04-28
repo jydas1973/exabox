@@ -743,6 +743,7 @@ class exaBoxKvmDiskMgr(object):
                 else:
                     _detail_error = 'lvresize command failed in domU'
                     _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_LVRESIZE_FAIL'], _detail_error)
+                    return self.__edp.mRecordError(gPartitionError['ErrorRunningRemoteCmd'], "*** " + _detail_error)
 
 
             # Resize LUKS Device

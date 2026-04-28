@@ -4,7 +4,7 @@
 #
 # cleanup_database_log.py
 #
-# Copyright (c) 2021, Oracle and/or its affiliates. 
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      cleanup_database_log.py - To cleanup database logs in exacloud/log directory
@@ -16,6 +16,7 @@
 #      Needs database_files_limit and database_age_limit_in_days defined in exacloud config
 #
 #    MODIFIED   (MM/DD/YY)
+#    aypaul      04/16/26 - Bug#38900303 Fix codev identified issues.
 #    gurkasin    03/18/21 - Creation
 #
 
@@ -46,13 +47,13 @@ class CleanUpDatabaseLog():
     def mParseConfig(self):
 
         #Parse max age
-        self.__max_age_in_days = int(get_gcontext().mGetConfigOptions().get("database_age_limit_in_days", ""))
+        self.__max_age_in_days = int(get_gcontext().mGetConfigOptions().get("database_age_limit_in_days", "30"))
         if not self.__max_age_in_days:
             self.__max_age_in_days = 30
         self.__max_age_in_seconds = (24*60*60) * int(self.__max_age_in_days)
 
         #Parse max files limit
-        self.__database_files_limit = int(get_gcontext().mGetConfigOptions().get("database_files_limit", ""))
+        self.__database_files_limit = int(get_gcontext().mGetConfigOptions().get("database_files_limit", "30"))
         if not self.__database_files_limit:
             self.__database_files_limit = 30
 

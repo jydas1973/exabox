@@ -3,7 +3,7 @@
 #
 # oneoffpluginhandler.py
 #
-# Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      oneoffpluginhandler.py - This module contains methods to run oneoff plugin on all targets.
@@ -15,6 +15,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    araghave    04/11/26 - Enhancement Request 39143049 - FIX PLUGIN HANDLER
+#                           RELATED CODE ISSUES REPORTED BY CODEV
 #    araghave    03/13/25 - ER 37701317 - ONEOFF PATCH SHOULD GENERATE UNIQUE
 #                           LOG FILE
 #    araghave    03/04/25 - Bug 37417431 - EXACS | DOMU | UNWANTED SSH
@@ -324,7 +326,7 @@ class OneOffPluginHandler(PluginHandler):
             if _connected_as_non_root_user:
                 _sudo_str = 'sudo '
                 # sudo chown -R opc:opc /opt/exacloud/customs/plugins/oneoff_patches; else will have permission denied problem
-                _cmd_oneoff_run = f" chown -R opc:opc {aPluginRemoteDir} {aLogDir}; {_sudo_str}chmod +x {aPatchFile}; {_sudo_str}{aPatchFile} {_oneoff_args} > {aLogFile} "
+                _cmd_oneoff_run = f" {_sudo_str}chown -R opc:opc {aPluginRemoteDir} {aLogDir}; {_sudo_str}chmod +x {aPatchFile}; {_sudo_str}{aPatchFile} {_oneoff_args} > {aLogFile} "
             else:
                 _cmd_oneoff_run = f"chmod +x {aPatchFile};{aPatchFile} {_oneoff_args} > {aLogFile} "  #for Dom0, cells and Switches
 

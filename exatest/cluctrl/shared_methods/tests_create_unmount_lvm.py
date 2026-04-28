@@ -4,7 +4,7 @@
 #
 # tests_create_unmount_lvm.py
 #
-# Copyright (c) 2022, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2022, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_create_unmount_lvm.py - <one-line expansion of the name>
@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    dekuckre    04/08/26 - update unit test mocks for vgs-based lv sizing
 #    jfsaldan    12/12/25 - Bug 38629562 - PREVENT SGU Y25W44 FAILURES |
 #                           EXASCALE_COMPLETE STEP FAILS IF U02 VG ALREADY
 #                           EXISTS IN DOM0 | LOGIC FOR CLEANUP NOT RUNNING IN
@@ -78,7 +79,9 @@ class ebTestCreateDeleteLVM(ebTestClucontrol):
                         aRc = 0),
                     exaMockCommand("lvm pvcreate --force  /dev/mapper/loop0p1", aStdout = "\n", aRc = 0),
                     exaMockCommand("lvm vgcreate VGExaDbDisk.u02_extra.img /dev/mapper/loop0p1", aStdout = "\n", aRc = 0),
-                    exaMockCommand("lvm lvcreate -L 58G -n LVDBDisk VGExaDbDisk.u02_extra.img", aStdout = "\n", aRc = 0),
+                    exaMockCommand("lvm vgs --noheadings --units b --nosuffix -o vg_free,vg_extent_size VGExaDbDisk.u02_extra.img",
+                        aStdout = " 64424509440 4194304\n", aRc = 0),
+                    exaMockCommand("lvm lvcreate -l 14847 -n LVDBDisk VGExaDbDisk.u02_extra.img", aStdout = "\n", aRc = 0),
                     exaMockCommand("lvm lvchange -a y /dev/VGExaDbDisk.u02_extra.img/LVDBDisk", aStdout = "\n", aRc = 0),
                     exaMockCommand("mkfs.ext4 -F /dev/VGExaDbDisk.u02_extra.img/LVDBDisk", aStdout = "\n", aRc = 0),
                     exaMockCommand("mkfs.ext4 -F /dev/VGExaDbDisk.u02_extra.img/LVDBDisk -O ^metadata_csum", aStdout = "\n", aRc = 0),
@@ -156,7 +159,9 @@ class ebTestCreateDeleteLVM(ebTestClucontrol):
                         aRc = 0),
                     exaMockCommand("lvm pvcreate --force  /dev/mapper/loop0p1", aStdout = "\n", aRc = 0),
                     exaMockCommand("lvm vgcreate VGExaDbDisk.u02_extra.img /dev/mapper/loop0p1", aStdout = "\n", aRc = 0),
-                    exaMockCommand("lvm lvcreate -L 58G -n LVDBDisk VGExaDbDisk.u02_extra.img", aStdout = "\n", aRc = 0),
+                    exaMockCommand("lvm vgs --noheadings --units b --nosuffix -o vg_free,vg_extent_size VGExaDbDisk.u02_extra.img",
+                        aStdout = " 64424509440 4194304\n", aRc = 0),
+                    exaMockCommand("lvm lvcreate -l 14847 -n LVDBDisk VGExaDbDisk.u02_extra.img", aStdout = "\n", aRc = 0),
                     exaMockCommand("lvm lvchange -a y /dev/VGExaDbDisk.u02_extra.img/LVDBDisk", aStdout = "\n", aRc = 0),
                     exaMockCommand("mkfs.ext4 -F /dev/VGExaDbDisk.u02_extra.img/LVDBDisk", aStdout = "\n", aRc = 0),
                     exaMockCommand("mkfs.ext4 -F /dev/VGExaDbDisk.u02_extra.img/LVDBDisk -O ^metadata_csum", aStdout = "\n", aRc = 0),
@@ -273,7 +278,9 @@ class ebTestCreateDeleteLVM(ebTestClucontrol):
                         aRc = 0),
                     exaMockCommand("lvm pvcreate --force  /dev/mapper/loop0p1", aStdout = "\n", aRc = 0),
                     exaMockCommand("lvm vgcreate VGExaDbDisk.u02_extra.img /dev/mapper/loop0p1", aStdout = "\n", aRc = 0),
-                    exaMockCommand("lvm lvcreate -L 58G -n LVDBDisk VGExaDbDisk.u02_extra.img", aStdout = "\n", aRc = 0),
+                    exaMockCommand("lvm vgs --noheadings --units b --nosuffix -o vg_free,vg_extent_size VGExaDbDisk.u02_extra.img",
+                        aStdout = " 64424509440 4194304\n", aRc = 0),
+                    exaMockCommand("lvm lvcreate -l 14847 -n LVDBDisk VGExaDbDisk.u02_extra.img", aStdout = "\n", aRc = 0),
                     exaMockCommand("lvm lvchange -a y /dev/VGExaDbDisk.u02_extra.img/LVDBDisk", aStdout = "\n", aRc = 0),
                     exaMockCommand("mkfs.ext4 -F /dev/VGExaDbDisk.u02_extra.img/LVDBDisk", aStdout = "\n", aRc = 0),
                     exaMockCommand("mkfs.ext4 -F /dev/VGExaDbDisk.u02_extra.img/LVDBDisk -O ^metadata_csum", aStdout = "\n", aRc = 0),
@@ -497,7 +504,9 @@ class ebTestCreateDeleteLVM(ebTestClucontrol):
                         aRc = 0),
                     exaMockCommand("lvm pvcreate --force  /dev/mapper/u02_Vmzktrs_1_e811", aStdout = "\n", aRc = 0),
                     exaMockCommand("lvm vgcreate VGExaDbDisk.u02_extra.img /dev/mapper/u02_Vmzktrs_1_e811", aStdout = "\n", aRc = 0),
-                    exaMockCommand("lvm lvcreate -L 58G -n LVDBDisk VGExaDbDisk.u02_extra.img", aStdout = "\n", aRc = 0),
+                    exaMockCommand("lvm vgs --noheadings --units b --nosuffix -o vg_free,vg_extent_size VGExaDbDisk.u02_extra.img",
+                        aStdout = " 64424509440 4194304\n", aRc = 0),
+                    exaMockCommand("lvm lvcreate -l 14847 -n LVDBDisk VGExaDbDisk.u02_extra.img", aStdout = "\n", aRc = 0),
                     exaMockCommand("lvm lvchange -a y /dev/VGExaDbDisk.u02_extra.img/LVDBDisk", aStdout = "\n", aRc = 0),
                     exaMockCommand("mkfs.ext4 -F /dev/mapper/u02_Vmzktrs_1_e811", aStdout = "\n", aRc = 0),
                     exaMockCommand("mkfs.ext4 -F /dev/VGExaDbDisk.u02_extra.img/LVDBDisk", aStdout = "\n", aRc = 0),

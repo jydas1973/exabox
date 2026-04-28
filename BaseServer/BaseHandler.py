@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2023, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     BaseHandler - Basic functionality
@@ -11,6 +11,7 @@ NOTE:
     None    
 
 History:
+    aypaul      04/06/2026 - 8900091 - Fix codev issues from AI static code analysis
     hgaldame    09/30/2023 - 35019797 - exacc - remoteec cps_tuner endpoint not
                              working
     jesandov    06/04/2020 - Add validation against base64_file, regex:, hidden, alias parameters
@@ -114,7 +115,7 @@ class BaseHandler(ExaHTTPRequestHandler):
                     _check = _endpointsJson[_single]['params']
                     break
 
-        if _check == False:
+        if _check == None or _check == False:
             aResponse['text']   = "The endpoint {0} does not support {1}".format(aEndpointName, self.command)
             aResponse['error']  = "Error, no body found"
             aResponse['status'] = 501
@@ -260,8 +261,7 @@ class BaseHandler(ExaHTTPRequestHandler):
         if _auth_header is None:
 
             self.do_AUTHHEAD()
-            self.wfile.write(self.headers.get('Authorization').encode('utf8'))
-            self.wfile.write(b'Authentication failed not authorized to access this service')
+            self.wfile.write(b'Authentication failed not authorized to access this service. No Authorization header provided.')
             return False
 
         else:

@@ -15,6 +15,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    jyotdas     04/08/26 - Codex scan issue fixes
 #    jyotdas     03/05/26 - 39033262 - Support Targetversion Latest for dom0
 #                           Elu in Non Single Thread Patching
 #    araghave    02/12/26 - Bug 38891325 - OCI: EXACS | SMR | SMR APPLY IS
@@ -1332,6 +1333,9 @@ class ebCluPatchDispatcher(LogHandler):
                 '''
                  Case 2 : Just increment the request count, if given target type is ibswitch.
                 '''
+                # A request targets either ibswitch OR non-ibswitch, never both simultaneously;
+                # returning here is safe as no non-switch targets will be missed.
+
                 if _f.mGetDoSwitch().lower() == 'yes' and (PATCH_IBSWITCH in _call['TargetType'] or PATCH_SWITCH in _call['TargetType']):
                     _requests += 1
                     self.mPatchLogInfo(f"Expected number of requests in case of a Switch operation : {_requests}")

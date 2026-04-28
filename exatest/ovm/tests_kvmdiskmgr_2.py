@@ -16,6 +16,10 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    dekuckre    04/10/26 - Fix encrypted lvresize failure unit test
+#                           expectations
+#    dekuckre    04/02/26 - Fix Python 3.6 mock call argument assertion in
+#                           kvmdiskmgr_2 tests
 #    aararora    03/03/26 - Bug 38902170: Correct resource leak issues
 #    nelango     02/23/26 - Bug 38996273 : Modify unittests for Bug 38700324 
 #    shapatna    01/07/26 - Codex UT enhancement
@@ -985,7 +989,7 @@ class TestExaBoxKvmDiskMgr(unittest.TestCase):
         mock_node_exec.assert_called_once_with(node, '/bin/shred -fu /tmp/keyfile')
         mock_log_info.assert_any_call(mock.ANY)
         self.assertTrue(
-            any('Ignoring error' in call.args[0] for call in mock_log_info.call_args_list),
+            any('Ignoring error' in call[0][0] for call in mock_log_info.call_args_list),
             'Expected log about ignoring lvresize error'
         )
         fake_ebox.mUpdateErrorObject.assert_not_called()
@@ -1211,16 +1215,18 @@ class TestExaBoxKvmDiskMgr(unittest.TestCase):
         mock_node_cls.return_value = node
 
         mock_mount_info.return_value = mock.Mock(fs_type='ext4', mount_point='/mnt')
+        self.fake_edp.mRecordError.return_value = 'lvresize-failure'
 
         result = exaBoxKvmDiskMgr(self.fake_edp).mExecuteDomUUpsizeStepsEncrypted(
             'domu', '/dev/mapper/lv', 26
         )
 
-        self.assertEqual(result, 0)
-        self.fake_edp.mRecordError.assert_not_called()
+        self.assertEqual(result, 'lvresize-failure')
+        self.fake_edp.mRecordError.assert_called_once_with(
+            gPartitionError['ErrorRunningRemoteCmd'], mock.ANY)
         self.fake_ebox.mUpdateErrorObject.assert_called_once_with(
             gReshapeError['ERROR_LVRESIZE_FAIL'], mock.ANY)
-        mock_node_exec.assert_called_once_with(node, f'/bin/shred -fu {keyfile_path}')
+        mock_node_exec.assert_not_called()
 
 
     # Auto-generated test for mExecuteDomUUpsizeStepsEncrypted

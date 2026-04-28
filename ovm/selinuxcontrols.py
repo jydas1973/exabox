@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    aypaul      04/23/26 - Bug#39225305 Remove reboot from infra nodes for SELinux
+#                           update
 #    aypaul      03/16/26 - ER#38277507 Add selinux operation response to ec
 #                           data.
 #    aypaul      01/16/26 - Creation
@@ -123,7 +125,11 @@ class ebSelinuxControls(object):
                         operationStatus["modeUpdate"] = "Success"
                         operationStatus["policyUpdate"] = "Success"
                         if self.mSetSeLinux(_node, newMode, componentType, operationStatus):
-                            _reboot_set.add(thisNode)
+                            ebLogInfo(f"SELinux configuration was successful on {thisNode}")
+                            if componentType == "domu":
+                                _reboot_set.add(thisNode)
+                        else:
+                            ebLogError(f"Failed to apply selinux configuration on {thisNode}")
 
                         if operationStatus["modeUpdate"] == "Failure":
                             _hasModeUpdateFailed = True

@@ -3,7 +3,7 @@
 #
 # plugintaskshandler.py
 #
-# Copyright (c) 2020, 2024, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      plugintaskshandler.py - Wrapper Patching API to expose exacloud
@@ -17,6 +17,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    araghave    04/13/26 - Enhancement Request 39143054 - FIX TASK HANDLER
+#                           RELATED CODE ISSUES REPORTED BY CODEV
 #    araghave    07/15/24 - Enh 36830077 - CLEANUP KSPLICE CODE FROM
 #                           INFRAPATCHING FILES
 #    araghave    02/28/24 - Enh 36295801 - IMPLEMENT ONEOFFV2 PLUGIN EXACLOUD
@@ -25,6 +27,7 @@
 #    nmallego    08/28/20 - Refactor infra patching code
 #    nmallego    08/28/20 - Creation
 #
+import traceback
 from exabox.infrapatching.handlers.targetHandler.cellhandler import CellHandler
 from exabox.infrapatching.handlers.targetHandler.dom0handler import Dom0Handler
 from exabox.infrapatching.handlers.targetHandler.domuhandler import DomUHandler
@@ -55,11 +58,15 @@ class PluginTasksHandler(TaskHandler):
                     _rc = _targetHandler.mOneOff()
                 elif _operation == TASK_ONEOFFV2:
                     _rc = _targetHandler.mOneOffv2()
+                else:
+                    raise Exception(f"Unsupported plugin task '{_operation}' for Dom0 target")
                 break
             elif _len == 1 and PATCH_DOMU in self.mGetTargetTypes():
                 _targetHandler = DomUHandler(self.mGetAllArgs())
                 if _operation == TASK_ONEOFF:
                     _rc = _targetHandler.mOneOff()
+                else:
+                    raise Exception(f"Unsupported plugin task '{_operation}' for DomU target")
                 break
             elif _len == 1 and PATCH_CELL in self.mGetTargetTypes():
                 _targetHandler = CellHandler(self.mGetAllArgs())
@@ -67,15 +74,18 @@ class PluginTasksHandler(TaskHandler):
                     _rc = _targetHandler.mOneOff()
                 elif _operation == TASK_ONEOFFV2:
                     _rc = _targetHandler.mOneOffv2()
+                else:
+                    raise Exception(f"Unsupported plugin task '{_operation}' for Cell target")
                 break
             elif _len == 1 and (any(x in self.mGetTargetTypes() for x in [PATCH_IBSWITCH,PATCH_ROCESWITCH])):
                 _targetHandler = SwitchHandler(self.mGetAllArgs())
                 if _operation == TASK_ONEOFF:
                     _rc = _targetHandler.mOneOff()
+                else:
+                    raise Exception(f"Unsupported plugin task '{_operation}' for Switch target")
                 break
 
         if _targetHandler is None:
             raise Exception("No Target handler specified for Patching")
 
         return _rc
-

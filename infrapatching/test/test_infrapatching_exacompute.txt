@@ -17,6 +17,9 @@
 #
 #
 #    MODIFIED   (MM/DD/YY)
+#    sdevasek    03/09/26 - Enh 39044163 - INFRAPATCHING TEST AUTOMATION - UPDATE
+#                           TESTS FOR FREE POOL NODE PATCHING IN EXACOMPUTE
+#                           PATCHING TOVALIDATE NODE_PROGRESS_DATA
 #    sdevasek    01/13/26 - Enh 38821433 - EXACOMPUTE FREE POOL NODE PATCHING:
 #                           USE ONE OF THE TARGET NODE AS LAUNCH NODE
 #    araghave    10/03/25 - Enhancement Request 38444755 - INFRAPATCHING TEST
@@ -119,6 +122,29 @@ class Test_exacompute_class(unittest.TestCase):
         if self.__ssh_equivalence_cleanup_required:
             _status = RemoveKeyFromHosts(Test_exacompute_class.__dom0s[1:], Test_exacompute_class.__dom0s[0])
 
+    def mRunPatchOperationWithAutoSelectionOfLaunchNodes(self, operation, node_list):
+        """Common flow for auto-selected launch node validations."""
+
+        _target_node = Test_exacompute_class.__dom0s[:]
+        # shutdown the vms on all the nodes
+        mShutdownVMsOnDom0(_target_node)
+
+        mUpdateParamInPayload("LaunchNodes", [])
+        mUpdateParamInPayload("NodeList", node_list)
+
+        self.__operation = operation
+        if self.__ssh_equivalence_configured:
+            self.__infra_patch_operation_status_result, self.__infra_patch_operation_status_output =  \
+                mExecuteInfraPatchCommandWithRetry(self.__operation, Test_exacompute_class.__target_name, self.__operation_style)
+            self.assertTrue(self.__infra_patch_operation_status_result,
+                            "Exacompute %s should pass with auto-selected launch nodes" % self.__operation)
+
+            status_json = json.loads(self.__infra_patch_operation_status_output)
+            details = status_json.get("exacompute_patching_details", {})
+            self.assertTrue(details.get("launch_node"),
+                            "Derived launch node missing from status output")
+            self.assertTrue(mValidateExacomputeNodesInNodePatchingProgressData(self.__infra_patch_operation_status_output, node_list))
+
     @pytest.mark.exacompute_patch_with_vms_running
     def test_exacompute_patch_with_vms_running(self):
         """
@@ -162,6 +188,9 @@ class Test_exacompute_class(unittest.TestCase):
                 self.__infra_patch_operation_status_result, self.__infra_patch_operation_status_output =  \
                     mExecuteInfraPatchCommandWithRetry(self.__operation, Test_exacompute_class.__target_name, self.__operation_style)
                 self.assertTrue(self.__infra_patch_operation_status_result, "Exacompute %s operation failed." % self.__operation)
+                self.assertTrue(
+                    mValidateExacomputeNodesInNodePatchingProgressData(self.__infra_patch_operation_status_output,
+                                                                       Test_exacompute_class.__dom0s[1:]))
 
     @pytest.mark.exacompute_precheck_patch_mgr_failure
     def test_exacompute_precheck_patch_mgr_failure(self):
@@ -302,6 +331,7 @@ class Test_exacompute_class(unittest.TestCase):
             self.__infra_patch_operation_status_result, self.__infra_patch_operation_status_output =  \
                 mExecuteInfraPatchCommandWithRetry(self.__operation, Test_exacompute_class.__target_name, self.__operation_style)
             self.assertTrue(self.__infra_patch_operation_status_result, "Exacompute %s operation failed." % self.__operation)
+            self.assertTrue(mValidateExacomputeNodesInNodePatchingProgressData(self.__infra_patch_operation_status_output, Test_exacompute_class.__dom0s[1:]))
 
     @pytest.mark.exacompute_postcheck
     def test_exacompute_postcheck(self):
@@ -318,6 +348,7 @@ class Test_exacompute_class(unittest.TestCase):
             self.__infra_patch_operation_status_result, self.__infra_patch_operation_status_output =  \
                 mExecuteInfraPatchCommandWithRetry(self.__operation, Test_exacompute_class.__target_name, self.__operation_style)
             self.assertTrue(self.__infra_patch_operation_status_result, "Exacompute %s operation failed." % self.__operation)
+            self.assertTrue(mValidateExacomputeNodesInNodePatchingProgressData(self.__infra_patch_operation_status_output, Test_exacompute_class.__dom0s[1:]))
 
     @pytest.mark.exacompute_backup_image
     def test_exacompute_backup_image(self):
@@ -354,28 +385,23 @@ class Test_exacompute_class(unittest.TestCase):
                 mExecuteInfraPatchCommandWithRetry(self.__operation, Test_exacompute_class.__target_name, self.__operation_style)
             self.assertTrue(self.__infra_patch_operation_status_result, "Exacompute ELU %s operation failed." % self.__operation)
 
-    @pytest.mark.exacompute_auto_launch_nodes
-    def test_exacompute_auto_launch_nodes(self):
+    @pytest.mark.exacompute_precheck_auto_launch_nodes
+    def test_exacompute_precheck_auto_launch_nodes(self):
         """Validate workflow derives launch nodes when payload omits them."""
 
-        _target_node = Test_exacompute_class.__dom0s[:]
-        #shutdown the vms on all the nodes
-        mShutdownVMsOnDom0(_target_node)
+        self.mRunPatchOperationWithAutoSelectionOfLaunchNodes(TASK_PREREQ_CHECK, Test_exacompute_class.__dom0s[:3])
 
-        mUpdateParamInPayload("LaunchNodes", [])
-        mUpdateParamInPayload("NodeList", Test_exacompute_class.__dom0s[:3])
+    @pytest.mark.exacompute_patch_auto_launch_nodes
+    def test_exacompute_patch_auto_launch_nodes(self):
+        """Validate workflow derives launch nodes when payload omits them."""
 
-        self.__operation = TASK_PREREQ_CHECK
-        if self.__ssh_equivalence_configured:
-            self.__infra_patch_operation_status_result, self.__infra_patch_operation_status_output =  \
-                mExecuteInfraPatchCommandWithRetry(self.__operation, Test_exacompute_class.__target_name, self.__operation_style)
-            self.assertTrue(self.__infra_patch_operation_status_result,
-                            "Exacompute precheck should pass with auto-selected launch nodes")
+        self.mRunPatchOperationWithAutoSelectionOfLaunchNodes(TASK_PATCH, Test_exacompute_class.__dom0s[:3])
 
-            status_json = json.loads(self.__infra_patch_operation_status_output)
-            details = status_json.get("exacompute_patching_details", {})
-            self.assertTrue(details.get("launch_node"),
-                            "Derived launch node missing from status output")
+    @pytest.mark.exacompute_rollback_auto_launch_nodes
+    def test_exacompute_rollback_auto_launch_nodes(self):
+        """Validate workflow derives launch nodes when payload omits them."""
+
+        self.mRunPatchOperationWithAutoSelectionOfLaunchNodes(TASK_ROLLBACK, Test_exacompute_class.__dom0s[:3])
 
     @pytest.mark.exacompute_single_node_without_launch
     def test_exacompute_single_node_without_launch(self):

@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    sdevasek    04/08/26 - Enh 39143069 - ADDRESS VOXIO CODEV AGENT SCAN
+#                           ISSUES OBSERVED IN EXACOMPUTE PATCHING
 #    sdevasek    02/09/26 - Enh 38891722 - REMOVAL OF SSH EQUIVALENCE BETWEEN
 #                           LAUNCH-NODE AND TARGET-NODES
 #    sdevasek    01/22/26 - Enh 38854794 - EXACOMPUTE FREE POOL NODE  PATCHING:
@@ -44,7 +46,7 @@ from exabox.core.Context import get_gcontext
 from exabox.core.Node import exaBoxNode
 from exabox.infrapatching.exacompute.handlers.exacomputegenerichandler import ExaGenericHandler
 from exabox.infrapatching.core.infrapatcherror import *
-from exabox.infrapatching.utils.constants import TASK_PREREQ_CHECK, PATCH_EXACOMPUTE, INFRA_PATCHING_HANDLERS
+from exabox.infrapatching.utils.constants import TASK_PREREQ_CHECK, PATCH_EXACOMPUTE, PATCH_DOM0, INFRA_PATCHING_HANDLERS
 from exabox.infrapatching.handlers.targetHandler.infrapatchmgrhandler import InfraPatchManager
 from exabox.infrapatching.utils.utility import mRegisterInfraPatchingHandlers, getTargetHandlerInstance
 

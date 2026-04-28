@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2024, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     DBStore - Basic DB functionality
@@ -12,6 +12,8 @@ NOTE:
 
 History:
     MODIFIED   (MM/DD/YY)
+       jfsaldan 04/09/26 - Bug 38900114 - EXACLOUD: ISSUES FOUND BY VOXIO CODEV
+                           AGENT IN DIR EXABOX/CORE
        ririgoye 02/13/24 - Bug 36215212 - Added memory diagnostics to crash
                            dump exception logging
     hnvenkat    07/30/2020 - Mask sensitive ENV variables
@@ -60,7 +62,7 @@ class CrashDump(object):
             # Stack of original exception
             self.__str_exception  = traceback.format_tb(tb)
             # Current stack
-            self.__str__currstack = traceback.format_stack()
+            self.__str_currstack = traceback.format_stack()
             self.AddExtraInfo('Exception class:{}, value: {}'.format(etype,value))
             # Retrieve memory diagnostics
             _return_json = mGetUsageMetrics()
@@ -118,7 +120,6 @@ class CrashDump(object):
         if isinstance(self.__str_exception,list):
             aFd.write("\nRoot cause Stack:\n")
             aFd.writelines(self.__str_exception)
-
 
 
 

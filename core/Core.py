@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2021, Oracle and/or its affiliates. 
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     Core - Basic functionality
@@ -123,10 +123,10 @@ class exaBoxCore(object):
         try:
             if os.path.exists("config/label.dat"):
                 with open('config/label.dat') as f:
-                    return f.read().strip()
+                    label = f.read().strip()
         except:
             return label
-            
+        return label
 
     def mGetVersion(self):
 

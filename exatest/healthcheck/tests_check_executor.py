@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    joysjose    03/24/26 - Bug 38900203 :Codev fixes for exabox/healtcheck
 #    joysjose    01/11/26 - Codex UT iteration 1
 #    aypaul      12/09/25 - Bug#38736166 Enhance code coverage with Cline
 #    bhpati      07/31/25 - Bug 38102552 - OCI: ECRA WORKFLOW FOR
@@ -31,8 +32,9 @@ from exabox.core.Node import exaBoxNode
 from exabox.core.MockCommand import exaMockCommand
 from exabox.log.LogMgr import ebLogInfo, ebLogWarn, ebLogError
 from unittest.mock import MagicMock, patch
-from exabox.healthcheck.hclogger import get_logger, init_logging
+from exabox.healthcheck.hclogger import get_logger, init_logging, HcLogger
 from exabox.healthcheck.check_executor import Finalize
+from exabox.healthcheck.custom_check import CustomCheck
 import warnings
 
 class TestFinalize(unittest.TestCase):
@@ -685,6 +687,27 @@ class TestNodeTaskOtherCustom(unittest.TestCase):
         # Should be a no-op
         t.execute(res)
 
+    def test_custom_task_serial_execution(self):
+        hc = _DummyHC()
+        hc._custom = {"CustomCheck": "echo hi"}
+        subtask = self.logger.mGetResultTemplate()
+        subtask[HcConstants.RES_CHKNAME] = "CustomCheck"
+        task = check_executor.CustomTask(hc, HcConstants.CUSTOMCHECK, [{
+            "fp": lambda cmd, params=None: {
+                HcConstants.RES_RESULT: CHK_RESULT.PASS,
+                HcConstants.RES_LOG: [cmd],
+                HcConstants.RES_MSGDETAIL: {},
+                HcConstants.RES_CHECKPARAM: params or {},
+            },
+            "result": copy.deepcopy(subtask),
+        }])
+        res = {"pids": [""]}
+        task.execute(res)
+        keys = [k for k in res.keys() if k.endswith("_results1")]
+        self.assertTrue(keys)
+        self.assertEqual(res[keys[0]][HcConstants.RES_CHKNAME], "CustomCheck")
+        self.assertEqual(res[keys[0]][HcConstants.RES_RESULT], "PASS")
+
     def test_node_task_parallel_execution(self):
         # Auto-generated test for NodeTask.execute
         hc = _DummyHC(ebox=_DummyVerboseEbox(timeout_value=432))
@@ -746,6 +769,38 @@ class TestNodeTaskOtherCustom(unittest.TestCase):
                 
             keys = [k for k in res.keys() if k.endswith("_results1")]
             self.assertTrue(keys)
+
+class TestHealthcheckHelpers(unittest.TestCase):
+    def test_hclogger_mUpdateResult_uses_fresh_default_dicts(self):
+        logger = HcLogger(mock.Mock(), object())
+        first = logger.mUpdateResult(CHK_RESULT.PASS)
+        first[HcConstants.RES_MSGDETAIL]["detail"] = "value"
+        first[HcConstants.RES_CHECKPARAM]["param"] = "value"
+
+        second = logger.mUpdateResult(CHK_RESULT.FAIL)
+
+        self.assertEqual({}, second[HcConstants.RES_MSGDETAIL])
+        self.assertEqual({}, second[HcConstants.RES_CHECKPARAM])
+
+    def test_custom_check_exception_before_execute_local_assignment(self):
+        logger = mock.Mock()
+        logger.mUpdateResult.side_effect = lambda result, msgdetail, chkparam: {
+            HcConstants.RES_RESULT: result,
+            HcConstants.RES_MSGDETAIL: msgdetail,
+            HcConstants.RES_CHECKPARAM: chkparam,
+        }
+        ebox = mock.Mock()
+        ebox.mExecuteLocal.side_effect = RuntimeError("boom")
+
+        custom_check = CustomCheck.__new__(CustomCheck)
+        custom_check.logger = logger
+        custom_check.mGetEbox = mock.Mock(return_value=ebox)
+
+        result = CustomCheck.mCheckCustomScript(custom_check, "echo hi")
+
+        self.assertEqual(CHK_RESULT.FAIL, result[HcConstants.RES_RESULT])
+        self.assertEqual({"cmd": "echo hi"}, result[HcConstants.RES_CHECKPARAM])
+        logger.mAppendLog.assert_called_once()
 
 class TestCheckExecutorEndToEnd(unittest.TestCase):
     def setUp(self):

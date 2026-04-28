@@ -16,6 +16,8 @@ NOTE:
 History:
 
     MODIFIED   (MM/DD/YY)
+    jfsaldan    04/10/26 - Bug 38900114 - EXACLOUD: ISSUES FOUND BY VOXIO CODEV
+                           AGENT IN DIR EXABOX/CORE
     rbhandar    01/08/26 - Add test for json patch report lock
     aypaul      07/07/25 - Enh#38105150 Increase code coverage for dbstore3.
     avimonda    09/26/24 - Added test for mGetChildRequestError()
@@ -1018,7 +1020,7 @@ class TestebExacloudDB(unittest.TestCase):
         with patch('exabox.core.DBStore3.ebMysqlDB.__init__'),\
              patch('exabox.core.DBStore3.ebExacloudDB.mCreateRegTable'),\
              patch('exabox.core.DBStore3.ebMysqlDBlite.mExecute'),\
-             patch('exabox.core.DBStore3.ebMysqlDBlite.mFetchOne', side_effect=["mockccareqid", "mockccareqtype"]),\
+             patch('exabox.core.DBStore3.ebMysqlDBlite.mFetchOne', side_effect=["mockid", "mockccareqid", "mockccareqtype"]),\
              patch('exabox.core.DBStore3.ebMysqlDBlite.mFetchAll', side_effect=[["mockccauserlist"], "mockccadata", "allccaresourceusertypes", "allccauserparurls", ["ccaschedulerid"], ["mockccauserstatus"]]):
              instance = ebExacloudDB()
              instance.mSetCCAData("mockdata")

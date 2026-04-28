@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    jyotdas     04/08/26 - Codex scan issue fixes
 #    araghave    02/12/26 - Bug 38891325 - OCI: EXACS | SMR | SMR APPLY IS
 #                           SHOWING INCORRECT TARGET VERSION , WHILE APPLYING
 #                           CORRECT VERSION
@@ -40,6 +41,10 @@
 
 import datetime
 import json
+# os and re were missing; undetected as these are only invoked when TargetVersion=LATEST,
+# a path not exercised in standard test runs.
+import os
+import re
 import traceback
 import uuid
 import glob

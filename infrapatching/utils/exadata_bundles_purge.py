@@ -4,7 +4,7 @@
 #
 # exadata_bundles_purge.py
 #
-# Copyright (c) 2022, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2022, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #    Exadata cloud bundle purge script - Basic Functionality
@@ -25,6 +25,10 @@
 #      No
 #
 #    MODIFIED   (MM/DD/YY)
+#    kdas        04/09/26 - Clarify CoDev scan false positive:
+#                           multi-line f-strings (ENH 39145031)
+#    kdas        03/18/26 - ER 34789348 - EXADATA_BUNDLES_PURGE.PY TO CLEAN
+#                           IMAGES' METADATA POST IMAGE DELETION
 #    kdas        10/29/25 - Bug 38588871 - Bundle purging should fail if we are
 #                           unable to download latest
 #                           exadata_bundles_retention_policy.json every after
@@ -79,6 +83,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 import sys
 import time
+import socket
 
 bundles_list_folder = "/u01/downloads"
 retention_policy_folder = "/opt/oci/exacc/exacloud/exabox/infrapatching/utils"
@@ -95,6 +100,12 @@ virtualization_xen = "xen"
 img_download_utility = "/opt/oci/exacc/imagemgmt/bin/download_utility.py"
 cps_infrapatch_base = "/opt/oci/exacc/exacloud/InfraPatchBase/"
 qa_exadata_retention_policy = "/u01/downloads/qa_exadata_retention_policy.json"
+api_image_mgmt = "/opt/oci/exacc/imagemgmt/bin/imgManualdownload.py"
+image_list = "/u01/downloads/imagelist.json"
+propfile = "/opt/oci/exacc/imagemgmt/config/download.properties"
+
+_metadata_cleanup_versions = set()
+_standby_host_cache = None
 
 class PurgeLog:
     __debug = False
@@ -222,6 +233,8 @@ class ExadataVersionConfig:
         for attempt in range(1, _num_retries + 1):
           _output, _status = safe_execute_local(shlex.split(_cmd_curl))
           if _status != 0:
+            # Scanner false positive: these adjacent f-strings live inside the call parens,
+            # so Python concatenates them and the file parses/runs correctly.
             log.print_warn(f"Failed to download oss file {bundles_list_file} : {_output}. "
                            f"Will retry in {_retry_delay} seconds.")
           else:
@@ -450,6 +463,88 @@ class ExadataVersionConfig:
                     log.print_warn(f"Unable to purge '{aExadataFolder}/{_filename}' {_output}")
 
 
+def cleanup_image_metadata(version, bptype):
+    global _metadata_cleanup_versions
+    _cache_key = f"{bptype}:{version}"
+    if not version or _cache_key in _metadata_cleanup_versions:
+        return
+    if not bptype:
+        log.print_warn(f"Image metadata cleanup skipped, bptype is missing for version {version}")
+        return
+    _bp_name = re.match(r'\d{1,2}\.\d{1,2}\.\d{1,2}\.\d{1,2}\.\d{1,2}', version)
+    _bp_date = re.search(r'((\d{6}\.\d+)$)|(\d{6}$)', version)
+    if not _bp_name or not _bp_date:
+        log.print_warn(f"Image metadata cleanup skipped, cannot parse version {version}")
+        return
+    _cmd = f"{api_image_mgmt} -op=rmImgListEntry -imglist={image_list} -bptype={bptype} -bpname={_bp_name.group()} -bpdate={_bp_date.group()}"
+    _output, _status = safe_execute_local(shlex.split(_cmd))
+    if _status == 0:
+        log.print_info(f"Removed imagelist entry for version {version}")
+        _standby_host = mGetStandbyCached()
+        if _standby_host:
+            _remote_cmd = "ssh %s '%s -op=rmImgListEntry -imglist=%s -bptype=%s -bpname=%s -bpdate=%s'" % \
+                   (_standby_host, api_image_mgmt, image_list, bptype, _bp_name.group(), _bp_date.group())
+            _remote_output, _remote_status = safe_execute_local(shlex.split(_remote_cmd))
+            if _remote_status == 0:
+                log.print_info(f"Removed standby imagelist entry for version {version}")
+            else:
+                log.print_warn(f"Image metadata cleanup failed on standby for {version}: {_remote_output}")
+        _metadata_cleanup_versions.add(_cache_key)
+    else:
+        log.print_warn(f"Image metadata cleanup failed for {version}: {_output}")
+
+def cleanup_exadata_bundle_if_purged(version):
+    _patchpayload_dir = f"{bundles_list_folder}/{exadata_version_folder}/PatchPayloads/{version}"
+    _images_glob = f"{bundles_list_folder}/{exadata_version_folder}/images/System.first.boot.{version}*.img.*"
+    if not os.path.exists(_patchpayload_dir) and len(glob.glob(_images_glob)) == 0:
+        cleanup_image_metadata(version, "exadata-bundlepatch")
+
+
+def mGetStandby():
+    # Get STANDBY hostname
+    _standbyhost = None
+    _shouldSync, _ = mGetCPSPropValue(propfile, "control.plane.enablesync=")
+    # Method returns standby host only
+    # 1. If Control plane sync is enable
+    # 2. If MASTER node tries to do the sync
+    if _shouldSync == "true" and os.path.exists("/etc/keepalived/MASTER"):
+        _standbyhost, _ = mGetCPSPropValue(propfile, "control.plane.server2.hostname=")
+        if _standbyhost and (_standbyhost in socket.gethostname() or socket.gethostname() in _standbyhost):
+            _standbyhost, _ = mGetCPSPropValue(propfile, "control.plane.server1.hostname=")
+            if _standbyhost and (_standbyhost in socket.gethostname() or socket.gethostname() in _standbyhost):
+                _standbyhost = None
+    else:
+        log.print_warn("INFO - Sync to standby disabled, standby node can't do sync, no standbyhost")
+    return _standbyhost
+
+
+def mGetCPSPropValue(aPropFile, aPropName):
+    """
+    Returns a tuple (lower_value, raw_value). If the property is missing,
+    both entries are None.
+    """
+    if (os.path.exists(aPropFile)):
+        with open(aPropFile) as f:
+            _datafile = f.readlines()
+            for _line in _datafile:
+                if aPropName in _line:
+                    _line = _line.rstrip()
+                    _prop_value = _line.split(aPropName,1)[1]
+                    return _prop_value.lower(), _prop_value
+        return None, None
+    else:
+        log.print_error(f"property file {aPropFile} doesn't exist")
+        return None, None
+
+
+def mGetStandbyCached():
+    global _standby_host_cache
+    if _standby_host_cache is not None:
+        return _standby_host_cache
+    _standby_host_cache = mGetStandby()
+    return _standby_host_cache
+
+
 def create_directory(aFolder):
     if not os.path.exists(aFolder):
         os.makedirs(aFolder)
@@ -522,16 +617,17 @@ def remove_folder_wild(aFolder):
 def remove_complete_common_infra(aPatchPayloadsFolder, aExadataVersion):
     log.print_info(f"{aExadataVersion} exadata common infra version will be purged!")
     remove_folder(f"{aPatchPayloadsFolder}/{aExadataVersion}")
+    cleanup_exadata_bundle_if_purged(aExadataVersion)
 
 def remove_compute_version(aComputeFolder, aComputeVersion):
     log.print_info(f"{aComputeVersion} compute version will be purged!")
     remove_folder(f"{aComputeFolder}/{aComputeVersion}")
+    cleanup_image_metadata(aComputeVersion, "exadata_compute_updates-bundlepatch")
 
 def remove_exasplice_version(aPatchPayloadsFolder, aExadataVersion):
     log.print_info(f"{aExadataVersion} exasplice version will be purged!")
     remove_folder(f"{aPatchPayloadsFolder}/{aExadataVersion}")
     remove_folder(f"{aPatchPayloadsFolder}/../../cpsos/exasplice_{aExadataVersion}")
-
 
 def remove_common_infra(aPatchPayloadsFolder, aExadataVersion, aComputeDetails, aExaspliceDetails):
     log.print_info(f"{aExadataVersion} exadata version will be purged!")
@@ -544,6 +640,7 @@ def remove_common_infra(aPatchPayloadsFolder, aExadataVersion, aComputeDetails, 
     if not aExaspliceDetails:
         log.print_info(f"{aExadataVersion} exadata exasplice (cell) will be purged!")
         remove_folder(f"{aPatchPayloadsFolder}/{aExadataVersion}/{'CellPatchFile'}")
+    cleanup_exadata_bundle_if_purged(aExadataVersion)
 
 
 def remove_system_image(aExadataFolder, aSystemImageFile):
@@ -555,6 +652,7 @@ def remove_system_images(aExadataFolder, aExadataVersion, aCommonComputeDetails)
     if not aCommonComputeDetails:
         log.print_info(f"{aExadataVersion} system image will be purged!")
         remove_folder_wild(f"{aExadataFolder}/images/System.first.boot.{aExadataVersion}*.img.*")
+        cleanup_exadata_bundle_if_purged(aExadataVersion)
     else:
         log.print_warn(f"{aExadataVersion} system image won't be purged, It's required for common compute!")
 
@@ -562,6 +660,7 @@ def remove_system_images(aExadataFolder, aExadataVersion, aCommonComputeDetails)
 def remove_cpsos_version(aCPSOSFolder, aCPSOSVersion):
     log.print_info(f"{aCPSOSVersion} cpsos version will be purged!")
     remove_folder(f"{aCPSOSFolder}/{aCPSOSVersion}")
+    cleanup_image_metadata(aCPSOSVersion, "cpsos-bundlepatch")
 
 
 def safe_execute_local(aListCmd, shell=False):

@@ -3,7 +3,7 @@
 #
 # ibclusterpatch.py
 #
-# Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      ibclusterpatch.py - Class IBClusterPatch
@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    jyotdas     04/08/26 - Codex scan issue fixes
 #    sdevasek    02/14/25 - ENH 37496197 - INFRAPATCHING TEST AUTOMATION -
 #                           REVIEW AND ADD METHODS INTO METHODS_TO_EXCLUDE_
 #                           COVERAGE_REPORT
@@ -57,6 +58,7 @@ from exabox.infrapatching.utils.utility import mFormatOut
 from exabox.infrapatching.core.infrapatcherror import *
 from exabox.core.Node import exaBoxNode
 from exabox.infrapatching.handlers.loghandler import LogHandler
+import os
 import re
 import traceback
 
@@ -77,6 +79,9 @@ class IBClusterPatch(LogHandler):
         self.__node = None
         self.__cluctrl = None
         self.__excludeNodeList = []
+        # Initialized to None so mInitializeCluster and other methods can safely
+        # reference self.__call regardless of whether aCall was passed or not.
+        self.__call = None
 
         self.__options = aOptions
 

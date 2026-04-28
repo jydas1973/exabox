@@ -4,7 +4,7 @@
 #
 # tests_cleanup_oeda_requests.py
 #
-# Copyright (c) 2025, Oracle and/or its affiliates.
+# Copyright (c) 2025, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_cleanup_oeda_requests.py - <one-line expansion of the name>
@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    aypaul      04/16/26 - Bug#38900303 Fix unit tests for codev identified issues
 #    shapatna    11/07/25 - Enh 38574081: Add unit tests to improve the
 #                           coverage using Cline
 #    shapatna    09/14/25 - Add unit tests for moving files and folder to
@@ -30,7 +31,27 @@ import time
 import unittest
 import tarfile
 from unittest.mock import patch, MagicMock, Mock, call
+
+import six
 from exabox.log.LogMgr import ebLogInfo
+
+if not hasattr(six, "ensure_binary"):
+    def _ensure_binary(value, encoding='utf-8', errors='strict'):
+        if isinstance(value, bytes):
+            return value
+        return str(value).encode(encoding, errors)
+
+    def _ensure_text(value, encoding='utf-8', errors='strict'):
+        if isinstance(value, bytes):
+            return value.decode(encoding, errors)
+        return str(value)
+
+    six.ensure_binary = _ensure_binary
+    six.ensure_text = _ensure_text
+    six.ensure_str = _ensure_text
+
+ORIGINAL_OS_STAT = os.stat
+
 from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
 from exabox.scheduleJobs.cleanup_oeda_requests import CleanUpOedaRequests
 
@@ -406,6 +427,116 @@ class ebTestCleanupOedaRequestsAdvanced(ebTestClucontrol):
             mock_fetch_entries.assert_called_once()
             mock_move.assert_called_once_with(["/b/r1", "/b/r2"])
         ebLogInfo("mExecuteJob happy path executed successfully")
+
+    @patch("exabox.scheduleJobs.cleanup_oeda_requests.ebLogError")
+    @patch("exabox.scheduleJobs.cleanup_oeda_requests.os.makedirs", side_effect=Exception("mkdir failed"))
+    @patch("exabox.scheduleJobs.cleanup_oeda_requests.os.path.exists", return_value=False)
+    @patch("exabox.scheduleJobs.cleanup_oeda_requests.os.path.isabs", return_value=True)
+    @patch("exabox.scheduleJobs.cleanup_oeda_requests.os.getcwd", return_value="/opt/oracle/exacloud/work/exacloud/bin")
+    @patch("exabox.scheduleJobs.cleanup_oeda_requests.date")
+    @patch("exabox.scheduleJobs.cleanup_oeda_requests.get_gcontext")
+    @patch("exabox.scheduleJobs.cleanup_oeda_requests.ebLogInit")
+    @patch("exabox.scheduleJobs.cleanup_oeda_requests.exaBoxCoreInit")
+    def test_mFetchOedaRequestArchiveDirectory_logs_error_on_creation_failure(
+        self,
+        _mock_core_init,
+        _mock_log_init,
+        mock_get_gctx,
+        mock_date,
+        _mock_getcwd,
+        _mock_isabs,
+        _mock_exists,
+        _mock_makedirs,
+        mock_log_error,
+    ):
+        ebLogInfo("Running unit test on CleanUpOedaRequests.mFetchOedaRequestArchiveDirectory error path")
+        fake_today = type("FakeDate", (), {"year": 2025, "month": 5, "day": 6})()
+        mock_date.today.return_value = fake_today
+        cfg = {
+            "schedule_oeda_requests_in_days": "1",
+            "log_file_archive_directory": "/tmp/archive",
+            "oeda_archive_requests_path": "",
+        }
+        mock_ctx = Mock()
+        mock_ctx.mGetArgsOptions.return_value = {}
+        mock_ctx.mGetConfigOptions.return_value = cfg
+        mock_get_gctx.return_value = mock_ctx
+
+        inst = CleanUpOedaRequests()
+        inst.mFetchOedaRequestArchiveDirectory()
+        self.assertIsNone(inst._CleanUpOedaRequests__oeda_request_archive_directory)
+        mock_log_error.assert_called()
+        ebLogInfo("mFetchOedaRequestArchiveDirectory error path executed successfully")
+
+    @patch("exabox.scheduleJobs.cleanup_oeda_requests.ebLogWarn")
+    @patch("exabox.scheduleJobs.cleanup_oeda_requests.os.stat")
+    @patch("exabox.scheduleJobs.cleanup_oeda_requests.get_gcontext")
+    @patch("exabox.scheduleJobs.cleanup_oeda_requests.ebLogInit")
+    @patch("exabox.scheduleJobs.cleanup_oeda_requests.exaBoxCoreInit")
+    def test_mCheckAndMoveOldOedaRequests_handles_stat_exception(
+        self,
+        _mock_core_init,
+        _mock_log_init,
+        mock_get_gctx,
+        mock_stat,
+        mock_warn,
+    ):
+        ebLogInfo("Running unit test on CleanUpOedaRequests.mCheckAndMoveOldOedaRequests error path")
+        cfg = {
+            "schedule_oeda_requests_in_days": "1",
+            "log_file_archive_directory": "/tmp/exalogarchive",
+            "oeda_archive_requests_path": ""
+        }
+        mock_ctx = Mock()
+        mock_ctx.mGetArgsOptions.return_value = {}
+        mock_ctx.mGetConfigOptions.return_value = cfg
+        mock_get_gctx.return_value = mock_ctx
+
+        inst = CleanUpOedaRequests()
+        inst._CleanUpOedaRequests__oeda_request_archive_directory = "/archive/dir"
+        inst._CleanUpOedaRequests__max_seconds = 1
+        def _stat_side_effect(path):
+            if path == "/bad/path":
+                raise Exception("stat failed")
+            return ORIGINAL_OS_STAT(path)
+        mock_stat.side_effect = _stat_side_effect
+        inst.mCheckAndMoveOldOedaRequests(["/bad/path"])
+        mock_warn.assert_called()
+        ebLogInfo("mCheckAndMoveOldOedaRequests error path executed successfully")
+
+    @patch("exabox.scheduleJobs.cleanup_oeda_requests.os.listdir", side_effect=Exception("list failed"))
+    @patch("exabox.scheduleJobs.cleanup_oeda_requests.os.path.exists", return_value=True)
+    @patch("exabox.scheduleJobs.cleanup_oeda_requests.os.getcwd", return_value="/opt/app/exacloud/env/exacloud/bin")
+    @patch("exabox.scheduleJobs.cleanup_oeda_requests.get_gcontext")
+    @patch("exabox.scheduleJobs.cleanup_oeda_requests.ebLogInit")
+    @patch("exabox.scheduleJobs.cleanup_oeda_requests.exaBoxCoreInit")
+    @patch("exabox.scheduleJobs.cleanup_oeda_requests.ebLogError")
+    def test_mFetchEntriesInRequestsBakDir_handles_exception(
+        self,
+        mock_log_error,
+        _mock_core_init,
+        _mock_log_init,
+        mock_get_gctx,
+        _mock_getcwd,
+        _mock_exists,
+        _mock_listdir,
+    ):
+        ebLogInfo("Running unit test on CleanUpOedaRequests.mFetchEntriesInRequestsBakDir error path")
+        cfg = {
+            "schedule_oeda_requests_in_days": "1",
+            "log_file_archive_directory": "/tmp/exalogarchive",
+            "oeda_archive_requests_path": ""
+        }
+        mock_ctx = Mock()
+        mock_ctx.mGetArgsOptions.return_value = {}
+        mock_ctx.mGetConfigOptions.return_value = cfg
+        mock_get_gctx.return_value = mock_ctx
+
+        inst = CleanUpOedaRequests()
+        entries = inst.mFetchEntriesInRequestsBakDir()
+        self.assertEqual(entries, [])
+        mock_log_error.assert_called()
+        ebLogInfo("mFetchEntriesInRequestsBakDir error path executed successfully")
 
 
 if __name__ == '__main__':

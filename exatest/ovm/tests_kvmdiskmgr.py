@@ -16,6 +16,9 @@
  History:
 
     MODIFIED   (MM/DD/YY)
+       dekuckre  04/10/26 - Fix UT setup flags to avoid DB/OEDA bootstrap
+       dekuckre  04/02/26 - Fix Python 3.6-compatible unittest mock call
+                            argument assertions
        nelango   02/06/26 - Bug 38700324 : Add tests for u02 bind mounts
        bhpati    02/04/26 - Bug 38820127 - OCI: LOCAL STORAGE RESHAPE OPERATION
                             HUNG FOR 2 WEEKS
@@ -127,12 +130,17 @@ class ebTestKVMDiskMgr(ebTestClucontrol):
     @classmethod
     def setUpClass(self):
         # Surcharge ebTestClucontrol, to specify noDB/noOEDA
-        super().setUpClass(True,True)    
+        super().setUpClass(False, False)
 
     def setUp(self):
         #Ensure every test begin with standard conf
         self.mGetClubox()._exaBoxCluCtrl__ociexacc = False
         self.mGetClubox()._exaBoxCluCtrl__kvm_enabled = True
+        # Keep unit tests isolated from DB-backed status/error updates.
+        self.mGetClubox().mUpdateErrorObject = MagicMock(return_value=None)
+        self.mGetClubox().mCheckIfCrsDbsUp = MagicMock(return_value=True)
+        self.mGetClubox().mAcquireRemoteLock = MagicMock(return_value=True)
+        self.mGetClubox().mReleaseRemoteLock = MagicMock(return_value=True)
         get_gcontext().mSetConfigOption('kvm_var_size',None)
         get_gcontext().mSetConfigOption('kvm_u01_size',None)
         get_gcontext().mSetConfigOption('disable_lvm_snapshot_space', None)
@@ -253,12 +261,16 @@ class ebTestKVMDiskMgr(ebTestClucontrol):
         currentOptions.jsonconf = None
         currentOptions.partitionOp = "resize"
         currentOptions.jsonmode = False
-        self.assertNotEqual(cluDomUPartitionObj.mClusterManageDomUPartition("resize", currentOptions), 0)
-        currentOptions.jsonconf = {"partitionName": "dummy","new_sizeGB": "50"}
-        self.assertNotEqual(cluDomUPartitionObj.mClusterManageDomUPartition("resize", currentOptions), 0)
-        currentOptions.jsonconf = {"partitionName": "dev","new_sizeGB": "50"}
-        cluDomUPartitionObj2 = ebCluManageDomUPartition(self.mGetClubox())
-        ebLogInfo(cluDomUPartitionObj2.mClusterManageDomUPartition("resize", currentOptions))
+        with patch("exabox.ovm.cludomupartitions.ebCluManageDomUPartition.mRecordError", return_value=1), \
+            patch.object(self.mGetClubox(), "mUpdateErrorObject", return_value=None), \
+            patch.object(self.mGetClubox(), "mCheckIfCrsDbsUp", return_value=True):
+            self.assertNotEqual(cluDomUPartitionObj.mClusterManageDomUPartition("resize", currentOptions), 0)
+            currentOptions.jsonconf = {"partitionName": "dummy","new_sizeGB": "50"}
+            self.assertNotEqual(cluDomUPartitionObj.mClusterManageDomUPartition("resize", currentOptions), 0)
+            currentOptions.jsonconf = {"partitionName": "dev","new_sizeGB": "50"}
+            cluDomUPartitionObj2 = ebCluManageDomUPartition(self.mGetClubox())
+            with patch("exabox.ovm.utils.clu_utils.ebCluUtils.mUpdateTaskProgressStatus", return_value=None):
+                ebLogInfo(cluDomUPartitionObj2.mClusterManageDomUPartition("resize", currentOptions))
         ebLogInfo("Completed unit test on exaBoxKvmDiskMgr.mClusterPartitionResize")
 
     @patch("exabox.ovm.kvmdiskmgr.time.sleep", return_value=None)
@@ -1034,7 +1046,7 @@ U02_IMAGE: ********** WARNING: Filesystem still has errors **********
         result = manager.mExecuteDomUDownsizeStepsEncrypted('domU-host', '/fs', 40)
 
         self.assertEqual('keyapi-error', result)
-        codes = [call.args[0] for call in ebox_ctrl.mUpdateErrorObject.call_args_list]
+        codes = [call[0][0] for call in ebox_ctrl.mUpdateErrorObject.call_args_list]
         self.assertIn(gReshapeError['ERROR_KEYAPI_FAIL'], codes)
         edp_mock.mRecordError.assert_called_with(
             gPartitionError['ErrorRunningRemoteCmd'],
@@ -1090,7 +1102,7 @@ U02_IMAGE: ********** WARNING: Filesystem still has errors **********
         result = manager.mExecuteDomUDownsizeStepsEncrypted('domU-host', '/fs', 45)
 
         self.assertEqual('crypt-error', result)
-        codes = [call.args[0] for call in ebox_ctrl.mUpdateErrorObject.call_args_list]
+        codes = [call[0][0] for call in ebox_ctrl.mUpdateErrorObject.call_args_list]
         self.assertIn(gReshapeError['ERROR_LUKSRESIZE_FAIL'], codes)
         edp_mock.mRecordError.assert_called_with(
             gPartitionError['ErrorRunningRemoteCmd'],
@@ -1154,7 +1166,7 @@ U02_IMAGE: ********** WARNING: Filesystem still has errors **********
         self.assertEqual('lvresize-error', result)
         self.assertTrue(any(
             call_args[0] == gReshapeError['ERROR_LVRESIZE_FAIL']
-            for call_args in (call.args for call in ebox_ctrl.mUpdateErrorObject.call_args_list)
+            for call_args in (call[0] for call in ebox_ctrl.mUpdateErrorObject.call_args_list)
         ))
         edp_mock.mRecordError.assert_called_with(
             gPartitionError['ErrorRunningRemoteCmd'],
@@ -1310,6 +1322,8 @@ U02_IMAGE: ********** WARNING: Filesystem still has errors **********
         ebox_ctrl.mCheckConfigOption.return_value = True
         edp_mock = mock.Mock()
         edp_mock.mGetEbox.return_value = ebox_ctrl
+        edp_mock.mRecordError.return_value = 1
+        edp_mock.mRecordError.return_value = 1
         edp_mock.mRecordError.return_value = 'lvresize-error'
 
         manager = exaBoxKvmDiskMgr(edp_mock)
@@ -2585,6 +2599,7 @@ U02_IMAGE: ********** WARNING: Filesystem still has errors **********
         ebox_ctrl.mCheckConfigOption.return_value = True
         edp_mock = mock.Mock()
         edp_mock.mGetEbox.return_value = ebox_ctrl
+        edp_mock.mRecordError.return_value = 1
 
         mount_info = mock.Mock()
         mount_info.fs_type = 'xfs'
@@ -2595,7 +2610,7 @@ U02_IMAGE: ********** WARNING: Filesystem still has errors **********
 
         result = manager.mExecuteDomUUpsizeStepsEncrypted('domU', '/fs', 140)
 
-        self.assertEqual(0, result)
+        self.assertEqual(1, result)
         ebox_ctrl.mUpdateErrorObject.assert_any_call(
             gReshapeError['ERROR_LVRESIZE_FAIL'],
             ANY
@@ -3083,11 +3098,10 @@ U02_IMAGE: ********** WARNING: Filesystem still has errors **********
         result = manager.mExecuteDomUUpsizeStepsEncrypted('domU-host', '/dev/mapper/VGExaDbDisk.u02_extra.img-LVDBDisk', 220)
 
         self.assertEqual(0, result)
-        commands = [call_args.args[0] for call_args in node_instance.mExecuteCmd.call_args_list]
+        commands = [call_args[0][0] for call_args in node_instance.mExecuteCmd.call_args_list]
         self.assertIn('/usr/sbin/lvresize -l +100%FREE /dev/mapper/VGExaDbDisk.u02_extra.img-LVDBDisk', commands)
         mock_node_exec_cmd.assert_called_once_with(node_instance, '/bin/shred -fu /tmp/keyapi-path')
         ebox_ctrl.mUpdateErrorObject.assert_not_called()
 
 if __name__ == '__main__':
     unittest.main()
-

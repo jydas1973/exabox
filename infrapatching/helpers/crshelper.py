@@ -13,6 +13,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    araghave    04/12/26 - FIX HELPER FILES RELATED CODE ISSUES REPORTED 
+#                           BY CODEV
 #    remamid     01/21/26 - Bug 38707554 Handle all cases for start crs
 #    araghave    01/12/26 - Enhancement Request 38723348 - EXACLOUD - IMPROVE
 #                           RESILIENCY OF CRS RESTART FOR INFRAPATCHING FLOW
@@ -103,6 +105,8 @@
 #    sdevasek    11/15/24 - Creation
 
 import logging
+import os
+import sys
 import traceback
 from time import sleep, time
 import json
@@ -1148,7 +1152,7 @@ class CrsHelper(LogHandler):
          part of single VM cluster setup. 
         '''
         if (self.mGetHandlerInstance().mGetCustomizedDomUList() and len(self.mGetHandlerInstance().mGetCustomizedDomUList()) == 1) or (aListOfEluNodes and len(aListOfEluNodes) == 1):
-            if int(_count_of_vms_where_auto_startup_is_enabled) == 1 and len(_list_of_vms_where_crs_did_not_start) < 0:
+            if int(_count_of_vms_where_auto_startup_is_enabled) == 1 and len(_list_of_vms_where_crs_did_not_start) > 0:
                 _suggestion_msg = f"CRS services were supposed to be running on the current : {str(_list_of_vms_where_crs_did_not_start)} VM in case of single node VM patching is performed and is currently down."
                 if self.mGetHandlerInstance().mGetTask() == TASK_PREREQ_CHECK:
                     self.mPatchLogWarn(_suggestion_msg)

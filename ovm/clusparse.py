@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2022, Oracle and/or its affiliates. 
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     OVM - Sparse Cloning related functionality
@@ -107,7 +107,7 @@ class ebCluSparseClone(object):
                 _rc = self.mClusterTmCreate(_options)
             elif (_options.sparseclone == "snap_create"):
                 ebLogInfo("Running Sparse Clone Step: Create Snapclone")
-                _sparsedata["Command"] = "tm_create"
+                _sparsedata["Command"] = "snap_create"
                 _rc = self.mClusterSnapCreate(_options)
             elif (_options.sparseclone == "status"):
                 ebLogInfo("Running Sparse Clone Step: Fetching status")
@@ -195,8 +195,7 @@ class ebCluSparseClone(object):
                 else:
                     _clonedb = _inparams["clonedb"]
                 _tmdb = _inparams["tmdb"]
-                if _inparams["passwd"]:
-                    _sourcepwd = _inparams["passwd"]
+                _sourcepwd = _inparams.get("passwd")
                 if "async" in list(_inparams.keys()):
                     _async = _inparams["async"]
             else:

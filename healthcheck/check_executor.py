@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2025, Oracle and/or its affiliates. 
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates. 
 
 NAME:
     checkexecutor.py - Added for hc v2 
@@ -11,6 +11,7 @@ NOTE:
     None
 
 History:
+    joysjose    03/06/2026 - Bug 38900203 - EXACLOUD: ISSUES FOUND BY VOXIO CODEV AGENT IN DIR EXABOX/HEALTHCHECK
     bhpati      07/31/2025 - Bug 38102552 - Log as error instead of warning for healthcheck failure 
     joysjose    06/25/2024 - Bug 36727956 - Regression fix for printing result json correctly
     aypaul      05/30/2024 - Issue#36640253 Replace default multiprocess with asyncprocessing module.
@@ -422,7 +423,7 @@ class CustomTask(HCTask):
             for _chk, _cmd_str in six.iteritems(_chkList):
                 _options["checkname"] =  _chk
                 _options["cmdstr"] =  _cmd_str
-                super(CustomTask, self).execute(_options) 
+                super(CustomTask, self).execute(_resdict, _options) 
         else:
             #enable it for multithreading
             _processMap = {}

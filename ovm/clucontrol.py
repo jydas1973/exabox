@@ -21,6 +21,18 @@ NOTE:
 History:
 
        MODIFIED (MM/DD/YY)
+       aypaul    04/23/26 - Bug#39225305 Remove reboot from infra nodes for SELinux
+                            update
+       aararora  04/13/26 - 39200237: Issues observed for ca signed certs being
+                            copied to domus for exacc
+       scoral    04/10/26 - Bug 39185574 - Make sure "limit" NFTables rule is
+                            appended at the end of the chain.
+       bhpati    04/09/26 - Bug 39083181 - CREATEVM UNDO TRIES TO DELETE WRONG
+                            BRIDGE VMETH200
+       ririgoye  04/09/26 - Bug 38639012 - Cryptography deprecation warning
+                            removal
+       ririgoye  04/07/26 - Handle unreadable redirected output streams in
+                            mExecuteLocal
        jesandov  03/27/26 - 39060375: Fix post validation endpoint on RPM
                             missing fields
        jesandov  03/25/26 - Bug 38358445 - Secureboot
@@ -29,6 +41,9 @@ History:
                             will hang on large output
        aypaul    03/16/26 - ER#38277507 Add selinux operation response to ec
                             data.
+       avimonda  03/10/26 - Bug 38940725 - GCP: EXACS: PROVISIONING FAILED AT
+                            SETUP CELL CONNECTIVITY STEP / OEDA : OEDA STEP 4
+                            FAILED, BUT NO OBVIOUS ERROR FOUND
        avimonda  03/06/26 - Bug 38951559 - GCP: WF WAS STUCK DUE TO NFT RULES
                             MISMATCHES ON DIFFERENT NODES
        nyvn      03/05/26 - Bug 39028499 - EXACC - EXACLOUD UPDATES THE WRONG
@@ -371,6 +386,7 @@ import signal
 import socket
 import six
 import base64
+import warnings
 
 from exabox.ovm.cluvmrecoveryutils import NodeRecovery
 
@@ -383,6 +399,17 @@ from functools import partial
 from exabox.utils.common import check_string_base64, version_compare
 from exabox.utils import common
 from exabox.tools.AttributeWrapper import wrapStrBytesFunctions
+
+try:
+    from cryptography.utils import CryptographyDeprecationWarning
+    warnings.filterwarnings(
+        "ignore",
+        category=CryptographyDeprecationWarning,
+        module=r"paramiko\..*",
+    )
+except Exception:
+    pass
+
 import paramiko
 from paramiko.ssh_exception import SSHException
 from exabox.infrapatching.core.infrapatcherror import PATCHING_NODE_SSH_CHECK_FAILED, PATCHING_CONNECT_FAILED, ebPatchFormatBuildError 
@@ -8760,7 +8787,9 @@ class exaBoxCluCtrl(object):
                     _node = exaBoxNode(get_gcontext())
                     _node.mConnect(aHost=_cell)       
                     if self.__selinux_controls.mSetSeLinux(_node, _sestatus, "cell"):
-                        _reboot_set.add(_cell)
+                        ebLogInfo(f"SELinux configuration was successful on {_cell}")
+                    else:
+                        ebLogError(f"Failed to apply SELinux configuration on {_cell}")
                     _node.mDisconnect()
             else:
                 ebLogWarn("*** se_linux key not present")
@@ -8898,7 +8927,9 @@ class exaBoxCluCtrl(object):
                 with connect_to_host(_dom0, get_gcontext()) as _connected_node:
                     if self.__cmd not in ["vmgi_reshape", "elastic_cell_update"] and _sestatus is not None:
                         if self.__selinux_controls.mSetSeLinux(_connected_node, _sestatus, "dom0"):
-                            _reboot_set.add(_dom0)
+                            ebLogInfo(f"SELinux configuration was successfully applied on {_dom0}")
+                        else:
+                            ebLogError(f"Failed to apply SELinux configuration on {_dom0}")
                     else:
                         ebLogWarn("*** se_linux key not present")
 
@@ -10258,7 +10289,9 @@ IPV6INIT=no"""
 
             # Adding LOG rule for FORWARD packets
             if self.mCheckConfigOption("log_dropped_packets", "True"):
-                _ip_rules_list += nftObj.mReplaceValuesJsonRules(iprules, 'log_forward_dropped_packets')
+                _log_forward_dropped_packets = nftObj.mReplaceValuesJsonRules(iprules, 'log_forward_dropped_packets')
+                _ip_drop_rules_list += _log_forward_dropped_packets
+                _ip_rules_list += _log_forward_dropped_packets
 
             _ip_rules_list += nftObj.mReplaceValuesJsonRules(iprules, 'ip_rules_list_output', _replaceAdminInterface)
 
@@ -10272,7 +10305,9 @@ IPV6INIT=no"""
 
             # Adding LOG rule for INPUT packets
             if self.mCheckConfigOption("log_dropped_packets", "True"):
-                _ip_default_rules += nftObj.mReplaceValuesJsonRules(iprules, 'log_input_dropped_packets')
+                _log_input_dropped_packets = nftObj.mReplaceValuesJsonRules(iprules, 'log_input_dropped_packets')
+                _ip_drop_rules_list += _log_input_dropped_packets
+                _ip_default_rules += _log_input_dropped_packets
 
             #Final DROP
             _ip_default_rules_final_drop = nftObj.mReplaceValuesJsonRules(iprules, 'ip_default_rules_final_drop')
@@ -15484,6 +15519,11 @@ IPV6INIT=no"""
             "there is no configkeys",
             "Error: Command [/opt/oracle.SupportTools/exadataAIDE"
         ]
+
+        _success_marker = [
+            "Successfully completed execution of step"
+        ]
+
         _ignorable_error_found = False
         _rc = True
         for _l in _out:
@@ -15492,15 +15532,23 @@ IPV6INIT=no"""
                 ebLogTrace("Ignoring OEDA error log: {}".format(_ls))
                 _ignorable_error_found = True
                 continue
+
             if _step in ["ESTP_POSTGI_NID", "ESTP_INSTALL_CLUSTER"] and _undo:
                 if any(skip_str in _ls for skip_str in _skip_strs):
                     ebLogTrace("Skipping error log: {}".format(_ls))
                     _rc = True
                     break
+
+            if (any(_success_str in _ls for _success_str in _success_marker) and
+                self.mCheckConfigOption('ignore_oeda_trailing_errors_after_success', 'True')):
+                _rc = True
+                break
+ 
             if any(err_str in _ls for err_str in _err_strs):
                 ebLogError(_ls)
                 _rc = False
                 break
+
         if _ignorable_error_found:
             _rc = True
         ebLogDebug("mParseOEDALog _rc: %s" % str(_rc))
@@ -17009,7 +17057,7 @@ IPV6INIT=no"""
         _sed_cmd = "/bin/sed -i 's/{0}=.*$/{0}={1}/g' {2}"
 
         _cell_list = self.mReturnCellNodes()
-        _num_cells = len(list(_cell_list.keys()))
+        _num_cells = len(list(_cell_list.keys())) 
         """
         35634247: With new OEDA build, configuring quorum devices will be
         handled by OEDA which requires quorum flag in es.properties
@@ -18114,16 +18162,21 @@ IPV6INIT=no"""
         _domuclient_cert_path = f"/opt/oci/exacc/certs/domuclient/domuclient_{_cluster_name}.crt"
         _domuclient_key_path = f"/opt/oci/exacc/certs/domuclient/domuclient_{_cluster_name}.key"
 
-        if self.mIsCaSignedCerts():
-            _cert_config_path = "/opt/oci/exacc/certs/config/exacc_certs.conf"
-            if os.path.exists(_cert_config_path):
-                _cert_config = mLoadConfig(_cert_config_path)
-                _base_path, _resource_class, _cert_path_val, _key_path_val = mGetCertKeyPath(_cert_config, "domuclient")
-                _domuclient_cert_path = _base_path + "/" + _cert_path_val
-                _domuclient_key_path = _base_path + "/" + _key_path_val
-            else:
-                ebLogError(f"Configuration file {_cert_config_path} doesn't exist in CPS")
-                raise ExacloudRuntimeError(0x0820, 0xA, f'Configuration file {_cert_config_path} does not exist in CPS')
+        # TODO - Below needs to be checked with Ronak/Sanjiv and implemented
+        # accordingly - for now, the default path for _domuclient_cert_path and
+        # _domuclient_key_path works. /opt/oci/exacc/certs/config/exacc_certs.conf
+        # is a template file and placeholders need to be replaced during runtime.
+        # A separate bug is opened to handle the same: 39200747
+        # if self.mIsCaSignedCerts():
+        #     _cert_config_path = "/opt/oci/exacc/certs/config/exacc_certs.conf"
+        #     if os.path.exists(_cert_config_path):
+        #         _cert_config = mLoadConfig(_cert_config_path)
+        #         _base_path, _resource_class, _cert_path_val, _key_path_val = mGetCertKeyPath(_cert_config, "domuclient")
+        #         _domuclient_cert_path = _base_path + "/" + _cert_path_val
+        #         _domuclient_key_path = _base_path + "/" + _key_path_val
+        #     else:
+        #         ebLogError(f"Configuration file {_cert_config_path} doesn't exist in CPS")
+        #         raise ExacloudRuntimeError(0x0820, 0xA, f'Configuration file {_cert_config_path} does not exist in CPS')
 
         _cert_source_destination_mapping = {
             f'{_domuclient_cert_path}' : '/etc/pki/oracle/domuidentity/domuclient_cert.pem',
@@ -25537,7 +25590,7 @@ IPV6INIT=no"""
         # TEMPORARY WORKAROUND FOR PSTACK 18 OCTBP ISSUE (29233958)
         #
         _prop_file = self.__oeda_path + '/properties/es.properties'
-        _sed_cmd = "/bin/sed -i 's/{0}.*$/{0}={1}/g' {2}"
+        _sed_cmd = "/bin/sed -i 's/{0}=.*$/{0}={1}/g' {2}"
         _cmd_list = []
         _cmd_str = _sed_cmd.format('MAXGIVERTODISABLEPSTACK', '18.0.0.0', _prop_file)
         _cmd_list.append(_cmd_str)
@@ -33876,8 +33929,22 @@ IPV6INIT=no"""
             else:
                 _stderr_stream = _wrap_existing(_stderr)
 
-            _std_out = _stdout_stream.read() if hasattr(_stdout_stream, "read") else ""
-            _std_err = _stderr_stream.read() if hasattr(_stderr_stream, "read") else ""
+            def _mReadStream(aStream):
+                if not hasattr(aStream, "read"):
+                    return ""
+                if hasattr(aStream, "readable"):
+                    try:
+                        if not aStream.readable():
+                            return ""
+                    except Exception:
+                        return ""
+                try:
+                    return aStream.read()
+                except Exception:
+                    return ""
+
+            _std_out = _mReadStream(_stdout_stream)
+            _std_err = _mReadStream(_stderr_stream)
         except Exception as e:
             _rc = 2
             _std_out = ""
@@ -36283,25 +36350,24 @@ IPV6INIT=no"""
                     _any_vm_running = True
                     break
             if not self.__shared_env or _any_vm_running is False:
-                self.mAcquireRemoteLock()
-                ebLogInfo(f"No VMs are running or it is a SVM environment for the dom0s: {_reboot_set}, Rebooting all dom0s for selinux changes to take effect.")
-                if not aStaggeredReboot:
-                    _plist = ProcessManager()
-                    for _node in _reboot_set:
-                        ebLogInfo("Rebooting {0} ({1}).".format(_component_type, _node))
-                        _p = ProcessStructure(self.mRebootNode, [_node], _node)
-                        _p.mSetMaxExecutionTime(30*60) # 30 minutes timeout
-                        _p.mSetJoinTimeout(10)
-                        _p.mSetLogTimeoutFx(ebLogWarn)
-                        _plist.mStartAppend(_p)
-                    _plist.mJoinProcess()
-                    self.mReleaseRemoteLock()
-                    ebLogInfo(f"Reboot of dom0s: {_reboot_set} was successful.")
-                else:
-                    for _node in _reboot_set:
-                        ebLogInfo("Rebooting {0} ({1}).".format(_component_type, _node))
-                        self.mRebootNode(_node)
-                        ebLogInfo(f"Reboot of dom0: {_node} was successful.")
+                with self.remote_lock():
+                    ebLogInfo(f"No VMs are running or it is a SVM environment for the dom0s: {_reboot_set}, Rebooting all dom0s for selinux changes to take effect.")
+                    if not aStaggeredReboot:
+                        _plist = ProcessManager()
+                        for _node in _reboot_set:
+                            ebLogInfo("Rebooting {0} ({1}).".format(_component_type, _node))
+                            _p = ProcessStructure(self.mRebootNode, [_node], _node)
+                            _p.mSetMaxExecutionTime(30*60) # 30 minutes timeout
+                            _p.mSetJoinTimeout(10)
+                            _p.mSetLogTimeoutFx(ebLogWarn)
+                            _plist.mStartAppend(_p)
+                        _plist.mJoinProcess()
+                        ebLogInfo(f"Reboot of dom0s: {_reboot_set} was successful.")
+                    else:
+                        for _node in _reboot_set:
+                            ebLogInfo("Rebooting {0} ({1}).".format(_component_type, _node))
+                            self.mRebootNode(_node)
+                            ebLogInfo(f"Reboot of dom0: {_node} was successful.")
             else:
                 ebLogWarn("Dom0s {0} needs to be rebooted manually since there are running VMs.".format(_reboot_set))
             return
@@ -36539,8 +36605,6 @@ IPV6INIT=no"""
         for _dom0, _domu in _ddpair:
             if not self.mIsKVM():
                 _cmd_str  = f'/opt/exadata_ovm/exadata.img.domu_maker remove-domain {_domu} -force'
-                if self.__exabm:
-                    _cmd_str += ' ; /opt/exadata_ovm/exadata.img.domu_maker remove-bridge-dom0 vmeth100 -force'
                 _cmd_str2 = '/usr/sbin/xm destroy '+_domu
                 _chkvm_cmd = '/usr/sbin/xm list | /bin/grep -w '+_domu
                 _hypervisor_service = 'xend'
@@ -36550,8 +36614,6 @@ IPV6INIT=no"""
                 _cmd_str3 = '/usr/bin/virsh undefine '+_domu
                 _chkvm_cmd = '/usr/sbin/vm_maker --list-domains | /bin/grep "^' + _domu + '("'
                 _hypervisor_service = 'libvirtd'
-                if self.__exabm:
-                    _cmd_str3 += ' ; /opt/exadata_ovm/vm_maker --remove-bridge vmeth200'
             _cmd_del_vmbkup = 'source /opt/python-vmbackup/bin/set-vmbackup-env.sh && vmbackup cleanall --vm '+_domu
             _node = exaBoxNode(get_gcontext())
             _node.mConnect(aHost=_dom0)

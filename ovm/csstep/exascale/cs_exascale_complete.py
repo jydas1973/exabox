@@ -21,6 +21,8 @@
 #    INTERNAL CLASSES:
 #
 #    MODIFIED   (MM/DD/YY)
+#.   aararora    04/13/26 - 39200237: Issues observed for ca signed certs being
+#.                          copied to domus for exacc
 #.   aararora    03/20/26 - 39106054: Install Falcon agent during postginid
 #    prsshukl    03/04/25 - Bug 38828221: Copy customer Root CA for SSL Inspection enabled infra
 #.   siyarlag    12/15/25 - 38654530: enable mCreateOracleEsWallet
@@ -311,7 +313,7 @@ class csExaScaleComplete(CSBase):
         #
         if _ebox.mIsOciEXACC():
             # Enh 35823972: COPY DOM-U CERTIFICATE INTO DOM-U DURING CS
-            if _ebox.mIsFedramp():
+            if _ebox.mIsFedramp() or _ebox.mIsCaSignedCerts():
                 _ebox.mSetupDomUsForSecurePatchServerCommunication()
             else:
                 _ebox.mSetupDomUsForSecureDBCSCommunication()

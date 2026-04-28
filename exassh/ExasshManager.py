@@ -37,6 +37,18 @@ import time
 import subprocess as sp
 import shlex
 import time
+import warnings
+
+try:
+    from cryptography.utils import CryptographyDeprecationWarning
+    warnings.filterwarnings(
+        "ignore",
+        category=CryptographyDeprecationWarning,
+        module=r"paramiko\..*",
+    )
+except Exception:
+    pass
+
 import paramiko
 import termios
 import select

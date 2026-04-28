@@ -13,6 +13,7 @@ NOTE:
 
 History:
     MODIFIED (MM/DD/YY)
+    avimonda  04/11/26 - Bug 39182562: Fix IORM multiline dbPlan parser
     ririgoye  11/20/25 - Bug 38667586 - EXACS: MAIN: PYTHON3.11: SUPRASS ALL
                          PYTHON WARNINGS
     dekuckre  06/23/25 - 38098385: Allow varied flashcache size across the cells.
@@ -1978,19 +1979,23 @@ class ebCluResManager(object):
                     break 
             if _index !=-1:
                 for _line in _out[_index:]:
-                    if _iorm_data_type in _line:
-                        _line = _line.split(":")[1].rstrip().lstrip()
+                    _stripped_line = _line.rstrip().lstrip()
+                    if _stripped_line.startswith(_iorm_data_type + ":"):
+                        _line = _stripped_line.split(":", 1)[1].rstrip().lstrip()
                     elif ":" in _line and _iorm_data_type not in _line:
                         break
                     else:
-                        _line = _line.rstrip().lstrip()
+                        _line = _stripped_line
                     if "name" in _line:
                         _kvpairs = _line.split(",")
                         _iormplan = {}
 
                     # Store the attribute name and value
                         for _kvp in _kvpairs:
-                            _iormplan[_kvp.split("=")[0]] = _kvp.split("=")[1]
+                            if "=" not in _kvp:
+                                continue
+                            _key, _value = _kvp.split("=", 1)
+                            _iormplan[_key] = _value
                         ebLogTrace(f"_iormplan to append to _iormdata: {_iormplan}")
                         _iormdata["cell"][_cell][_iorm_data_type].append(_iormplan)
                     

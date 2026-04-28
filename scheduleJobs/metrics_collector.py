@@ -1,5 +1,5 @@
 """
- Copyright (c) 2024, Oracle and/or its affiliates.
+ Copyright (c) 2024, 2026, Oracle and/or its affiliates.
 
 NAME:
     metrics_collector - This is responsible for the creation of a scheduler that periodically inserts the data to MySQL Db
@@ -12,6 +12,7 @@ NOTE:
 
 History:
     MODIFIED   (MM/DD/YY)
+    aypaul      04/16/26 - Bug#38900303 Fix codev identified issues.
     shapatna    06/21/24 - Adding in methods for adding 'metrics_collector' scheduler job
     shapatna    06/14/24 - Bug 36732867: Create File
 """
@@ -36,7 +37,9 @@ class MetricsCollector():
         ebLogInit(self.__ctx, self.__options)
         
         self.__exacloudPath = os.getcwd()
-        self.__exacloudPath = self.__exacloudPath[0: self.__exacloudPath.rfind("exacloud")+8]
+        _find_idx = self.__exacloudPath.rfind("exacloud")
+        if _find_idx >= 0:
+            self.__exacloudPath = self.__exacloudPath[0: _find_idx+8]
         self.__configPath = f"{self.__exacloudPath}/config/metrics_categories.conf"
 
     def mParseConfig(self):

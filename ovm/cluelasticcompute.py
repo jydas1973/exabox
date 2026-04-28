@@ -15,6 +15,9 @@ NOTE:
 History:
 
     MODIFIED   (MM/DD/YY)
+    pbellary    04/15/26 - Enh 39213619 - EXACLOUD SHOULD UPDATE STORAGE INTERCONNECTS IN ASM ADD NODE FOR A EXASCALE INFRA 
+    aararora    04/13/26 - 39200237: Issues observed for ca signed certs being
+                           copied to domus for exacc
     aararora    03/20/26 - 39106054: Falcon agent install for new compute additions
     pbellary    03/16/26 - Fix dom0 network reset for add node
     atgandhi    03/15/26 - Bug 39011469 - EXACS:26.1:VOTING FILES FOR A CLUSTER
@@ -1637,19 +1640,19 @@ class ebCluReshapeCompute(object):
                     _stepSpecificDetails = self.mGetCluUtils().mStepSpecificDetails("elasticAddDetails", 'ONGOING', f"Elastic Add Compute step {step} in progress", step)
                     self.mGetCluUtils().mUpdateTaskProgressStatus([], 0, step, "In Progress", _stepSpecificDetails) 
 
-                if step == "CREATE_GUEST" and (_ebox.mIsXS() or _utils.mIsEDVImageSupported(aOptions) or _utils.mIsEDVBackupSupported(aOptions)):
+                _jsonconf = getattr(aOptions, "jsonconf", None) if aOptions is not None else None
+                _has_exascale_payload = False
+                if isinstance(_jsonconf, dict):
+                    _sentinel = object()
+                    _has_exascale_payload = _jsonconf.get("exascale", _sentinel) is not _sentinel
+                if step == "CREATE_GUEST" and _has_exascale_payload and not _ebox.mIsExaScale():
                     _utils.mEnableQinQIfNeeded(aOptions, aDom0List=_newdom0List)
                     _failedList = []
                     #perform check to deduce if QinQ is enabled
                     if not _utils.mCheckRoCEIPs(aOptions, _failedList, aDom0List=_newdom0List):
-                        # execute command to enable QinQ
-                        ebLogInfo(f" *** Enabling QinQ on the Host Nodes {_failedList}. Host node will be restarted serially to handle that")
-                        _utils.mSetupRoCEIPs(aOptions, _failedList, aDom0List=_newdom0List)
-                        #Require CP to inject tmp ssh key, disabling until CP fixes the issue
-                        #_rc = _utils.mValidateGuest(aOptions, _failedList)# validate domU after rebooting of dom0s for QinQ enabling
-                        #if _rc != 0:
-                        #    ebLogError("*** DomU Validation failed after enabling QinQ")
-                        #    return _rc
+                        # execute command to Set storage vlan
+                        ebLogInfo(f" *** Set storage vlan on the Host Nodes {_failedList}")
+                        _utils.mSetStorageVlanOnCompute(aOptions, _failedList, aDom0List=_newdom0List)
 
                 self.mExecuteOEDACLIDoStep(_newdomUList, step, aOptions)
 
@@ -1855,8 +1858,9 @@ class ebCluReshapeCompute(object):
                     self.mSetDRVip(_newdomUList[0])
 
                 if _ebox.mIsOciEXACC():
-                    if  _ebox.mIsFedramp():
+                    if  _ebox.mIsFedramp() or _ebox.mIsCaSignedCerts():
                         _ebox.mSetupDomUsForSecurePatchServerCommunication()
+                    if  _ebox.mIsFedramp():
                         _ebox.mAddEcraNatOnDomU()
                         _ebox.mHandlerCopyCSSHubKeys()
                     # for fedramp check is placed inside class

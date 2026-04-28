@@ -17,6 +17,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    araghave    04/11/26 - Enhancement Request 39143049 - FIX PLUGIN HANDLER
+#                           RELATED CODE ISSUES REPORTED BY CODEV
 #    sdevasek    03/09/26 - Bug 39053714 - INFRAPATCH REGISTERED PLUGINS: REUSE
 #                           CACHED VALIDATION RESULTS ACROSS NODES FOR THE
 #                           SCRIPTBUNDLE VALIDATION
@@ -647,7 +649,9 @@ class OneOffV2PluginHandler(PluginHandler):
                     _node.mConnect(aHost=aNode, aTimeout=20)
                     _in, _out, _err = _node.mExecuteCmd('uptime')
                     _output = _out.readlines()
-                    self.mPatchLogInfo(f"Node : {aNode} is accessible and the uptime on the node is {str(_output)}")
+                    if _output:
+                        self.mPatchLogInfo(f"Node : {aNode} is accessible and the uptime on the node is {str(_output)}")
+                        break
 
                 if not _node.mIsConnectable(aNode, aTimeout=mGetSshTimeout(), aKeyOnly=True):
                     _ret = NODE_DID_NOT_STARTUP_POST_ONEOFF_PLUGINS

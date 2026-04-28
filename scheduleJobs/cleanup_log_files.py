@@ -4,7 +4,7 @@
 #
 # cleanup_log_files.py
 #
-# Copyright (c) 2021, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      cleanup_log_files.py - <one-line expansion of the name>
@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    aypaul      04/16/26 - Bug#38900303 Fix codev identified issues.
 #    aararora    08/26/25 - Bug 38298135: Enhance exception handling and
 #                           logging for cleanup logs scheduler command
 #    aararora    04/07/25 - Bug 37779410: Move oeda request archive paths from
@@ -80,7 +81,8 @@ class CleanUpLogFiles():
                     os.mkdir(self.__log_file_archive_directory)
             else:
                 ebLogWarn("Log archive directory does not exist: {0}. Older log files will be deleted.".format(_log_file_archive_directory))
-        else:
+
+        if self.__log_file_archive_directory is None:
             _relativeLogArchiveDirectory = "../exacloudLogArchive"
             self.__log_file_archive_directory = os.path.join(self.__exacloudPath, _relativeLogArchiveDirectory)
             todays_date = date.today() 

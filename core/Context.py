@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     Context - Basic functionality
@@ -328,6 +328,8 @@ class exaBoxContext(object):
         """
 
         _oeda_build = "UNKNOWN"
+        if self.__oedapath is None:
+            return _oeda_build
         _properties_file = os.path.join(self.__oedapath, "properties",
                 "es.properties")
 
@@ -414,5 +416,4 @@ def set_gcontext(aContext):
 
 def get_gcontext():
     return GlobalContext
-
 

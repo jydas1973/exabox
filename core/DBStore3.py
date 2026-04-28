@@ -12,6 +12,8 @@ NOTE:
 
 History:
     MODIFIED   (MM/DD/YY)
+    jfsaldan    04/09/26 - Bug 38900114 - EXACLOUD: ISSUES FOUND BY VOXIO CODEV
+                           AGENT IN DIR EXABOX/CORE
     jesandov    03/20/26 - 39094088: Add race condition check on creation of
                            tables
     rbhandar    01/07/26 - Bug 38336893 - OCI: OCI1 | EXACS | QMR PATCHING
@@ -2466,8 +2468,9 @@ class ebExacloudDB(ebMysqlDB):
         _time   = aRequest.mGetTimeStampStart()
         _end    = aRequest.mGetTimeStampEnd()
         _ctype  = aRequest.mGetCmdType()
+        _params = aRequest.mGetParams()
         if self.mGetMaskParams():
-            _params = maskSensitiveData(aRequest.mGetParams(), full_mask=True)
+            _params = maskSensitiveData(_params, full_mask=True)
         _error  = aRequest.mGetError()
         _error_str = aRequest.mGetErrorStr()
         _body   = aRequest.mGetBody()
@@ -2556,11 +2559,10 @@ class ebExacloudDB(ebMysqlDB):
 
     @mUpdateResponseToEcra
     def mUpdateParams(self, aRequest):
-        _params = None
+        _params = aRequest.mGetParams()
         _uuid   = aRequest.mGetUUID()
         if self.mGetMaskParams():
-            _params = maskSensitiveData(aRequest.mGetParams(), full_mask=True)
-        _params = _params
+            _params = maskSensitiveData(_params, full_mask=True)
         _sql = """UPDATE requests SET params=%(1)s WHERE uuid=%(2)s"""
         _data = [_params, _uuid]
         self.mExecuteLog(_sql, _data)
@@ -3876,7 +3878,10 @@ class ebExacloudDB(ebMysqlDB):
     def mGetCCADataStatus(self, aId):
         _sql = """SELECT status FROM ccadata WHERE id=%(1)s"""
         _data = [aId]
-        return self.mExecute(_sql, _data)
+        _row = self.mFetchOne(_sql, _data)
+        if _row:
+            return _row[0]
+        return None
 
     def mGetCCAUserList(self):
         _sql = """SELECT id FROM ccadata"""

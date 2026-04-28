@@ -15,6 +15,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    jyotdas     04/08/26 - Codex scan issue fixes
 #    kdas        03/15/26 - ER 38354388 - EXACC: INCLUDE NETWORK INTERFACE 
 #                           ALERT ON PATCHING PRE-CHECK
 #    bhpati      03/06/26 - Bug 38932171 - AIM4ECS:0X03030006 - DB SERVICES
@@ -953,6 +954,10 @@ def mGetPatchkey(_error_code_range_key):
 
     if _error_code_range_key == G_CPS_ERROR_RANGE_BACKUP:
         return gCpsBackupkError
+
+    # Without a default return, unrecognised ranges return None. Callers wrap the result
+    # in dict(), so dict(None) raises TypeError before the generic-error fallback is reached.
+    return gPatchGenericError
 
 #This function is made backward compatible whether the error json schema is defined in old or new format
 def ebPatchFormatBuildError(aErrorCode, aSuggestionCode=None, aComment=None):

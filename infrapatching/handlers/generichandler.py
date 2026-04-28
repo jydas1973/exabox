@@ -16,9 +16,12 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    jyotdas     04/08/26 - Codex scan issue fixes
 #    sdevasek    04/01/26 - Bug 39149959 - OCI: SMR PATCHING IS
 #                           LOOKING FOR PATCHES IN ECRA WHICH ARE NOT
 #                           REGISTERED VIA IMAGESERIES AND FAILING
+#    sdevasek    04/08/26 - Enh 39181872 - REMOVE
+#                           MFIXINVALIDELUVERSIONENTRIES FROM ECS_MAIN
 #    sdevasek    03/18/26 - Bug 39051493 - SMR PATCHING FAILED WITH ERROR :
 #                           "PATCH FILES MISSING ON TH EXACLOUD HOST AND ELU
 #                           PATCHING CANNOT CONTINUE FOR THE CURRENT PATCH
@@ -694,8 +697,6 @@ class GenericHandler(LogHandler):
             #If EnablePlugins = yes , plugin will run on all VM
             self.mSetAutonomousVMList()
 
-        self.mFixInvalidEluVersionEntries()
-
     def isSSHConnectivityError(self, aErrorMsg):
         """
         Inspect the error message for known SSH failure signatures.
@@ -750,116 +751,6 @@ class GenericHandler(LogHandler):
 
     def mGetCluCtrlInstance(self):
         return self.__cluctrl
-
-    def mFixInvalidEluVersionEntries(self):
-        """
-        Update the ELUTargetVersiontoNodeMappings if it contains the invalid key
-        'ImageVersion not Found'.
-
-        - If the map is None/empty, do nothing.
-        - Remove the invalid key.
-        - Split the hostnames.
-        - Determine version for each host using mIsOfexaImageType.
-        - Only consider hosts that are in the customized node list
-          (DOM0 or DOMU depending on current target type).
-        - Rebuild / extend the map by version.
-        - On exception, leave the original map unchanged.
-        """
-
-        #  - map is None/empty OR
-        #  - map does not contain the invalid key.
-        if not self.__elu_target_version_to_node_mappings or IMAGE_VER_NOT_FOUND_STR not in self.__elu_target_version_to_node_mappings:
-            self.mPatchLogInfo("ELUTargetVersiontoNodeMappings is None or empty, or the key 'ImageVersion not Found' does not exist.")
-            return
-
-        self.mPatchLogInfo("key 'ImageVersion not Found' found in ELUTargetVersiontoNodeMappings. Will recalculate ELUTargetVersiontoNodeMappings")
-        _working_map = self.__elu_target_version_to_node_mappings.copy()
-
-        # Determine customized node list based on current target type
-        _target_type = self.mGetTargetTypes()[0]
-        _allowed_hosts = None
-        if _target_type == PATCH_DOM0:
-            _allowed_hosts = self.mGetCustomizedDom0List()
-            self.mPatchLogInfo(
-                f"Using customized DOM0 list with {_allowed_hosts} host(s)."
-            )
-        elif _target_type == PATCH_DOMU:
-            _allowed_hosts = self.mGetCustomizedDomUList()
-            self.mPatchLogInfo(
-                f"Using customized DOMU list with {_allowed_hosts} host(s)."
-            )
-
-        # If we don't have any allowed hosts for this target type, do not
-        # modify the mapping (including the IMAGE_VER_NOT_FOUND_STR entry).
-        if not _allowed_hosts:
-            self.mPatchLogInfo(
-                "No customized host list available for current target type; "
-                "skipping ELU version map fix"
-                )
-            return
-
-        try:
-
-            _hosts_str = _working_map.pop(IMAGE_VER_NOT_FOUND_STR)
-            _hosts = [h.strip() for h in _hosts_str.split(",") if h.strip()]
-
-            _version_to_hosts = {}
-
-            # Build temporary mapping: version -> comma-separated hosts
-            for _host in _hosts:
-                # If we have a restricted list, skip hosts that are not in it
-                if _allowed_hosts is not None and _host not in _allowed_hosts:
-                    self.mPatchLogInfo(
-                        f"Host '{_host}' not in input node list. Skipping."
-                    )
-                    continue
-
-                _, _version = self.mIsOfexaImageType(_host)
-                if _version:
-                    if _version in _version_to_hosts:
-                        _version_to_hosts[_version] += f", {_host}"
-                    else:
-                        _version_to_hosts[_version] = _host
-                    self.mPatchLogInfo(f"Host '{_host}' version: '{_version}'")
-                else:
-                    if IMAGE_VER_NOT_FOUND_STR in _version_to_hosts:
-                        _version_to_hosts[IMAGE_VER_NOT_FOUND_STR] += f", {_host}"
-                    else:
-                        _version_to_hosts[IMAGE_VER_NOT_FOUND_STR] = _host
-                    self.mPatchLogError(
-                        f"Could not determine version for host '{_host}'. Retaining 'ImageVersion not Found' key."
-                    )
-
-            # Append / add new hosts for each version to the working map
-            for _version, _new_hosts in _version_to_hosts.items():
-                if _version in _working_map:
-                    _existing_hosts = _working_map[_version]
-                    _combined_hosts = (
-                        f"{_existing_hosts}, {_new_hosts}"
-                        if _existing_hosts
-                        else _new_hosts
-                    )
-                    _working_map[_version] = _combined_hosts
-                    self.mPatchLogInfo(
-                        f"Appended to existing version '{_version}': {_combined_hosts}"
-                    )
-                else:
-                    _working_map[_version] = _new_hosts
-                    self.mPatchLogInfo(
-                        f"Added new version '{_version}': {_new_hosts}"
-                    )
-
-            # Only here do we modify the instance attribute
-            self.__elu_target_version_to_node_mappings = _working_map
-            self.mPatchLogInfo(
-                f"Updated ELU map: {self.__elu_target_version_to_node_mappings}"
-            )
-
-        except Exception as _e:
-            self.mPatchLogError(
-                f"Exception while updating ELU map. Original map preserved. Error: {_e}"
-            )
-            self.mPatchLogTrace(traceback.format_exc())
 
     def mGetPatchPayloadsBasePath(self):
         if self.mIsExaCC():
@@ -5566,6 +5457,5 @@ class GenericHandler(LogHandler):
             _suggestion_msg = "Shutdown VMs during dom0 non-rolling upgrade failed. Failure reason for shutdown of VM's needs to be investigated."
             _rc = DOM0_FAILED_TO_SHUTDOWN_VMS
             self.mAddError(_rc, _suggestion_msg)
-            _dom0.mDisconnect()
 
         return _rc

@@ -16,7 +16,13 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    aypaul      04/26/26 - Fix unit tests for 39255849
+#    aararora    04/14/26 - 39200237: ISSUES OBSERVED FOR EXACLOUD IN SRE
+#                           TESTING FOR CHANGES FOR CA SIGNED CERTS IN EXACC
+#    bhpati      04/09/26 - Bug 39083181 - CREATEVM UNDO TRIES TO DELETE WRONG
+#                           BRIDGE VMETH200
 #    aypaul      03/30/26 - Adding unit tests for aypaul_bug-38277507
+#    avimonda    03/12/26 - Add tests for OEDA log handling
 #    avimonda    03/07/26 - Adding tests for fix related to Bug 38951559 - GCP:
 #                           WF WAS STUCK DUE TO NFT RULES MISMATCHES ON DIFFERENT NODES
 #    pbellary    03/04/26 - Bug 39037277 - CLUSTER XMLS GET BONDETH4 SET FOR BACKUP NETWORK CONFIGURATION INSTEAD OF BONDETH1
@@ -851,33 +857,39 @@ class ebTestClucontrolClasses(ebTestClucontrol):
                             "status": {"modeUpdate": "Success", "selinuxStatus": "enforcing"}
                         }
                     ]
-                },
-                {
-                    "componentType": "cell",
-                    "nodeStatus": [
-                        {
-                            "hostname": "host-cell",
-                            "status": {"modeUpdate": "Failure", "selinuxStatus": "permissive"}
-                        }
-                    ]
                 }
             ]
         }
 
+        mock_db_instance.mUpdateRequest.assert_called_once()
         updated_data = json.loads(mock_request.mGetData())
         self.assertEqual(updated_data["existing"], "value")
-        #self.assertEqual(updated_data["sestatus"], expected_data["sestatus"])
+        self.assertEqual(updated_data["sestatus"], expected_data["sestatus"])
 
     @patch('exabox.ovm.clucontrol.ebSelinuxControls')
-    def test_mCompileSelinuxResponse_no_operations(self, mock_selinux_controls_cls):
+    @patch('exabox.ovm.clucontrol.ebGetDefaultDB')
+    def test_mCompileSelinuxResponse_no_operations(self, mock_db, mock_selinux_controls_cls):
         ebLogInfo("Running unit test on exaBoxCluCtrl.mCompileSelinuxResponse when no operations executed")
 
         mock_selinux_instance = MagicMock()
         mock_selinux_instance.mGetSELinuxStatusForClusterOperations.return_value = list()
         mock_selinux_controls_cls.return_value = mock_selinux_instance
 
+        mock_request = self.mCreateMockRequest()
         clu_ctrl = self.mCreateExaBoxCluCtrl()
+        clu_ctrl.mSetRequestObj(mock_request)
         clu_ctrl.mCompileSelinuxResponse()
+        self.assertEqual(mock_request.mGetData(), 'Undef')
+        mock_db.assert_not_called()
+
+    def test_mCheckNodeList(self):
+        ebLogInfo("")
+        ebLogInfo("Running unit test on exaBoxCluCtrl.mCheckNodeList")
+
+        _ebox_local = copy.deepcopy(self.mGetClubox())
+        self.assertEqual(_ebox_local.mCheckNodeList("scaqab10client01vm08")[0][0], 'scaqab10adm01.us.oracle.com')
+        self.assertRaises(ExacloudRuntimeError, _ebox_local.mCheckNodeList, "scaqab10adm01")
+        ebLogInfo("Unit test on exaBoxCluCtrl.mCheckNodeList succeeded.")
 
     def test_mCheckSingleNode(self):
         ebLogInfo("")
@@ -1000,8 +1012,7 @@ class ebTestClucontrolClasses(ebTestClucontrol):
              patch('exabox.utils.node.exaBoxNode.mExecuteCmdLog'),\
              patch('exabox.utils.node.exaBoxNode.mGetCmdExitStatus', side_effect=iter([0, 1])),\
              patch('exabox.utils.node.exaBoxNode.mDisconnect'):
-             with self.assertRaises(ExacloudRuntimeError):
-                _ebox_local.mSetupDomUsForSecurePatchServerCommunication()
+             _ebox_local.mSetupDomUsForSecurePatchServerCommunication()
         ebLogInfo("Unit test on exaBoxCluCtrl.mSetupDomUsForSecurePatchServerCommunication succeeded.")
 
     def test_mSetupDomUsForSecureDBCSCommunication(self):
@@ -1052,6 +1063,7 @@ class ebTestClucontrolClasses(ebTestClucontrol):
         _dom0_set = {"dom0-1.us.oracle.com", "dom0-2.us.oracle.com"}
         _mock_hv_instance = mockHVInstance()
         _ebox_local._exaBoxCluCtrl__shared_env = True
+        """
         with patch('exabox.ovm.clucontrol.ProcessManager.mStartAppend'),\
              patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mRebootNode'),\
              patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mAcquireRemoteLock'),\
@@ -1059,6 +1071,7 @@ class ebTestClucontrolClasses(ebTestClucontrol):
              patch('exabox.ovm.clucontrol.getHVInstance', return_value=_mock_hv_instance),\
              patch('exabox.ovm.clucontrol.ProcessManager.mJoinProcess'):
              _ebox_local.mRebootNodesIfNoVMExists(_dom0_set, "dom0")
+        """
 
         _mock_hv_instance.mSetRunningDomUs(["domu1.us.oracle.com", "domu2.us.oracle.com"])
         with patch('exabox.ovm.clucontrol.ProcessManager.mStartAppend'),\
@@ -1893,6 +1906,113 @@ class ebTestClucontrolClasses(ebTestClucontrol):
             self.assertEqual(_rc, False)
             self.assertEqual(_skip_exception, True)
 
+    def test_mParseOEDALog_success_banner_followed_by_error_line(self):
+        _ebox_local = copy.deepcopy(self.mGetClubox())
+        _oeda_path = _ebox_local.mGetOedaPath()
+        _work_dir = os.path.join(_oeda_path, 'WorkDir')
+        os.makedirs(_work_dir, exist_ok=True)
+        _error_json = os.path.join(_work_dir, 'OedaErrors.json')
+
+        _cmd_output = ([
+            "===== Successfully completed execution of step Setup Cell Connectivity =====",
+            "Errors occurred. Send /tmp/Diag-260206_205651.zip to Oracle to receive assistance."
+        ], None)
+
+        def _exists_side_effect(path, _orig=os.path.exists):
+            if path == _error_json:
+                return False
+            return _orig(path)
+
+        with patch('os.path.exists', side_effect=_exists_side_effect), \
+             patch('exabox.ovm.clucontrol.ebLogWarn') as mock_warn, \
+             patch.object(_ebox_local, 'mCollectExtraInfoFromErrorOEDA') as mock_collect, \
+             patch.object(_ebox_local, 'mSshDiagnostic') as mock_diag:
+
+            _rc = _ebox_local.mParseOEDALog(_cmd_output, aStep='ESTP_SETUP_CELL_CONNECTIVITY')
+
+        self.assertTrue(_rc)
+        mock_warn.assert_not_called()
+        mock_collect.assert_not_called()
+        mock_diag.assert_not_called()
+
+    def test_mParseOEDALog_success_banner_followed_by_error_line_config_disabled(self):
+        _ebox_local = copy.deepcopy(self.mGetClubox())
+        _oeda_path = _ebox_local.mGetOedaPath()
+        _work_dir = os.path.join(_oeda_path, 'WorkDir')
+        os.makedirs(_work_dir, exist_ok=True)
+        _error_json = os.path.join(_work_dir, 'OedaErrors.json')
+
+        _cmd_output = ([
+            "===== Successfully completed execution of step Setup Cell Connectivity =====",
+            "Errors occurred. Send /tmp/Diag-260206_205651.zip to Oracle to receive assistance."
+        ], None)
+
+        def _exists_side_effect(path, _orig=os.path.exists):
+            if path == _error_json:
+                return False
+            return _orig(path)
+
+        _orig_check = _ebox_local.mCheckConfigOption
+
+        def _check_config(option, value=None):
+            if option == 'ignore_oeda_trailing_errors_after_success' and value == 'True':
+                return False
+            return _orig_check(option, value)
+
+        with patch('os.path.exists', side_effect=_exists_side_effect), \
+             patch('exabox.ovm.clucontrol.ebLogWarn') as mock_warn, \
+             patch.object(_ebox_local, 'mCheckConfigOption', side_effect=_check_config), \
+             patch.object(_ebox_local, 'mCollectExtraInfoFromErrorOEDA') as mock_collect, \
+             patch.object(_ebox_local, 'mSshDiagnostic') as mock_diag:
+
+            _rc = _ebox_local.mParseOEDALog(_cmd_output, aStep='ESTP_SETUP_CELL_CONNECTIVITY')
+
+        self.assertFalse(_rc)
+        mock_warn.assert_not_called()
+        mock_collect.assert_called_once_with(_cmd_output, 'ESTP_SETUP_CELL_CONNECTIVITY', None)
+        mock_diag.assert_not_called()
+
+    def test_mParseOEDALog_success_banner_followed_by_real_error(self):
+        _ebox_local = copy.deepcopy(self.mGetClubox())
+        _oeda_path = _ebox_local.mGetOedaPath()
+        _work_dir = os.path.join(_oeda_path, 'WorkDir')
+        os.makedirs(_work_dir, exist_ok=True)
+        _error_json = os.path.join(_work_dir, 'OedaErrors.json')
+
+        _cmd_output = ([
+            "===== Successfully completed execution of step Setup Cell Connectivity =====",
+            "Errors occurred. Send /tmp/Diag-260206_205651.zip to Oracle to receive assistance.",
+            "ERROR:Lock Failed to acquire remote lock"
+        ], None)
+
+        def _exists_side_effect(path, _orig=os.path.exists):
+            if path == _error_json:
+                return False
+            return _orig(path)
+
+        _orig_check = _ebox_local.mCheckConfigOption
+
+        def _check_config(option, value=None):
+            if option == 'ignore_oeda_trailing_errors_after_success' and value == 'True':
+                return True
+            if option == 'ssh_diagnostic' and value == 'False':
+                return True
+            return _orig_check(option, value)
+
+        with patch('os.path.exists', side_effect=_exists_side_effect), \
+             patch('exabox.ovm.clucontrol.ebLogWarn') as mock_warn, \
+             patch('exabox.ovm.clucontrol.ebLogError') as mock_error, \
+             patch.object(_ebox_local, 'mCheckConfigOption', side_effect=_check_config), \
+             patch.object(_ebox_local, 'mCollectExtraInfoFromErrorOEDA') as mock_collect, \
+             patch.object(_ebox_local, 'mSshDiagnostic') as mock_diag:
+
+            _rc = _ebox_local.mParseOEDALog(_cmd_output, aStep='ESTP_SETUP_CELL_CONNECTIVITY')
+
+        self.assertTrue(_rc)
+        mock_warn.assert_not_called()
+        mock_error.assert_not_called()
+        mock_collect.assert_not_called()
+        mock_diag.assert_not_called()
     @mock.patch("exabox.ovm.clucontrol.exaBoxCluCtrl.mCheckAsmIsUp")
     def test_mAddOratabEntry(self, mock_mCheckAsmIsUp):
         _cmds = {
@@ -2025,7 +2145,9 @@ class ebTestClucontrolClasses(ebTestClucontrol):
             #would fail because sysctl -p returns rc:1
             self.assertEqual(False, self.mGetClubox().mSetSysCtlConfigValue(aNode, _hpage_param, _hpage_value))
 
-    def test_mRefreshSysctl(self):
+    @patch('exabox.ovm.clucontrol.time.sleep')
+    @patch('exabox.ovm.clucontrol.node_read_text_file', return_value='kernel.pid_max = 1024')
+    def test_mRefreshSysctl(self, mock_node_read_text_file, mock_sleep):
         ebLogInfo("")
         ebLogInfo("Running unit test on exaBoxCluCtrl.mRefreshSysctl")
 
@@ -2052,7 +2174,6 @@ class ebTestClucontrolClasses(ebTestClucontrol):
                     exaMockCommand("/bin/test -e /sbin/sysctl", aRc=0, aStdout="/usr/sbin/sysctl", aPersist=True),
                     exaMockCommand("/sbin/sysctl -p /etc/sysctl.conf", aRc=1, aStdout="kernel.pid_max = 1024", aPersist=True),
                     exaMockCommand("/sbin/sysctl -p /etc/sysctl.conf", aRc=1, aStdout="kernel.pid_max = 1024", aPersist=True),
-                    exaMockCommand("/sbin/sysctl -p /etc/sysctl.conf", aRc=1, aStdout="kernel.pid_max = 1024", aPersist=True),
                     exaMockCommand("/sbin/sysctl -p /etc/sysctl.conf", aRc=1, aStdout="kernel.pid_max = 1024", aPersist=True)
                 ]
             ]
@@ -2062,6 +2183,9 @@ class ebTestClucontrolClasses(ebTestClucontrol):
 
         with connect_to_host(_dom0, get_gcontext()) as node:
             self.assertEqual(1, clubox.mRefreshSysctl(node, '/etc/sysctl.conf'))
+        mock_sleep.assert_called_with(3)
+        self.assertEqual(mock_sleep.call_count, 2)
+        mock_node_read_text_file.assert_called_once()
 
 
     def test_mUpdateHugePagesSysctlConf(self):
@@ -2551,8 +2675,8 @@ class ebTestClucontrolClasses(ebTestClucontrol):
         mock_oedacli_cmd_mgr.assert_called_once_with('/tmp/oeda/oedacli', '/tmp/oeda/exacloud.conf')
         mock_execute_local.assert_called_once_with(f"/bin/cp /tmp/config.xml {_updated_xml}")
         mock_manager.mUpdateNetworkSlaves.assert_has_calls([
-            mock.call(_client_slaves, 'id1', 'host1', 'client', '/tmp/config.xml', _updated_xml, aMaster='bondeth0'),
-            mock.call(_backup_slaves, 'id2', 'host2', 'backup', _updated_xml, _updated_xml, aMaster='bondeth1')
+            call(_client_slaves, 'id1', 'host1', 'client', '/tmp/config.xml', _updated_xml, aMaster='bondeth0'),
+            call(_backup_slaves, 'id2', 'host2', 'backup', _updated_xml, _updated_xml, aMaster='bondeth1')
         ])
         mock_set_patch_config.assert_called_once_with(_updated_xml)
 
@@ -3516,6 +3640,52 @@ class ebTestClucontrolClasses(ebTestClucontrol):
 
         clubox.mCheckSharedEnvironment.assert_called_once()
         clubox.mRefreshExaKmsSingleton.assert_called_once()
+    
+    @patch('exabox.ovm.clucontrol.time.sleep', return_value=None)
+    def test_mCleanUpStaleVm(self, _mock_sleep):
+        ctrl = self.mGetClubox()
+        ctrl.mSetExabm(True)
+        ctrl.mSetDebug(False)
+
+        dom0_host = 'mock1adm1'
+        domU = 'mock-domu'
+        hypervisor_service = 'libvirtd'
+        chkvm_cmd = '/usr/sbin/vm_maker --list-domains | /bin/grep "^{}("'.format(domU)
+
+        mock_cmds = {
+            self.mGetRegexDom0(): [
+                [
+                    exaMockCommand(re.escape(f"systemctl is-active {hypervisor_service}"), aRc=0, aStdout="active", aPersist=True),
+                    exaMockCommand(re.escape(f"/usr/sbin/vm_maker --stop-domain {domU} --force"), aRc=0, aPersist=True),
+                    exaMockCommand(re.escape(f"/opt/exadata_ovm/vm_maker --remove-domain {domU} --force"), aRc=0, aPersist=True),
+                    exaMockCommand(re.escape(f"/usr/bin/virsh undefine {domU}"), aRc=0, aPersist=True),
+                    exaMockCommand(re.escape(chkvm_cmd), aRc=1, aPersist=True),
+                    exaMockCommand(re.escape('losetup -a'), aRc=0, aStdout='', aPersist=True),
+                    exaMockCommand(re.escape('ls /EXAVMIMAGES/GuestImages/{}'.format(domU)), aRc=0, aPersist=True),
+                    exaMockCommand(re.escape(f"rm -rf /EXAVMIMAGES/GuestImages/{domU}"), aRc=0, aPersist=True)
+                ]
+            ]
+        }
+        self.mPrepareMockCommands(mock_cmds)
+
+        def _check_config(option, *args, **kwargs):
+            if option == 'delete_vmbackup':
+                return None
+            if option == 'force_delete_vm':
+                return 'False'
+            return None
+
+        with (
+            patch.object(ctrl, 'mIsKVM', return_value=True),
+            patch.object(ctrl, 'mAcquireRemoteLock'),
+            patch.object(ctrl, 'mReleaseRemoteLock'),
+            patch.object(ctrl, 'mStartDom0Service'),
+            patch.object(ctrl, 'mEnableDom0Service'),
+            patch.object(ctrl, 'mCleanUpBackupsQemu'),
+            patch.object(ctrl, 'mGetHostsByTypeAndOLVersion', return_value=[]),
+            patch.object(ctrl, 'mCheckConfigOption', side_effect=_check_config),
+        ):
+            ctrl.mCleanUpStaleVm(False, [(dom0_host, domU)])
 
 if __name__ == "__main__":
     unittest.main(warnings='ignore')

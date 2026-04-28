@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     SshGen - Basic functionality for Ssh Connection management
@@ -11,6 +11,7 @@ NOTE:
     None
 
 History:
+    bhpati      04/03/2026 - Bug 39067888: add NLS_LANG variable to ssh commands
     jesandov    11/03/2025 - Bug#38606181: Fix UT
     jesandov    10/27/2025 - Bug#37073667: Force key only on domus
     jesandov    08/19/2025 - Bug#38195112: Add a fallback mechanism in switches connection between ssh-rsa and rsa-sha2-512
@@ -58,6 +59,18 @@ History:
 """
 
 from six.moves import getoutput
+import warnings
+
+try:
+    from cryptography.utils import CryptographyDeprecationWarning
+    warnings.filterwarnings(
+        "ignore",
+        category=CryptographyDeprecationWarning,
+        module=r"paramiko\..*",
+    )
+except Exception:
+    pass
+
 import paramiko
 import socket
 import sys
@@ -940,7 +953,7 @@ class sshconn(object):
         if not _cb_error:
             self.__channel.set_combine_stderr(True)
         if get_gcontext().mCheckConfigOption('enable_multilanguage_support') == 'True':
-            self.__channel.exec_command(f"export LANG=en_US.UTF-8;{aCmd}")
+            self.__channel.exec_command(f"export LANG=en_US.UTF-8;export NLS_LANG=AMERICAN_AMERICA.UTF8;{aCmd}")
         else:
             self.__channel.exec_command(aCmd)
 
@@ -1110,7 +1123,7 @@ class sshconn(object):
             try:
 
                 if get_gcontext().mCheckConfigOption('enable_multilanguage_support') == 'True':
-                    fin, fout, ferr = self.__client.exec_command(command=f"export LANG=en_US.UTF-8;{aCmd}")
+                    fin, fout, ferr = self.__client.exec_command(command=f"export LANG=en_US.UTF-8;export NLS_LANG=AMERICAN_AMERICA.UTF8;{aCmd}")
                 else:
                     fin, fout, ferr = self.__client.exec_command(command=aCmd)
 
@@ -1134,7 +1147,7 @@ class sshconn(object):
         _command_exec_time = time.time()
 
         if get_gcontext().mCheckConfigOption('enable_multilanguage_support') == 'True':
-            _channel.exec_command(f"export LANG=en_US.UTF-8;{aCmd}")
+            _channel.exec_command(f"export LANG=en_US.UTF-8;export NLS_LANG=AMERICAN_AMERICA.UTF8;{aCmd}")
         else:
             _channel.exec_command(aCmd)
 

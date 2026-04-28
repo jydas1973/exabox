@@ -4147,6 +4147,98 @@ class ebTestCluElasticComp(ebTestClucontrol):
             self.assertTrue("Connectivity checks" or "mConnectivityChecks" in str(e))
 
 
+    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mCheckCrsIsUp')
+    @patch('exabox.ovm.cluelasticcompute.ebCluReshapeCompute.mExecuteOEDACLIDoStep')
+    @patch('exabox.ovm.cluelasticcompute.ebCluReshapeCompute.mBuildClusterDir', return_value='cluster-key')
+    @patch('exabox.ovm.cluelasticcompute.ebCluReshapeCompute.mUpdateDom0DomUPair')
+    @patch('exabox.ovm.cluelasticcompute.ebCluPreChecks')
+    @patch('exabox.ovm.cluelasticcompute.ebCluExaScale')
+    def test_mAddNode_create_guest_sets_storage_vlan(self, mock_exascale_cls, mock_prechecks, mock_update_dom_pair,
+                                                     mock_build_cluster, mock_execute_step, mock_mCheckCrsIsUp):
+        """
+        When CREATE_GUEST runs for an Exascale payload and QinQ check fails,
+        the flow should configure the storage VLAN on the affected dom0s.
+        """
+        _ebox = self.mGetClubox()
+        fullOptions = copy.deepcopy(_ebox.mGetArgsOptions())
+        fullOptions.jsonconf = json.loads(EXASCALE_ADD_NODE_PAYLOAD)
+        fullOptions.steplist = "CREATE_GUEST"
+
+        _orig_pairs = []
+        mock_utils = mock.MagicMock()
+
+        def _check_roce(options, failed_list, aDom0List=None):
+            failed_list.extend(aDom0List or [])
+            return False
+
+        mock_utils.mEnableQinQIfNeeded = mock.MagicMock()
+        mock_utils.mCheckRoCEIPs.side_effect = _check_roce
+        mock_utils.mSetStorageVlanOnCompute = mock.MagicMock()
+
+        mock_exascale_cls.return_value = mock.MagicMock()
+        mock_prechecks.return_value = mock.MagicMock()
+
+        with ExitStack() as stack:
+            stack.enter_context(patch.object(_ebox, 'mGetOrigDom0sDomUs', return_value=_orig_pairs))
+            stack.enter_context(patch.object(_ebox, 'mSetOrigDom0sDomUs'))
+            stack.enter_context(patch.object(_ebox, 'mGetOracleBaseDirectories', return_value=("/u01/app/19.0.0.0/grid", None, None)))
+            stack.enter_context(patch.object(_ebox, 'mGetKey', return_value='cluster-key'))
+            stack.enter_context(patch.object(_ebox, 'mSetKey'))
+            stack.enter_context(patch.object(_ebox, 'mSaveOEDASSHKeys'))
+            stack.enter_context(patch.object(_ebox, 'mUpdateOEDAProperties'))
+            stack.enter_context(patch.object(_ebox, 'mLogStepElapsedTime'))
+            stack.enter_context(patch.object(_ebox, 'mIsOciEXACC', return_value=False))
+            stack.enter_context(patch.object(_ebox, 'mSetDRNetPresent'))
+            stack.enter_context(patch.object(_ebox, 'mGetNetworkSetupInformation', return_value=None))
+            stack.enter_context(patch.object(_ebox, 'mUpdateStatus'))
+            stack.enter_context(patch.object(_ebox, 'mSetSharedEnv'))
+            stack.enter_context(patch.object(_ebox, 'mCheckSharedEnvironment'))
+            stack.enter_context(patch.object(_ebox, 'mSetClusterPath'))
+            stack.enter_context(patch.object(_ebox, 'mCheckCrsIsUp'))
+            stack.enter_context(patch.object(_ebox, 'mUpdateClusterName'))
+            stack.enter_context(patch.object(_ebox, 'mHasNatAndCustomerNet', return_value=False))
+            stack.enter_context(patch.object(_ebox, 'mReturnDom0DomUNATPair', return_value=[]))
+            stack.enter_context(patch.object(_ebox, 'mCheckDom0NetworkType', return_value=False))
+            stack.enter_context(patch.object(_ebox, 'mResetDom0NetworkMapping'))
+            stack.enter_context(patch.object(_ebox, 'mIsAdbs', return_value=False))
+            stack.enter_context(patch.object(_ebox, 'mIsXS', return_value=False))
+            stack.enter_context(patch.object(_ebox, 'mIsExaScale', return_value=False))
+            stack.enter_context(patch.object(_ebox, 'mIsKVM', return_value=False))
+            stack.enter_context(patch.object(_ebox, 'isDBonVolumes', return_value=False))
+            stack.enter_context(patch.object(_ebox, 'mReturnDom0DomUPair', return_value=[('dom0a.example', 'domUa.example'), ('dom0b.example', 'domUb.example')]))
+            stack.enter_context(patch('exabox.ovm.cluelasticcompute.exaBoxNode'))
+
+            def _mock_check_config(option, default=None):
+                if option == 'crs_timeout_add_node_minutes':
+                    return '30'
+                return 'False'
+
+            stack.enter_context(patch.object(_ebox, 'mCheckConfigOption', side_effect=_mock_check_config))
+            stack.enter_context(patch.object(_ebox, 'mGetExascaleUtils', return_value=mock_utils))
+            stack.enter_context(patch.object(ebCluReshapeCompute, 'mSetSrcDom0DomU', return_value=None))
+
+            _reshape_obj = ebCluReshapeCompute(_ebox, fullOptions)
+            _dom0, _domU = self.mGetClubox().mReturnDom0DomUPair()[0]
+            _reshape_obj.mSetSrcDom0(_dom0)
+            _reshape_obj.mSetSrcDomU(_domU)
+
+            expected_dom0s = [node['dom0']['hostname'] for node in _reshape_obj.mGetReshapeConf()['nodes']]
+
+            mock_clu_utils = mock.MagicMock()
+            mock_clu_utils.mStepSpecificDetails.return_value = "details"
+
+            with patch.object(ebCluReshapeCompute, 'mGetCluUtils', return_value=mock_clu_utils):
+                _reshape_obj.mAddNode(fullOptions)
+
+        mock_utils.mEnableQinQIfNeeded.assert_called_once_with(fullOptions, aDom0List=expected_dom0s)
+        mock_utils.mCheckRoCEIPs.assert_called_once()
+        self.assertEqual(mock_utils.mSetStorageVlanOnCompute.call_count, 1)
+        vlan_args, vlan_kwargs = mock_utils.mSetStorageVlanOnCompute.call_args
+        self.assertEqual(vlan_args[0], fullOptions)
+        self.assertEqual(vlan_args[1], expected_dom0s)
+        self.assertEqual(vlan_kwargs.get('aDom0List'), expected_dom0s)
+        mock_execute_step.assert_called_once_with(mock.ANY, "CREATE_GUEST", fullOptions)
+
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetOracleBaseDirectories', return_value=("/u01/app/19.0.0.0/grid", None, None))
     def test_mUpdateKMSRPM_rpm_exists(self, mock_mGetOracleBaseDirectories):
         ebLogInfo("Running unit test on mUpdateKMSRPM rpm exists")

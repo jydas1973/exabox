@@ -1,5 +1,5 @@
 """
- Copyright (c) 2020, 2023, Oracle and/or its affiliates.
+ Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 
 NAME:
     cluexaccatp.py - ATP parts specific to ExaCC
@@ -12,6 +12,7 @@ NOTE:
 History:
 
     MODIFIED   (MM/DD/YY)
+       dekuckre 03/24/26 - Fix ATP simulation command tuple membership
        diyanez  10/19/20 - 32042031 - OCIEXACC: ADB: MAIN: PYTHON 3
                            COMPATIBILITY ISSUE IN CLUEXACCATP.PY
        vgerard  03/10/20 - add full ATP support (NatVIPs, XML with admin Net)
@@ -366,7 +367,7 @@ class ebExaCCAtpSimulatePayload(object):
         if not self.__atp_force:
             return False
 
-        if self.__cmd in ('vmgi_install,db_install,createservice,info,env_info'):
+        if self.__cmd in ('vmgi_install', 'db_install', 'createservice', 'info', 'env_info'):
             if 'jsonconf' in self.__payload:
                 return True
         return False
@@ -425,5 +426,4 @@ class ebExaCCAtpSimulatePayload(object):
             _atp_dbaas_payload = json.load(_fd)
         aDBAASPayload['params'].update(_atp_dbaas_payload)
         
-
 

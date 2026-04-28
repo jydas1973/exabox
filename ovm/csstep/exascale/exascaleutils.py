@@ -16,6 +16,8 @@
 #      NONE
 #
 #    MODIFIED   (MM/DD/YY)
+#    pbellary    04/20/26 - Bug 39196275 - X11M EF:EXASCALE CONFIGURATION FAILS: "DBM-00201: EDV SERVICES STARTUP FAILED. ERROR: DBM-01559: FAILURE FOR UNKNOWN REASONS"
+#    pbellary    04/15/26 - Enh 39213619 - EXACLOUD SHOULD UPDATE STORAGE INTERCONNECTS IN ASM ADD NODE FOR A EXASCALE INFRA
 #    siyarlag    04/02/26 - Update domU validation logic
 #    oespinos    03/09/26 - 39001455: Deconfigure exascale on kvm host
 #    pbellary    02/24/26 - Bug 38972840 - DELETE-SERVICE WF FAILED TO VERIFY ACL USER ID
@@ -548,6 +550,10 @@ class ebExascaleUtils(object):
                 if _vlan_id and _storage_ip1 and _priv1 and _storage_ip2 and _priv2 and _netmask:
                     _oedacliCmds.append(["ALTER NETWORK", {"VLANID": _vlan_id, "INTERFACENAME": "stre0", "IP": _storage_ip1, "NETMASK": _netmask}, {"NETWORKHOSTNAME": _priv1}])
                     _oedacliCmds.append(["ALTER NETWORK", {"VLANID": _vlan_id, "INTERFACENAME": "stre1", "IP": _storage_ip2, "NETMASK": _netmask}, {"NETWORKHOSTNAME": _priv2}])
+
+        if _cell_list and _vlan_id:
+            _hostnames = ", ".join(_cell_list)
+            _oedacliCmds.append(["ALTER NETWORKS", {"VLANID": _vlan_id}, {"HOSTNAMES": _hostnames, "NETWORKTYPE": "private"}])
 
         for _ocmd in _oedacliCmds:
             _oedacli.mAppendCommand(_ocmd[0], _ocmd[1], _ocmd[2], aForce=True)
@@ -1841,6 +1847,58 @@ class ebExascaleUtils(object):
                         _retflag = False
                         ebLogWarn(f"mCheckRoCEIPs: Interface {stre_iface} is not yet configured in {_host['compute_hostname']}")   
         return _retflag
+
+    def mSetStorageVlanOnCompute(self, aOptions, aFailedList, aDom0List=None):
+        ebLogInfo(" *** mSetStorageVlanOnCompute() >>")
+        _ret = -1
+        _ebox = self.__cluctrl
+        _host_list = []
+        _exascale_attr = aOptions.jsonconf['exascale']
+        if aDom0List:
+            _host_nodes = _exascale_attr['host_nodes']
+            for _dom0 in aDom0List:
+                _host = self.mParseQinQHostInfo(_host_nodes, _dom0)
+                _host_list.append(_host)
+        else:
+            ebLogWarn("New Dom0List is not populated, configuring storage interconnects will be skipped")
+            return
+
+        for _host in _host_list:
+            if not aOptions.jsonconf or 'compute_hostname' not in _host or 'storage_ip1' not in _host:
+                _msg= f'Missing config details in the payload'
+                _ebox.mUpdateErrorObject(gExascaleError["INVALID_INPUT_PARAMETER"], _msg)
+                raise ExacloudRuntimeError(0x0811, 0xA, _msg)
+
+            if _host['compute_hostname'] not in  aFailedList:
+                continue
+
+            _ip = _host['storage_ip1']
+            _dom0 = _host['compute_hostname']
+            ebLogInfo(f'mSetStorageVlanOnCompute: {_dom0} : {_ip}')
+            _vlan_id = _exascale_attr['storage_vlan_id']
+            _netmask = _host['netmask']
+            if _netmask is None:
+                #stre interfaces are allocated 'class B' address from ecra. Hence this netmask of 255.255.0.0
+                _netmask = "255.255.0.0"
+
+            with connect_to_host(_dom0, get_gcontext()) as _node:
+                # Configure RoCE VLAN and IPs
+                _cmd = f'/usr/sbin/vm_maker --set --storage-vlan {_vlan_id} --ip {_ip} --netmask {_netmask}'
+                _ret, _out, _err = node_exec_cmd(_node, _cmd)
+
+                if _ret != 0:
+                    _msg = f'mSetStorageVlanOnCompute: Unable to configure the stre interface'
+                    ebLogError(_msg)
+                    _ebox.mUpdateErrorObject(gExascaleError["CONFIG_STRE_FAILED"], _msg)
+                    raise ExacloudRuntimeError(0x0811, 0xA, _msg)
+
+        # Setup NFTables rules for stre0 & stre1 interfaces in Dom0s
+        _dom0s = [ _host['compute_hostname'] for _host in _host_list
+                   if _host['compute_hostname'] in aFailedList ]
+        if _dom0s:
+            _ebox.mSetupNatNfTablesOnDom0v2(aDom0s=_dom0s)
+
+        return _ret
 
     def mSetupRoCEIPs(self, aOptions, aFailedList, aDom0List=None):
         ebLogInfo(" *** mSetupRoCEIPs() >>")

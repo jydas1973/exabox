@@ -1,5 +1,5 @@
 """
- Copyright (c) 2017, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2017, 2026, Oracle and/or its affiliates.
 
 NAME:
     cleanup_oeda_requests - cleanup oeda requests files
@@ -9,6 +9,9 @@ FUNCTION:
 
 NOTE:
     None
+
+    MODIFIED   (MM/DD/YY)
+    aypaul      04/16/26 - Bug#38900303 Fix codev identified issues.
 
 """
 
@@ -45,7 +48,9 @@ class CleanUpOedaRequests():
         ebLogInit(self.__ctx, self.__options)
 
         self.__exacloudPath = os.getcwd()
-        self.__exacloudPath = self.__exacloudPath[0: self.__exacloudPath.rfind("exacloud")+8]
+        _find_idx = self.__exacloudPath.rfind("exacloud")
+        if _find_idx >= 0:
+            self.__exacloudPath = self.__exacloudPath[0: _find_idx+8]
 
         self.__oeda_request_archive_directory = None
 

@@ -3,7 +3,7 @@
 #
 # targetmockhandler.py
 #
-# Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      targetmockhandler.py - Place holder for common functionalities among all
@@ -17,6 +17,9 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    mirrodri    04/08/26 - ENH 39144884 - ADDRESS CODEV SCAN ISSUE 
+#                           IN TARGETMOCKHANDLER.PY: MISSING SYS/OS, 
+#                           RE IMPORTS (IMPORT-TIME NAMEERROR)
 #    vikasras    11/28/25 - OCI: VALIDATE CONTENT OF DOC ID 2829056.1 & REPLACE
 #                           IT WITH KB123625 IN ALL OS PATCHING WFS FOR
 #                           EXACC/DB-D/XS
@@ -439,6 +442,9 @@ import time
 import datetime
 import traceback
 import types
+import os
+import re
+import sys
 from exabox.BaseServer.AsyncProcessing import ProcessManager, ProcessStructure
 from multiprocessing import Process
 from uuid import uuid4

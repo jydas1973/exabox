@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    bhpati      03/10/26 - Bug 38759700 - OCI: OCI-EXACS - VA-2024-0117 -
+#                           CLAMAV 0.103 LTS END OF LIFE (EOL)
 #    araghave    02/19/26 - Bug 38766026 - FAIL DOMU PATCHING IN CASE OF A
 #                           VERSION VALIDATION FAILURE
 #    araghave    02/12/26 - Bug 38891325 - OCI: EXACS | SMR | SMR APPLY IS
@@ -432,7 +434,7 @@ import json
 from exabox.infrapatching.handlers.targetHandler.targethandler import TargetHandler
 from exabox.infrapatching.handlers.targetHandler.infrapatchmgrhandler import InfraPatchManager
 from exabox.infrapatching.utils.utility import mSetFromEnv, mGetFirstDirInZip, mReadCallback, mErrorCallback, \
-    mManageRPMs, mRegisterInfraPatchingHandlers, DOMU_PATCH_BASE, flocked, mChangeOwnerofDir, mGetLaunchNodeConfig
+    mManageRPMs, mRegisterInfraPatchingHandlers, DOMU_PATCH_BASE, flocked, mChangeOwnerofDir, mGetLaunchNodeConfig, mGetInfraPatchingConfigParam
 from exabox.infrapatching.core.clupatchmetadata import mWritePatchInitialStatesToLaunchNodes, \
     mUpdateAllPatchStatesForNode, mUpdateMetadataLaunchNode, mGetPatchStatesForNode, mUpdatePatchMetadata, \
     mGetLaunchNodeForTargetType
@@ -1735,16 +1737,55 @@ class DomUHandler(TargetHandler):
             #       scripts in right dirs (pre or post) in lexically ordered
             #       manner. Till then we use this. ie. remove krb5-workstation
             _rpm_ret_val = True
-            try:
-                for _node_patcher, _node_patch_list in _node_patcher_and_node_patch_list:
-                    for _domu in _node_patch_list:
-                        _rpm_ret_val = mManageRPMs(aNode=_domu, aNodeConnection=None,
-                                          aRPMList=['krb5-workstation.x86_64'],
-                                          aAction='remove')
+            
+            # Flatten the DOMU list
+            _domus_list = [
+                    _domu
+                    for _, _node_patch_list in _node_patcher_and_node_patch_list
+                    for _domu in _node_patch_list
+            ]
+
+            try:            
+                for _domu in _domus_list:
+                    _rpm_ret_val = mManageRPMs(aNode=_domu, aNodeConnection=None,
+                                        aRPMList=['krb5-workstation.x86_64'],
+                                        aAction='remove')
             except Exception as e:
                 self.mPatchLogWarn(
                     f"Exception caught while removing  krb5-workstation.x86_64 from domu. Exception is {str(e)} ")
                 self.mPatchLogTrace(traceback.format_exc())
+            
+            # Remove ClamAv RPMs when payload tenancyName matches infrapatching.conf configuration.
+            _remove_rpmlist = []
+            _additional_opts = self.mGetAdditionalOptions() or []
+            _payload_tenant = None
+            _tenancy_actions = {}
+            if _additional_opts:
+                self.mPatchLogInfo(f"_additional_opts from the payload: {_additional_opts}")
+                _payload_tenant = (_additional_opts[0] or {}).get('tenancyName')
+
+            if _payload_tenant:
+                try:
+                    _tenancy_actions = mGetInfraPatchingConfigParam("tenancyActions") or {}
+                except Exception as e:
+                    self.mPatchLogWarn(f"Failed to load tenancyActions from Infrapatching configuration file: {e}")                
+
+            _actions_for_tenancy = _tenancy_actions.get(_payload_tenant)            
+            if _actions_for_tenancy:
+                for _action in _actions_for_tenancy:
+                    if not _action:
+                        continue
+                    _rpms = _action.get("remove_rpmlist") or []
+                    _remove_rpmlist.extend([_rpm.strip() for _rpm in _rpms if _rpm and _rpm.strip()])
+
+            if _remove_rpmlist:
+                self.mPatchLogInfo(f"List of RPM's : {_remove_rpmlist} to be removed from: {_domus_list}")              
+                for _domu in _domus_list:
+                    try:
+                        mManageRPMs(aNode=_domu, aNodeConnection=None, aRPMList=_remove_rpmlist, aAction='remove')
+                    except Exception as e:
+                        self.mPatchLogWarn(f"Failed to remove rpms from {_domu}: {str(e)}")
+                        self.mPatchLogTrace(traceback.format_exc())
 
             _operationStyle = self.mGetOpStyle()
             if self.mIsElu():

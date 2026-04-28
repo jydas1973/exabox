@@ -1625,9 +1625,33 @@ def mCreateImageLVM(aCluctrl, aNode, aPath, aSize, aType='ext4', aKeep=False):
     _cmd = 'lvm vgcreate VGExaDbDisk.{0}.img /dev/mapper/{1}'.format(_short_name,_device_id)
     _out = _process_cmd(aNode, _cmd, '*** vDisk image creation fail (vgcreate)')
 
-    _lv_size = f"-L {int(aSize[:-1]) - 2}{aSize[-1]}"
-    _cmd = 'lvm lvcreate {1} -n LVDBDisk VGExaDbDisk.{0}.img'.format(_short_name, _lv_size)
+    _vg_name = f"VGExaDbDisk.{_short_name}.img"
+    _cmd = f"lvm vgs --noheadings --units b --nosuffix -o vg_free,vg_extent_size {_vg_name}"
+    _out = _process_cmd(aNode, _cmd, '*** vDisk image creation fail (vgs sizing)')
+    if not _out:
+        _bail_on_error('*** vDisk image creation fail (vgs sizing): no output')
+
+    _parts = _out[0].split()
+    if len(_parts) < 2:
+        _bail_on_error('*** vDisk image creation fail (vgs sizing): invalid output', _out)
+
+    _vg_free_b = int(float(_parts[0]))
+    _pe_b = int(float(_parts[1]))
+    _reserve_b = parse_size('2G')
+    _requested_b = parse_size(aSize) - _reserve_b
+    _max_alloc_b = _vg_free_b - _reserve_b
+    _lv_b = min(_requested_b, _max_alloc_b)
+    if _lv_b < _pe_b:
+        _bail_on_error(
+            f'*** vDisk image creation fail (lvcreate sizing): '
+            f'vg_free={_vg_free_b} bytes, reserve={_reserve_b} bytes, pe={_pe_b} bytes'
+        )
+
+    # Reserve one extra PE to avoid edge cases caused by LVM metadata/alignment rounding.
+    _lv_pe = max((_lv_b // _pe_b) - 1, 1)
+    _cmd = f'lvm lvcreate -l {_lv_pe} -n LVDBDisk {_vg_name}'
     _out = _process_cmd(aNode, _cmd, '*** vDisk image creation fail (lvcreate)')
+
 
     _cmd = 'lvm lvchange -a y /dev/VGExaDbDisk.{0}.img/LVDBDisk'.format(_short_name)
     _out = _process_cmd(aNode, _cmd, '*** vDisk image creation fail (lvchange Yes)')

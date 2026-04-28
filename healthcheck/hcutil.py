@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2020, Oracle and/or its affiliates. 
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates. 
 
 NAME:
     hcutil.py - added for hc v2 
@@ -11,6 +11,7 @@ NOTE:
     None
 
 History:
+    joysjose    03/06/2026 - Bug 38900203 - EXACLOUD: ISSUES FOUND BY VOXIO CODEV AGENT IN DIR EXABOX/HEALTHCHECK
     bhuvnkum    02/19/2018 - Creation
 
 """
@@ -50,12 +51,11 @@ class HcUtil(object):
 def mReadConfigFile(aConfigFilePath):
     _cf = None
     try:
-        _f  = open(aConfigFilePath)
-        _cf = json.loads(_f.read())
-        _f.close()
-    except:
-        ebLogError('*** Could not access/read %s file' %(aConfigFilePath))
-        return {}
+        with open(aConfigFilePath) as _f:
+            _cf = json.loads(_f.read())
+    except Exception as err:
+        ebLogError('*** Could not access/read %s file: %s' %(aConfigFilePath, str(err)))
+        return None
     return _cf
 
 # # for current func name, specify 0 or no argument.

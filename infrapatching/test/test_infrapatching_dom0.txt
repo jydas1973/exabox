@@ -15,6 +15,9 @@
 #      Unit test case script for all Dom0 operations.
 #
 #    MODIFIED   (MM/DD/YY)
+#    araghave    04/14/26 - Enhancement Request 39204576 - ADD INFRA PATCHING
+#                           TEST CHANGES TO SET EXASPLICE TO NO DURING DOM0 ELU
+#                           ROLLBACK
 #    sdevasek    02/26/26 - Bug 39008110 - REMOVE ELUOPTIONS FROM ADDITIONAL
 #                           OPTIONS IN DOM0 TEST SETUP
 #    mirrodri    02/06/26 - Enh 37516807 - INFRAPATCHING TEST AUTOMATION - 
@@ -698,7 +701,6 @@ class Test_dom0_class(unittest.TestCase):
 
     @pytest.mark.dom0_rollback_elu
     def test_dom0_rollback_elu(self):
-        mUpdateAdditionalOptionsInPayload("exasplice", "yes")
         # While Elu upgrade is performed one node at a time, rollback must
         # be supported with multiple nodes.
         _result, _status_output = mExecuteInfraPatchCommandWithRetry(TASK_ROLLBACK, PATCH_DOM0, OP_STYLE_AUTO)

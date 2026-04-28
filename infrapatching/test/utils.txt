@@ -16,6 +16,9 @@
 #      This module contains common methods for each of the Test target handlers.
 #
 #    MODIFIED   (MM/DD/YY)
+#    sdevasek    03/09/26 - Enh 39044163 - INFRAPATCHING TEST AUTOMATION - UPDATE
+#                           TESTS FOR FREE POOL NODE PATCHING IN EXACOMPUTE
+#                           PATCHING TOVALIDATE NODE_PROGRESS_DATA
 #    sdevasek    02/24/26 - Bug 38971433 - FIX PLUGIN LOG VERIFICATION FOR 
 #                           LOWERCASE STAGE NAMES
 #    sdevasek    01/22/26 - Enh 38821433 - EXACOMPUTE FREE POOL NODE PATCHING:
@@ -2412,6 +2415,42 @@ def mCheckNodesPresenceInNodeProgressStatus(aStatusOutput, aExistableNodes, aNon
 
     mPatchLogInfo("Node_progress_status has correct set of nodes.")
     return True
+
+def mValidateExacomputeNodesInNodePatchingProgressData(aStatusOutput, aExpectedNodes):
+    """
+    Validates that all expected nodes are present in node_patching_progress_data from the ExaCompute status output.
+
+    :param aStatusOutput: The JSON string from the status call.
+    :param aExpectedNodes: List of node names to validate presence for.
+    :return: True if all expected nodes are present, False otherwise.
+    """
+    try:
+        _status_json = json.loads(aStatusOutput)
+        if "exacompute_patching_details" not in _status_json or "node_patching_progress_data" not in _status_json["exacompute_patching_details"]:
+            mPatchLogError("node_patching_progress_data not found in status output.")
+            return False
+
+        _progress_data = _status_json["exacompute_patching_details"]["node_patching_progress_data"]
+        _actual_nodes = {entry.get("node_name", "") for entry in _progress_data if "node_name" in entry and entry["node_name"]}
+
+        _missing_nodes = [node for node in aExpectedNodes if node not in _actual_nodes]
+        if _missing_nodes:
+            mPatchLogError(f"Missing expected nodes {_missing_nodes} in node_patching_progress_data.")
+            return False
+
+        if len(_actual_nodes) != len(aExpectedNodes):
+            _unexpected_nodes = [node for node in _actual_nodes if node not in aExpectedNodes]
+            mPatchLogError(f"Unexpected nodes {_unexpected_nodes} found in node_patching_progress_data.")
+            return False
+
+        mPatchLogInfo(f"All {len(aExpectedNodes)} expected nodes found in node_patching_progress_data.")
+        return True
+    except json.JSONDecodeError as e:
+        mPatchLogError(f"Invalid JSON in status_output: {e}")
+        return False
+    except Exception as e:
+        mPatchLogError(f"Error validating nodes in node_patching_progress_data: {e}")
+        return False
 
 def mStageCustomPluginScripts(aTargetType, aForcePluginFailure = False):
     """

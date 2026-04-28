@@ -4,7 +4,7 @@
 #
 # test_io_resource_manager.py
 #
-# Copyright (c) 2021, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      test_io_resource_manager.py - <one-line expansion of the name>
@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    avimonda    04/11/26 - Bug 39182562 Add multiline IORM dbPlan parser test
 #    aypaul      02/19/25 - Update unit tests for pmemcachesize fetch.
 #    joysjose    10/04/24 - Bug 37113297 Add pmemcache check
 #    joysjose    08/01/24 - ER 36727567 Add support for IORM resetclusterplan
@@ -427,6 +428,109 @@ class ebTestIOResourceManager(ebTestClucontrol):
 
     def test_mClusterGetDbPlan_dbplan_no_flashcahce(self):
         self.tests_mClusterGetDbPlan("name=scaqab10celadm01_DBPLAN", True)
+
+    def test_mClusterGetDbPlan_multiline_dbplan_entries(self):
+        """
+        Verify multiline dbPlan output with continuation lines is parsed.
+        """
+
+        _cmds = {
+            self.mGetRegexCell(): [
+                [
+                    exaMockCommand(
+                        "cellcli -e list iormplan detail",
+                        aStdout=(
+                            "name:                   nrt102124exdcl04_IORMPLAN\n"
+                            "dbPlan:                 name=dbPlan08,share=1,type=profile,flashcachelimit=3886370184045\n"
+                            "                        name=dbPlan09,share=1,type=profile,flashcachelimit=3886370184045\n"
+                            "                        name=dbPlan10,share=1,type=profile,flashcachelimit=3886370184045\n"
+                            "                        name=dbPlan22,share=1,type=profile,flashcachelimit=3886370184045\n"
+                            "                        name=dbPlan25,share=1,type=profile,flashcachelimit=3886370184045\n"
+                            "                        name=dbPlan26,share=1,type=profile,flashcachelimit=3886370184045\n"
+                            "                        name=dbPlan30,share=1,type=profile,flashcachelimit=3886370184045\n"
+                            "clusterPlan:\n"
+                            "objective:              auto\n"
+                            "status:                 active"
+                        ),
+                        aRc=0
+                    ),
+                ],
+            ],
+            self.mGetRegexLocal():[
+                [
+                    exaMockCommand("ping -c 1 scaqab10celadm01.us.oracle.com",
+                        aRc=0),
+                    exaMockCommand("ping -c 1 scaqab10celadm02.us.oracle.com",
+                        aRc=0),
+                    exaMockCommand("ping -c 1 scaqab10celadm03.us.oracle.com",
+                        aRc=0),
+                ],
+            ]
+        }
+
+        self.mPrepareMockCommands(_cmds)
+
+        _ebox = self.mGetClubox()
+        _options = self.mGetPayload()
+        _options.jsonmode = True
+        _options.resmanage = "getdbplan"
+        _iormobj = ebCluResManager(_ebox, _options)
+
+        _result = _iormobj.mClusterIorm(_options)
+
+        self.assertEqual(_result, 0)
+
+    def test_mClusterGetDbPlan_malformed_token_ignored(self):
+        """
+        Verify malformed comma-separated tokens are ignored while valid dbPlan
+        attributes are still parsed.
+        """
+
+        _cmds = {
+            self.mGetRegexCell(): [
+                [
+                    exaMockCommand(
+                        "cellcli -e list iormplan detail",
+                        aStdout=(
+                            "name:                   nrt102124exdcl04_IORMPLAN\n"
+                            "dbPlan:                 name=dbPlan08,malformedtoken,share=1,type=profile,flashcachelimit=3886370184045\n"
+                            "clusterPlan:\n"
+                            "objective:              auto\n"
+                            "status:                 active"
+                        ),
+                        aRc=0
+                    ),
+                ],
+            ],
+            self.mGetRegexLocal():[
+                [
+                    exaMockCommand("ping -c 1 scaqab10celadm01.us.oracle.com",
+                        aRc=0),
+                    exaMockCommand("ping -c 1 scaqab10celadm02.us.oracle.com",
+                        aRc=0),
+                    exaMockCommand("ping -c 1 scaqab10celadm03.us.oracle.com",
+                        aRc=0),
+                ],
+            ]
+        }
+
+        self.mPrepareMockCommands(_cmds)
+
+        _ebox = self.mGetClubox()
+        _options = self.mGetPayload()
+        _options.jsonmode = True
+        _options.resmanage = "getdbplan"
+        _iormobj = ebCluResManager(_ebox, _options)
+
+        _result = _iormobj.mClusterIorm(_options)
+        _data = _iormobj.mGetData()
+
+        self.assertEqual(_result, 0)
+        self.assertEqual(_data["dbPlan"][0]["dbname"], "dbPlan08")
+        self.assertEqual(_data["dbPlan"][0]["share"], "1")
+        self.assertEqual(_data["dbPlan"][0]["type"], "profile")
+        self.assertEqual(_data["dbPlan"][0]["flashcachelimit"], "3886370184045")
+        self.assertNotIn("malformedtoken", _data["dbPlan"][0])
 
     def get_error_code(self, aErrorCode: int) -> str:
         """

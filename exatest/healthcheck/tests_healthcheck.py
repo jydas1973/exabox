@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    joysjose    03/24/26 - Bug 38900203 :Codev fixes for exabox/healtcheck
 #    avimonda    03/09/26 - Modifying tests for fix related to Bug 38951559 -
 #                           GCP: WF WAS STUCK DUE TO NFT RULES MISMATCHES ON
 #                           DIFFERENT NODES
@@ -35,6 +36,7 @@
 import copy
 import json
 import unittest
+from unittest import mock
 from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
 from exabox.core.Node import exaBoxNode
 from exabox.core.MockCommand import exaMockCommand
@@ -1166,6 +1168,64 @@ class ebTestDom0HealthCheck(ebTestClucontrol):
 
         currentHealthObject.mCheckSubnetMask()
 
+    def test_mCheckSubnetMask_marks_mismatched_host_failed(self):
+        storage_cfg = mock.Mock()
+        storage_cfg.mGetNetType.return_value = 'private'
+        storage_cfg.mGetNetIpAddr.return_value = '10.0.0.10'
+        storage_cfg.mGetNetMask.return_value = '255.255.255.0'
+        storage_cfg.mGetPkey.return_value = '0x1111'
+        storage_cfg.mGetPkeyName.return_value = 'st-private'
+        storage_cfg.mGetNetNatHostName.return_value = 'cell-storage'
+
+        mismatch_cfg = mock.Mock()
+        mismatch_cfg.mGetNetType.return_value = 'private'
+        mismatch_cfg.mGetNetIpAddr.return_value = '10.0.1.10'
+        mismatch_cfg.mGetNetMask.return_value = '255.255.255.0'
+        mismatch_cfg.mGetPkey.return_value = '0x1111'
+        mismatch_cfg.mGetPkeyName.return_value = 'st-private'
+        mismatch_cfg.mGetNetNatHostName.return_value = 'domu-storage'
+
+        networks = mock.Mock()
+        networks.mGetNetworkConfigByName.return_value = mock.Mock()
+        networks.mGetNetworkConfig.side_effect = lambda name: {
+            'cell-net': storage_cfg,
+            'domu-net': mismatch_cfg,
+        }[name]
+
+        cell_machine = mock.Mock()
+        cell_machine.mGetMacNetworks.return_value = ['cell-net']
+        domu_machine = mock.Mock()
+        domu_machine.mGetMacNetworks.return_value = ['domu-net']
+
+        machines = mock.Mock()
+        machines.mGetMachineConfig.side_effect = lambda host: {
+            'cell-1': cell_machine,
+            'domu-1': domu_machine,
+        }[host]
+
+        ebox = mock.Mock()
+        ebox.mGetNetworks.return_value = networks
+        ebox.mGetConfig.return_value = mock.Mock()
+        ebox.mGetMachines.return_value = machines
+        ebox.mReturnAllClusterHosts.return_value = ([], ['domu-1'], ['cell-1'], [])
+
+        logger = mock.Mock()
+        logger.mUpdateResult.side_effect = lambda result, msgdetail, checkparam=None: {
+            'result': result,
+            'detail': msgdetail,
+            'params': checkparam or {},
+        }
+
+        currentHealthObject = HealthCheck.__new__(HealthCheck)
+        currentHealthObject.logger = logger
+        currentHealthObject.mGetEbox = mock.Mock(return_value=ebox)
+
+        returnedResult = currentHealthObject.mCheckSubnetMask()
+
+        self.assertEqual(HEALTHCHECK_FAIL, returnedResult['result'])
+        self.assertEqual(HEALTHCHECK_FAIL, returnedResult['detail']['domu-storage']['TestResult'])
+        self.assertEqual(HEALTHCHECK_FAIL, returnedResult['detail']['TestResult'])
+
     def test_mGetSubnet(self):
         ebLogInfo("")
         ebLogInfo("Running unit test on HealthCheck.mGetSubnet")
@@ -1249,6 +1309,29 @@ class ebTestDom0HealthCheck(ebTestClucontrol):
         thisNode = currentHealthObject.mGetNode(self.mGetClubox().mReturnDom0DomUPair()[0][0])
         recommendList = list()
         currentHealthObject.mCheckVmImage(self.mGetClubox().mReturnDom0DomUPair()[0][0], thisNode, None, None, recommendList, None)
+
+    def test_mGetNode_force_retry_clears_not_reachable_cache(self):
+        fullOptions = testOptions()
+        fullOptions.configpath = ""
+        baseHealthCheckObject = ebCluHealth(self.mGetClubox(), fullOptions)
+        currentHealthObject = HealthCheck(self.mGetClubox(), baseHealthCheckObject)
+        dom0 = self.mGetClubox().mReturnDom0DomUPair()[0][0]
+        node_connection = currentHealthObject.mGetNodeConnection()
+        cluster_node = node_connection.mGetClusterHostD()[dom0]
+        cluster_node.mSetPingable(True)
+
+        destination = 'root@%s' % dom0
+        node_connection._NodeConnection__not_reachable.add(dom0)
+        node_connection._NodeConnection__not_reachable.add(destination)
+
+        fake_node = mock.Mock()
+        with mock.patch.object(node_connection, 'mSshTest', return_value=fake_node):
+            returned = node_connection.mGetNode(dom0, aForceRetry=True)
+
+        self.assertIs(fake_node, returned)
+        self.assertNotIn(dom0, node_connection._NodeConnection__not_reachable)
+        self.assertNotIn(destination, node_connection._NodeConnection__not_reachable)
+        self.assertIs(fake_node, node_connection._NodeConnection__ssh_connections[destination])
 
     def test_mCheckSmnodesList(self):
         ebLogInfo("")

@@ -15,6 +15,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    kdas        03/30/26 - ENH 39145049 - ADDRESS VOXIO CODEV AGENT SCAN
+#                           ISSUES OBSERVED IN INFRAPATCH UTILS SCRIPT 
 #    kdas        03/15/26 - ER 38354388 - EXACC: INCLUDE NETWORK INTERFACE 
 #                           ALERT ON PATCHING PRE-CHECK
 #    jyotdas     02/09/26 - ENH 38824997 - Support target version for dom0 and
@@ -129,13 +131,16 @@ except ImportError:
 
 from exabox.core.Context import get_gcontext
 from exabox.core.Node import exaBoxNode
+# CoDev scanner note: PATCH_DOM0 was already being imported in the
+# latest file version.
 from exabox.infrapatching.utils.constants import ANSI_ESCAPE, WAIT_LINES_ESCAPE, INFRA_PATCHING_HANDLERS, \
     TASK_HANDLER_MAP, TARGET_HANDLER_MAP, INFRA_PATCHING_KNOWN_ALERTS_EXACOMPUTE, PATCH_DOM0,              \
     INFRA_PATCHING_KNOWN_ALERTS_EXACC, INFRA_PATCHING_KNOWN_ALERTS_EXACS, INFRA_PATCHING_CONF_FILE,       \
     EXACOMPUTE_PATCH_CONF_FILE, EXACS_SRV, EXACC_SRV, KEY_API, TASK_MOCK_HANDLER_MAP, TARGET_MOCK_HANDLER_MAP, \
     SHELL_CMD_TIMEOUT_EXIT_CODE, SHELL_CMD_DEFAULT_TIMEOUT_IN_SECONDS, PATCH_CELL_CLUSTERLESS, PATCH_DOM0_CLUSTERLESS, \
     INFRA_PATCHING_KNOWN_SOFTWARE_ALERTS_EXACC, INFRA_PATCHING_KNOWN_SOFTWARE_ALERTS_EXACS,               \
-    INFRA_PATCHING_KNOWN_SOFTWARE_ALERTS_EXACOMPUTE
+    INFRA_PATCHING_KNOWN_SOFTWARE_ALERTS_EXACOMPUTE, \
+    ERROR_MSG_TRUNCATE_LENGTH, PATCH_CELL, PDB_DEGRADED_STATES_MATRIX_KEY
 from exabox.log.LogMgr import ebLogInfo, ebLogDebug, ebLogWarn, ebLogError, ebLogTrace
 from exabox.infrapatching.core.infrapatcherror import *
 from exabox.ovm.cluencryption import getMountPointInfo

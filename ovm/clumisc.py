@@ -12,6 +12,10 @@ NOTE:
 
 History:    
     MODIFIED   (MM/DD/YY)
+    kanmanic   04/14/26 - 39192065 - increase the ping timeout for
+                          validate_elastic_shapes operation
+    aararora   04/13/26 - 39200237: Issues observed for ca signed certs being
+                          copied to domus for exacc
     kanmanic   03/24/26 - 39082361 Add dbmcli precheck
     ajayasin   02/27/26 - 39018800:n-3,26ai:default gi support from UI
     naps       02/26/26 - Bug 38984665 - fix the exception in log message.
@@ -5390,7 +5394,12 @@ class ebCluDom0SanityTests:
         return _out
 
     def mPingTest(self):
-        if not self.__cluctrl.mPingHost(self.__host):
+        if self.__step == "ELASTIC_SHAPES_VALIDATION":
+            _ping_ok = self.__cluctrl.mPingHost(self.__host, 10, 30)
+        else:
+            _ping_ok = self.__cluctrl.mPingHost(self.__host)
+
+        if not _ping_ok:
             ebLogError('*** {0}: Host {1} is not pingable.'.format(self.__alert_log, self.__host))
             self.__res.update( {'ping_test' : 'abnormal'} )
             self.__error_list.append(get_hw_validate_error(90001, "ping_test", self.__host))
@@ -6456,7 +6465,7 @@ class ebCluStorageReshapePrecheck(object):
         ebLogInfo('*** mGetOfflineCellDisks >>> ***')
         GRID_DISK_FAULTY = 1
         GRID_DISK_GOOD = 0
-        MAX_EXEC_TIME = 600
+        MAX_EXEC_TIME = 60 * 30
         MAX_JOIN_TIMEOUT = 5
         _rc = GRID_DISK_GOOD
 
@@ -6959,10 +6968,8 @@ class ebCopyDBCSAgentpfxFile:
         self._cert_destination_dir = '/opt/oracle/dcs/auth'
         self._dbcs_agent_user = 'opc'
         self._dbcs_agent_group = 'opc'
-        self._cluster_name = self._ebox.mGetClusterName()
-        self._dbcs_files = self.get_dbcs_files()
-            
-    def get_dbcs_files(self):
+
+    def get_dbcs_files(self, aDomU):
         """
         For OC1 region two new files will be generated
         dbcsagent_keystore.pfx and
@@ -6972,8 +6979,8 @@ class ebCopyDBCSAgentpfxFile:
         To maintain backward compatibility if these 2 files aren't present then 
         copy dbcsagent.pfx to dom-u 
         """
-        if self._ebox.mIsFedramp():
-            return {f'/opt/oci/exacc/certs/dbcsagent/dbcsagent_keystore_{self._cluster_name}.p12' : f'{self._cert_destination_dir}/dbcsagent_keystore.pfx', 
+        if self._ebox.mIsFedramp() or self._ebox.mIsCaSignedCerts():
+            return {f'/opt/oci/exacc/certs/dbcsagent/dbcsagent_keystore_{aDomU}.p12' : f'{self._cert_destination_dir}/dbcsagent_keystore.pfx', 
                     '/etc/pki/ociexacc/cacert.pfx' : f'{self._cert_destination_dir}/dbcsagent_truststore.pfx'}
             
         else:
@@ -7045,7 +7052,8 @@ class ebCopyDBCSAgentpfxFile:
         for _, domU in self._ebox.mReturnDom0DomUPair():
             with connect_to_host(domU, get_gcontext(), username='root') as nodeU:
                 self.setup_pfx_directory(nodeU, domU)
-                for _source_file, _destination_file in self._dbcs_files.items():
+                _dbcs_files = self.get_dbcs_files(domU)
+                for _source_file, _destination_file in _dbcs_files.items():
                     if not os.path.isfile(_source_file):
                         ebLogError(f'*** source dbcsagent pfx file {_source_file} does not exist.')
                         raise ExacloudRuntimeError(0x0819, 0xA, 'Certificate Missing!')

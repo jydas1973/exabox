@@ -14,6 +14,7 @@
 #     Reload dnsmasq service
 #
 #    MODIFIED   (MM/DD/YY)
+#    oespinos    04/14/26 - 39207741 - Duplicate entries in /etc/hosts.exacc*
 #    oespinos    07/14/25 - 38189701 - Symlinks not getting updated on encrypted fs
 #    oespinos    06/10/25 - 33416778 - Add all clusters nats during cps deploy
 #    oespinos    05/15/25 - 37953247 - Preserve symlinks in /etc/hosts.* files
@@ -348,7 +349,7 @@ class ebDNSConfig(object):
         return ["/usr/bin/sudo", "/usr/bin/sed", "-i", "--follow-symlinks", "$a " + aDNSEntry, aFilename]
 
     def mBuildDeleteCmd(self, aHostname, aFilename):
-        return ["/usr/bin/sudo", "/usr/bin/sed", "-i", "--follow-symlinks", "/(^|[[:space:]])" + aHostname + "([[:space:]]|$)/d", aFilename]
+        return ["/usr/bin/sudo", "/usr/bin/sed", "-i", "--follow-symlinks", "-E", "/(^|[[:space:]])" + aHostname + "([[:space:]]|$)/d", aFilename]
 
 
     def mRemoveHostEntries(self, aHostname):

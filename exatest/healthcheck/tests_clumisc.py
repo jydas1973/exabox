@@ -4,7 +4,7 @@
 #
 # tests_clumisc.py
 #
-# Copyright (c) 2022, 2024, Oracle and/or its affiliates.
+# Copyright (c) 2022, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_clumisc.py - <one-line expansion of the name>
@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    joysjose    03/24/26 - Bug 38900203 :Codev fixes for exabox/healtcheck
 #    naps        08/14/24 - Bug 36949876 - X11 ipconf path changes.
 #    joysjose    03/31/22 - Unit Test for healthcheck/clumisc.py
 #    joysjose    03/31/22 - Creation
@@ -156,7 +157,7 @@ class ebTestClumisc(ebTestClucontrol):
             
         }
         self.mPrepareMockCommands(_cmds)
-        currentHealthObject.mConnectivityChecks()
+        self.assertTrue(currentHealthObject.mConnectivityChecks())
 
     def test_mGetSSHPublicKeyFromHost1(self):
         ebLogInfo("")
@@ -364,6 +365,27 @@ class ebTestClumisc(ebTestClucontrol):
         baseHealthCheckObject = ebCluHealth(self.mGetClubox(), fullOptions)
         currentHealthObject = ebCluPreChecks(self.mGetClubox(), baseHealthCheckObject)
         currentHealthObject.mNetworkDom0PreChecks()
+
+    def test_mNetworkDom0PreChecks_exact_match_at_line_start(self):
+        ebLogInfo("Running unit test for clumisc")
+
+        _cmds = {
+
+            self.mGetRegexDom0(): [
+
+                [
+                    exaMockCommand("/bin/test -e /opt/oracle.cellos/cell.conf", aRc=0, aPersist=True),
+                    exaMockCommand("/usr/local/bin/ipconf -nocodes -conf /opt/oracle.cellos/cell.conf -check-consistency -semantic -at-runtime", aRc=0, aStdout="Consistency check PASSED\n", aPersist=True)
+                ]
+            ]
+        }
+
+        self.mPrepareMockCommands(_cmds)
+        fullOptions = testOptions()
+        fullOptions.configpath = ""
+        baseHealthCheckObject = ebCluHealth(self.mGetClubox(), fullOptions)
+        currentHealthObject = ebCluPreChecks(self.mGetClubox(), baseHealthCheckObject)
+        self.assertTrue(currentHealthObject.mNetworkDom0PreChecks())
     
     def test_mCompareVersions(self):
         ebLogInfo("")

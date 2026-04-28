@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    avimonda    04/07/26 - Bug 39128684 - OCI: QMR IS FAILED DUE TO AN UNKNOWN ISSUE.
 #    remamid     02/19/26 - Add mgmt launch async test
 #    araghave    01/19/26 - Bug 38861325 - ECS_MAIN ->
 #                           TESTS_ROCESWITCHHANDLER_PY.DIF AND
@@ -178,6 +179,10 @@ class ebTestTargetHandler(ebTestClucontrol):
     @classmethod
     def setUpClass(self):
         ebLogInfo("Starting classSetUp TargetHandler")
+        self._build_ib_fabric_patcher = patch(
+            'exabox.infrapatching.handlers.generichandler.GenericHandler.mBuildIBFabric'
+        )
+        self._build_ib_fabric_patcher.start()
         super(ebTestTargetHandler, self).setUpClass(aGenerateDatabase=False)
         self.mGetClubox(self).mGetCtx().mSetConfigOption("repository_root", self.mGetPath(self))
         _cluCtrl = self.mGetClubox(self)
@@ -203,6 +208,12 @@ class ebTestTargetHandler(ebTestClucontrol):
                                      'exasplice': 'no', 'isSingleNodeUpgrade': 'no', 'serviceType': 'EXACC',
                                      'exaunitId': 0}]}
         ebLogInfo("Ending classSetUp TargetHandler")
+
+    @classmethod
+    def tearDownClass(self):
+        if hasattr(self, '_build_ib_fabric_patcher'):
+            self._build_ib_fabric_patcher.stop()
+        super(ebTestTargetHandler, self).tearDownClass()
 
     def test_mVerifyAndCleanupMissingPatchmgrRemotePatchBase1(self):
         ebLogInfo("")
@@ -1110,6 +1121,60 @@ class ebTestTargetHandler(ebTestClucontrol):
             )
             mock_clean_ssh.assert_called_once_with(dom0, nodes, aSkipRestore=True)
             mock_restore_ssh.assert_called_once_with(dom0, aUser=None)
+
+    @patch("exabox.infrapatching.handlers.targetHandler.targethandler.get_gcontext", return_value=MagicMock())
+    @patch("exabox.core.Node.exaBoxNode.__init__", return_value=None)
+    @patch("exabox.core.Node.exaBoxNode.mDisconnect")
+    @patch("exabox.core.Node.exaBoxNode.mIsConnected", return_value=False)
+    @patch("exabox.core.Node.exaBoxNode.mExecuteCmd")
+    @patch("exabox.core.Node.exaBoxNode.mFileExists", return_value=True)
+    @patch("exabox.core.Node.exaBoxNode.mConnect", return_value=True)
+    @patch("exabox.infrapatching.handlers.targetHandler.targethandler.TargetHandler.mSetConnectionUser")
+    def test_mGetPatchMgrDiagFiles_missing_notification_file_repro(
+        self,
+        mock_mSetConnectionUser,
+        mock_mConnect,
+        mock_mFileExists,
+        mock_mExecuteCmd,
+        mock_mIsConnected,
+        mock_mDisconnect,
+        mock_mInit,
+        mock_get_gcontext,
+    ):
+        ebLogInfo("")
+        ebLogInfo("Running repro unit test on TargetHandler.mGetPatchMgrDiagFiles for missing notification metadata")
+
+        self.__patch_args_dict['TargetType'] = ["cell"]
+        target_handler = TargetHandler(self.__patch_args_dict)
+        target_handler.mGetLogPath = MagicMock(return_value="/tmp/logs")
+        target_handler.mPatchLogInfo = MagicMock()
+        target_handler.mPatchLogTrace = MagicMock()
+
+        def _fail_on_internal_warning(message):
+            if "_patch_notification_file" in message:
+                raise AssertionError(message)
+
+        target_handler.mPatchLogWarn = MagicMock(side_effect=_fail_on_internal_warning)
+
+        mock_mExecuteCmd.side_effect = [
+            (None, mockFileHandler(io.StringIO("")), mockFileHandler()),
+            (None, mockFileHandler(io.StringIO("")), mockFileHandler()),
+        ]
+
+        target_handler.mGetPatchMgrDiagFiles(
+            "sc1iad00dd01.us.oracle.com",
+            "cell",
+            ["sc1iad00cl01.us.oracle.com"],
+            "/EXAVMIMAGES/25.2.6.0.0.260117.patch.zip/patch_25.2.6.0.0.260117/patchmgr_log_reqid",
+        )
+
+        mock_mSetConnectionUser.assert_called_once()
+        mock_mConnect.assert_called_once_with(aHost="sc1iad00dd01.us.oracle.com")
+        mock_mFileExists.assert_called_once_with(
+            "/EXAVMIMAGES/25.2.6.0.0.260117.patch.zip/patch_25.2.6.0.0.260117/patchmgr_log_reqid/notifications"
+        )
+        target_handler.mPatchLogWarn.assert_not_called()
+        target_handler.mPatchLogTrace.assert_not_called()
 
     @patch("exabox.infrapatching.handlers.targetHandler.infrapatchmgrhandler.InfraPatchManager.mGetNodeListFromNodesToBePatchedFile", return_value=['slcs27adm04.us.oracle.com'])
     @patch("exabox.core.Node.exaBoxNode.mExecuteCmd")

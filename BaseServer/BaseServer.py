@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2022, Oracle and/or its affiliates. 
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates. 
 
 NAME:
     BaseServer - Basic functionality
@@ -11,6 +11,7 @@ NOTE:
     None    
 
 History:
+    aypaul      04/06/2026 - 8900091 - Fix codev issues from AI static code analysis
     ndesanto    11/05/2019 - ENH 30480538: HTTPS and Certificate Rotation
     ndesanto    09/19/2019 - 30294648 - IMPLEMENT PYTHON 3 MIGRATION WHITELIST ON EXATEST
     jesandov    26/03/2019 - File Creation
@@ -124,7 +125,8 @@ class BaseServerAdministrator(object):
         try:
             self.__httpd.serve_forever()
         except KeyboardInterrupt:
-            pass
+            self.__httpd.mGetLog().mInfo(f"Keyboad interrupt occured, shutting down server at {self.__listenAddress}:{self.__port}")
+            self.mDisconnect()
         except Exception as e:
             self.__httpd.mGetLog().mError(e)
 

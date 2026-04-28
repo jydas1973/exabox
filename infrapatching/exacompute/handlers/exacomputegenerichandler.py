@@ -16,6 +16,10 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    sdevasek    04/08/26 - Enh 39143069 - ADDRESS VOXIO CODEV AGENT SCAN
+#                           ISSUES OBSERVED IN EXACOMPUTE PATCHING
+#    araghave    03/12/26 - Enh 38932829 - PROVIDE A PLUGIN SUPPORT DURING DOM0
+#                           EXACOMPUTE PATCHING
 #    sdevasek    02/12/26 - Enh 38891722 - REMOVAL OF SSH EQUIVALENCE BETWEEN
 #                           LAUNCH-NODE AND TARGET-NODES
 #    sdevasek    01/22/26 - Enh 38854794 - EXACOMPUTE FREE POOL NODE  PATCHING:
@@ -77,6 +81,8 @@
 #    jyotdas     07/22/22 - Creation
 #
 
+import abc
+import os
 import copy
 import json
 import socket
@@ -103,6 +109,7 @@ from exabox.infrapatching.handlers.generichandler import GenericHandler
 from exabox.infrapatching.handlers.targetHandler.targethandler import TargetHandler
 from exabox.infrapatching.core.clupatchhealthcheck import ebCluPatchHealthCheck
 from exabox.infrapatching.utils.utility import mGetInfraPatchingHandler, mRegisterInfraPatchingHandlers, getTargetHandlerInstance, mIsFSEncryptedList, runInfraPatchCommandsLocally
+from exabox.infrapatching.utils.utility import checkPluginEnabledFromInfraPatchMetadata
 
 class ExaGenericHandler(TargetHandler):
 
@@ -1530,6 +1537,16 @@ class ExaGenericHandler(TargetHandler):
         # set the launch node and execute patchmgr cmd
         _patchMgrObj.mSetLaunchNode(aLaunchNode=_node_patcher)
 
+        # Run PluginMetadata-based Exacloud plugins before patchmgr when applicable (pre stage)
+        if (self.mGetTask() in [ TASK_PATCH ]) and (not self.mIsExaSplice()) and len(self.mGetPluginMetadata()) > 0:
+            _exacloud_plugin_enabled, _ = checkPluginEnabledFromInfraPatchMetadata(self.mGetPluginMetadata())
+            if _exacloud_plugin_enabled and self.mGetPluginHandler() is not None:
+                self.mPatchLogInfo("Executing Exacloud Plugins implicitly based on the infra patch plugin metadata during PrePatch stage and as part of {} patching.".format(self.mGetOpStyle()))
+                _pre_rc = self.mGetPluginHandler().mExacloudPluginMetadataExecutor(aNodePatchList, "pre")
+                if _pre_rc != PATCH_SUCCESS_EXIT_CODE:
+                    _ret = _pre_rc
+                    return _ret
+
         _patchMgrObj.mExecutePatchMgrCmd(aPatchMgrCmd=_patch_cmd)
 
         # Monitor console log
@@ -1568,6 +1585,15 @@ class ExaGenericHandler(TargetHandler):
             self.mGetPatchMgrMiscLogFiles(_node_patcher, self.mGetPatchmgrLogPathOnLaunchNode(),
                                           TASK_PATCH,
                                           aNodePatchList)
+        # Run PluginMetadata-based Exacloud plugins after patchmgr when applicable (post stage)
+        if (self.mGetTask() in [ TASK_PATCH ]) and (not self.mIsExaSplice()) and len(self.mGetPluginMetadata()) > 0:
+            _exacloud_plugin_enabled, _ = checkPluginEnabledFromInfraPatchMetadata(self.mGetPluginMetadata())
+            if _exacloud_plugin_enabled and self.mGetPluginHandler() is not None:
+                self.mPatchLogInfo("Executing Exacloud Plugins implicitly based on the infra patch plugin metadata during PostPatch stage and as part of {} patching.".format(self.mGetOpStyle()))
+                _post_rc = self.mGetPluginHandler().mExacloudPluginMetadataExecutor(aNodePatchList, "post")
+                if _post_rc != PATCH_SUCCESS_EXIT_CODE:
+                    _ret = _post_rc
+                    return _ret
 
         # Print all the log details at the end of log files copy.
         self.mPrintPatchmgrLogFormattedDetails()

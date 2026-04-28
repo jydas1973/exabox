@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    oespinos    04/14/26 - 39207741 - Duplicate entries in /etc/hosts.exacc*
 #    hgaldame    02/15/25 - 37593351 - oci/exacc: cps sw upgrade fails in step
 #                           configure heathchk metric
 #    hgaldame    03/01/23 - 35134139 - exacc:22.3.1.0.0:bb:x10m:cps sw upgrade
@@ -55,7 +56,7 @@ class ebTestebDNSConfig(ebTestClucontrol):
 
     DUMMY_ENTRY = "10.31.112.4    \tscaqab10adm01.us.oracle.com                       \tscaqab10adm01"
     APPEND_CMD = ["/usr/bin/sudo", "/usr/bin/sed", "-i", "--follow-symlinks", f"$a {DUMMY_ENTRY}", "/etc/hosts.exacc_infra"]
-    DELETE_CMD = ["/usr/bin/sudo", "/usr/bin/sed", "-i", "--follow-symlinks", "/(^|[[:space:]])" + "scaqab10adm01.us.oracle.com" + "([[:space:]]|$)/d", "/etc/hosts.exacc_infra"]
+    DELETE_CMD = ["/usr/bin/sudo", "/usr/bin/sed", "-i", "--follow-symlinks", "-E", "/(^|[[:space:]])" + "scaqab10adm01.us.oracle.com" + "([[:space:]]|$)/d", "/etc/hosts.exacc_infra"]
 
 
     @classmethod

@@ -16,7 +16,10 @@ EXTERNAL INTERFACES:
 
 INTERNAL CLASSES:
 
-History: 
+History:
+    bhpati      04/09/2026 - Bug 39083181 - CREATEVM UNDO TRIES TO DELETE WRONG
+                             BRIDGE VMETH200
+    remamid     03/30/2025 - Bug 39088724 - Enforce cell lock during OEDA step2
     jesandov    03/16/2026 - Bug 39036804 - Add GIP error raise
     scoral      12/16/2025 - Bug 38770136 - Make sure monitor_adming.json is
                              updated for BaseDB environments.
@@ -92,6 +95,7 @@ from exabox.log.LogMgr import ebLogError, ebLogInfo, ebLogTrace, ebLogWarn, ebLo
 from exabox.ovm.bom_manager import ImageBOM
 from exabox.ovm.clumisc import ebMigrateUsersUtil
 from exabox.tools.oedacli import OedacliCmdMgr
+from exabox.ovm.remotelock import RemoteLock
 
 class CSBase(metaclass=abc.ABCMeta):
     @property
@@ -1172,7 +1176,18 @@ class CSBase(metaclass=abc.ABCMeta):
             _csConstants = _csu.mGetConstants(_ebox, aOptions)
 
             try:
-                _csu.mExecuteOEDAStep(_ebox, self.step, steplist, aOedaStep=_csConstants.OSTP_CREATE_VM, dom0Lock=_grabLock)
+                _cells_to_lock = []
+                if _ebox.SharedEnv():
+                    _, _, _cells_to_lock, _ = _ebox.mReturnAllClusterHosts()
+                    _cells_to_lock = list(_cells_to_lock or [])
+
+                if _cells_to_lock:
+                    ebLogInfo("Acquiring cell remote lock before Create VM OEDA step")
+                    _cell_lock = RemoteLock(_ebox, force_host_list=_cells_to_lock)
+                    with _cell_lock('cell', step='Create VM OEDA'):
+                        _csu.mExecuteOEDAStep(_ebox, self.step, steplist, aOedaStep=_csConstants.OSTP_CREATE_VM, dom0Lock=_grabLock)
+                else:
+                    _csu.mExecuteOEDAStep(_ebox, self.step, steplist, aOedaStep=_csConstants.OSTP_CREATE_VM, dom0Lock=_grabLock)
             except Exception as e:
                 if imageBom.mIsGoldImageProvisioning():
                     _error_str = "Failed on Gold Image Provisioning"
@@ -1404,8 +1419,10 @@ class CSBase(metaclass=abc.ABCMeta):
 
         if _ebox.mCheckConfigOption('min_vm_cycles_reboot') is not None:
             _ebox.mCheckVMCyclesAndReboot()
-
-        _csu.mDeleteBridges(_ebox, _bridges)
+        if _bridges:
+            _csu.mDeleteBridges(_ebox, _bridges)
+        else:
+            ebLogWarn("No stale bridges found to delete")
         _ebox.mLogStepElapsedTime(_step_time, 'Force residual VM deletion')
 
         _consoleobj = serialConsole(_ebox, aOptions)

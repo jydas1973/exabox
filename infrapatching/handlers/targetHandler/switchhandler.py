@@ -15,6 +15,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    sdevasek    04/08/26 - Enh 39143076 - ADDRESS VOXIO CODEV AGENT SCAN
+#                           ISSUES OBSERVED IN TARGETHANLDER FILES
 #    araghave    12/16/25 - Enh 38766076 - CONFIGURE UPDATE-CRYPTO-POLICIES
 #                           BEFORE AND AFTER SWITCH PATCHING
 #    ajayasin    08/05/25 - moving handler function from clucontrol.py
@@ -1304,7 +1306,9 @@ class SwitchHandler(TargetHandler):
             _final_IB_list = self.mGetSwitchList()
 
         for _ibswitch in _final_IB_list:
-            _ret = self.mPrePostIBSwitchCheck(_ibswitch)
+            _switch_ret = self.mPrePostIBSwitchCheck(_ibswitch)
+            if _switch_ret != PATCH_SUCCESS_EXIT_CODE:
+                return _switch_ret
 
         return _ret
 

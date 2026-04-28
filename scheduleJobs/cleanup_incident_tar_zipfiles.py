@@ -1,5 +1,5 @@
 """
- Copyright (c) 2017, 2023, Oracle and/or its affiliates.
+ Copyright (c) 2017, 2026, Oracle and/or its affiliates.
 
 NAME:
     insert_job_cleanup_incident_tar_zipfiles - cleanup configurable number of incident zip files and all tar files.
@@ -9,6 +9,9 @@ FUNCTION:
 
 NOTE:
     None
+
+    MODIFIED   (MM/DD/YY)
+    aypaul      04/16/26 - Bug#38900303 Fix codev identified issues.
 
 """
 
@@ -41,7 +44,7 @@ class CleanUpIncidentTarAndZipFiles():
     def mParseConfig(self):
 
         #Parse max age
-        self.__incident_zipfiles_limit = int(get_gcontext().mGetConfigOptions().get("incident_zip_files_limit", ""))
+        self.__incident_zipfiles_limit = int(get_gcontext().mGetConfigOptions().get("incident_zip_files_limit", "10"))
         if not self.__incident_zipfiles_limit:
             self.__incident_zipfiles_limit = 10
 

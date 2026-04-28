@@ -11,6 +11,8 @@ NOTE:
     None    
 
 History:
+    shapatna    04/23/2026 - Bug: 39248066 - Fix for restricting file read 
+                             outside diagPath directory
     shapatna    02/09/2026 - Bug: 38900266 - Fix for issues pointed by Codev
                              in exabox/management directory
     jesandov    06/04/2020 - Change function name affected by AsyncTrackEndpoint
@@ -53,16 +55,16 @@ class DiagEndpoint(AsyncTrackEndpoint):
         return _diags
 
     def mDownloadDiag(self, aZip):
-
         _diagPath = os.path.abspath("{0}/../../oeda/requests/".format(self.mGetConfig().mGetPath()))
-        _zip = "{0}/{1}".format(_diagPath, aZip)
+        _realDiagPath = os.path.realpath(_diagPath)
+        _zip = os.path.realpath(os.path.join(_realDiagPath, aZip))
 
-        if not os.path.exists(_zip):
+        # Longest common path between the parent and the zip should be the parent
+        if os.path.commonpath([_realDiagPath, _zip]) != _realDiagPath or not os.path.exists(_zip):
             self.mGetResponse()['status'] = 500
-            self.mGetResponse()['text']   = "File not found in File System {0}".format(_zip)
-            self.mGetResponse()['error']  = "File not found in File System {0}".format(_zip)
+            self.mGetResponse()['text']   = "File not found in File System or cannot access File System: {0}".format(_zip)
+            self.mGetResponse()['error']  = "File not found in File System or cannot access File System: {0}".format(_zip)
         else:
-
             _fileC = ""
             _file_bytes = ""
             with open(_zip, "rb") as _f:
@@ -78,13 +80,14 @@ class DiagEndpoint(AsyncTrackEndpoint):
         _exapath = self.mGetConfig().mGetPath()
         _exapath = _exapath[0: _exapath.find("exabox")] 
 
-        _args = "-clu create_diag -cf {0}".format(self.mGetBody()['remote_xml_path'])
+        _args = ["-clu", "create_diag", "-cf", self.mGetBody()['remote_xml_path']]
+
         if "remote_payload_path" in list(self.mGetBody().keys()):
-            _args = "{0} -jc {1}".format(_args, self.mGetBody()['remote_payload_path'])
+           _args.extend(["-jc", self.mGetBody()['remote_payload_path']])
 
         _cmd = []
         _cmd.append(os.path.join(_exapath, "bin/exacloud"))
-        _cmd.append(_args)
+        _cmd.extend(_args)
 
         _cmdList = [_cmd]
 

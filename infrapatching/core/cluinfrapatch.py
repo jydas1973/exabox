@@ -2,7 +2,7 @@
 #
 # cluinfrapatch.py
 #
-# Copyright (c) 2021, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      cluinfrapatch.py - Contains method to start infra patching operation
@@ -14,6 +14,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    jyotdas     04/08/26 - Codex scan issue fixes
 #    jyotdas     07/18/25 - ER 38056425 - Handle elu in racks with node qmr at
 #                           different versions on ecra
 #    araghave    08/27/24 - Enh 36829406 - PERFORM STRING INTERPOLATION USING
@@ -95,6 +96,7 @@ class ebCluInfraPatch(LogHandler):
         _idemPotencyData = {}
         _infra_patch_plugin_metadata = {}
         _oneoff_script_alias = ''
+        _additional_options = ''
         
         _isMVM = ''
         _shared_env = ''

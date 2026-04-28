@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    remamid     04/01/26 - Bug 39088724 update unit test for cell lock
+#    remamid     03/30/26 - Bug39088724 Add cell lock unit test
 #    avimonda    12/06/25 - Bug 38610132 - OCI: DBAAS.CREATEEXACCVMCLUSTER
 #                           HANGS /DOES NOT PROGRESS
 #    avimonda    11/06/25 - Bug 38427813 - OCI: EXACS: PROVISIONING FAILED WITH
@@ -33,6 +35,7 @@
 #
 
 import unittest
+from contextlib import contextmanager
 
 from unittest.mock import patch
 
@@ -62,6 +65,58 @@ class ebTestCSCreateVm(ebTestClucontrol):
                 _createvm_instance = csCreateVM()
                 _createvm_instance.mCreateVM(self.mGetClubox(),self.mGetClubox().mGetArgsOptions(), [])
 
+    def test_mCreateVM_acquires_cell_lock_in_shared_env(self):
+        cluster = self.mGetClubox()
+        lock_contexts = []
+
+        def fake_check_config(option, value=None):
+            if option == "skip_dom0_lock_oeda_createvm" and value == "False":
+                return True
+            if option in {"skip_completely_stale_bridge_removal", "_skip_jumbo_frames_config"}:
+                return True
+            return False
+
+        with patch('exabox.ovm.csstep.cs_base.ImageBOM') as mock_imagebom_cls, \
+             patch('exabox.ovm.csstep.cs_base.csUtil') as mock_csutil_cls, \
+             patch('exabox.ovm.csstep.cs_base.RemoteLock') as mock_remote_lock_cls, \
+             patch.object(cluster, 'SharedEnv', return_value=True), \
+             patch.object(cluster, 'mReturnAllClusterHosts', return_value=(['dom0a'], ['domUa'], ['cell1'], [])), \
+             patch.object(cluster, 'mCheckConfigOption', side_effect=fake_check_config), \
+             patch.object(cluster, 'mIsExaScale', return_value=True), \
+             patch.object(cluster, 'mIsKVM', return_value=False), \
+             patch.object(cluster, 'isBaseDB', return_value=False), \
+             patch.object(cluster, 'isExacomputeVM', return_value=False), \
+             patch.object(cluster, 'mIsOciEXACC', return_value=False), \
+             patch.object(cluster, 'isDBonVolumes', return_value=False):
+
+            mock_imagebom = mock_imagebom_cls.return_value
+            mock_imagebom.mIsSubStepExecuted.side_effect = lambda step, substep: substep != "OEDA_STEP"
+            mock_imagebom.mIsGoldImageProvisioning.return_value = False
+
+            mock_csutil = mock_csutil_cls.return_value
+            mock_csutil.mExecuteOEDAStep = MagicMock()
+
+            fake_lock = MagicMock()
+
+            def lock_call(*args, **kwargs):
+                lock_name = args[0] if args else 'Default'
+
+                @contextmanager
+                def _ctx():
+                    lock_contexts.append((lock_name, kwargs))
+                    yield
+
+                return _ctx()
+
+            fake_lock.side_effect = lock_call
+            mock_remote_lock_cls.return_value = fake_lock
+
+            csCreateVM().mCreateVM(cluster, cluster.mGetArgsOptions(), [])
+
+        mock_remote_lock_cls.assert_called_once_with(cluster, force_host_list=['cell1'])
+        self.assertIn(('cell', {'step': 'Create VM OEDA'}), lock_contexts)
+        mock_csutil.mExecuteOEDAStep.assert_called_once()
+        self.assertTrue(mock_csutil.mExecuteOEDAStep.call_args.kwargs.get('dom0Lock'))
 
 
     def test_mCheckSystemImage(self):

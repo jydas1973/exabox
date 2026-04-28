@@ -1298,9 +1298,61 @@ class ebTestExascaleUtils(ebTestClucontrol):
        shutil.copyfile(self.mGetClubox().mGetConfigPath(), _dns_ntp_xml)
 
        with patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetBasePath', return_value=_xs_log_dir):
-           self.mGetClubox().mSetCmd('xsconfig')
-           _utils = ebExascaleUtils(_ebox)
-           _utils.mEnableXSService(_options)
+            self.mGetClubox().mSetCmd('xsconfig')
+            _utils = ebExascaleUtils(_ebox)
+            _utils.mEnableXSService(_options)
+
+    @mock.patch("exabox.tools.ebTree.ebTree.ebTree.mExportXml")
+    @patch('exabox.ovm.csstep.exascale.exascaleutils.ebOedacli')
+    @patch('exabox.ovm.csstep.exascale.exascaleutils.ebEscliUtils')
+    def test_mEnableXSService_updates_cell_vlan(self, mock_escli_cls, mock_oedacli_cls, _mock_export):
+        _ebox = self.mGetClubox()
+        _utils = ebExascaleUtils(_ebox)
+        _options = copy.deepcopy(_ebox.mGetArgsOptions())
+        _options.jsonconf = json.loads(ENABLE_XS_CONFIG_PAYLOAD)
+        _expected_hosts = ", ".join(_options.jsonconf['exascale']['cell_list'])
+
+        self.mGetClubox().mSetCmd('xsconfig')
+
+        mock_oedacli = mock.Mock()
+        mock_oedacli_cls.return_value = mock_oedacli
+
+        _mock_escli = mock.Mock()
+        _mock_escli.mIsEFRack.return_value = False
+        mock_escli_cls.return_value = _mock_escli
+
+        _cluster = mock.Mock()
+        _cluster.mGetCluName.return_value = 'cluster01'
+        _clusters = mock.Mock()
+        _clusters.mGetCluster.return_value = _cluster
+
+        with patch.object(_ebox, 'mCheckConfigOption', return_value='true'), \
+             patch.object(ebExascaleUtils, 'mCheckVaultTag', return_value=False), \
+             patch.object(_ebox, 'mReturnCellNodes', return_value={'scaqab10celadm01.us.oracle.com': object(), 'cell2': object()}), \
+             patch.object(_ebox, 'mGetNodeModel', return_value='X9M-2'), \
+             patch.object(_ebox, 'mCompareExadataModel', return_value=1), \
+             patch.object(_ebox, 'mGetStorageType', return_value='XS'), \
+             patch.object(_ebox, 'mGetClusters', return_value=_clusters), \
+             patch.object(_ebox, 'mSetXS'), \
+             patch.object(_ebox, 'mSetRemoteConfig'), \
+             patch.object(_ebox, 'mUpdateInMemoryXmlConfig'), \
+             patch.object(_ebox, 'mExecuteLocal'), \
+             patch.object(_ebox, 'mGetBasePath', return_value='/tmp'), \
+             patch.object(_ebox, 'mGetOedaPath', return_value='/tmp/oeda_unit_test'):
+            _utils.mEnableXSService(_options)
+
+        alter_network_calls = [
+            record for record in mock_oedacli.mAppendCommand.call_args_list
+            if len(record.args) >= 3 and record.args[0] == 'ALTER NETWORKS'
+        ]
+        self.assertEqual(len(alter_network_calls), 1)
+
+        _cmd, _options_dict, _filters_dict = alter_network_calls[0].args[:3]
+        self.assertEqual(_cmd, 'ALTER NETWORKS')
+        self.assertEqual(_options_dict, {'VLANID': '631'})
+        self.assertEqual(_filters_dict, {'HOSTNAMES': _expected_hosts, 'NETWORKTYPE': 'private'})
+        self.assertTrue(alter_network_calls[0].kwargs.get('aForce'))
+
 
     @patch('exabox.ovm.csstep.exascale.exascaleutils.ebEscliUtils')
     def test_mEnableXSService_flag_disabled(self, mock_escli_cls):
@@ -3876,6 +3928,34 @@ class ebTestExascaleUtils(ebTestClucontrol):
         mock_update_error.assert_called_once_with(gExascaleError["CONFIG_STRE_FAILED"], mock.ANY)
         mock_start_domu.assert_not_called()
 
+
+    @patch('exabox.ovm.csstep.exascale.exascaleutils.connect_to_host')
+    @patch('exabox.ovm.csstep.exascale.exascaleutils.node_exec_cmd')
+    def test_mSetStorageVlanOnCompute_success(self, mock_node_exec_cmd, mock_connect_to_host):
+        _ebox = self.mGetClubox()
+        _utils = ebExascaleUtils(_ebox)
+
+        _options = copy.deepcopy(_ebox.mGetArgsOptions())
+        _options.jsonconf = json.loads(EXASCALE_PAYLOAD)
+        _options.jsonconf['exascale']['storage_vlan_id'] = '631'
+
+        _failed_list = ["scaqab10adm01.us.oracle.com"]
+
+        _node = mock.MagicMock()
+        mock_connect_to_host.return_value.__enter__.return_value = _node
+        mock_connect_to_host.return_value.__exit__.return_value = None
+
+        mock_node_exec_cmd.return_value = (0, "configured", "")
+
+        with patch.object(_ebox, 'mSetupNatNfTablesOnDom0v2') as mock_nf_tables:
+            _ret = _utils.mSetStorageVlanOnCompute(_options, _failed_list, aDom0List=_failed_list)
+
+        mock_node_exec_cmd.assert_called_once_with(
+            _node,
+            '/usr/sbin/vm_maker --set --storage-vlan 631 --ip 100.106.2.0 --netmask 255.255.0.0'
+        )
+        mock_nf_tables.assert_called_once_with(aDom0s=_failed_list)
+        self.assertEqual(_ret, 0)
 
     @patch('exabox.ovm.csstep.exascale.exascaleutils.connect_to_host')
     def test_mCheckStorageVlanID_success(self, mock_connect_to_host):

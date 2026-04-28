@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2023, Oracle and/or its affiliates. 
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates. 
 
 NAME:
     clucheck.py - added for hc v2 
@@ -11,6 +11,7 @@ NOTE:
     None
 
 History:
+    joysjose    03/06/2026 - Bug 38900203 - EXACLOUD: ISSUES FOUND BY VOXIO CODEV AGENT IN DIR EXABOX/HEALTHCHECK
     bhuvnkum    02/19/2018 - Creation
 
 """
@@ -241,6 +242,10 @@ class NodeConnection(object):
         if _node is None:
             self.__not_reachable.add(_destination)
         else:
+            if aHost in self.__not_reachable:
+                self.__not_reachable.discard(aHost)
+            if _destination in self.__not_reachable:
+                self.__not_reachable.discard(_destination)
             self.__ssh_connections[_destination] = _node
 
         # print self.__ssh_connections, self.__not_reachable

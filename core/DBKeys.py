@@ -3,7 +3,7 @@ $Header: ecs/exacloud/exabox/core/DBKeys.py /main/8 2022/01/20 22:31:41 oespinos
 
 DBKeys.py
 
- Copyright (c) 2020, 2022, Oracle and/or its affiliates.
+ Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 
    NAME
      DBKeys.py - <one-line expansion of the name>
@@ -15,6 +15,8 @@ DBKeys.py
      <other useful comments, qualifications, etc.>
 
    MODIFIED   (MM/DD/YY)
+   jfsaldan    04/09/26 - Bug 38900114 - EXACLOUD: ISSUES FOUND BY VOXIO CODEV
+                          AGENT IN DIR EXABOX/CORE
    oespinos    01/18/22 - 33761439 - keys.db not getting synced to second node
    ndesanto    12/14/21 - Increase coverage for ndesanto files.
    ndesanto    12/10/21 - Increase coverage on ndesanto files.
@@ -157,10 +159,10 @@ class DBKeys():
     def _set(self, aKey, aValue, aDump=True):
         try:
             if aDump:
-                self.mDumpdb(aUpdate=(aKey, aValue))
+                return self.mDumpdb(aUpdate=(aKey, aValue))
             else:
                 self._db[aKey] = aValue
-            return True
+                return True
         except Exception as e:  # pragma: no cover
             ebLogError("DBKeys._set - Error Saving Values to Database : {}"\
                 .format(e))
@@ -177,8 +179,7 @@ class DBKeys():
     def _delete(self, aKey):
         if not aKey in self._db:
             return False
-        self.mDumpdb(aDelete=aKey)
-        return True
+        return self.mDumpdb(aDelete=aKey)
 
 # Compatibility methods
 

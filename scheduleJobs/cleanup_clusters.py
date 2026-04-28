@@ -4,7 +4,7 @@
 #
 # cleanup_clusters.py
 #
-# Copyright (c) 2023, Oracle and/or its affiliates.
+# Copyright (c) 2023, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      cleanup_clusters.py - <one-line expansion of the name>
@@ -20,6 +20,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    aypaul      04/16/26 - Bug#38900303 Fix codev identified issues.
 #    aararora    12/19/23 - Bug 35863722: Scheduler to delete xml files under
 #                           PodRepo directory periodically.
 #    aararora    12/19/23 - Creation
@@ -40,7 +41,9 @@ class CleanUpClustersFolder():
         ebLogInit(self.__ctx, self.__options)
 
         self.__exacloudPath = os.getcwd()
-        self.__exacloudPath = self.__exacloudPath[0: self.__exacloudPath.rfind("exacloud")+8]
+        _find_idx = self.__exacloudPath.rfind("exacloud")
+        if _find_idx >= 0:
+            self.__exacloudPath = self.__exacloudPath[0: _find_idx+8]
 
         # 336 hours is 14 days
         # 14 days is needed since the original cluster xml maybe required for debugging purpose

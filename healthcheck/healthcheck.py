@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     healthcheck.py - added for hc v2 (migrated all checks from ebCluHealth)
@@ -13,6 +13,8 @@ NOTE:
 History:
 
     MODIFIED     (MM/DD/YY)
+       joysjose   03/06/26 - Bug 38900203 - EXACLOUD: ISSUES FOUND BY VOXIO
+                             CODEV AGENT IN DIR EXABOX/HEALTHCHECK
        aararora   05/28/25 - Bug 37981919: cellcli alerthistory command output
                              is now on multiple lines from 25.x onwards
        rkhemcha   11/11/24 - 37243436 - Fix bridge existence logic for network
@@ -3085,7 +3087,7 @@ class HealthCheck(ebCluCheck):
                         _jsonMap[_hostname]['TestResult'] = CHK_RESULT.PASS
                         self.logger.mAppendLog(LOG_TYPE.INFO, '***                  Subnet Match: \t True')
                     else:
-                        _jsonMap[_hostname]['TestResult'] = CHK_RESULT > CHK_RESULT.FAIL
+                        _jsonMap[_hostname]['TestResult'] = CHK_RESULT.FAIL
                         self.logger.mAppendLog(LOG_TYPE.ERROR, 'Subnet %s should match with storage subnet %s for %s of %s' %(_subnet, _storage_subnet, _hostname, _host), _jsonMap)
                         _err = True
 

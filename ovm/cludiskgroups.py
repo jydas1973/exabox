@@ -16,6 +16,9 @@ NOTE:
     None
 
 History:
+    zpallare  04/14/26 - Bug 39203556 - EXACS:25.4.1 one off3: custom
+                         data-reco-sparse: reshape fails when percentage
+                         stay the same: keyerror: cell_count
     zpallare  12/19/25 - Bug 38955623 - EXACC:BB:25.3.1.1.0:ability to change data, reco, sparse 
                          percentage:adding sparse manual operation failed:error create_dg: error 
                          creating diskgroup sprc8 using sql create diskgroup sprc8 high redundancy disk
@@ -1628,7 +1631,8 @@ class ebCluManageDiskgroup(object):
         ebLogInfo("*** ebCluManageDiskgroup:mClusterDgrpDrop - Updating DiskgroupData with sparse related info, cell count and griddisk count for rollback")
         _rc = self.mUpdateDgrpData(_options, _diskgroupData, _sparsedg_name, _cur_dg_sizes[_constantsObj._sparse_dg_rawname], True)
         if _rc:
-            ebLogDebug("*** Could not get sparse related information for rollback. Might fail in rollback stage")
+            ebLogError("*** ebCluManageDiskgroup:mClusterDgrpDrop - Could not get sparse related information for rollback")
+            return _rc
 
         _inparams = {}
         ebLogInfo("*** ebCluManageDiskgroup:mClusterDgrpDrop - Fetching and validating input args")
@@ -2141,6 +2145,12 @@ class ebCluManageDiskgroup(object):
         
         # end resizeDg       
         
+        if "cell_count" not in _diskgroupData or "griddisk_count" not in _diskgroupData:
+            return self.mRecordError(
+                gDiskgroupError['ErrorFetchingDetails'],
+                "*** Missing diskgroup metadata for resize. cell_count and griddisk_count are required"
+            )
+
         _cell_count = _diskgroupData["cell_count"]
         _griddisk_count = _diskgroupData["griddisk_count"]
 

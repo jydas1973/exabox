@@ -1,143 +1,222 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/exatest/scheduleJobs/tests_cleanup_log_files.py /main/4 2025/09/01 07:15:02 aararora Exp $
+# $Header: ecs/exacloud/exabox/exatest/scheduleJobs/tests_cleanup_log_files.py /main/5 2026/04/17 15:42:00 aypaul Exp $
 #
 # tests_cleanup_log_files.py
 #
-# Copyright (c) 2023, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2023,
+# Oracle and/or its affiliates.
 #
 #    NAME
-#      tests_cleanup_log_files.py - <one-line expansion of the name>
-#
-#    DESCRIPTION
-#      <short description of component this file declares/defines>
-#
-#    NOTES
-#      <other useful comments, qualifications, etc.>
+#      tests_cleanup_log_files.py - Unit tests for scheduleJobs.cleanup_log_files
 #
 #    MODIFIED   (MM/DD/YY)
-#    aararora    08/28/25 - Bug 38298135: Enhance exception handling and
-#                           logging for cleanup logs scheduler command
-#    avimonda    03/14/25 - Bug 37584489 - OC1| FRA3 | ECRA2 SERVER FILESYSTEM
-#                /U02 FILLED UP WITH EXACLOUDLOGARCHIVE FILES
-#    aararora    09/29/23 - Adding unit test for scheduler job of log files
-#                           cleanup
-#    aararora    09/29/23 - Creation
+#    aypaul      04/16/26 - Bug#38900303 Fix unit tests for codev identified issues
 #
-
 import unittest
-import copy
-import tempfile
-from exabox.core.Node import exaBoxNode
-from exabox.core.MockCommand import exaMockCommand
-from exabox.log.LogMgr import ebLogInfo
-from unittest.mock import patch, call
+from datetime import date, datetime, timedelta
+from unittest.mock import MagicMock, patch
+
+import six
+
+if not hasattr(six, "ensure_binary"):
+    def _ensure_binary(value, encoding='utf-8', errors='strict'):
+        if isinstance(value, bytes):
+            return value
+        return str(value).encode(encoding, errors)
+
+    def _ensure_text(value, encoding='utf-8', errors='strict'):
+        if isinstance(value, bytes):
+            return value.decode(encoding, errors)
+        return str(value)
+
+    six.ensure_binary = _ensure_binary
+    six.ensure_text = _ensure_text
+    six.ensure_str = _ensure_text
+
 from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
 from exabox.scheduleJobs.cleanup_log_files import CleanUpLogFiles
-from datetime import datetime, timedelta
-from exabox.core.Context import get_gcontext
 
-LOG_ARCHIVE="/path/to/exacloud/../exacloudLogArchive"
+
+def _ctx_with_config(**overrides):
+    config = {
+        "log_cleanup_duration": "168",
+        "log_file_archive_directory": "",
+        "log_archive_cleanup_age_limit_in_days": "180",
+    }
+    config.update(overrides)
+    ctx = MagicMock()
+    ctx.mGetArgsOptions.return_value = {}
+    ctx.mGetConfigOptions.return_value = config
+    return ctx
+
+
+def _today_dir():
+    _today = date.today()
+    return f"{_today.year}_{_today.month}_{_today.day}"
+
 
 class ebTestCleanupLogFiles(ebTestClucontrol):
 
     @classmethod
-    def setUpClass(self):
-        super(ebTestCleanupLogFiles, self).setUpClass(True,False)
-        self.__age_limit = int(get_gcontext().mGetConfigOptions().get("log_archive_cleanup_age_limit_in_days", "180"))
+    def setUpClass(cls):
+        super(ebTestCleanupLogFiles, cls).setUpClass(True, False)
 
-    @patch("exabox.core.Context.exaBoxContext.mGetArgsOptions")
-    @patch("logging.config.fileConfig")
-    @patch("exabox.scheduleJobs.cleanup_log_files.CleanUpLogFiles.mParseConfig")
-    @patch("os.listdir")
-    @patch("os.path.isdir", return_value=True)
-    @patch("shutil.rmtree")
-    @patch("os.mkdir")
-    def test_mExecuteJob(self, _mock_mkdir, _mock_rmtree, _mock_isdir, _mock_listdir, _mock_mParseConfig, _mock_file_config, _mock_options):
+    def test_mParseConfig_uses_absolute_archive_dir(self):
+        ctx = _ctx_with_config(
+            log_cleanup_duration="24",
+            log_file_archive_directory="/tmp/exalogarchive",
+            log_archive_cleanup_age_limit_in_days="45",
+        )
+        expected_dir = f"/tmp/exalogarchive/{_today_dir()}"
 
-        ebLogInfo("")
-        ebLogInfo("Running unit test on CleanUpLogFiles.mExecuteJob")
-        _options = copy.deepcopy(self.mGetClubox().mGetArgsOptions())
-        _mock_options.return_value = _options
-        _dir1 = (datetime.today() - timedelta(days=self.__age_limit + 1)).strftime('%Y_%m_%d')
-        _dir2 = (datetime.today() - timedelta(days=self.__age_limit - 1)).strftime('%Y_%m_%d')
-        _mock_listdir.return_value = [_dir1, _dir2, "InvalidPattern"]
-        clean = CleanUpLogFiles()
-        clean._CleanUpLogFiles__log_file_archive_directory= LOG_ARCHIVE + '/' + datetime.today().strftime('%Y_%m_%d')
-        clean.mExecuteJob()
-        _mock_rmtree.assert_called_once_with(LOG_ARCHIVE + "/" + _dir1)
-        ebLogInfo("Unit test on CleanUpLogFiles.mExecuteJob executed successfully")
+        with patch("exabox.scheduleJobs.cleanup_log_files.exaBoxCoreInit"), \
+             patch("exabox.scheduleJobs.cleanup_log_files.ebLogInit"), \
+             patch("exabox.scheduleJobs.cleanup_log_files.get_gcontext", return_value=ctx), \
+             patch("exabox.scheduleJobs.cleanup_log_files.os.getcwd", return_value="/opt/app/exacloud/bin"), \
+             patch("exabox.scheduleJobs.cleanup_log_files.os.path.isabs", return_value=True), \
+             patch("exabox.scheduleJobs.cleanup_log_files.os.path.exists") as mock_exists, \
+             patch("exabox.scheduleJobs.cleanup_log_files.os.mkdir") as mock_mkdir, \
+             patch("exabox.scheduleJobs.cleanup_log_files.os.makedirs") as mock_makedirs, \
+             patch("exabox.scheduleJobs.cleanup_log_files.ebLogInfo"):
 
-    @patch("exabox.core.Context.exaBoxContext.mGetArgsOptions")
-    @patch("logging.config.fileConfig")
-    @patch("exabox.scheduleJobs.cleanup_log_files.CleanUpLogFiles.mParseConfig")
-    @patch("os.listdir")
-    @patch("os.path.isdir", return_value=True)
-    @patch("shutil.rmtree")
-    @patch("os.mkdir")
-    @patch("glob.glob")
-    def test_mExecuteJobErrorScenario(self, mock_glob, _mock_mkdir, _mock_rmtree, _mock_isdir, _mock_listdir, _mock_mParseConfig, _mock_file_config, _mock_options):
+            def exists_side(path):
+                if path == "/tmp/exalogarchive":
+                    return True
+                return False
 
-        ebLogInfo("")
-        ebLogInfo("Running unit test on CleanUpLogFiles.mExecuteJob")
-        mock_glob.side_effect = [
-            ['file1.log', 'file2.log'], # for '*.log*'
-            [Exception("File not found")],# for '*.trc*'
-            ['error1.err'],               # for '*.err*'
-            [],                           # for '*.xml*' (no matches)
-            ['file1.log', 'file2.log'],   # for '*.log*'
-            ['trace1.trc'],               # for '*.trc*'
-            ['error1.err'],               # for '*.err*'
-            ['error1.tar.gz'],            # for '*.tar.gz'
-            []
+            mock_exists.side_effect = exists_side
+            job = CleanUpLogFiles()
+
+        self.assertEqual(job._CleanUpLogFiles__log_file_persist_duration_hrs, 24)
+        self.assertEqual(job._CleanUpLogFiles__log_archive_cleanup_age_limit_in_days, 45)
+        self.assertEqual(job._CleanUpLogFiles__log_file_archive_directory, expected_dir)
+        mock_mkdir.assert_called_once_with(expected_dir)
+        mock_makedirs.assert_not_called()
+
+    def test_mParseConfig_falls_back_when_path_missing(self):
+        ctx = _ctx_with_config(
+            log_cleanup_duration="12",
+            log_file_archive_directory="/missing/archive",
+        )
+        expected_base = "/opt/app/exacloud/../exacloudLogArchive"
+        expected_dir = f"{expected_base}/{_today_dir()}"
+
+        with patch("exabox.scheduleJobs.cleanup_log_files.exaBoxCoreInit"), \
+             patch("exabox.scheduleJobs.cleanup_log_files.ebLogInit"), \
+             patch("exabox.scheduleJobs.cleanup_log_files.get_gcontext", return_value=ctx), \
+             patch("exabox.scheduleJobs.cleanup_log_files.os.getcwd", return_value="/opt/app/exacloud/bin"), \
+             patch("exabox.scheduleJobs.cleanup_log_files.os.path.isabs", return_value=True), \
+             patch("exabox.scheduleJobs.cleanup_log_files.os.path.exists", return_value=False) as mock_exists, \
+             patch("exabox.scheduleJobs.cleanup_log_files.os.mkdir") as mock_mkdir, \
+             patch("exabox.scheduleJobs.cleanup_log_files.os.makedirs") as mock_makedirs, \
+             patch("exabox.scheduleJobs.cleanup_log_files.ebLogInfo"):
+            job = CleanUpLogFiles()
+
+        self.assertEqual(job._CleanUpLogFiles__log_file_persist_duration_hrs, 12)
+        self.assertEqual(job._CleanUpLogFiles__log_file_archive_directory, expected_dir)
+        mock_mkdir.assert_not_called()
+        mock_makedirs.assert_called_once_with(expected_dir)
+
+    def test_mCleanupExacloudLogArchiveDirectory_handles_errors(self):
+        ctx = _ctx_with_config()
+        with patch.object(CleanUpLogFiles, "mParseConfig", autospec=True, return_value=None), \
+             patch("exabox.scheduleJobs.cleanup_log_files.exaBoxCoreInit"), \
+             patch("exabox.scheduleJobs.cleanup_log_files.ebLogInit"), \
+             patch("exabox.scheduleJobs.cleanup_log_files.get_gcontext", return_value=ctx), \
+             patch("exabox.scheduleJobs.cleanup_log_files.os.getcwd", return_value="/opt/app/exacloud/bin"):
+            job = CleanUpLogFiles()
+
+        with patch("exabox.scheduleJobs.cleanup_log_files.os.listdir", return_value=["old_dir", "another_dir"]), \
+             patch("exabox.scheduleJobs.cleanup_log_files.os.path.isdir", return_value=True), \
+             patch.object(CleanUpLogFiles, "mIsOldDir", side_effect=[True, True]), \
+             patch("exabox.scheduleJobs.cleanup_log_files.shutil.rmtree", side_effect=[Exception("boom"), None]) as mock_rmtree, \
+             patch("exabox.scheduleJobs.cleanup_log_files.ebLogError") as mock_error, \
+             patch("exabox.scheduleJobs.cleanup_log_files.ebLogInfo"):
+            job.mCleanupExacloudLogArchiveDirectory("/archive/dir")
+
+        self.assertEqual(mock_rmtree.call_count, 2)
+        mock_error.assert_called()
+
+    def test_mIsOldDir_various_inputs(self):
+        ctx = _ctx_with_config(log_archive_cleanup_age_limit_in_days="1")
+        with patch.object(CleanUpLogFiles, "mParseConfig", autospec=True, return_value=None), \
+             patch("exabox.scheduleJobs.cleanup_log_files.exaBoxCoreInit"), \
+             patch("exabox.scheduleJobs.cleanup_log_files.ebLogInit"), \
+             patch("exabox.scheduleJobs.cleanup_log_files.get_gcontext", return_value=ctx), \
+             patch("exabox.scheduleJobs.cleanup_log_files.os.getcwd", return_value="/opt/app/exacloud/bin"):
+            job = CleanUpLogFiles()
+
+        today = datetime.today()
+        fresh = (today - timedelta(days=0)).strftime("%Y_%m_%d")
+        old = (today - timedelta(days=2)).strftime("%Y_%m_%d")
+
+        job._CleanUpLogFiles__log_archive_cleanup_age_limit_in_days = 1
+        self.assertFalse(job.mIsOldDir(fresh))
+        self.assertTrue(job.mIsOldDir(old))
+        self.assertFalse(job.mIsOldDir("invalid-format"))
+
+    def test_mExecuteJob_moves_and_cleans_expected_files(self):
+        ctx = _ctx_with_config()
+        with patch.object(CleanUpLogFiles, "mParseConfig", autospec=True, return_value=None), \
+             patch("exabox.scheduleJobs.cleanup_log_files.exaBoxCoreInit"), \
+             patch("exabox.scheduleJobs.cleanup_log_files.ebLogInit"), \
+             patch("exabox.scheduleJobs.cleanup_log_files.get_gcontext", return_value=ctx), \
+             patch("exabox.scheduleJobs.cleanup_log_files.os.getcwd", return_value="/opt/app/exacloud/bin"):
+            job = CleanUpLogFiles()
+
+        job._CleanUpLogFiles__exacloudPath = "/opt/app/exacloud"
+        job._CleanUpLogFiles__log_file_archive_directory = "/archive/dir"
+        job._CleanUpLogFiles__log_file_persist_duration_hrs = 1
+
+        class FakeDB:
+            def mGetRequest(self, uuid):
+                if uuid == "uuid_none":
+                    return None
+                if uuid == "uuid_done":
+                    return (uuid, "Done")
+                if uuid == "fail":
+                    raise RuntimeError("db failure")
+                return (uuid, "Running")
+
+        with patch("exabox.scheduleJobs.cleanup_log_files.ebGetDefaultDB", return_value=FakeDB()), \
+             patch("exabox.scheduleJobs.cleanup_log_files.CleanUpLogFiles.mCleanupExacloudLogArchiveDirectory") as mock_cleanup_archives, \
+             patch("exabox.scheduleJobs.cleanup_log_files.glob.glob") as mock_glob, \
+             patch("exabox.scheduleJobs.cleanup_log_files.time.time", return_value=7200.0), \
+             patch("exabox.scheduleJobs.cleanup_log_files.os.path.getmtime", side_effect=[0.0, 7199.0]), \
+             patch("exabox.scheduleJobs.cleanup_log_files.os.remove") as mock_remove, \
+             patch("exabox.scheduleJobs.cleanup_log_files.shutil.copy2") as mock_copy, \
+             patch("exabox.scheduleJobs.cleanup_log_files.os.path.exists", return_value=False), \
+             patch("exabox.scheduleJobs.cleanup_log_files.os.mkdir") as mock_mkdir, \
+             patch("exabox.scheduleJobs.cleanup_log_files.ebLogWarn") as mock_warn, \
+             patch("exabox.scheduleJobs.cleanup_log_files.ebLogInfo"):
+
+            mock_glob.side_effect = [
+                ["/opt/app/exacloud/log/threads/uuid_none.log"],
+                ["/opt/app/exacloud/log/threads/uuid_done.trc"],
+                ["/opt/app/exacloud/log/threads/uuid_run.err"],
+                ["/opt/app/exacloud/log/threads/fail_uuid.xml"],
+                ["/opt/app/exacloud/log/workers/worker.log.1"],
+                [],
+                [],
+                ["/opt/app/exacloud/oeda/requests/file.tar.gz"],
+                ["/opt/app/exacloud/oeda/requests.bak/bak.tar.gz"],
+            ]
+
+            job.mExecuteJob()
+
+        mock_cleanup_archives.assert_called_once_with("/archive")
+        removed_paths = [call.args[0] for call in mock_remove.call_args_list]
+        expected_removed = [
+            "/opt/app/exacloud/log/workers/worker.log.1",
+            "/opt/app/exacloud/oeda/requests/file.tar.gz",
+            "/opt/app/exacloud/oeda/requests.bak/bak.tar.gz",
         ]
-        _options = copy.deepcopy(self.mGetClubox().mGetArgsOptions())
-        _mock_options.return_value = _options
-        _dir1 = (datetime.today() - timedelta(days=self.__age_limit + 1)).strftime('%Y_%m_%d')
-        _dir2 = (datetime.today() - timedelta(days=self.__age_limit - 1)).strftime('%Y_%m_%d')
-        _mock_listdir.return_value = [_dir1, _dir2, "InvalidPattern"]
-        clean = CleanUpLogFiles()
-        clean._CleanUpLogFiles__log_file_archive_directory= LOG_ARCHIVE + '/' + datetime.today().strftime('%Y_%m_%d')
-        clean.mExecuteJob()
-        _mock_rmtree.assert_called_once_with(LOG_ARCHIVE + "/" + _dir1)
-        ebLogInfo("Unit test on CleanUpLogFiles.mExecuteJob executed successfully")
+        self.assertCountEqual(removed_paths, expected_removed)
+        self.assertEqual(mock_copy.call_count, len(expected_removed))
+        mock_mkdir.assert_called_once_with("/archive/dir/oeda_requests")
+        mock_warn.assert_called()
 
-    @patch("exabox.core.Context.exaBoxContext.mGetArgsOptions")
-    @patch("logging.config.fileConfig")
-    @patch("exabox.scheduleJobs.cleanup_log_files.CleanUpLogFiles.mParseConfig")
-    @patch("os.listdir")
-    @patch("os.path.isdir", return_value=True)
-    @patch("shutil.rmtree")
-    def test_mCleanupExacloudLogArchiveDirectory(self, _mock_rmtree, _mock_isdir, _mock_listdir, _mock_mParseConfig, _mock_file_config, _mock_options):
-
-        ebLogInfo("")
-        ebLogInfo("Running unit test on CleanUpLogFiles.mCleanupExacloudLogArchiveDirectory")
-        _options = copy.deepcopy(self.mGetClubox().mGetArgsOptions())
-        _mock_options.return_value = _options
-        _dir1 = (datetime.today() - timedelta(days=self.__age_limit + 15)).strftime('%Y_%m_%d')
-        _dir2 = (datetime.today() - timedelta(days=self.__age_limit + 20)).strftime('%Y_%m_%d')
-        _dir3 = (datetime.today() - timedelta(days=self.__age_limit - 1)).strftime('%Y_%m_%d')
-        _mock_listdir.return_value = [_dir1, _dir2, _dir3, "InvalidPattern"]
-        clean = CleanUpLogFiles()
-        clean.mCleanupExacloudLogArchiveDirectory(LOG_ARCHIVE)
-        _mock_rmtree.assert_has_calls([call(LOG_ARCHIVE + "/" + _dir1), call(LOG_ARCHIVE + "/" + _dir2)])
-        ebLogInfo("Unit test on CleanUpLogFiles.mCleanupExacloudLogArchiveDirectory executed successfully")
-
-    @patch("exabox.core.Context.exaBoxContext.mGetArgsOptions")
-    @patch("logging.config.fileConfig")
-    @patch("exabox.scheduleJobs.cleanup_log_files.CleanUpLogFiles.mParseConfig")
-    def test_mIsOldDir(self, _mock_mParseConfig, _mock_file_config, _mock_options):
-
-        ebLogInfo("")
-        ebLogInfo("Running unit test on CleanUpLogFiles.mIsOldDir")
-        _options = copy.deepcopy(self.mGetClubox().mGetArgsOptions())
-        _mock_options.return_value = _options
-        clean = CleanUpLogFiles()
-        _dir_lists = [("2024_01_01", True), (datetime.today().strftime('%Y_%m_%d'), False), ((datetime.today() - timedelta(days=self.__age_limit + 1)).strftime('%Y_%m_%d'), True), ((datetime.today() - timedelta(days=self.__age_limit - 1)).strftime('%Y_%m_%d'), False)]
-        for _dir_name, _results in _dir_lists:
-            with self.subTest(dir_name=_dir_name):
-                self.assertEqual(clean.mIsOldDir(_dir_name), _results)
-        ebLogInfo("Unit test on CleanUpLogFiles.mIsOldDir executed successfully")
 
 if __name__ == '__main__':
     unittest.main()

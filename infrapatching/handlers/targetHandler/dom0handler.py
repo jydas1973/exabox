@@ -16,6 +16,13 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    araghave    04/15/26 - Bug 39173338 - EXACS:26.1.0:SET USER CONTEXT TO OPC
+#                           USER IN CASE OF CLUSTERLESS PATCHING PERFORMED
+#                           USING MGMT HOST AS THE LAUNCH NODE
+#    araghave    04/08/26 - Bug 39177995 - EXACS:26.1.0:CLUSTERLESS:POST DOM0
+#                           PATCHING IMAGE STATUS SHOWING EMPTY
+#    sdevasek    04/08/26 - Enh 39143076 - ADDRESS VOXIO CODEV AGENT SCAN
+#                           ISSUES OBSERVED IN TARGETHANLDER FILES
 #    avimonda    03/16/26 - Bug 38969712 - AIM4ECS:0X03030021 - UNABLE TO
 #                           STARTUP GUEST VMS AS PART OF UPGRADE/ROLLBACK
 #                           OPERATION
@@ -1309,7 +1316,7 @@ class Dom0Handler(TargetHandler):
                 '''
                 _ret_consolidated_dict.setdefault(_ret, []).extend(_list_of_elu_nodes)
 
-            _actual_error_list = [_err for _err in list(_ret_consolidated_dict.keys()) if _err not in PATCH_SUCCESS_EXIT_CODE]
+            _actual_error_list = [_err for _err in list(_ret_consolidated_dict.keys()) if _err != PATCH_SUCCESS_EXIT_CODE]
             if len(_actual_error_list) > 0:
                 _ret = DOM0_PRECHECK_EXECUTION_FAILED_ERROR
                 _suggestion_msg = "Patch Prereq check failed on multiple dom0 nodes"
@@ -3073,6 +3080,11 @@ class Dom0Handler(TargetHandler):
         _patchMgrObj = None
         if self.mGetDom0ToPatchInitialDom0():
             _launch_nodes.append(self.mGetDom0ToPatchInitialDom0())
+
+        _launch_node_user = 'root'
+        if self.mGetInfrapatchExecutionValidator().mCheckCondition('mIsManagementHostLaunchNodeForClusterless'):
+            _launch_node_user = 'opc'
+
         try:
             if not self.mPatchRequestRetried():
                 self.mCreateDirOnNodes(_launch_nodes, self.mGetPatchStatesBaseDir())
@@ -3082,10 +3094,10 @@ class Dom0Handler(TargetHandler):
                 '''
                 if len(aListOfEluNodes) > 0:
                     mWritePatchInitialStatesToLaunchNodes(PATCH_DOM0, aListOfEluNodes,
-                                                      _launch_nodes, self.mGetMetadataJsonFile())
+                                                      _launch_nodes, self.mGetMetadataJsonFile(), aUser=_launch_node_user)
                 else:
                     mWritePatchInitialStatesToLaunchNodes(PATCH_DOM0, self.mGetCustomizedDom0List(),
-                                                      _launch_nodes, self.mGetMetadataJsonFile())
+                                                      _launch_nodes, self.mGetMetadataJsonFile(), aUser=_launch_node_user)
         except Exception as e:
             self.mPatchLogWarn(f"Create Dir Error {str(e)} ")
             self.mPatchLogTrace(traceback.format_exc())
@@ -3136,6 +3148,10 @@ class Dom0Handler(TargetHandler):
         else:
             _taskType = TASK_PATCH
 
+        _launch_node_user = 'root'
+        if self.mGetInfrapatchExecutionValidator().mCheckCondition('mIsManagementHostLaunchNodeForClusterless'):
+            _launch_node_user = 'opc'
+
         # Run post plugins if needed on already completed nodes
         if len(aDiscarded) > 0:
             self.mPatchLogInfo("Run patch manager and plugins for already upgraded nodes if required")
@@ -3143,16 +3159,17 @@ class Dom0Handler(TargetHandler):
             if not self.mPatchRequestRetried():
                 self.mPatchLogInfo("Set completed for already upgraded nodes")
                 for _n in aDiscarded:
-                    mUpdateAllPatchStatesForNode(_launch_nodes, _n, self.mGetMetadataJsonFile(), PATCH_COMPLETED)
+                    mUpdateAllPatchStatesForNode(_launch_nodes, _n, self.mGetMetadataJsonFile(), PATCH_COMPLETED, aUser=_launch_node_user)
             elif self.mPatchRequestRetried():
+
                 # Verify last attempted patchmgr and resume if required.
                 for _n in aDiscarded:
                     _read_patch_state = mGetPatchStatesForNode(_launch_nodes, self.mGetMetadataJsonFile(), _n,
-                                                               PATCH_MGR)
+                                                               PATCH_MGR, aUser=_launch_node_user)
                     if _read_patch_state == PATCH_RUNNING:
                         _active_launch_node = mGetLaunchNodeForTargetType(_launch_nodes,
                                                                           self.mGetMetadataJsonFile(),
-                                                                          PATCH_DOM0)
+                                                                          PATCH_DOM0, aUser=_launch_node_user)
                         self.mPatchLogInfo(
                             f"Launch node where last patchmgr was run = {_active_launch_node} and log path = {self.mGetPatchmgrLogPathOnLaunchNode()}")
 
@@ -3205,10 +3222,10 @@ class Dom0Handler(TargetHandler):
                             if _ret == PATCH_SUCCESS_EXIT_CODE:
                                 self.mPatchLogInfo("Patch manager success during patch retry")
                                 mUpdatePatchMetadata(PATCH_DOM0, _launch_nodes, _n,
-                                                     self.mGetMetadataJsonFile(), PATCH_MGR, PATCH_COMPLETED)
+                                                     self.mGetMetadataJsonFile(), PATCH_MGR, PATCH_COMPLETED, aUser=_launch_node_user)
                             else:
                                 mUpdatePatchMetadata(PATCH_DOM0, _launch_nodes, _n,
-                                                     self.mGetMetadataJsonFile(), PATCH_MGR, PATCH_FAILED)
+                                                     self.mGetMetadataJsonFile(), PATCH_MGR, PATCH_FAILED, aUser=_launch_node_user)
                                 _suggestion_msg = f"Patch manager failed during patch retry. Exit code = {_ret} on {_n}"
                                 ret = PATCHMGR_RETRY_EXECUTION_FAILED_ERROR
                                 self.mAddError(ret, _suggestion_msg)
@@ -3218,12 +3235,17 @@ class Dom0Handler(TargetHandler):
                 _read_patch_state = ""
                 if self.mIsExacloudPluginEnabled():
                     self.mPatchLogInfo(f"ExaCloud Plugin Enabled . Launch nodes = {_launch_nodes}")
+
+                    _launch_node_user = 'root'
+                    if self.mGetInfrapatchExecutionValidator().mCheckCondition('mIsManagementHostLaunchNodeForClusterless'):
+                        _launch_node_user = 'opc'
+
                     for _n in aDiscarded:
                         self.mPatchLogInfo(f"Getting post patch status on node {_n}.")
                         try:
                             _read_patch_state = ""
                             _read_patch_state = mGetPatchStatesForNode(_launch_nodes, self.mGetMetadataJsonFile(),
-                                                                       _n, POST_PATCH)
+                                                                       _n, POST_PATCH, aUser=_launch_node_user)
                             self.mPatchLogInfo(f"Post plugin patch status: {_read_patch_state}")
                         except Exception as e:
                             self.mPatchLogWarn(f'Failed to get the post patch state : {str(e)}')
@@ -3255,7 +3277,7 @@ class Dom0Handler(TargetHandler):
                                                                    aRollback=_rollback_operation)
                             if _ret != PATCH_SUCCESS_EXIT_CODE:
                                 mUpdatePatchMetadata(PATCH_DOM0, _launch_nodes, _n,
-                                                     self.mGetMetadataJsonFile(), POST_PATCH, PATCH_FAILED)
+                                                     self.mGetMetadataJsonFile(), POST_PATCH, PATCH_FAILED, aUser=_launch_node_user)
                                 _suggestion_msg = f"Exacloud plugin failed on an upgraded node during retry : {_n}"
                                 # do not overwrite error coming from plugin mApply
                                 _rc, _child_request_error_already_exists_in_db = self.mGetErrorCodeFromChildRequest()
@@ -3267,7 +3289,7 @@ class Dom0Handler(TargetHandler):
                                 return _ret, _no_action_taken
 
                             mUpdatePatchMetadata(PATCH_DOM0, _launch_nodes, _n,
-                                                 self.mGetMetadataJsonFile(), POST_PATCH, PATCH_COMPLETED)
+                                                 self.mGetMetadataJsonFile(), POST_PATCH, PATCH_COMPLETED, aUser=_launch_node_user)
 
         self.mPatchLogInfo("Finished Check for IdemPotency in Patch Manager session")
         return _ret, _no_action_taken
@@ -4114,8 +4136,11 @@ class Dom0Handler(TargetHandler):
             '''
             self.__crs_config_enable_stat = {}
 
+            _launch_node_user = 'root'
+            if self.mGetInfrapatchExecutionValidator().mCheckCondition('mIsManagementHostLaunchNodeForClusterless'):
+                _launch_node_user = 'opc'
             # Update with launch node in the patch metadata json
-            mUpdateMetadataLaunchNode(_launch_nodes, self.mGetMetadataJsonFile(), PATCH_DOM0, _node_patcher)
+            mUpdateMetadataLaunchNode(_launch_nodes, self.mGetMetadataJsonFile(), PATCH_DOM0, _node_patcher, aUser=_launch_node_user)
 
             for _node_to_patch in _node_patch_list:
                 _is_system_valid_state = True
@@ -4200,7 +4225,7 @@ class Dom0Handler(TargetHandler):
                 if self.mIsExacloudPluginEnabled():
 
                     _read_patch_state = mGetPatchStatesForNode(_launch_nodes, self.mGetMetadataJsonFile(),
-                                                               _node_to_patch, PRE_PATCH)
+                                                               _node_to_patch, PRE_PATCH, aUser=_launch_node_user)
 
                     self.mPatchLogInfo(f"Dom0 pre plugin patch status: {_read_patch_state}")
                     if not _read_patch_state:
@@ -4215,17 +4240,17 @@ class Dom0Handler(TargetHandler):
                         if _read_patch_state == PATCH_PENDING:
                             # Update patch metadata status progress for pre plugins
                             mUpdatePatchMetadata(PATCH_DOM0, _launch_nodes, _node_to_patch,
-                                                 self.mGetMetadataJsonFile(), PRE_PATCH, PATCH_RUNNING)
+                                                 self.mGetMetadataJsonFile(), PRE_PATCH, PATCH_RUNNING, aUser=_launch_node_user)
                         _rc = self.mGetPluginHandler().mApply(_node_to_patch,
                                                                PATCH_DOM0, PRE_PATCH,
                                                                aRollback=aRollback)
                         if _rc != PATCH_SUCCESS_EXIT_CODE:
                             mUpdatePatchMetadata(PATCH_DOM0, _launch_nodes, _node_to_patch,
-                                                 self.mGetMetadataJsonFile(), PRE_PATCH, PATCH_FAILED)
+                                                 self.mGetMetadataJsonFile(), PRE_PATCH, PATCH_FAILED, aUser=_launch_node_user)
                             break
 
                         mUpdatePatchMetadata(PATCH_DOM0, _launch_nodes, _node_to_patch,
-                                             self.mGetMetadataJsonFile(), PRE_PATCH, PATCH_COMPLETED)
+                                             self.mGetMetadataJsonFile(), PRE_PATCH, PATCH_COMPLETED, aUser=_launch_node_user)
                     elif _read_patch_state == PATCH_FAILED:
                         _suggestion_msg = f"Patch read state : FAILED on : {_node_to_patch}"
                         _rc = DOM0_PRECHECK_EXECUTION_FAILED_ERROR
@@ -4284,7 +4309,7 @@ class Dom0Handler(TargetHandler):
                     # so re-execute with same launch/_node_patcher
                     # Update patch metadata status progress for patchmgr
                     mUpdatePatchMetadata(PATCH_DOM0, _launch_nodes, _node_to_patch,
-                                         self.mGetMetadataJsonFile(), PATCH_MGR, PATCH_RUNNING)
+                                         self.mGetMetadataJsonFile(), PATCH_MGR, PATCH_RUNNING, aUser=_launch_node_user)
 
                     '''
                       Write crs stop message into cell alert logs.
@@ -4352,11 +4377,11 @@ class Dom0Handler(TargetHandler):
                 if _rc != PATCH_SUCCESS_EXIT_CODE:
                     # Update patch metadata status progress for patchmgr
                     mUpdatePatchMetadata(PATCH_DOM0, _launch_nodes, _node_to_patch,
-                                         self.mGetMetadataJsonFile(), PATCH_MGR, PATCH_FAILED)
+                                         self.mGetMetadataJsonFile(), PATCH_MGR, PATCH_FAILED, aUser=_launch_node_user)
                 else:
                     # Update patch metadata status progress for patchmgr
                     mUpdatePatchMetadata(PATCH_DOM0, _launch_nodes, _node_to_patch,
-                                         self.mGetMetadataJsonFile(), PATCH_MGR, PATCH_COMPLETED)
+                                         self.mGetMetadataJsonFile(), PATCH_MGR, PATCH_COMPLETED, aUser=_launch_node_user)
 
                 self.mUpdatePatchStatus(True,
                                         (STEP_CLEAN_ENV + '_' + PATCH_DOM0 + f'_[{_node_stat_index:d}]'), _comment)
@@ -4436,13 +4461,13 @@ class Dom0Handler(TargetHandler):
 
                     # Update patch metadata status progress for post plugins
                     mUpdatePatchMetadata(PATCH_DOM0, _launch_nodes, _node_to_patch,
-                                         self.mGetMetadataJsonFile(), POST_PATCH, PATCH_RUNNING)
+                                         self.mGetMetadataJsonFile(), POST_PATCH, PATCH_RUNNING, aUser=_launch_node_user)
                     _ret = self.mGetPluginHandler().mApply(_node_to_patch,
                                                            PATCH_DOM0, POST_PATCH,
                                                            aRollback=aRollback)
                     if _ret != PATCH_SUCCESS_EXIT_CODE:
                         mUpdatePatchMetadata(PATCH_DOM0, _launch_nodes, _node_to_patch,
-                                             self.mGetMetadataJsonFile(), POST_PATCH, PATCH_FAILED)
+                                             self.mGetMetadataJsonFile(), POST_PATCH, PATCH_FAILED, aUser=_launch_node_user)
                         # do not overwrite the error code from mApply
                         _suggestion_msg = f"Exacloud plugin failed during post patch : {_node_to_patch}"
                         _rc, _child_request_error_already_exists_in_db = self.mGetErrorCodeFromChildRequest()
@@ -4454,7 +4479,7 @@ class Dom0Handler(TargetHandler):
                         break
 
                     mUpdatePatchMetadata(PATCH_DOM0, _launch_nodes, _node_to_patch,
-                                         self.mGetMetadataJsonFile(), POST_PATCH, PATCH_COMPLETED)
+                                         self.mGetMetadataJsonFile(), POST_PATCH, PATCH_COMPLETED, aUser=_launch_node_user)
 
                 # Run plugin metadata based exacloud plugins after patchmgr cmd
                 if self.mGetTask() in [ TASK_PATCH ] and not self.mIsExaSplice() and len(self.mGetPluginMetadata()) > 0:
@@ -4485,10 +4510,10 @@ class Dom0Handler(TargetHandler):
                     self.mGetSleepbetweenComputeTimeInSec() > 0 and \
                     _num_nodes_to_patch > _count_nodes:
                 mUpdatePatchMetadata(PATCH_DOM0, _launch_nodes, _node_to_patch,
-                                     self.mGetMetadataJsonFile(), POST_PATCH, PATCH_SLEEP_START)
+                                     self.mGetMetadataJsonFile(), POST_PATCH, PATCH_SLEEP_START, aUser=_launch_node_user)
                 self.mSleepBtwNodes()
                 mUpdatePatchMetadata(PATCH_DOM0, _launch_nodes, _node_to_patch,
-                                     self.mGetMetadataJsonFile(), POST_PATCH, PATCH_SLEEP_END)
+                                     self.mGetMetadataJsonFile(), POST_PATCH, PATCH_SLEEP_END, aUser=_launch_node_user)
 
         self.mPatchLogInfo(
             f"\n{PATCH_DOM0.upper()}s patched: {' '.join(_nodes_successfuly_patched)}\n{PATCH_DOM0.upper()}s not patched: {' '.join(_nodes_not_patched)}")
@@ -4595,7 +4620,7 @@ class Dom0Handler(TargetHandler):
             if self.mGetInfrapatchExecutionValidator().mCheckCondition('mIsManagementHostLaunchNodeForClusterless'):
                 _launch_node_user = 'opc'
 
-            mUpdateMetadataLaunchNode(_launch_nodes, self.mGetMetadataJsonFile(), PATCH_DOM0, _node_patcher, _launch_node_user)
+            mUpdateMetadataLaunchNode(_launch_nodes, self.mGetMetadataJsonFile(), PATCH_DOM0, _node_patcher, aUser=_launch_node_user)
 
             # gather the data which we will need for the post patch checks
             _domU_up_per_dom0 = {}  # key is Dom0, value is list of DomU
@@ -4711,7 +4736,7 @@ class Dom0Handler(TargetHandler):
                 self.mPatchLogInfo(f"Running dom0 pre exacloud plugins on : {json.dumps(_node_patch_list, indent=4)}")
                 for _dom0_to_patch in _node_patch_list:
                     _read_patch_state = mGetPatchStatesForNode(_launch_nodes, self.mGetMetadataJsonFile(),
-                                                               _dom0_to_patch, PRE_PATCH)
+                                                               _dom0_to_patch, PRE_PATCH, aUser=_launch_node_user)
                     self.mPatchLogInfo(f"Dom0 pre plugin patch status: {_read_patch_state}")
                     if not _read_patch_state:
                         _rc = DOM0_PRECHECK_EXECUTION_FAILED_ERROR
@@ -4725,18 +4750,18 @@ class Dom0Handler(TargetHandler):
                         if _read_patch_state == PATCH_PENDING:
                             # Update patch metadata status progress for pre plugins
                             mUpdatePatchMetadata(PATCH_DOM0, _launch_nodes, _dom0_to_patch,
-                                                 self.mGetMetadataJsonFile(), PRE_PATCH, PATCH_RUNNING)
+                                                 self.mGetMetadataJsonFile(), PRE_PATCH, PATCH_RUNNING, aUser=_launch_node_user)
 
                         _rc = self.mGetPluginHandler().mApply(_dom0_to_patch,
                                                                PATCH_DOM0, PRE_PATCH,
                                                                aRollback=aRollback)
                         if _rc != PATCH_SUCCESS_EXIT_CODE:
                             mUpdatePatchMetadata(PATCH_DOM0, _launch_nodes, _dom0_to_patch,
-                                                 self.mGetMetadataJsonFile(), PRE_PATCH, PATCH_FAILED)
+                                                 self.mGetMetadataJsonFile(), PRE_PATCH, PATCH_FAILED, aUser=_launch_node_user)
                             break
 
                         mUpdatePatchMetadata(PATCH_DOM0, _launch_nodes, _dom0_to_patch,
-                                             self.mGetMetadataJsonFile(), PRE_PATCH, PATCH_COMPLETED)
+                                             self.mGetMetadataJsonFile(), PRE_PATCH, PATCH_COMPLETED, aUser=_launch_node_user)
                     elif _read_patch_state == PATCH_FAILED:
                         _suggestion_msg = f"_read_patch_state (rolling): {_read_patch_state} on Node : {_dom0_to_patch}"
                         _rc = DOM0_PRECHECK_EXECUTION_FAILED_ERROR
@@ -4792,7 +4817,7 @@ class Dom0Handler(TargetHandler):
                 # Update patch metadata status progress for patchmgr
                 for _n in _node_patch_list:
                     mUpdatePatchMetadata(PATCH_DOM0, _launch_nodes, _n,
-                                         self.mGetMetadataJsonFile(), PATCH_MGR, PATCH_RUNNING, None, _launch_node_user)
+                                         self.mGetMetadataJsonFile(), PATCH_MGR, PATCH_RUNNING, None, aUser=_launch_node_user)
 
                     '''
                       Write crs stop message into cell alert logs.
@@ -4870,7 +4895,7 @@ class Dom0Handler(TargetHandler):
 
             for _n in _node_patch_list:
                 mUpdatePatchMetadata(_task, _launch_nodes, _n,
-                                     self.mGetMetadataJsonFile(), PATCH_MGR, _patch_metadata_status, None, _launch_node_user)
+                                     self.mGetMetadataJsonFile(), PATCH_MGR, _patch_metadata_status, None, aUser=_launch_node_user)
 
             self.mSetConnectionUser(_dom0)
             _dom0.mConnect(aHost=_node_patcher)
@@ -4950,6 +4975,14 @@ class Dom0Handler(TargetHandler):
                 _dom0.mDisconnect()
                 break
 
+        # In case of patchmgr crashes with error codes like NO_PATCHMGR_RESPONSE_DETECTED,
+        # Error codes are not detected outside the patchmgr loop and can proceed to run
+        # postcheck and the error codes can get overwritten. This txn takes care of the 
+        # forwarding the error codes like NO_PATCHMGR_RESPONSE_DETECTED that can get overwritten
+        # otherwise.
+        if _rc != PATCH_SUCCESS_EXIT_CODE:
+            return _rc
+
         # Perform heartbeat, RDS and post patch CRS check at the end of
         # dom0 non-rolling patching.
         _is_discarded_node_list_check_enabled = False
@@ -4967,13 +5000,13 @@ class Dom0Handler(TargetHandler):
                 for _dom0_to_patch in _node_patch_list:
                     # Update patch metadata status progress for pre plugins
                     mUpdatePatchMetadata(PATCH_DOM0, _launch_nodes, _dom0_to_patch,
-                                         self.mGetMetadataJsonFile(), POST_PATCH, PATCH_RUNNING)
+                                         self.mGetMetadataJsonFile(), POST_PATCH, PATCH_RUNNING, aUser=_launch_node_user)
                     _ret = self.mGetPluginHandler().mApply(_dom0_to_patch,
                                                            PATCH_DOM0, POST_PATCH,
                                                            aRollback=aRollback)
                     if _ret != PATCH_SUCCESS_EXIT_CODE:
                         mUpdatePatchMetadata(PATCH_DOM0, _launch_nodes, _dom0_to_patch,
-                                             self.mGetMetadataJsonFile(), POST_PATCH, PATCH_FAILED)
+                                             self.mGetMetadataJsonFile(), POST_PATCH, PATCH_FAILED, aUser=_launch_node_user)
                         _suggestion_msg = f"Exacloud plugin failed during post patch : {_dom0_to_patch}"
                         # do not overwrite error coming from plugin mApply
                         _rc, _child_request_error_already_exists_in_db = self.mGetErrorCodeFromChildRequest()
@@ -4984,7 +5017,7 @@ class Dom0Handler(TargetHandler):
                         break
 
                     mUpdatePatchMetadata(PATCH_DOM0, _launch_nodes, _dom0_to_patch,
-                                         self.mGetMetadataJsonFile(), POST_PATCH, PATCH_COMPLETED)
+                                         self.mGetMetadataJsonFile(), POST_PATCH, PATCH_COMPLETED, aUser=_launch_node_user)
 
             # Run plugin metadata based exacloud plugins after patchmgr cmd
             if self.mGetTask() in [ TASK_PATCH ] and not self.mIsExaSplice() and len(self.mGetPluginMetadata()) > 0:

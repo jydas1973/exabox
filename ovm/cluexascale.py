@@ -17,6 +17,10 @@
 #      None.
 #
 #    MODIFIED   (MM/DD/YY)
+#    scoral      04/21/26 - Bug 39225731 - Improved mAddRoceSshEntry to capture
+#                           IPv4 only and skip IPv6.
+#                           Improved mInternalMountInterfaceCallback to mount
+#                           the GCV only if it is not mounted already.
 #    scoral      03/27/26 - Enh 39115978 - Now we mark the GCVs that are part
 #                           of ongoing VM moves so that they are not
 #                           recognized as stale EDVs.
@@ -3512,7 +3516,7 @@ class ebCluExaScale:
 
             ebLogInfo(f"Checking for interface {aInterface} in sshd_config of {aNode.mGetHostname()}")
 
-            _, _o, _ = aNode.mExecuteCmd("/usr/sbin/ifconfig %s | /bin/grep 'inet' | /bin/awk '{print $2}'" % aInterface)
+            _, _o, _ = aNode.mExecuteCmd("/usr/sbin/ifconfig %s | /bin/grep 'inet ' | /bin/awk '{print $2}'" % aInterface)
             if aNode.mGetCmdExitStatus() == 0:
                 _currentIp = _o.read().strip()
                 ebLogInfo(f"Interface {aInterface} current ip is {_currentIp} in {aNode.mGetHostname()}")
@@ -3702,7 +3706,8 @@ class ebCluExaScale:
         def mInternalMountInterfaceCallback(aOedacliCmd, aArgs):
             if "CREATE_BRIDGES" in aOedacliCmd:
 
-                aArgs["exascale_obj"].mMountVolumesVmMove(aArgs["aOptions"])
+                if not aArgs["exascale_obj"].mIsGCVMounted(aArgs['net_info']['target_dom0_name'], aArgs["vm_name"]):
+                    aArgs["exascale_obj"].mMountVolumesVmMove(aArgs["aOptions"])
 
                 aArgs["exascale_obj"].mConfigureBonding(
                     aArgs["aOptions"],

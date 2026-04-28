@@ -3,7 +3,7 @@
 #
 # dbnupluginhandler.py
 #
-# Copyright (c) 2020, 2024, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      dbnupluginhandler.py - This module contains methods to run dbnu plugin on selected targets.
@@ -15,6 +15,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    araghave    04/11/26 - Enhancement Request 39143049 - FIX PLUGIN HANDLER
+#                           RELATED CODE ISSUES REPORTED BY CODEV
 #    araghave    08/27/24 - Enh 36829406 - PERFORM STRING INTERPOLATION USING
 #                           F-STRINGS FOR ALL THE CORE, PLUGIN AND TASKHANDLER
 #                           FILES
@@ -159,7 +161,7 @@ class DbnuPluginHandler(PluginHandler):
                                 _dom0U.mCopyFile(os.path.join(_plugin_loc_dir, _entry_file),
                                                  os.path.join(_plugin_remote_dir, _entry_file))
                     _dom0U.mExecuteCmdLog(f"chmod +x -R {_plugin_remote_dir}")
-                    if os.path.join(_plugin_remote_dir, "install.sh"):
+                    if _dom0U.mFileExists(os.path.join(_plugin_remote_dir, "install.sh")):
                         ebLogInfo(
                             f"Move install.sh from Source = {os.path.join(_plugin_remote_dir, 'install.sh')}, Destination = {os.path.dirname(os.path.dirname(_plugin_remote_dir))}")
                         _dom0U.mExecuteCmdLog(

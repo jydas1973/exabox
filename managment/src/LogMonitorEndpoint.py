@@ -4,7 +4,7 @@
 #
 # LogMonitorEndpoint.py
 #
-# Copyright (c) 2023, Oracle and/or its affiliates.
+# Copyright (c) 2023, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      LogMonitorEndpoint.py - Basic Functionality
@@ -41,6 +41,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    dekuckre    04/24/26 - Adjust log monitor special query request path
+#    dekuckre    04/23/26 - Fix log monitor path traversal validation
 #    chandapr    05/02/23 - Bug#35230563: Add modify config params remoteec
 #                           endpoints
 #    chandapr    04/11/23 - Bug#35230549: Add off-query remoteec endpoints 
@@ -54,6 +56,7 @@ import tempfile
 import subprocess
 import base64
 import json
+import re
 from socket import getfqdn
 
 class LogMonitorEndpoint(AsyncTrackEndpoint):
@@ -103,6 +106,10 @@ class LogMonitorEndpoint(AsyncTrackEndpoint):
         
         #Name the registeration file
         __service_name = str(self.mGetBody()['name'])
+        if self.validate_service_name(__service_name) is False:
+            self.mGetResponse()['status'] = 500
+            self.mGetResponse()['error'] = 'Invalid service name. Service name must match [A-Za-z0-9_.-]+'
+            return
 
         try:
             with tempfile.NamedTemporaryFile() as __payload_file:
@@ -150,6 +157,10 @@ class LogMonitorEndpoint(AsyncTrackEndpoint):
             _url_args = list(self.mGetUrlArgs().keys())
             if "name" in _url_args:
                 __service_name = str(self.mGetUrlArgs()["name"])
+                if self.validate_service_name(__service_name) is False:
+                    self.mGetResponse()['status'] = 500
+                    self.mGetResponse()['error'] = 'Invalid service name. Service name must match [A-Za-z0-9_.-]+'
+                    return
         try:
             if __service_name is None:
                 self.mGetLog().mInfo("executing log monitoring for every registered service")
@@ -180,6 +191,33 @@ class LogMonitorEndpoint(AsyncTrackEndpoint):
         except ValueError as err:
             return False
         return True
+
+    def validate_service_name(self, service_name):
+        if service_name != os.path.basename(service_name):
+            return False
+
+        if service_name in ('.', '..'):
+            return False
+
+        return re.match(r'^[A-Za-z0-9_.-]+$', service_name) is not None
+
+    def resolve_special_query_file(self, service_name):
+        __temp_json_path = os.path.join(self.__install_dir, 'logmanager')
+        if not os.path.isdir(__temp_json_path):
+            raise ValueError('{0} is an invalid config path for LogMonitor. Please review '
+                             'exacloud/exabox/managment/config/basic.conf'.format(__temp_json_path))
+
+        __file_name = "temp.json"
+        if service_name is not None:
+            __file_name = "{}.json".format(service_name)
+
+        __resolved_temp_json_path = os.path.realpath(__temp_json_path)
+        __resolved_temp_json_file = os.path.realpath(os.path.join(__temp_json_path, __file_name))
+
+        if os.path.commonpath([__resolved_temp_json_path, __resolved_temp_json_file]) != __resolved_temp_json_path:
+            raise ValueError('Invalid service name for special query file')
+
+        return __resolved_temp_json_path, __resolved_temp_json_file
 
     def mDelete(self):
         if self.__install_dir is None or not os.path.isdir(self.__install_dir):
@@ -260,21 +298,21 @@ class LogMonitorEndpoint(AsyncTrackEndpoint):
         __service_name = None
         if 'name' in self.mGetBody() and self.mGetBody()['name'] is not None:
             __service_name = str(self.mGetBody()['name'])
+            if self.validate_service_name(__service_name) is False:
+                self.mGetResponse()['status'] = 500
+                self.mGetResponse()['error'] = 'Invalid service name. Service name must match [A-Za-z0-9_.-]+'
+                return
             self.mGetLog().mInfo("Found service name for special query:  {0}".format(__service_name))
-        __temp_json_path = os.path.join(self.__install_dir, 'logmanager')
-        if not os.path.isdir(__temp_json_path):
+        try:
+            __temp_json_path, __temp_json_file = self.resolve_special_query_file(__service_name)
+        except ValueError as __err:
             self.mGetResponse()['status'] = 500
-            self.mGetResponse()['error'] = '{0} is an invalid config path for LogMonitor. Please review ' \
-                                        'exacloud/exabox/managment/config/basic.conf'.format(__temp_json_path)
+            self.mGetResponse()['error'] = str(__err)
             return
-        __file_name = "temp.json"
-        if __service_name is not None:
-            __file_name = "{}.json".format(__service_name)
-        __temp_json_file = os.path.join(__temp_json_path, __file_name)
-         
+
         
         try:
-            with tempfile.NamedTemporaryFile(dir=os.path.dirname("temp.json")) as __payload_file:
+            with tempfile.NamedTemporaryFile(dir=__temp_json_path) as __payload_file:
                 __payload_file.write(__payload)
                 __payload_file.flush()
                 __copycmd = ["sudo", "cp", "-p", __payload_file.name, __temp_json_file]
@@ -283,7 +321,7 @@ class LogMonitorEndpoint(AsyncTrackEndpoint):
                     self.mGetResponse()['status'] = 500
                     self.mGetResponse()['error'] = 'Error copying temporary json file {0} {1}'.format(__stdout, __stderr)
                     return
- 
+
                 __registercmd = ["/usr/bin/python3", "/opt/oci/exacc/logmanager/logMonitorSpecialQuery.py", "--File={}".format(__temp_json_file)]
             
                 self.mGetLog().mInfo("executing log monitoring special query!")
@@ -324,6 +362,10 @@ class LogMonitorEndpoint(AsyncTrackEndpoint):
         
         if "name" in self.mGetBody():
             __service_name = str(self.mGetBody()["name"])
+            if self.validate_service_name(__service_name) is False:
+                self.mGetResponse()['status'] = 500
+                self.mGetResponse()['error'] = 'Invalid service name. Service name must match [A-Za-z0-9_.-]+'
+                return
             self.mGetLog().mInfo("Found service name for special query:  {0}".format(__service_name))
         
         try:
@@ -350,4 +392,3 @@ class LogMonitorEndpoint(AsyncTrackEndpoint):
 
         #If we reach here which means success.
         self.mGetResponse()['text'] = "Execution of special query is successful."
-

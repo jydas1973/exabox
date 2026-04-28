@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2024, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     OVM - Basic functionality
@@ -11,6 +11,7 @@ NOTE:
     None
 
 History:
+    joysjose    03/06/2026 - Bug 38900203 - EXACLOUD: ISSUES FOUND BY VOXIO CODEV AGENT IN DIR EXABOX/HEALTHCHECK
     vikasras    03/17/2021 - Bug 32285465 - BETTER HANDLING OF SSH-KEYGEN
     josedelg    08/03/2021 - Bug 32522779 - Add confirmation when executing
                                             ssh-keygen
@@ -86,7 +87,7 @@ class ebCluPreChecks(ebCluCheck):
             if _out:
                 _rc = False
                 for _line in _out:
-                    if _line.find('Consistency check PASSED'):
+                    if 'Consistency check PASSED' in _line:
                         ebLogDebug('Network Consistency checks PASSED on {0}'.format(_dom0))
                         _rc = True
                         break
@@ -132,7 +133,7 @@ class ebCluPreChecks(ebCluCheck):
 
     def mConnectivityChecks(self,aCheckDomU=True,aCheckMode=None):
 
-        _rc = False
+        _rc = True
 
         _dom0s, _domUs, _cells, _switches = self.__cluctrl.mReturnAllClusterHosts()
         _cluhosts = _dom0s + _domUs + _cells + _switches
@@ -207,9 +208,7 @@ class ebCluPreChecks(ebCluCheck):
             #
             if _clunode.mGetSSHConnection():
                 ebLogDebug('Connectivity check to {1} host: {0} PASS'.format(_host,_clunode.mGetNodeType()))
-                _rc = True
             elif _clunode.mGetNodeType() == 'domu' and aCheckDomU is False:
-                _rc = True
                 ebLogWarn('Connectivity check to domu: {0} FAILED (non critical)'.format(_host))
             elif _clunode.mGetPingable():
                 ebLogError('Connectivity check to {1} host: {0} FAILED (ping: OK ssh: FAIL)'.format(_host, _clunode.mGetNodeType()))
@@ -515,4 +514,3 @@ class OracleVersion(object):
 
         _sortlist = sorted(aListVersions, cmp=self.mCompareVersions)
         return _sortlist[-1]
-

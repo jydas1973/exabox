@@ -1,6 +1,6 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/exatest/ovm/tests_cludiskgroups.py /main/6 2026/01/29 18:05:46 zpallare Exp $
+# $Header: ecs/exacloud/exabox/exatest/ovm/tests_cludiskgroups.py /main/7 2026/04/15 12:44:36 zpallare Exp $
 #
 # tests_cludiskgroups.py
 #
@@ -16,6 +16,9 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    zpallare    04/14/26 - Bug 39203556 - EXACS:25.4.1 one off3: custom
+#                           data-reco-sparse: reshape fails when percentage
+#                           stay the same: keyerror: cell_count
 #    zpallare    01/29/26 - Bug 38890053 - EXACS:25.4.1 ONEOFF2:26.1.1
 #                           Dbaas:custom data-reco-sparse: even when reshape
 #                           fails, exacloud passes as success
@@ -726,6 +729,48 @@ class ebTestCludiskgroups(ebTestClucontrol):
         self.assertEqual(rc, 5)
         self.assertEqual(diskgroup_data['Status'], 'Fail')
         dbaas_obj._mUpdateRequestData.assert_not_called()
+
+    # Auto-generated test for mClusterDgrpDrop
+    @patch('exabox.ovm.cludiskgroups.ebCluDbaas')
+    @patch('exabox.ovm.cludiskgroups.get_gcontext')
+    def test_mClusterDgrpDrop_update_dgrp_data_failure_returns_before_drop(self, mock_get_gcontext, mock_ebCluDbaas):
+        manager, ebox, _, options = self._create_manager_with_stubs(mock_get_gcontext, mock_ebCluDbaas)
+        constants = manager.mGetConstantsObj()
+        diskgroup_data = {}
+        rollback_stack = []
+
+        manager.mGetDiskGroupOperationData = MagicMock(return_value=diskgroup_data)
+        manager.mGetRollbackStack = MagicMock(return_value=rollback_stack)
+        manager.mGetEbox = MagicMock(return_value=ebox)
+
+        self._setup_sparse_cluster(manager, ebox, constants)
+        self._mock_diskgroup_size(
+            manager,
+            constants,
+            {
+                ('DATAC1', False): 1024,
+                ('RECOC1', False): 512,
+                ('SPRC1', False): 256
+            }
+        )
+
+        manager.mCheckDgExist = MagicMock(return_value=1)
+        manager.mCalculateNewDgSizes = MagicMock(return_value=0)
+        manager.mUpdateDgrpData = MagicMock(return_value=11)
+        manager.mClusterParseInput = MagicMock()
+        manager.mDropDiskGroup = MagicMock()
+        manager.mDropGridDisks = MagicMock()
+        manager.mExecuteOrderedResizes = MagicMock()
+
+        rc = manager.mClusterDgrpDrop(options)
+
+        self.assertEqual(rc, 11)
+        manager.mUpdateDgrpData.assert_called_once_with(options, diskgroup_data, 'SPRC1', 256, True)
+        manager.mClusterParseInput.assert_not_called()
+        manager.mDropDiskGroup.assert_not_called()
+        manager.mDropGridDisks.assert_not_called()
+        manager.mExecuteOrderedResizes.assert_not_called()
+        self.assertEqual(rollback_stack, [])
 
     # Auto-generated test for mEnsureDgsRebalanced
     @patch('exabox.ovm.cludiskgroups.ebCluDbaas')
@@ -4966,6 +5011,28 @@ if __name__ == "__main__":
         manager.mResizeGriddisks.assert_not_called()
         manager.mRollback.assert_not_called()
         self.assertEqual(rollback_stack, [])
+
+    # Auto-generated test for mResizeDg
+    @patch('exabox.ovm.cludiskgroups.ebCluDbaas')
+    @patch('exabox.ovm.cludiskgroups.get_gcontext')
+    def test_mResizeDg_missing_metadata_returns_controlled_error(self, mock_get_gcontext, mock_ebCluDbaas):
+        manager, _, _, options = self._create_manager_with_stubs(mock_get_gcontext, mock_ebCluDbaas)
+        constants = manager.mGetConstantsObj()
+        diskgroup_data = {
+            constants._data_dg_rawname: 'DATAC1',
+            constants._reco_dg_rawname: 'RECOC1'
+        }
+
+        manager.mSetDiskGroupOperationData(diskgroup_data)
+        manager.mHandleDbaasapiSynchronousCall = MagicMock()
+
+        rc = manager.mResizeDg(options, 'DATAC1', 4096, diskgroup_data)
+
+        self.assertNotEqual(rc, 0)
+        self.assertEqual(diskgroup_data['Status'], 'Fail')
+        self.assertEqual(diskgroup_data['ErrorCode'], gDiskgroupError['ErrorFetchingDetails'][0])
+        self.assertIn('cell_count and griddisk_count are required', diskgroup_data['Log'])
+        manager.mHandleDbaasapiSynchronousCall.assert_not_called()
 
 # Auto-generated test for mClusterParseInput
     @patch('exabox.ovm.cludiskgroups.ebCluDbaas')
