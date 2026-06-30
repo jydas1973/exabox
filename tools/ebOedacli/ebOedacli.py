@@ -15,6 +15,7 @@ NOTE:
 History:
 
     MODIFIED   (MM/DD/YY)
+       jfsaldan 05/07/26 - Set Java home for OEDA execution
        jesandov 04/03/26 - Bug 39039331 - Add validation in case of missing data
        aararora 02/27/26 - Bug 38902170: Correct resource leak issues
        jesandov 06/03/25 - Bug 38024144 - Add sanitize string to ignore errors
@@ -35,6 +36,8 @@ import json
 import os
 import re
 import six
+import fcntl
+import shutil
 import subprocess
 import shlex
 import sys
@@ -48,6 +51,108 @@ from exabox.core.Error import ExacloudRuntimeError
 from exabox.core.Node import exaBoxNode
 
 DEVNULL = open(os.devnull, 'wb')
+
+def mEnsureOedaJavaHome(aOedaPath):
+    """
+    Ensure OEDA launcher scripts set JAVA_HOME before Exacloud executes them.
+    """
+    _java_home_pattern = r"(^|\n)\s*(export\s+)?JAVA_HOME="
+    _script_names = ["install.sh", "oedacli"]
+    _launcher_paths = []
+    _needs_patch = False
+
+    for _script_name in _script_names:
+        _script_path = os.path.join(aOedaPath, _script_name)
+        if not os.path.exists(_script_path):
+            continue
+
+        _launcher_paths.append(_script_path)
+        with open(os.path.realpath(_script_path), "r") as _script_file:
+            _content = _script_file.read()
+
+        if not re.search(_java_home_pattern, _content):
+            _needs_patch = True
+
+    if not _launcher_paths:
+        return
+
+    if not _needs_patch:
+        return
+
+    _java_home = get_gcontext().mGetJavaHome()
+
+    # Request staging directories symlink install.sh and oedacli back to the
+    # base OEDA tree, so lock and patch beside the real script target.
+    _lock_dir = os.path.realpath(aOedaPath)
+    for _script_name in _script_names:
+        _script_path = os.path.join(aOedaPath, _script_name)
+        if os.path.exists(_script_path):
+            _lock_dir = os.path.dirname(os.path.realpath(_script_path))
+            break
+    _lock_path = os.path.join(_lock_dir, ".exacloud_java_home.lock")
+
+    with open(_lock_path, "a+") as _lock_file:
+        fcntl.flock(_lock_file, fcntl.LOCK_EX)
+        try:
+            for _script_name in _script_names:
+                _script_path = os.path.join(aOedaPath, _script_name)
+                if not os.path.exists(_script_path):
+                    ebLogInfo('OEDA script "{0}" not found. Skipping JAVA_HOME patch.'
+                              .format(_script_path))
+                    continue
+
+                # Patch the symlink target so staged request directories keep
+                # sharing the same base OEDA script.
+                _script_path = os.path.realpath(_script_path)
+
+                with open(_script_path, "r") as _script_file:
+                    _content = _script_file.read()
+
+                # If OEDA already owns JAVA_HOME setup, leave it intact.
+                if re.search(_java_home_pattern, _content):
+                    ebLogTrace('OEDA script "{0}" already sets JAVA_HOME.'.format(_script_path))
+                    continue
+
+                _stat = os.stat(_script_path)
+                _backup_path = "{0}.exacloud_java_home.bak".format(_script_path)
+                if not os.path.exists(_backup_path):
+                    shutil.copy2(_script_path, _backup_path)
+                    ebLogInfo('Created OEDA script backup "{0}".'.format(_backup_path))
+
+                # Insert JAVA_HOME immediately after the shebang so the rest of
+                # the script observes it without changing callers.
+                _escaped_java_home = (_java_home.replace("\\", "\\\\")
+                                                .replace('"', '\\"')
+                                                .replace("$", "\\$")
+                                                .replace("`", "\\`"))
+                _export = 'export JAVA_HOME="{0}"\n'.format(_escaped_java_home)
+                _lines = _content.splitlines(True)
+                if _lines and _lines[0].startswith("#!"):
+                    _new_content = _lines[0] + _export + "".join(_lines[1:])
+                else:
+                    _new_content = _export + _content
+
+                _tmp_path = None
+                try:
+                    # Replace atomically from the script directory to avoid
+                    # partially written launchers on failures.
+                    with tempfile.NamedTemporaryFile("w",
+                                                     dir=os.path.dirname(_script_path),
+                                                     delete=False) as _tmp_file:
+                        _tmp_path = _tmp_file.name
+                        _tmp_file.write(_new_content)
+                    os.chmod(_tmp_path, _stat.st_mode & 0o7777)
+                    os.replace(_tmp_path, _script_path)
+                    ebLogInfo('Patched OEDA script "{0}" with JAVA_HOME.'.format(_script_path))
+                except Exception as _ex:
+                    if _tmp_path and os.path.exists(_tmp_path):
+                        os.unlink(_tmp_path)
+                    ebLogError('Failed to patch OEDA script "{0}" with JAVA_HOME: {1}'
+                               .format(_script_path, _ex))
+                    raise
+        finally:
+            fcntl.flock(_lock_file, fcntl.LOCK_UN)
+
 
 class ebOedacli(object):
 
@@ -72,10 +177,12 @@ class ebOedacli(object):
 
         self.mLog("Info", "__init__")
 
-        if aOedacliPath is not None and not self.mProbePath():
-            _msg = "Invalid path to oedacli: {0}".format(aOedacliPath)
-            self.mLog("Error", _msg)
-            raise ExacloudRuntimeError(0x0EDA, 0x0EDA, _msg)
+        if aOedacliPath is not None:
+            mEnsureOedaJavaHome(os.path.dirname(aOedacliPath))
+            if not self.mProbePath():
+                _msg = "Invalid path to oedacli: {0}".format(aOedacliPath)
+                self.mLog("Error", _msg)
+                raise ExacloudRuntimeError(0x0EDA, 0x0EDA, _msg)
 
     def mGetCallbacks(self):
         return self.__callbacks

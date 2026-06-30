@@ -4,7 +4,7 @@
 #
 # tests_domufilesystems.py
 #
-# Copyright (c) 2021, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_domufilesystems.py - Unit tests for cludomufilesystems.py
@@ -16,6 +16,13 @@
 #      None.
 #
 #    MODIFIED   (MM/DD/YY)
+#    bhpati      05/07/26 - Bug 39284048 - Use VM_MAKER instead of virsh for
+#                           forcefully shutting down the VM
+#    remamid     05/05/26 - bug 39239033 mock cleanup_lv_snapshots
+#    dekuckre    04/27/26 - fix xen domu_maker handling in domufilesystems
+#    avimonda    04/26/26 - Bug 39084339: Fix DomU filesystem mocks for PATH probe
+#    dekuckre    04/23/26 - Fix filesystem unit test mocks for vm_maker and
+#                           parallel execution
 #    rajsag      10/29/25 - bug 38484985 - exascale- exacloud: add vm to
 #                           exascale cluster with exascale images failed
 #    remamid     09/30/25 - Add unittest for bug 38453991
@@ -54,8 +61,11 @@ import unittest
 from exabox.utils.node import connect_to_host
 from exabox.core.Error import ExacloudRuntimeError
 from unittest.mock import patch, MagicMock
+from types import SimpleNamespace
 from exabox.ovm.cludomufilesystems import get_edvdisk_path_from_domblklist, get_dom0_edvdisk_for_filesystem
 from exabox.ovm.cludomufilesystems import (
+    cleanup_lv_snapshots,
+    expand_domu_fs_using_free_vg,
     KIB,
     MIB,
     GIB,
@@ -105,6 +115,8 @@ TEST_LS_PATH: exaMockCommand = exaMockCommand('/bin/test -e /bin/ls')
 TEST_DF_PATH: exaMockCommand = exaMockCommand('/bin/test -e /bin/df')
 TEST_GREP_PATH: exaMockCommand = exaMockCommand('/bin/test -e /bin/grep')
 TEST_PARTED_PATH: exaMockCommand = exaMockCommand('/bin/test -e /sbin/parted')
+TEST_LVCHANGE_PATH: exaMockCommand = exaMockCommand('/bin/test -e /sbin/lvchange')
+TEST_LVREMOVE_PATH: exaMockCommand = exaMockCommand('/bin/test -e /sbin/lvremove')
 TEST_PVR_PATH: exaMockCommand = exaMockCommand('/bin/test -e /sbin/pvresize')
 TEST_LVR_PATH: exaMockCommand = exaMockCommand('/bin/test -e /sbin/lvresize')
 TEST_LVS_PATH: exaMockCommand = exaMockCommand('/bin/test -e /sbin/lvs')
@@ -118,13 +130,60 @@ TEST_PVCREATE_PATH: exaMockCommand = \
     exaMockCommand('/bin/test -e /sbin/pvcreate')
 TEST_VGEXTEND_PATH: exaMockCommand = \
     exaMockCommand('/bin/test -e /sbin/vgextend')
+TEST_EMPTY_PATH: exaMockCommand = exaMockCommand('echo "\\$PATH"', aStdout='')
 TEST_VIRSH_THEN_XM: List[exaMockCommand] = [
     exaMockCommand('/bin/test -e /bin/virsh', aRc = -1),
     exaMockCommand('/bin/test -e /usr/bin/virsh', aRc = -1),
+    TEST_EMPTY_PATH,
     TEST_XM_PATH
 ]
 TEST_SYSTEMD_ANALYZE: exaMockCommand = \
     exaMockCommand('/bin/test -e /sbin/systemd-analyze')
+
+
+class _InlineSharedManager(object):
+
+    def dict(self):
+        return {}
+
+
+class _InlineProcessStructure(object):
+
+    def __init__(self, callback, aArgs=None, aId=None, aMaxExecutionTime=-1,
+                 aLogFile=None):
+        self._callback = callback
+        self._args = tuple(aArgs or [])
+
+    def mSetMaxExecutionTime(self, _timeout):
+        return
+
+    def mSetJoinTimeout(self, _timeout):
+        return
+
+    def mSetLogTimeoutFx(self, _fx):
+        return
+
+    def start(self):
+        return
+
+
+class _InlineProcessManager(object):
+
+    def __init__(self, *args, **kwargs):
+        self._manager = _InlineSharedManager()
+        self._status = "done"
+
+    def mGetManager(self):
+        return self._manager
+
+    def mStartAppend(self, process):
+        process.start()
+
+    def mJoinProcess(self):
+        return
+
+    def mGetStatus(self):
+        return self._status
 
 
 
@@ -389,10 +448,19 @@ def shutdown_domu_cmds(
         hypervisor = '/sbin/xm'
 
     cmds.append(exaMockCommand(f"{hypervisor} list", aStdout = domu_name))
-    cmds.append(exaMockCommand(f"{hypervisor} shutdown {domu_name}"))
+    if domu_state.is_kvm:
+        cmds.append(
+            exaMockCommand(f"/opt/exadata_ovm/vm_maker --stop-domain {domu_name}")
+        )
+    else:
+        cmds.append(exaMockCommand(f"{hypervisor} shutdown {domu_name}"))
     for _ in range(attempts):
         cmds.append(exaMockCommand(f"{hypervisor} list", aStdout = domu_name))
-    if force_on_timeout:
+    if force_on_timeout and domu_state.is_kvm:
+        cmds.append(
+            exaMockCommand(f"/opt/exadata_ovm/vm_maker --stop-domain {domu_name} --force")
+        )
+    elif force_on_timeout:
         cmds.append(exaMockCommand(f"{hypervisor} destroy {domu_name}"))
     cmds.append(exaMockCommand(f"{hypervisor} list"))
 
@@ -419,7 +487,7 @@ def start_domu_cmds(
     if domu_state.is_kvm:
         cmds.append(TEST_VIRSH_PATH)
         hypervisor = '/bin/virsh'
-        start_vm_cmd = f"{hypervisor} start {domu_name}"
+        start_vm_cmd = f"/opt/exadata_ovm/vm_maker --start-domain {domu_name}"
     else:
         cmds += TEST_VIRSH_THEN_XM
         hypervisor = '/sbin/xm'
@@ -823,7 +891,14 @@ def expand_domu_fs_using_free_vg_cmds(
         of exaMockcommands.
     """
     cmds: List[exaMockCommand] = []
+    cmds.append(TEST_LVCHANGE_PATH)
+    cmds.append(TEST_LVREMOVE_PATH)
+    cmds.append(TEST_LVS_PATH)
     cmds.append(TEST_LVR_PATH)
+    cmds.append(exaMockCommand(
+        r"\s*/sbin/lvs\s+--reportformat\s+json\s+--noheadings\s+-o\s+lv_name,origin,vg_name\s*",
+        aStdout='{"report":[{"lv":[]}]}'
+    ))
 
     resize_fs_flag: str = '--resizefs'
     if resize_mode == ebDomUFSResizeMode.LV_ONLY or \
@@ -1275,6 +1350,95 @@ def expand_domu_vg_cmds(
 
 class ebTestFomUFilesystems(ebTestClucontrol):
 
+    def mMockFsTree(self, lv_name, inactive_lv_name=None):
+        fs_info = ebNodeFilesystemInfo('/', '/dev/mapper/VGExaDb-LVDbSys1', 'xfs', 10, 5, False)
+        lv = ebNodeLVInfo(lv_name, f'/dev/mapper/VGExaDb-{lv_name}', 'VGExaDb', 10)
+        inactive = None
+        if inactive_lv_name:
+            inactive = ebNodeLVInfo(
+                inactive_lv_name,
+                f'/dev/mapper/VGExaDb-{inactive_lv_name}',
+                'VGExaDb',
+                10,
+            )
+        vg = ebNodeVGInfo('VGExaDb', 20, 10, 4)
+        return ebNodeFSTree(fs_info, lv, inactive, vg, None)
+
+
+
+
+    @patch('exabox.ovm.cludomufilesystems.cleanup_lv_snapshots')
+    @patch('exabox.ovm.cludomufilesystems.get_domu_filesystem_tree')
+    @patch('exabox.ovm.cludomufilesystems.get_node_fs_layout')
+    def test_resize_calls_cleanup(self, mock_get_node_fs_layout, mock_get_domu_fs_tree, mock_cleanup):
+        fs_tree = self.mMockFsTree('LVDbSys1', 'LVDbSys2')
+        mock_get_node_fs_layout.return_value = fs_tree
+        mock_get_domu_fs_tree.return_value = fs_tree
+
+        cmds = {
+            self.mGetRegexDomU(): [
+                [
+                    exaMockCommand(r"\s*/bin/test -e /bin/echo\s*"),
+                    exaMockCommand(r"\s*/bin/echo\s*", aStdout=''),
+                    exaMockCommand(r"\s*/bin/test -e /sbin/lvchange\s*"),
+                    exaMockCommand(r"\s*/bin/test -e /sbin/lvremove\s*"),
+                    exaMockCommand(r"\s*/bin/test -e /sbin/lvs\s*"),
+                    exaMockCommand(r"\s*/bin/test -e /sbin/lvresize\s*"),
+                    exaMockCommand(r"\s*/bin/test -e /sbin/parted\s*"),
+                    exaMockCommand(
+                        'lvs --reportformat json --noheadings -o lv_name,origin,vg_name',
+                        aStdout='{"report":[{"lv":[{"lv_name":"snap1","origin":"LVDbSys1","vg_name":"VGExaDb"}]}]}'
+                    ),
+                    exaMockCommand(
+                        r"\s*/sbin/lvs\s+--noheadings\s+-o\s+lv_path,mountpoint\s+--select\s+lv_name=snap1\s*",
+                        aStdout='/dev/VGExaDb/snap1 /mnt/snapshot\n'
+                    ),
+                    exaMockCommand(r"\s*/bin/umount\s+/mnt/snapshot\s*"),
+                    exaMockCommand('lvchange -an VGExaDb/snap1'),
+                    exaMockCommand('lvremove -f VGExaDb/snap1'),
+                    exaMockCommand(
+                        'lvs --reportformat json --noheadings -o lv_name,origin,vg_name',
+                        aStdout='{"report":[{"lv":[]}]}'
+                    ),
+                    exaMockCommand(r"\s*/sbin/lvresize\s+--resizefs\s+-L\s+\+1B\s+/dev/mapper/VGExaDb-LVDbSys1\s*"),
+                    exaMockCommand(r"\s*/sbin/lvresize\s+-L\s+\+1B\s+/dev/mapper/VGExaDb-LVDbSys2\s*"),
+                    exaMockCommand(
+                        r"\s*/sbin/parted\s+/dev/mapper/VGExaDb-LVDbSys2\s+print\s*",
+                        aStdout='Partition Table: unknown\n'
+                    ),
+                    exaMockCommand(r"\s*/bin/test -e /bin/df\s*"),
+                    exaMockCommand(r"\s*/bin/test -e /bin/grep\s*"),
+                    exaMockCommand(
+                        "df --local --output=target,source,fstype,size,avail --block-size=1 | grep -v 'nfs'",
+                        aStdout='Mount Target FSType Size Avail\n/ /dev/mapper/VGExaDb-LVDbSys1 xfs 10 5\n/dev /dev/mapper/VGExaDb-LVDbSys2 xfs 10 5\n'
+                    ),
+                    exaMockCommand(r"\s*/bin/test -e /bin/lsblk\s*"),
+                    exaMockCommand('lsblk -rno TYPE /dev/mapper/VGExaDb-LVDbSys1', aStdout='lvm\n'),
+                    exaMockCommand('lsblk -rno TYPE /dev/mapper/VGExaDb-LVDbSys2', aStdout='lvm\n'),
+                    exaMockCommand(r"\s*/bin/test -e /sbin/lvs\s*"),
+                    exaMockCommand('lvs --noheading -o lv_name,lv_dm_path,vg_name,lv_size --units B'),
+                    exaMockCommand(r"\s*/bin/test -e /sbin/vgs\s*"),
+                    exaMockCommand('vgs --noheading -o vg_name,vg_size,vg_free,vg_extent_size --units B'),
+                    exaMockCommand(r"\s*/bin/test -e /sbin/pvs\s*"),
+                    exaMockCommand('pvs --noheading -o pv_name,vg_name,pv_size --units B')
+                ]
+            ]
+        }
+
+        self.mPrepareMockCommands(cmds)
+
+        clubox = self.mGetClubox()
+        for _dom0, dom_u in clubox.mReturnDom0DomUPair():
+            with connect_to_host(dom_u, self.mGetContext()) as node:
+                expand_domu_fs_using_free_vg(node, fs_tree, ebDomUFilesystem.ROOT, 1)
+
+        cleanup_args = mock_cleanup.call_args[0]
+        self.assertCountEqual(cleanup_args[1], ['LVDbSys1', 'LVDbSys2'])
+
+
+
+
+
     @classmethod
     def setUpClass(self):
         super(ebTestFomUFilesystems, self).setUpClass(True, True)
@@ -1591,7 +1755,14 @@ class ebTestFomUFilesystems(ebTestClucontrol):
         )
 
 
-
+    @patch('exabox.ovm.cludomufilesystems.shutdown_domu',
+           new=lambda *args, **kwargs: None)
+    @patch('exabox.ovm.cludomufilesystems.start_domu',
+           new=lambda *args, **kwargs: None)
+    @patch('exabox.ovm.cludomufilesystems.ProcessManager',
+           _InlineProcessManager)
+    @patch('exabox.ovm.cludomufilesystems.ProcessStructure',
+           _InlineProcessStructure)
     def test_resize_non_lvm_xen(self):
 
         domu_states: Dict[str, ebFilesystemsState] = {
@@ -1658,6 +1829,31 @@ class ebTestFomUFilesystems(ebTestClucontrol):
         self.mPrepareMockCommands(cmds)
         with connect_to_host(dom0_name, get_gcontext()) as node:
             self.assertRaises(ExacloudRuntimeError, shutdown_domu, node, domu_name, 10)
+    
+    def test_shutdown_domu_timeout_force(self):
+
+          (dom0_name, domu_name), *_ = self.mGetClubox().mReturnDom0DomUPair()
+          domu_state: ebFilesystemsState = ebFilesystemsState(None, [], 0, True)
+          cmds: Dict[str, List[List[str]]] = {
+              dom0_name: [
+                  shutdown_domu_cmds(
+                      domu_state,
+                      domu_name,
+                      2,
+                      force_on_timeout=True
+                  )
+              ]
+          }
+
+          self.mPrepareMockCommands(cmds)
+          with connect_to_host(dom0_name, get_gcontext()) as node:
+              result = shutdown_domu(
+                  node,
+                  domu_name,
+                  10,
+                  force_on_timeout=True
+              )
+          self.assertIsNone(result)
 
     def test_shutdown_domu_incorrectvm(self):
 
@@ -1691,6 +1887,67 @@ class ebTestFomUFilesystems(ebTestClucontrol):
         self.mPrepareMockCommands(cmds)
         with connect_to_host(dom0_name, get_gcontext()) as node:
             start_domu(node, domu_name) 
+
+    def test_shutdown_start_domu_xen(self):
+
+        (dom0_name, domu_name), *_ = self.mGetClubox().mReturnDom0DomUPair()
+        domu_state: ebFilesystemsState = ebFilesystemsState(None, [], 0, False)
+        cmds: Dict[str, List[List[str]]] = {
+            dom0_name: [ shutdown_domu_cmds(domu_state, domu_name, 2) ]
+        }
+
+        self.mPrepareMockCommands(cmds)
+        with connect_to_host(dom0_name, get_gcontext()) as node:
+            shutdown_domu(node, domu_name)
+
+        cmds = {
+            dom0_name: [ start_domu_cmds(domu_state, domu_name) ]
+        }
+
+        self.mPrepareMockCommands(cmds)
+        with connect_to_host(dom0_name, get_gcontext()) as node:
+            start_domu(node, domu_name)
+
+    @patch('exabox.ovm.cludomufilesystems.node_exec_cmd_check')
+    @patch('exabox.ovm.cludomufilesystems.node_exec_cmd')
+    @patch('exabox.ovm.cludomufilesystems.node_cmd_abs_path_check')
+    def test_cleanup_lv_snapshots_drops_snapshots(self, mock_path, mock_exec, mock_exec_check):
+        mock_path.side_effect = lambda _node, cmd, sbin=True: f"/sbin/{cmd}"
+        initial = json.dumps({
+            "report": [{
+                "lv": [{"lv_name": "snap1", "origin": "LVDbSys1", "vg_name": "VGExaDb"}]
+            }]
+        })
+        mount = '/dev/VGExaDb/snap1 /mnt/snapshot\n'
+        verify = json.dumps({"report": [{"lv": []}]})
+        mock_exec.side_effect = [
+            SimpleNamespace(stdout=initial),
+            SimpleNamespace(stdout=mount),
+            SimpleNamespace(stdout=verify)
+        ]
+        node = MagicMock()
+        node.mGetHostname.return_value = 'host1'
+
+        cleanup_lv_snapshots(node, ['LVDbSys1'], 'host1')
+
+        self.assertEqual(mock_path.call_count, 2)
+        mock_exec_check.assert_has_calls([
+            unittest.mock.call(node, '/bin/umount /mnt/snapshot'),
+            unittest.mock.call(node, '/sbin/lvremove -f VGExaDb/snap1')
+        ])
+        self.assertEqual(mock_exec.call_count, 3)
+
+    @patch('exabox.ovm.cludomufilesystems.node_exec_cmd')
+    @patch('exabox.ovm.cludomufilesystems.node_cmd_abs_path_check')
+    def test_cleanup_lv_snapshots_no_snapshots(self, mock_path, mock_exec):
+        mock_path.side_effect = lambda _node, cmd, sbin=True: f"/sbin/{cmd}"
+        empty = json.dumps({"report": [{"lv": []}]})
+        mock_exec.return_value = SimpleNamespace(stdout=empty)
+        node = MagicMock()
+
+        cleanup_lv_snapshots(node, ['LVDbSys1'], 'host1')
+
+        mock_exec.assert_called_once()
 
     @patch('exabox.ovm.cludomufilesystems.node_cmd_abs_path_check')
     @patch('exabox.ovm.cludomufilesystems.node_exec_cmd_check')

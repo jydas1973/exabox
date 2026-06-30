@@ -1,7 +1,7 @@
 """
 $Header:
 
- Copyright (c) 2020, 2022, Oracle and/or its affiliates.
+ Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 
 NAME:
     Crypt - Use python cryptography package to replace the usage of /bin/openssl
@@ -33,6 +33,8 @@ NOTE:
 History:
 
     MODIFIED   (MM/DD/YY)
+      aypaul    06/18/26 - SecBug#39386389 Secure the fallback for AES_CBC
+                           decrypt call
       ndesanto  12/21/21 - Change encryption cipher from CBC for security
                            concerns.
       gsundara  12/07/20 - Creation
@@ -43,6 +45,7 @@ import os
 import re
 import six
 
+from exabox.core.Error import ExacloudRuntimeError
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -228,9 +231,8 @@ class cryptographyAES:
         """
         try:
             return decrypt(aPassword, aCiphertext)
-        except:
-            _old = cryptographyAES_CBC()
-            return _old.mDecrypt(aPassword, aCiphertext)
+        except Exception as err:
+            raise ExacloudRuntimeError(0x00, 0x0, f"Decryption failed with the error: {err}")
 
 
 class cryptographyAES_CBC:

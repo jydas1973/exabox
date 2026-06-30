@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     ExasshScript - Basic functionality
@@ -12,6 +12,8 @@ NOTE:
 
 History:
     MODIFIED   (MM/DD/YY)
+    jesandov    06/10/26 - Bug#39462050: Add secure client
+    jesandov    04/27/26 - Bug#39263025 Fix security issues found using IA
     jesandov    01/06/25 - Add PKCS8 and TraditionalOpenSSL Format export
     ririgoye    09/30/24 - Bug 36390923 - REMOVE EXAKMS HISTORY VALIDATION
                            ACROSS HOSTS
@@ -67,12 +69,12 @@ class ExasshScript:
             metavar=('<Remote File Absolute path>', '<Local File absolute path>')
          )
         _g2.add_argument(
-            '-up', '--upload', dest='upload', nargs=2, 
+            '-up', '--upload', dest='upload', nargs=2,
             metavar=('<Local File Absolute Path>', '<Remote File Absolute Path>')
         )
         _g2.add_argument('-e', '--execute', dest='execute', nargs=argparse.REMAINDER, help='Execute the Script on the target host')
         _g2.add_argument(
-            '-re', '--remote-execute', dest='remotelyexecute', nargs=argparse.REMAINDER, 
+            '-re', '--remote-execute', dest='remotelyexecute', nargs=argparse.REMAINDER,
             help='Executes a file remotely without copying them directly to target.',
             metavar=('<Local path of the file to execute>', '<Arguments of the file to be run>')
         )
@@ -274,7 +276,7 @@ class ExasshScript:
         elif self.__args.download:
             _dw = self.__args.download
             return self.__manager.mDownload(_dw[0], _dw[1])
-        
+
         elif self.__args.remotelyexecute:
             _re = self.__args.remotelyexecute
             self.__manager.mGetLog().info(f"About to run file {_re[0]} with args: {_re[1:]}")

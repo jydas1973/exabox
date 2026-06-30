@@ -58,7 +58,10 @@ class ebTestCSCreateVm(ebTestClucontrol):
     def test_mCreateVM(self):
         ebLogInfo("Running unit test on csCreateVM.py:mCreateVM")
 
-        with patch('exabox.ovm.csstep.cs_base.ImageBOM.mIsSubStepExecuted', side_effect=iter([True,True,True,True,True,True,True,True,True,False,True,True,True])),\
+        def fake_is_substep_executed(step, substep):
+            return substep != "SAVE_OEDA_KEYS"
+
+        with patch('exabox.ovm.csstep.cs_base.ImageBOM.mIsSubStepExecuted', side_effect=fake_is_substep_executed),\
              patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mIsOciEXACC', return_value=True),\
              patch('exabox.ovm.csstep.cs_base.serialConsole.mRunContainer'),\
              patch('exabox.ovm.csstep.cs_base.serialConsole.mRestartContainer'):

@@ -4,7 +4,7 @@
 #
 # tests_exakms.py
 #
-# Copyright (c) 2021, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_exakms.py - <one-line expansion of the name>
@@ -62,6 +62,7 @@ class ebTestExaKms(ebTestClucontrol):
     def setUpClass(self):
         super().setUpClass(aGenerateDatabase=True)
         self.maxDiff = None
+        get_gcontext().mSetConfigOption('ssh_connect_max_retries', '1')
 
     def mCleanUpKeys(self, aExaKms):
 

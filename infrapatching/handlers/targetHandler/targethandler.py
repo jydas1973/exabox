@@ -17,8 +17,25 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    jyotdas     06/20/26 - Enh 39523473 - Track Plugin Progress Status in
+#                           Infrapatching Tooling
+#    sdevasek    06/19/26 - Bug 39562371 - Support full-version dbserver
+#                           patch selection
+#    bhpati      06/17/26 - Bug 39298929 - AIM4ECS:0X03010000 - PATCH OPERATION
+#                           STATUS FAILED
+#    kdas        06/09/26 - Bug 39519373 - OCI: DWCSPROD|EXACS|SJC1|QMR 
+#                           PRECHECK FAILING DUE TO CRITICAL SOFTWARE ALERTS
+#    vikasras    05/18/26 - Bug 39348752 - EXACS | ADD TIME-OUT FOR 
+#                           MCHECKSYSTEMCONSITENCY RPM CHECKS 
+#    jyotdas     05/13/26 - Bug 39368079 - single Node domu Patch Failing With
+#                           Permission denied Occurred While Trying to Read the
+#                           Patch States Json File
+#                           /var/odo/infrapatchbase/dbserver.patch.zip_exadata
+#    nelango     05/12/26 - Bug 39333475: Handle df empty output
 #    avimonda    04/07/26 - Bug 39128684: Fix missing patchmgr notification local
 #                           initialization
+#    araghave    03/25/26 - Enh 39082322 - INFRAPATCHING ARTIFACTS - SPACE
+#                           MANAGEMENT ON MANAGEMENT HOST AS LAUNCH NODE
 #    kdas        03/15/26 - ER 38354388 - EXACC: INCLUDE NETWORK INTERFACE 
 #                           ALERT ON PATCHING PRE-CHECK
 #    araghave    03/12/26 - Enh 38932829 - PROVIDE A PLUGIN SUPPORT DURING DOM0
@@ -44,6 +61,8 @@
 #                           SMR patching of Clusterless free nodes 
 #    araghave    12/16/25 - Enh 38766076 - CONFIGURE UPDATE-CRYPTO-POLICIES
 #                           BEFORE AND AFTER SWITCH PATCHING
+#    mirrodri    10/12/25 - Enh 38521465 PROVIDE OPTIONS TO MOCK PATCHMGR
+#                           COMMAND ON AUTOMATION ENVIRONMENTS
 #    rbhandar    12/11/25 - Bug 37865971 - AIM4ECS:0X03010067 - COMMAND TIMED
 #                           OUT BEFORE IT COMPLETED.
 #    vikasras    11/28/25 - OCI: VALIDATE CONTENT OF DOC ID 2829056.1 & REPLACE
@@ -594,8 +613,8 @@ from exabox.infrapatching.handlers.pluginHandler.pluginhandlertypes import mGetP
 from exabox.infrapatching.utils.utility import PATCH_BASE, mFormatOut, mReadPatcherInfo, mGetFirstDirInZip,\
   mReadCallback, mErrorCallback, mGetInfraPatchingKnownAlert, mGetInfraPatchingKnownSoftwareAlert, mIsFSEncryptedList, mIsFSEncryptedNode, mGetInfraPatchingHandler,\
   DOMU_PATCH_BASE, runInfraPatchCommandsLocally, flocked, mCheckAndFailOnCmdTimeout, mGetSshTimeout, mGetLaunchNodeConfig,\
-  mExaspliceVersionPatternMatch
-from exabox.ovm.clumisc import ebCluSshSetup, ebCluPreChecks
+  mExaspliceVersionPatternMatch, mQuarterlyVersionPatternMatch
+from exabox.ovm.clumisc import ebCluSshSetup, ebCluPreChecks, OracleVersion
 from exabox.utils.common import version_compare
 from exabox.infrapatching.handlers.targetHandler.infrapatchmgrhandler import InfraPatchManager
 
@@ -714,6 +733,22 @@ class TargetHandler(GenericHandler):
                 f"Invalid value set for sleep between compute nodes = {self.EXADATA_SLEEP_BETWEEN_COMPUTES_TIME_IN_SEC}.")
         #This is to handle keys for connecting to hosts . Initialized in setPatchEnvironment and cleared after every operation
         self.__ssh_env_setup_switches_cell = ebCluSshSetup(self.mGetCluControl())
+    
+    # Returns True only when the normalized `EnableMock` flag in additional_options
+    # is "yes" and the global USE_MOCK_IMPLEMENTATION toggle is still enabled.
+    # ECRA normalizes `EnableMock`, so we simply look for the first occurrence in the
+    # additional options payload and compare it against "yes".
+    def mIsMockEnabledByEcra(self):
+        if not USE_MOCK_IMPLEMENTATION:
+            return False
+        options = self.mGetAdditionalOptions()
+        enable_mock = None
+        if isinstance(options, list):
+            for option in options:
+                if isinstance(option, dict) and option.get("EnableMock") is not None:
+                    enable_mock = option.get("EnableMock")
+                    break
+        return isinstance(enable_mock, str) and enable_mock.lower() == "yes"
 
     # Abstract method definitions -- needed to be implemented by the child class
     # Can be left completely blank, or a base implementation can be provided
@@ -796,82 +831,133 @@ class TargetHandler(GenericHandler):
 
     def mGetDbserverPatchVersionDetails(self, aDbPatchFileDir):
         """
-         This method returns the db patch file along with version based 
+         This method returns the db patch version directory suffix based
          on the input DB patch file path provided.
 
          -bash-4.4$ /bin/unzip -l /scratch/araghave/ecra_installs/abhi/mw_home/user_projects/
-         domains/exacloud/PatchPayloads/DBPatchFile/dbserver.patch.zip | /bin/grep dbserver_ | 
-         /bin/head -1 | /bin/awk '{print $4}' | /bin/tr -d "/"
-         dbserver_patch_250119
+         domains/exacloud/PatchPayloads/DBPatchFile/dbserver.patch.zip | /bin/grep dbserver_patch_ |
+         /bin/head -1 | /bin/awk '{print $4}' | /bin/tr -d "/" | /bin/cut -d_ -f3-
+         250119
          -bash-4.4$
         """
         _version = None
         _db_patch_file = None
         try:
             _cmd_list = []
-            _out = []
-            # Get Dbserver patch version details.
             _db_patch_file = os.path.join(aDbPatchFileDir)
             _cmd_list.append(["/bin/unzip", "-l", _db_patch_file])
-            _cmd_list.append(["/bin/grep", "dbserver_"])
+            _cmd_list.append(["/bin/grep", "dbserver_patch_"])
             _cmd_list.append(["/bin/head", "-1"])
             _cmd_list.append(["/bin/awk", '{print $4}'])
             _cmd_list.append(["/bin/tr", "-d", '/'])
-            _cmd_list.append(["/bin/cut", "-d.", "-f1"])
+            _cmd_list.append(["/bin/cut", "-d_", "-f3-"])
             _rc, _o = runInfraPatchCommandsLocally(_cmd_list)
             if _o:
-                _version = ((_o.split("\n"))[0]).split("_")[2]
+                _version = ((_o.split("\n"))[0]).strip()
         except Exception as e:
             self.mPatchLogWarn("Error in generating dbserver patch version. Error: %s" % str(e))
             self.mPatchLogTrace(traceback.format_exc())
         return _version
 
-    def mCompareDbserverPatchFiles(self, aOldDbPatchFile, aNewDbPatchFile):
+    def mParseDbserverPatchVersionDetails(self, aDbPatchVersion):
+        if not aDbPatchVersion:
+            return None
+
+        _db_patch_version = aDbPatchVersion.strip().strip("/")
+        if mQuarterlyVersionPatternMatch(_db_patch_version):
+            return {
+                "format": "fullPatchVersion",
+                "db_patch_version": _db_patch_version,
+            }
+        # 6 digit dated version format, it can be 260531 or 260531.1 format 
+        if mExaspliceVersionPatternMatch(_db_patch_version):
+            return {
+                "format": "legacyExapsliceSixDigitVersion",
+                "db_patch_version": _db_patch_version,
+            }
+
+        return None
+
+    def mCompareDbserverPatchVersionDetails(self, aVersionedLocDbPatchInfo,
+                                            aCommonLocDbPatchInfo):
+        """
+         Return 1 if first patch version is newer, -1 if second patch version
+         is newer, and 0 if both versions compare the same or cannot be compared.
+
+         Full vs legacy:
+           26.1.0.0.0.260531 > 260515.1 because full-version format has
+           precedence over legacy date-code format.
+
+         Full vs full, higher Exadata release:
+           26.2.0.0.0.260520 > 26.1.0.0.0.260531 because OracleVersion compares
+           26.2 higher than 26.1 before considering the build date.
+
+         Full vs full, same Exadata release:
+           26.1.0.0.0.260615 > 26.1.0.0.0.260531 because the later build date
+           is higher when release components are the same.
+
+         Full vs full, same build date with suffix:
+           26.1.0.0.0.260615.2 > 26.1.0.0.0.260615.1 because the optional
+           trailing suffix participates in OracleVersion comparison.
+
+         Legacy vs legacy:
+           260615.2 > 260615.1, and 260615.1 > 260531.2, using the same
+           OracleVersion comparison for date-code versions.
+
+         Equal or uncomparable versions:
+           26.1.0.0.0.260615.1 == 26.1.0.0.0.260615.1 returns 0. If
+           OracleVersion cannot compare parsed versions, this helper also
+           returns 0 and lets the caller use its tie handling.
+        """
+        if aVersionedLocDbPatchInfo["format"] == "fullPatchVersion" and aCommonLocDbPatchInfo["format"] != "fullPatchVersion":
+            return 1
+        if aVersionedLocDbPatchInfo["format"] != "fullPatchVersion" and aCommonLocDbPatchInfo["format"] == "fullPatchVersion":
+            return -1
+
+        _verobj = OracleVersion()
+        _comparison_result = _verobj.mCompareVersions(aVersionedLocDbPatchInfo["db_patch_version"],
+                                                     aCommonLocDbPatchInfo["db_patch_version"])
+        if _comparison_result is None:
+            return 0
+        return _comparison_result
+
+    def mCompareDbserverPatchFiles(self, aVersionedLocDbPatchFile, aCommonLocDbPatchFile):
         """
          This method checks for the dbserver patch files staged at common
          and the exadata version stage locations and return the LATEST
-         based on the date format details in the file naming convention.
+         based on the dbserver_patch directory version naming convention.
 
-         In the below example, 2 dbserver patch zip locations are provided
-         as input for comparison to return the LATEST patch.
-
-          [ araghave_dbserver ] bash-4.2$  unzip -l
-          PatchPayloads/DBPatchFile/dbserver.patch.zip | grep 'dbserver_patch_' | head -1
-            0  10-18-2023 00:09   dbserver_patch_231017/
-          [ araghave_dbserver ] bash-4.2$
-
-          [ araghave_dbserver ] bash-4.2$ unzip -l
-          PatchPayloads/23.1.24.0.0.250306.1/DBPatchFile/dbserver.patch.zip | grep
-          'dbserver_patch_' | head -1
-            0  03-14-2025 00:00   dbserver_patch_250313/
-          [ araghave_dbserver ] bash-4.2$
-
-          -bash-4.2$ unzip -l PatchPayloads/DBPatchFile/dbserver.patch.zip | head -4
-          Archive:  PatchPayloads/DBPatchFile/dbserver.patch.zip
-           Length      Date    Time    Name
-          ---------  ---------- -----   ----
-                0  09-18-2024 23:46   dbserver_patch_240915.1/
-          -bash-4.2$
-
-          Here dbserver_patch_250313 is LATEST compared to dbserver_patch_231017 and
-          will be consumed for patching.
+         Full-version naming such as dbserver_patch_26.1.0.0.0.260531
+         takes precedence over legacy date-code naming such as
+         dbserver_patch_260515.1. When both entries have the same format,
+         Oracle version comparison is used, including optional trailing suffixes.
         """
-        _old_db_patch_file_date_format = None
-        _new_db_patch_file_date_format = None
+        _versioned_loc_dbserver_version = None
+        _common_loc_dbserver_version = None
         try:
-            _old_db_patch_file_date_format = self.mGetDbserverPatchVersionDetails(aOldDbPatchFile)
-            _new_db_patch_file_date_format = self.mGetDbserverPatchVersionDetails(aNewDbPatchFile)
+            _versioned_loc_dbserver_version = self.mGetDbserverPatchVersionDetails(aVersionedLocDbPatchFile)
+            _common_loc_dbserver_version = self.mGetDbserverPatchVersionDetails(aCommonLocDbPatchFile)
+            _versioned_loc_dbserver_info = self.mParseDbserverPatchVersionDetails(_versioned_loc_dbserver_version)
+            _common_loc_dbserver_info = self.mParseDbserverPatchVersionDetails(_common_loc_dbserver_version)
 
-            if _old_db_patch_file_date_format and _new_db_patch_file_date_format:
-                if int(_old_db_patch_file_date_format) > int(_new_db_patch_file_date_format):
-                    self.mPatchLogInfo(f"{aOldDbPatchFile} is the LATEST dbserver patch file available based on the date.")
-                    return aOldDbPatchFile
-                elif int(_old_db_patch_file_date_format) < int(_new_db_patch_file_date_format):
-                    self.mPatchLogInfo(f"{aNewDbPatchFile} is the LATEST dbserver patch file available based on the date.")
-                    return aNewDbPatchFile
+            if _versioned_loc_dbserver_info and _common_loc_dbserver_info:
+                _comparison_result = self.mCompareDbserverPatchVersionDetails(_versioned_loc_dbserver_info, _common_loc_dbserver_info)
+                if _comparison_result > 0:
+                    self.mPatchLogInfo(f"{aVersionedLocDbPatchFile} is the LATEST dbserver patch file available based on version {_versioned_loc_dbserver_version}.")
+                    return aVersionedLocDbPatchFile
+                elif _comparison_result < 0:
+                    self.mPatchLogInfo(f"{aCommonLocDbPatchFile} is the LATEST dbserver patch file available based on version {_common_loc_dbserver_version}.")
+                    return aCommonLocDbPatchFile
                 else:
-                    self.mPatchLogInfo(f"Both the dbserver patch files have the same date: {_new_db_patch_file_date_format} and either of them can be used for patching.")
-                    return aNewDbPatchFile
+                    self.mPatchLogInfo(f"Both the dbserver patch files have the same version details: {_common_loc_dbserver_version} and either of them can be used for patching.")
+                    return aCommonLocDbPatchFile
+
+            if _versioned_loc_dbserver_info is not None:
+                self.mPatchLogInfo(f"DBPatch file details not found for {aCommonLocDbPatchFile}. Returning {aVersionedLocDbPatchFile}")
+                return aVersionedLocDbPatchFile
+            elif _common_loc_dbserver_info is not None:
+                self.mPatchLogInfo(f"DBPatch file details not found for {aVersionedLocDbPatchFile}. Returning {aCommonLocDbPatchFile}")
+                return aCommonLocDbPatchFile
             else:
                 self.mPatchLogInfo("DBPatch file not found in either of the Patch Stage locations.")
                 return None
@@ -1527,7 +1613,16 @@ class TargetHandler(GenericHandler):
                 [root@slcs16adm04 ~]# rpm -qa --queryformat '%{ARCH} %{NAME}\n' | sort | uniq -c | sed -e 's/^ *//g'| egrep -v "^1 | kernel-uek|uptrack-updates|gpg-pubkey"
                 2 x86_64 kernel-ueknano
             '''
-            _i, _o, _e = _node.mExecuteCmd(_cmd_dup_rpm)
+            _i, _o, _e = _node.mExecuteCmd(
+                _cmd_dup_rpm,
+                aTimeout=RPM_VALIDATION_TIMEOUT_SECONDS,
+            )
+            mCheckAndFailOnCmdTimeout(
+                aCmd=_cmd_dup_rpm,
+                aNode=_node,
+                aHandler=self,
+                aTimeOutInSecs=RPM_VALIDATION_TIMEOUT_SECONDS,
+            )
             _out = _o.readlines()
             if _out:
                 self.mPatchLogError(f"Following duplicate RPMs found on {_node_name}:")
@@ -1537,7 +1632,16 @@ class TargetHandler(GenericHandler):
             # Command to find incomplete yum transactions
             _cmd_pending_yum_trans = "find /var/lib/yum -maxdepth 1 -type f -name 'transaction-all*' -not -name '*disabled'"
             self.mPatchLogInfo(f"Command for incomplete yum transaction = {_cmd_pending_yum_trans}")
-            _i, _o, _e = _node.mExecuteCmd(_cmd_pending_yum_trans)
+            _i, _o, _e = _node.mExecuteCmd(
+                _cmd_pending_yum_trans,
+                aTimeout=RPM_VALIDATION_TIMEOUT_SECONDS,
+            )
+            mCheckAndFailOnCmdTimeout(
+                aCmd=_cmd_pending_yum_trans,
+                aNode=_node,
+                aHandler=self,
+                aTimeOutInSecs=RPM_VALIDATION_TIMEOUT_SECONDS,
+            )
             _out = _o.readlines()
             if _out:
                 self.mPatchLogError(f"\nFollowing incomplete yum transactions found on node {_node_name}:")
@@ -1832,6 +1936,13 @@ class TargetHandler(GenericHandler):
                         _existing_node_progressing_status = _json_patch_report_data["node_progressing_status"]
                         if _existing_node_progressing_status:
                             _cnsjson["data"]["node_progressing_status"] = _existing_node_progressing_status
+
+                    # Carry forward the plugin execution progress block so the freshly
+                    # built cnsjson (written wholesale by mUpdateCnsJsonPayload) does not override it
+                    if PLUGIN_PROGRESSING_STATUS in _json_patch_report_data:
+                        _existing_plugin_progressing_status = _json_patch_report_data[PLUGIN_PROGRESSING_STATUS]
+                        if _existing_plugin_progressing_status:
+                            _cnsjson["data"][PLUGIN_PROGRESSING_STATUS] = _existing_plugin_progressing_status
                 else:
                     self.mPatchLogInfo('mParsePatchmgrXml: _json_patch_report_data is not present in mParsePatchmgrXml')
         except KeyError as k:
@@ -3709,7 +3820,7 @@ class TargetHandler(GenericHandler):
 
             _dom0_filter_list = mGetInfraPatchingKnownSoftwareAlert(PATCH_DOM0, _srvType)
             _dom0_filter = '|'.join(_dom0_filter for _dom0_filter in _dom0_filter_list) if _dom0_filter_list else ''
-            _filter_cmd = f" | grep -vE '{_dom0_filter}'" if _dom0_filter else ""
+            _filter_cmd = f" | grep -E '{_dom0_filter}'" if _dom0_filter else ""
             _cmd = _dbmcli_cmd + _filter_cmd
 
         elif aTargetType in [ PATCH_DOMU ]:
@@ -3725,7 +3836,7 @@ class TargetHandler(GenericHandler):
 
             _cell_filter_list = mGetInfraPatchingKnownSoftwareAlert(PATCH_CELL, _srvType)
             _cell_filter = '|'.join(_cell_filter for _cell_filter in _cell_filter_list) if _cell_filter_list else ''
-            _filter_cmd = f" | grep -vE '{_cell_filter}'" if _cell_filter else ""
+            _filter_cmd = f" | grep -E '{_cell_filter}'" if _cell_filter else ""
             _cmd = _cellcli_cmd + _filter_cmd 
 
         return _cmd
@@ -3833,6 +3944,10 @@ class TargetHandler(GenericHandler):
         self.mPatchLogInfo("Critical software alerts verification started.")
 
         _aTimeout = self.mGetTimeoutForDbmcliCellCliInSeconds()
+        _sw_filter_list = mGetInfraPatchingKnownSoftwareAlert(aTargetType, self.mGetServiceTypeForAlert())
+        if not _sw_filter_list:
+            self.mPatchLogInfo(f"No software alert blacklist configured for target type {aTargetType}. Skipping software alert verification.")
+            return _sw_alert_flag, _sw_alert_details, _MS_down_nodes
 
         # Detect S/W alert on all nodes.
         for aNode in aListOfNodes:
@@ -4314,7 +4429,7 @@ class TargetHandler(GenericHandler):
                                    aRemotePatchmgr, aRemoteNecessarySpaceMb, aPatchBaseDir,
                                    aSuccessMsg="", aMoreFilesToCopy=None, aSingleVmHandler=None):
         """
-        Makes sure the patchmgr is installed alog with any other files for
+        Makes sure the patchmgr is installed along with any other files for
         its correct use. Generic method to install patchmgr on a given node to
         patch cells/ibswitches, dom0s or domus
         """
@@ -4383,7 +4498,7 @@ class TargetHandler(GenericHandler):
             _node.mExecuteCmd(f"ls -l {aRemotePatchmgr}")
             _exit_code = _node.mGetCmdExitStatus()
 
-            #make sure we can get the patch to the directory that came out of unziping the patch
+            #make sure we can get the patch to the directory that came out of unzipping the patch
             if int(_exit_code) != 0:
                 if _node.mIsConnected():
                     _node.mDisconnect()
@@ -4395,6 +4510,12 @@ class TargetHandler(GenericHandler):
 
             self.mPatchLogInfo(
                 f"Selecting {str(_launch_node)} as a patch base for {aSuccessMsg}. patchmgr is at {aRemotePatchmgr}")
+
+            # Remote-only cleanup of older dbserver_patch_* directories under aRemotePatchBase.
+            # Keep the directory from the current zip if identifiable; else keep newest by mtime.
+            _cleanup_base = os.path.dirname(os.path.dirname(aRemotePatchmgr))
+            self.mCleanupRemoteDbserverPatchDirs(_node, _cleanup_base, aLocalPatchZipFile)
+
             if _node.mIsConnected():
                 _node.mDisconnect()
             return _launch_node
@@ -4550,31 +4671,40 @@ class TargetHandler(GenericHandler):
                     _ret = PATCH_COPY_ERROR
                     self.mAddError(_ret, _suggestion_msg)
                     aStatus.append({'node': _remote_node, 'status': 'failed', 'errorcode':_ret, 'errormessage':_suggestion_msg})
+                    #Removing the corrupted patch file that failed checksum validation.
+                    self.mPatchLogInfo(f"Removing corrupted patch file {_remote_patch_file}")
+                    _node.mExecuteCmdLog(f"rm -f {_remote_patch_file}")                    
                 else:
                     self.mPatchLogInfo(
                         f'Patch file: {_remote_patch_file} correctly copied to node: {_remote_node}. Proceeding with patch file extraction...')
-                    _i, _o, _e = _node.mExecuteCmd(_patch_unzip_cmd)
-                    _exit_code = _node.mGetCmdExitStatus()
-                    if int(_exit_code) != 0:
-                        _node.mExecuteCmdLog(f"ls -l {_remote_patch_file}")
-                        _patch_copy_end_time = datetime.datetime.now()
-                        self.mGetPatchRunningTime(_task_type, _patch_copy_start_time, _patch_copy_end_time)
-                        _suggestion_msg = f"Error while unziping the patch : {_remote_patch_file} on {str(_remote_node)}, skipping this Node. Error : {_e}"
-                        _ret = PATCH_UNZIP_ERROR
-                        self.mAddError(_ret, _suggestion_msg)
-                        aStatus.append({'node': _remote_node, 'status': 'failed', 'errorcode':_ret, 'errormessage':_suggestion_msg})
-                    else:
-                        #
-                        # When management host is used as launch node, the permission
-                        # on dbserver patch dir should be 775
-                        #
-                        if self.mGetInfrapatchExecutionValidator().mCheckCondition('mIsManagementHostLaunchNodeForDomU'):
-                            _first_patchdir = mGetFirstDirInZip(_local_patch_file)
-                            if _first_patchdir:
-                                _remote_dbserver_patchdir = _first_patchdir.split("/")[-1]
-                                _node.mExecuteCmdLog(f"/usr/bin/chmod 775 {aRemotePatchBase}/{_remote_dbserver_patchdir}")
-                        self.mPatchLogInfo(
-                            f'*** Patch file : {_local_patch_file} >>>> {_remote_patch_file} transferred to Node : {_remote_node}')
+                    if _patch_unzip_cmd:
+                        _i, _o, _e = _node.mExecuteCmd(_patch_unzip_cmd)
+                        _exit_code = _node.mGetCmdExitStatus()
+                        if int(_exit_code) != 0:
+                            _node.mExecuteCmdLog(f"ls -l {_remote_patch_file}")
+                            _patch_copy_end_time = datetime.datetime.now()
+                            self.mGetPatchRunningTime(_task_type, _patch_copy_start_time, _patch_copy_end_time)
+                            _suggestion_msg = f"Error while unzipping the patch : {_remote_patch_file} on {str(_remote_node)}, skipping this Node. Error : {_e}"
+                            _ret = PATCH_UNZIP_ERROR
+                            self.mAddError(_ret, _suggestion_msg)
+                            aStatus.append({'node': _remote_node, 'status': 'failed', 'errorcode':_ret, 'errormessage':_suggestion_msg})                            
+                        else:
+                            #
+                            # When management host is used as launch node, the permission
+                            # on dbserver patch dir should be 775
+                            #
+                            if self.mGetInfrapatchExecutionValidator().mCheckCondition('mIsManagementHostLaunchNodeForDomU'):
+                                _first_patchdir = mGetFirstDirInZip(_local_patch_file)
+                                if _first_patchdir:
+                                    _remote_dbserver_patchdir = _first_patchdir.split("/")[-1]
+                                    _node.mExecuteCmdLog(f"/usr/bin/chmod 775 {aRemotePatchBase}/{_remote_dbserver_patchdir}")
+                            self.mPatchLogInfo(
+                                f'*** Patch file : {_local_patch_file} >>>> {_remote_patch_file} transferred to Node : {_remote_node}')
+
+                        # After successful unzip, cleanup older dbserver_patch_* directories via helper
+                        # Older versions of dbserver patch zip directories are cleaned up here
+                        self.mCleanupRemoteDbserverPatchDirs(_node, aRemotePatchBase, _local_patch_file)
+                        self.mLogSpaceUtilization(aRemotePatchBase, "END space", node=_node, aNodeType=_remote_node)
             except Exception as e:
                 if _node.mIsConnected():
                     _suggestion_msg = f"Copy operation failed with errors on Node : {_remote_node} Error : {str(e)}."
@@ -4603,7 +4733,7 @@ class TargetHandler(GenericHandler):
 
             try:
                 _node.mConnect(aHost = _remote_node)
-
+                self.mLogSpaceUtilization(aRemotePatchBase, "Space utilization", node=_node, aNodeType=_remote_node, aSuffixMsg="at the start of patch copy.")
                 # Create Patch and Images directory if missing.
                 _exec_code = f"mkdir -p {aRemotePatchBase}"
                 _node.mExecuteCmdLog(_exec_code)
@@ -4620,25 +4750,29 @@ class TargetHandler(GenericHandler):
                     _node.mExecuteCmdLog(f"/usr/bin/chmod 775 {aRemotePatchBase}")
 
                 _i, _o, _e  = _node.mExecuteCmd(_patch_base_df_cmd)
-                _patch_base_space_available = int(mFormatOut(_o))
+                _df_out = mFormatOut(_o).strip()
+                if not _df_out:
+                    _stderr = mFormatOut(_e).strip()
+                    raise ValueError(f"df command returned empty output for {aRemotePatchBase}. stderr: {_stderr}")
+                _patch_base_space_available = int(_df_out)
 
                 # If the space to copy patch is not available on the target node
                 # this node will be skipped.
-                if _patch_base_space_available < (aRemoteNecessarySpaceMb*3):
+                if _patch_base_space_available < (aRemoteNecessarySpaceMb*self.mGetPatchSpaceMultiplierRemoteLaunchNode()):
                     if _node.mIsConnected():
                         _node.mDisconnect()
-                    _suggestion_msg = f"{_remote_node} does not have enough space in {aRemotePatchBase} to be used as the patching base. Needed {((aRemoteNecessarySpaceMb * 3) / 1024):.2f} GB({(aRemoteNecessarySpaceMb * 3):.2f} MB), got {(_patch_base_space_available / 1024):.2f} GB({(_patch_base_space_available):.2f} MB)."
+                    _suggestion_msg = f"{_remote_node} does not have enough space in {aRemotePatchBase} to be used as the patching base. Needed {((aRemoteNecessarySpaceMb*self.mGetPatchSpaceMultiplierRemoteLaunchNode()) / 1024):.2f} GB({(aRemoteNecessarySpaceMb*self.mGetPatchSpaceMultiplierRemoteLaunchNode()):.2f} MB), got {(_patch_base_space_available / 1024):.2f} GB({(_patch_base_space_available):.2f} MB)."
                     _ret = INSUFFICIENT_SPACE_ON_PATCH_BASE
                     if self.mGetInfrapatchExecutionValidator().mCheckCondition('mIsManagementHostLaunchNodeForDomU'):
-                        _suggestion_msg = f"Management Host does not have enough space in {aRemotePatchBase} to be used as the patching base. Needed {((aRemoteNecessarySpaceMb * 3) / 1024):.2f} GB({(aRemoteNecessarySpaceMb * 3):.2f} MB), got {(_patch_base_space_available / 1024):.2f} GB({(_patch_base_space_available):.2f} MB)."
+                        _suggestion_msg = f"Management Host does not have enough space in {aRemotePatchBase} to be used as the patching base. Needed {((aRemoteNecessarySpaceMb*self.mGetPatchSpaceMultiplierRemoteLaunchNode()) / 1024):.2f} GB({(aRemoteNecessarySpaceMb*self.mGetPatchSpaceMultiplierRemoteLaunchNode()):.2f} MB), got {(_patch_base_space_available / 1024):.2f} GB({(_patch_base_space_available):.2f} MB)."
                         self.mPatchLogError(
-                            f"{_remote_node} does not have enough space in {aRemotePatchBase} to be used as the patching base. Needed {((aRemoteNecessarySpaceMb * 3) / 1024):.2f} GB({(aRemoteNecessarySpaceMb * 3):.2f} MB), got {(_patch_base_space_available / 1024):.2f} GB({(_patch_base_space_available):.2f} MB).")
+                            f"{_remote_node} does not have enough space in {aRemotePatchBase} to be used as the patching base. Needed {((aRemoteNecessarySpaceMb*self.mGetPatchSpaceMultiplierRemoteLaunchNode()) / 1024):.2f} GB({(aRemoteNecessarySpaceMb*self.mGetPatchSpaceMultiplierRemoteLaunchNode()):.2f} MB), got {(_patch_base_space_available / 1024):.2f} GB({(_patch_base_space_available):.2f} MB).")
                         _ret = INSUFFICIENT_SPACE_ON_PATCH_BASE_FOR_SINGLENODE
                     self.mAddError(_ret, _suggestion_msg)
                     aStatus.append({'node': _remote_node, 'status': 'failed', 'errorcode':_ret, 'errormessage':_suggestion_msg})
                 else:
                     self.mPatchLogInfo(
-                        f"Sufficient space available to stage patches on Node : {_remote_node}, Location : {aRemotePatchBase}, Required : {(aRemoteNecessarySpaceMb / 1024):.2f} GB({(aRemoteNecessarySpaceMb):.2f} MB), Available Space : {(_patch_base_space_available / 1024):.2f} GB({(_patch_base_space_available):.2f} MB)")
+                        f"Sufficient space available to stage patches on Node : {_remote_node}, Location : {aRemotePatchBase}, Required : {(aRemoteNecessarySpaceMb*self.mGetPatchSpaceMultiplierRemoteLaunchNode() / 1024):.2f} GB({(aRemoteNecessarySpaceMb*self.mGetPatchSpaceMultiplierRemoteLaunchNode()):.2f} MB), Available Space : {(_patch_base_space_available / 1024):.2f} GB({(_patch_base_space_available):.2f} MB)")
                     if not _node.mFileExists(_remote_patch_file):
                         '''
                         Patch file not yet staged. Go ahead and copy 
@@ -4669,8 +4803,13 @@ class TargetHandler(GenericHandler):
                             self.mPatchLogInfo(
                                 f"Patch file : {_remote_patch_file} already staged on node : {_remote_node} and matches with source file checksum.")
 
+                            # Patch already staged and checksum matches; cleanup via helper for consistency
+                            # Older versions of dbserver patch zip directories are cleaned up here
+                            self.mCleanupRemoteDbserverPatchDirs(_node, aRemotePatchBase, _local_patch_file)
+                            self.mLogSpaceUtilization(aRemotePatchBase, "END space", node=_node, aNodeType=_remote_node)
+
             except ValueError as e:
-                _suggestion_msg = f"Could not parse {aRemotePatchBase} for free space on {str(_remote_node)}. Expected a number, got {str(e)}. Trying a different node"
+                _suggestion_msg = f"Could not determine free space on {str(_remote_node)} at {aRemotePatchBase}. Reason: {str(e)}. Trying a different node"
                 _ret = PATCH_COPY_ERROR
                 aStatus.append({'node': _remote_node, 'status': 'failed', 'errorcode':_ret, 'errormessage':_suggestion_msg})
                 if _node.mIsConnected():
@@ -4731,8 +4870,12 @@ class TargetHandler(GenericHandler):
         for _output in _out.readlines():
             _file_size = _output.strip()
 
-        # Patch unzip command is prepared based on patch file extension.
-        if _remote_patch_file.endswith('.zip'):
+        # Patch unzip command is prepared based on target type and file extension.
+        _patch_unzip_cmd = None
+        if self.mGetCurrentTargetType() in [ PATCH_DOM0, PATCH_DOMU ]:
+            if 'dbserver.patch.zip' in os.path.basename(_remote_patch_file):
+                _patch_unzip_cmd = f"unzip -d {aRemotePatchBase} -o {_remote_patch_file}"
+        else:
             _patch_unzip_cmd = f"unzip -d {aRemotePatchBase} -o {_remote_patch_file}"
 
         """
@@ -4785,6 +4928,137 @@ class TargetHandler(GenericHandler):
                 self.mPatchLogError(_err_msg)
                 return _rc_details['errorcode'], _err_msg
         return PATCH_SUCCESS_EXIT_CODE, None
+
+    def mCleanupRemoteDbserverPatchDirs(self, aNode, aRemotePatchBase, aCurrentLocalPatchFile=None):
+        '''
+          Remove all dbserver_patch_* directories on a remote node under aRemotePatchBase
+          except the one corresponding to the current zip (if determinable).
+        '''
+        try:
+            if not aNode:
+                self.mPatchLogWarn('Skip remote cleanup: node is None')
+                return
+   
+            aRemotePatchBase = aRemotePatchBase.rstrip('/')
+            _keep_dir = None
+   
+            # If caller passed a dbserver_patch_* directory, keep that and operate on its parent
+            _base_bn = os.path.basename(aRemotePatchBase)
+            if _base_bn.startswith('dbserver_patch_'):
+                _keep_dir = _base_bn
+                _parent = os.path.dirname(aRemotePatchBase)
+            else:
+                _parent = aRemotePatchBase
+   
+            # Prefer keep_dir from the current local zip (top-level dir name)
+            if not _keep_dir and aCurrentLocalPatchFile:
+                _first = mGetFirstDirInZip(aCurrentLocalPatchFile)
+                if _first:
+                    _keep_dir = os.path.basename(_first.rstrip('/'))
+   
+            # List candidate remote dbserver_patch_* directories (names only)
+            _list_cmd = f'find "{_parent}" -mindepth 1 -maxdepth 1 -type d -name "dbserver_patch*" -printf "%f\\n"'
+            _i, _o, _e = aNode.mExecuteCmd(_list_cmd)
+            _entries = []
+            if _o:
+                for _name in _o.readlines():
+                    _name = _name.strip()
+                    if _name:
+                        _entries.append((_name, f"{_parent}/{_name}"))
+   
+            if not _entries:
+                return
+   
+            # Fallback to most-recent by mtime if keep_dir is still unknown
+            if not _keep_dir:
+                _ts_cmd = f'find "{_parent}" -mindepth 1 -maxdepth 1 -type d -name "dbserver_patch*" -printf "%T@ %f\\n"'
+                _i2, _o2, _e2 = aNode.mExecuteCmd(_ts_cmd)
+                if _o2:
+                    _best = None
+                    for _line in _o2.readlines():
+                        _line = _line.strip()
+                        if not _line:
+                            continue
+                        _parts = _line.split(maxsplit=1)
+                        if len(_parts) != 2:
+                            continue
+                        try:
+                            _ts = float(_parts[0])
+                        except Exception:
+                            continue
+                        _nm = _parts[1]
+                        if (_best is None) or (_ts > _best[0]):
+                            _best = (_ts, _nm)
+                    if _best:
+                        _keep_dir = _best[1]
+   
+            if not _keep_dir:
+                self.mPatchLogWarn('Skip remote cleanup: could not determine keep_dir under ' + _parent)
+                return
+   
+            self.mPatchLogInfo('Remote cleanup in ' + _parent + ', keeping ' + _keep_dir)
+   
+            for _dbserver_patch_file, _dbserver_patch_path in _entries:
+                if not _dbserver_patch_file:
+                    continue
+   
+                # Skip if marker present (treat as in-progress)
+                # Example - /var/odo/InfraPatchBase/dbserver.patch.zip_exadata_ol8_24.1.15.0.0.250805_Linux-x86-64.zip/dbserver_patch_250505/7c8842b2-c907-4334-9640-9fbcd32526d8_progress.txt
+                _marker_cmd = f'find "{_dbserver_patch_path}" -maxdepth 1 -type f -name "*_progress.txt" -print -quit'
+                _im, _om, _em = aNode.mExecuteCmd(_marker_cmd)
+                _has_marker = False
+                if _om:
+                    for _l in _om.readlines():
+                        if _l.strip():
+                            _has_marker = True
+                            break
+                if _has_marker:
+                    self.mPatchLogInfo('Skipping remote dir ' + _dbserver_patch_path + ' due to marker file present')
+                    continue
+   
+                if _dbserver_patch_file != _keep_dir:
+                    self.mPatchLogInfo('Removing remote old patch dir ' + _dbserver_patch_path)
+                    try:
+                        aNode.mExecuteCmdLog(f'rm -rf "{_dbserver_patch_path}"')
+                    except Exception as _e:
+                        self.mPatchLogWarn('Failed to remove remote ' + _dbserver_patch_path + ': ' + str(_e))
+   
+        except Exception as e:
+            self.mPatchLogWarn('Remote dbserver_patch_* cleanup skipped: ' + str(e))
+
+    def mLogSpaceUtilization(self, aBasePath, aMessagePrefix, node=None, aNodeType=None, aSuffixMsg=None):
+        """
+        Log filesystem space utilization for a given base path.
+
+        Parameters:
+        - aBasePath (str): Filesystem path whose utilization needs logging
+        - aMessagePrefix (str): Custom message prefix (e.g., "START space", "END space",
+          "Space utilization" or "Space utilization check") printed before "on <node> <path>:"
+        - node (exaBoxNode, optional): Remote node object. If provided, command runs remotely
+        - aNodeType (str, optional): Display name of the node (e.g., hostname). Defaults to
+          "localhost" when node is None
+        - aSuffixMsg (str, optional): Extra message appended at the end of the log line
+
+        This helper centralizes repeated df/tail logging and warning handling.
+        """
+        try:
+            if node is None:
+                _display_node = aNodeType if aNodeType else "localhost"
+                _cmd_list = [["df", "-hP", aBasePath], ["tail", "-n1"]]
+                _rc, _o = runInfraPatchCommandsLocally(_cmd_list)
+                _suffix = f" {aSuffixMsg}" if aSuffixMsg else ""
+                self.mPatchLogInfo(
+                    f"{aMessagePrefix} on {_display_node} {aBasePath}: {str(_o).strip()}{_suffix}")
+            else:
+                _display_node = aNodeType if aNodeType else "remote-node"
+                _i, _o, _e = node.mExecuteCmd(f"df -hP {aBasePath} | tail -n1")
+                _suffix = f" {aSuffixMsg}" if aSuffixMsg else ""
+                self.mPatchLogInfo(
+                    f"{aMessagePrefix} on {_display_node} {aBasePath}: {mFormatOut(_o)}{_suffix}")
+        except Exception as _ex:
+            _display_node = aNodeType if aNodeType else ("localhost" if node is None else "remote-node")
+            self.mPatchLogWarn(
+                f"Unable to capture {aMessagePrefix} on {_display_node} {aBasePath}: {str(_ex)}")
 
     def mGetPatchRunningTime(self, aTaskType, aPatchStartTime=None, aPatchEndTime=None):
         """
@@ -4970,6 +5244,13 @@ class TargetHandler(GenericHandler):
 
             patch_progressing_status_json['node_patching_progress_data'] = _node_progress_list
             _json_patch_report['data']['node_progressing_status'] = patch_progressing_status_json
+
+            # _json_patch_report is built fresh here; preserve any already-persisted
+            # plugin_progressing_status so this initial node-seeding write does not
+            # override a plugin progress block from an earlier (rolling) node.
+            _persisted_plugin_progress = self.mGetPersistedPluginProgressStatus()
+            if _persisted_plugin_progress:
+                _json_patch_report['data'][PLUGIN_PROGRESSING_STATUS] = _persisted_plugin_progress
             _patch_update_json_to_db(_json_patch_report)
 
         else: #Update Case
@@ -5910,6 +6191,13 @@ class TargetHandler(GenericHandler):
                     self.mPatchLogInfo(f"Master request uuid for error status {_master_request_uuid}")
                     self.__json_status["data"]["master_request_uuid"] = _master_request_uuid
 
+                # This report is rebuilt from a fresh mAddPatchreport() template; preserve
+                # any already-persisted plugin_progressing_status so it is not overwritten by
+                # this post-patchmgr write
+                _persisted_plugin_progress = self.mGetPersistedPluginProgressStatus()
+                if _persisted_plugin_progress and PLUGIN_PROGRESSING_STATUS not in self.__json_status["data"]:
+                    self.__json_status["data"][PLUGIN_PROGRESSING_STATUS] = _persisted_plugin_progress
+
                 self.mPatchLogInfo('Updating patch list to Exacloud DB from mPopulatePatchListPostPatchMgrCompletion.')
                 _db = ebGetDefaultDB()
                 _db.mUpdateJsonPatchReport(_reqobj.mGetUUID(), json.dumps(self.__json_status))
@@ -6086,14 +6374,14 @@ class TargetHandler(GenericHandler):
                 # transferred and unzipped to the patch base directory.
                 # Therefore, we're completely removing the patch base
                 # directory to ensure all content is transferred and updated.
-                if len(_output_list) == 0: 
+                if len(_output_list) == 0:
                     self.mPatchLogWarn(f"The patch base directory doesn't contain any subdirectories, resulting in the deletion of the patch base directory {_parent_dir}")
                     _cmd_list_rm_dir = []
                     _cmd_list_rm_dir.append(['rm', '-rf', _parent_dir])
                     runInfraPatchCommandsLocally(_cmd_list_rm_dir)
 
                 for _output in _output_list:
-                    _dir_path = _output.strip() 
+                    _dir_path = _output.strip()
                     _patchmgr_path = _dir_path + "/patchmgr"
                     if not os.path.exists(_patchmgr_path):
                         self.mPatchLogWarn(f'The patchmgr file cannot be found in {_dir_path}, leading to the removal of the patch base directory {_parent_dir}')
@@ -6110,7 +6398,7 @@ class TargetHandler(GenericHandler):
                                               aRemotePatchmgr, aRemoteNecessarySpaceMb, aPatchBaseDir,
                                               aSuccessMsg="", aMoreFilesToCopy=None, aSingleVmHandler=None):
         """
-        Makes sure the patchmgr is installed alog with any other files for
+        Makes sure the patchmgr is installed along with any other files for
         its correct use. Generic method to install patchmgr on a given node to
         patch cells/ibswitches, dom0s or domus
         """
@@ -6161,7 +6449,7 @@ class TargetHandler(GenericHandler):
 
         for _launch_node in aLaunchNodeCandidates:
 
-            # make sure we can get the patch to the directory that came out of unziping the patch
+            # make sure we can get the patch to the directory that came out of unzipping the patch
             if not os.path.exists(aRemotePatchmgr):
                 _suggestion_msg = f"Expected patchmgr script {_launch_node}:{aRemotePatchmgr} but it was not found.Patch zip structure may have changed"
                 _ret = PATCHMGR_SCRIPT_MISSING_ON_LAUNCH_NODE
@@ -6203,22 +6491,23 @@ class TargetHandler(GenericHandler):
                 _cmd_list.append(['cp', _local_patch_file, _remote_patch_file])
                 _exit_code, _o = runInfraPatchCommandsLocally(_cmd_list)
 
-                _cmd_list = []
-                _cmd_list.append(_patch_unzip_cmd.split())
-                _exit_code, _o = runInfraPatchCommandsLocally(_cmd_list)
-
-                if int(_exit_code) != 0:
+                if _patch_unzip_cmd:
                     _cmd_list = []
-                    _cmd_list.append(['rm', '-f', _remote_patch_file])
-                    runInfraPatchCommandsLocally(_cmd_list)
-                    _patch_copy_end_time = datetime.datetime.now()
-                    self.mGetPatchRunningTime("Patch_copy", _patch_copy_start_time, _patch_copy_end_time)
-                    _suggestion_msg = f"Error while unziping the patch : {_remote_patch_file} on {str(_remote_node)}, skipping this Node."
-                    _ret = PATCH_UNZIP_ERROR
-                    self.mAddError(_ret, _suggestion_msg)
-                else:
-                    self.mPatchLogInfo(
-                        f'*** Patch file :{_local_patch_file} >>>> {_remote_patch_file} transferred to Node : {_remote_node}')
+                    _cmd_list.append(_patch_unzip_cmd.split())
+                    _exit_code, _o = runInfraPatchCommandsLocally(_cmd_list)
+
+                    if int(_exit_code) != 0:
+                        _cmd_list = []
+                        _cmd_list.append(['rm', '-f', _remote_patch_file])
+                        runInfraPatchCommandsLocally(_cmd_list)
+                        _patch_copy_end_time = datetime.datetime.now()
+                        self.mGetPatchRunningTime("Patch_copy", _patch_copy_start_time, _patch_copy_end_time)
+                        _suggestion_msg = f"Error while unzipping the patch : {_remote_patch_file} on {str(_remote_node)}, skipping this Node."
+                        _ret = PATCH_UNZIP_ERROR
+                        self.mAddError(_ret, _suggestion_msg)
+                    else:
+                        self.mPatchLogInfo(
+                           f'*** Patch file :{_local_patch_file} >>>> {_remote_patch_file} transferred to Node : {_remote_node}')
 
             except Exception as e:
                 _suggestion_msg = f"Copy operation failed with errors on Node : {_remote_node} Error : {str(e)}."
@@ -6245,25 +6534,25 @@ class TargetHandler(GenericHandler):
                 #_exec_code = "mkdir -p %s" % aRemotePatchBase
                 _cmd_list = []
                 _cmd_list.append(["mkdir", "-p", aRemotePatchBase])
-                runInfraPatchCommandsLocally(_cmd_list)                
+                runInfraPatchCommandsLocally(_cmd_list)
                 _cmd_list = []
-                _cmd_list.append(["df", "-mP", aRemotePatchBase])             
-                _cmd_list.append(["tail", "-n1"])   
-                _cmd_list.append(["awk", '{print $(NF - 2); }'])  
-                _rc, _o = runInfraPatchCommandsLocally(_cmd_list)                
+                _cmd_list.append(["df", "-mP", aRemotePatchBase])
+                _cmd_list.append(["tail", "-n1"])
+                _cmd_list.append(["awk", '{print $(NF - 2); }'])
+                _rc, _o = runInfraPatchCommandsLocally(_cmd_list)
                 _patch_base_space_available = int(_o)
 
 
                 # If the space to copy patch is not available on the target node
                 # this node will be skipped.
-                if _patch_base_space_available < (aRemoteNecessarySpaceMb * 3):
-                    _suggestion_msg = f"{_remote_node} does not have enough space in {aRemotePatchBase} to be used as the patching base. Needed {((aRemoteNecessarySpaceMb * 3) / 1024):.2f}GB, got {(_patch_base_space_available / 1024):.2f}GB."
+                if _patch_base_space_available < (aRemoteNecessarySpaceMb*self.mGetPatchSpaceMultiplierLocalLaunchNode()):
+                    _suggestion_msg = f"{_remote_node} does not have enough space in {aRemotePatchBase} to be used as the patching base. Needed {((aRemoteNecessarySpaceMb*self.mGetPatchSpaceMultiplierLocalLaunchNode()) / 1024):.2f}GB, got {(_patch_base_space_available / 1024):.2f}GB."
                     _ret = INSUFFICIENT_SPACE_ON_PATCH_BASE
                     self.mAddError(_ret, _suggestion_msg)
                 else:
                     _sufficient_space_available = True
                     self.mPatchLogInfo(
-                        f"Sufficient space available to stage patches on Node : {_remote_node}, Location : {aRemotePatchBase}, Required : {(aRemoteNecessarySpaceMb / 1024):.2f}GB, Available Space : {(_patch_base_space_available / 1024):.2f}GB")
+                        f"Sufficient space available to stage patches on Node : {_remote_node}, Location : {aRemotePatchBase}, Required : {(aRemoteNecessarySpaceMb*self.mGetPatchSpaceMultiplierLocalLaunchNode() / 1024):.2f}GB, Available Space : {(_patch_base_space_available / 1024):.2f}GB")
 
             except ValueError as e:
                 _suggestion_msg = f"Could not parse {aRemotePatchBase} for free space on {str(_remote_node)}. Expected a number, got {str(e)}. Trying a different node"
@@ -6302,14 +6591,19 @@ class TargetHandler(GenericHandler):
         _local_patch_file = os.path.join(aPatchRepo, aPatchFile)
         _remote_patch_file = os.path.join(aRemotePatchBase, aPatchFile)
 
-        # Patch unzip command is prepared based on patch file extension.
-        if _remote_patch_file.endswith('.zip'):
-            #_patch_unzip_cmd = "unzip -o %s -d %s;" % ( _remote_patch_file,aRemotePatchBase)
+        # Patch unzip command is prepared based on target type and file extension.
+        _patch_unzip_cmd = None
+        if self.mGetCurrentTargetType() in [ PATCH_DOM0, PATCH_DOMU ]:
+            if 'dbserver.patch.zip' in os.path.basename(_remote_patch_file):
+                _patch_unzip_cmd = f"unzip -d {aRemotePatchBase} -o {_remote_patch_file}"
+        else:
             _patch_unzip_cmd = f"unzip -d {aRemotePatchBase} -o {_remote_patch_file}"
 
 
         _ret = PATCH_SUCCESS_EXIT_CODE
+        self.mLogSpaceUtilization(aRemotePatchBase, "Space utilization", node=None, aNodeType="localhost", aSuffixMsg="at the start of patch copy.")
         _ret = _mExecute_FileCopy("localhost")
+        self.mLogSpaceUtilization(aRemotePatchBase, "END space", node=None, aNodeType="localhost")
 
         return _ret, None
 

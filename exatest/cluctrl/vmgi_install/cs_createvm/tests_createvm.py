@@ -2,7 +2,7 @@
 
  $Header: 
 
- Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 
  NAME:
       tests_clucontrol_createvm.py - Unitest for CRS/DB related funcs in clucontrl
@@ -362,8 +362,10 @@ nodehostr052-4018.exacp10.jboduvcn.oraclevcn.com
                 exaMockCommand("/bin/virsh list --all --name", aStdout=_domus),
                 exaMockCommand("/bin/test -e /bin/umount"),
                 exaMockCommand("/bin/test -e /bin/sed"),
+                exaMockCommand("/bin/test -e /EXAVMIMAGES/GuestImages/xsdb6-3642.exacp10.jboduvcn.oraclevcn.com/under_migration", aRc=1),
                 exaMockCommand("/bin/umount /EXAVMIMAGES/GuestImages/xsdb6-3642.exacp10.jboduvcn.oraclevcn.com"),
                 exaMockCommand(re.escape("/bin/sed -i '\\@/EXAVMIMAGES/GuestImages/xsdb6-3642.exacp10.jboduvcn.oraclevcn.com@d' /etc/fstab")),
+                exaMockCommand("/bin/test -e /EXAVMIMAGES/GuestImages/nodehostr042-7157.exacp10.jboduvcn.oraclevcn.com/under_migration", aRc=1),
                 exaMockCommand("/bin/umount /EXAVMIMAGES/GuestImages/nodehostr042-7157.exacp10.jboduvcn.oraclevcn.com"),
                 exaMockCommand(re.escape("/bin/sed -i '\\@/EXAVMIMAGES/GuestImages/nodehostr042-7157.exacp10.jboduvcn.oraclevcn.com@d' /etc/fstab")),
                 exaMockCommand("/bin/test -e /bin/rmdir"),

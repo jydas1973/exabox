@@ -313,6 +313,7 @@ class TestDiskMgr(ebTestClucontrol):
                     exaMockCommand("cellcli -e drop griddisk all.*", aRc=0, aPersist=True),
                     exaMockCommand("cellcli -e list griddisk attributes name where asmmodestatus.*", aRc=0, aPersist=True),
                     exaMockCommand("/opt/oracle/cell/cellsrv/bin/cellcli -e \"list griddisk attributes name,asmmodestatus where name like*", aRc=0, aPersist=True),
+                    exaMockCommand(".*cellcli -e list GRIDDISK ATTRIBUTES NAME,SIZE where NAME like .*DATAC8_.* and diskType like .*Disk.*", aRc=0, aPersist=True),
 
                 ],
                 [   
@@ -323,6 +324,7 @@ class TestDiskMgr(ebTestClucontrol):
                     exaMockCommand("cellcli -e create griddisk all.*", aRc=0, aPersist=True),
                     exaMockCommand("cellcli -e drop griddisk all.*", aRc=0, aPersist=True),
                     exaMockCommand("cellcli -e list griddisk attributes name where asmmodestatus.*", aRc=0, aPersist=True),
+                    exaMockCommand(".*cellcli -e list GRIDDISK ATTRIBUTES NAME,SIZE where NAME like .*DATAC8_.* and diskType like .*Disk.*", aRc=0, aPersist=True),
 
                 ],
                 [
@@ -333,6 +335,8 @@ class TestDiskMgr(ebTestClucontrol):
                     exaMockCommand("cellcli -e create griddisk all.*", aRc=0, aPersist=True),
                     exaMockCommand("cellcli -e drop griddisk all.*", aRc=0, aPersist=True),
                     exaMockCommand("cellcli -e list griddisk attributes name where asmmodestatus.*", aRc=0, aPersist=True),
+                    exaMockCommand(".*cellcli -e list GRIDDISK ATTRIBUTES NAME,SIZE where NAME like .*DATAC8_.* and diskType like .*Disk.*", aRc=0, aPersist=True),
+
                 ],
                 [
                     exaMockCommand(f"{_cellcli_path} -e \"list griddisk attributes name where asmmodestatus=\'DROPPED\' and name like \'.*{_dg_suffix}.*\'\"", aRc=0, aPersist=True),
@@ -342,6 +346,8 @@ class TestDiskMgr(ebTestClucontrol):
                     exaMockCommand("cellcli -e create griddisk all.*", aRc=0, aPersist=True),
                     exaMockCommand("cellcli -e drop griddisk all.*", aRc=0, aPersist=True),
                     exaMockCommand("cellcli -e list griddisk attributes name where asmmodestatus.*", aRc=0, aPersist=True),
+                    exaMockCommand(".*cellcli -e list GRIDDISK ATTRIBUTES NAME,SIZE where NAME like .*DATAC8_.* and diskType like .*Disk.*", aRc=0, aPersist=True),
+
                 ],
                 [
                     exaMockCommand(f"{_cellcli_path} -e \"list griddisk attributes name where asmmodestatus=\'DROPPED\' and name like \'.*{_dg_suffix}.*\'\"", aRc=0, aPersist=True),
@@ -351,6 +357,8 @@ class TestDiskMgr(ebTestClucontrol):
                     exaMockCommand("cellcli -e create griddisk all.*", aRc=0, aPersist=True),
                     exaMockCommand("cellcli -e drop griddisk all.*", aRc=0, aPersist=True),
                     exaMockCommand("cellcli -e list griddisk attributes name where asmmodestatus.*", aRc=0, aPersist=True),
+                    exaMockCommand(".*cellcli -e list GRIDDISK ATTRIBUTES NAME,SIZE where NAME like .*DATAC8_.* and diskType like .*Disk.*", aRc=0, aPersist=True),
+
                 ],
                 [
                     exaMockCommand(f"{_cellcli_path} -e \"list griddisk attributes name where asmmodestatus=\'DROPPED\' and name like \'.*{_dg_suffix}.*\'\"", aRc=0, aPersist=True),
@@ -360,6 +368,8 @@ class TestDiskMgr(ebTestClucontrol):
                     exaMockCommand("cellcli -e create griddisk all.*", aRc=0, aPersist=True),
                     exaMockCommand("cellcli -e drop griddisk all.*", aRc=0, aPersist=True),
                     exaMockCommand("cellcli -e list griddisk attributes name where asmmodestatus.*", aRc=0, aPersist=True),
+                    exaMockCommand(".*cellcli -e list GRIDDISK ATTRIBUTES NAME,SIZE where NAME like .*DATAC8_.* and diskType like .*Disk.*", aRc=0, aPersist=True),
+
                 ],
 
             ]
@@ -378,8 +388,9 @@ class TestDiskMgr(ebTestClucontrol):
         _options.jsonconf['total_storagegb'] = 1000
 
         cluctrl = self.mGetClubox()
-        _diskgroupobj = ebCluManageDiskgroup(cluctrl, aOptions=_options)
-        _rc = _diskgroupobj.mClusterManageDiskGroup(aOptions=_options)
+        with patch.object(cluctrl, 'mCheckCellsServicesUp', return_value=True):
+           _diskgroupobj = ebCluManageDiskgroup(cluctrl, aOptions=_options)
+           _rc = _diskgroupobj.mClusterManageDiskGroup(aOptions=_options)
         self.assertEqual(_rc, 0)
 
     def test_mClusterDgrpInfo2(self):

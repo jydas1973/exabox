@@ -17,6 +17,22 @@
 #      None.
 #
 #    MODIFIED   (MM/DD/YY)
+#    scoral      06/17/26 - Bug 39437046 - Implemented mMountVMSnapshots
+#                           before CREATE_BRIDGES instead of during
+#                           mPostVMMoveSteps to allow the snapshots being
+#                           mounted before VM migration to avoid Live Migration
+#                           failures related to missing VM volumes.
+#                           Removed OEDA undo steps for Live Migration.
+#                           Implement mUnmountVMSnapshots inside mCleanUpVMMove
+#                           to support Live Migration as well.
+#                           Added an extra validation for Live Migration to
+#                           skip unnecesary OEDA steps.
+#    prsshukl    06/05/26 - Bug 39479459 - Call ALTER/DELETE NETWORK oeda
+#                           command before ALTER/ADD/DELETE EDVVOLUME command
+#    scoral      05/22/26 - Bug 39318575 - Fixed STALE_VM_FILES validation.
+#    scoral      05/22/26 - Bug 39318694 - Improve mCleanUpVMMove to also
+#                           remove the console directory if still existing in
+#                           the source host when available during Force VM move.
 #    scoral      04/21/26 - Bug 39225731 - Improved mAddRoceSshEntry to capture
 #                           IPv4 only and skip IPv6.
 #                           Improved mInternalMountInterfaceCallback to mount
@@ -706,10 +722,10 @@ class ebCluExaScale:
         _xmlTree = ebTree(_storagePool)
         _xmlTree.mExportXml(self.__ebox.mGetPatchConfig())
 
-        self.mUpdateVolumesOedacli(aWhen="CS")
         self.mUpdateDom0Network()
         self.mRemoveDomUBackupNetwork()
         self.mRemoveInterfaceInXml()
+        self.mUpdateVolumesOedacli(aWhen="CS")
 
     def mRemoveInterfaceInXml(self):
 
@@ -876,6 +892,10 @@ class ebCluExaScale:
                 if "vlan_id" in _info:
                     _args1["VLANID"] = _info["vlan_id"]
                     _args2["VLANID"] = _info["vlan_id"]
+
+                if self.__ebox.isBaseDB():
+                    _args1["INTERFACENAME"] = "stre0"
+                    _args2["INTERFACENAME"] = "stre1"
 
                 _oedacliCmds.append(
                     ["ALTER NETWORK", _args1, {"ID": f"{_dom0}_priv1"}]
@@ -1604,6 +1624,7 @@ class ebCluExaScale:
 
         # Get the client & backup VLAN IDs
         _force = str(aOptions.jsonconf.get('force')).lower() == 'true'
+        _live = str(aOptions.jsonconf.get('mode')).lower() == 'live'
 
         _oldClientVlan = ""
         _oldBackupVlan = ""
@@ -1641,10 +1662,17 @@ class ebCluExaScale:
                     if _vmName not in _srcVMs:
                         ebLogInfo(f"VM {_vmName} not defined in host {_srcDom0}")
                     else:
+                        _cmd = (f"/bin/virsh dumpxml {_vmName} | "
+                                '/bin/grep serial.sock | /bin/cut -d"/" -f4')
+                        _serialId = node_exec_cmd(_srcNode, _cmd).stdout.strip()
+                        if _serialId:
+                            _cmd = f"/bin/rm -rf /EXAVMIMAGES/console/{_serialId}"
+                            node_exec_cmd(_srcNode, _cmd)
+
                         _vmBridges = get_kvm_guest_bridges(_srcNode, _vmName)
-                        _cmd = f"/bin/virsh destroy {_vmName}"
+                        _cmd = f"{VM_MAKER} --stop-domain {_vmName} --destroy"
                         node_exec_cmd(_srcNode, _cmd)
-                        _cmd = f"/bin/virsh undefine {_vmName}"
+                        _cmd = f"{VM_MAKER} --remove-domain {_vmName}"
                         node_exec_cmd(_srcNode, _cmd)
                         for _bridge in _vmBridges:
                             _cmd = f"{VM_MAKER} --remove-bridge {_bridge}"
@@ -1660,6 +1688,11 @@ class ebCluExaScale:
             ebLogWarn(_msg)
         finally:
             _lock.release()
+
+        # Unmount u02 & u02 snapshots from source host if this is Live Migration
+        if _live:
+            self.mUnmountVMSnapshots(_tgtDom0, _srcDom0, _vmName)
+
 
     def mPostVMMoveSteps(self, aOptions):
         """Performs the remaining steps for VM move that OEDA does not execute.
@@ -1797,34 +1830,14 @@ class ebCluExaScale:
             ebLogInfo(f"Copying VM maker XML {_srcXml} => {_dstXml}")
             node_exec_cmd(_tgtNode, _cmd, log_warning=True)
 
+            # Remove temporary file in GCV
+            _cmd = f"/usr/bin/rm -f {GUEST_IMAGES}/{_vmName}/{UNDER_MIGRATION_VM_GCV}"
+            node_exec_cmd(_tgtNode, _cmd)
+
         # setup nft rules on target host for cold migration.
         # for live migration they were setup prior to the move.
         if not _live:
             self.mSetupNftRules(aOptions)
-
-        # Manage VM snapshots on target host
-        with connect_to_host(_tgtDom0, get_gcontext()) as _tgtNode:
-            #  If snapshot of u01 is present then attach it to the VM in the new dom0 as well                                                    
-            _, _out, _ = node_exec_cmd(_tgtNode, f"ls /EXAVMIMAGES/GuestImages/{_vmName}/snapshots/*u01*xml")                                             
-            if _out:                                
-                _dev = _out.split('/')[-1].split('.')[0]                                                                                        
-                ebLogInfo(f"Create logical volume for {_dev}")
-                                                    
-                _json = {"storageType": "EXASCALE", "snapshot_device_name": _dev, "dom0": _tgtDom0, "vm": _vmName}                               
-                self.mMountVolume(aOptions, _json, aLive=False)                                                                                  
-                                                    
-            _, _out, _ = node_exec_cmd(_tgtNode, f"ls /EXAVMIMAGES/GuestImages/{_vmName}/snapshots/*u02*xml")                                              
-            # If snapshot of u02 is present then attach it to the VM in the new dom0 as well.                                                    
-            if _out:                                
-                _dev = _out.split('/')[-1].split('.')[0]                                                                                         
-                ebLogInfo(f"Create logical volume for {_dev}")
-                                                    
-                _json = {"storageType": "EXASCALE", "snapshot_device_name": _dev, "dom0": _tgtDom0, "vm": _vmName}                               
-                self.mMountVolume(aOptions, _json, aLive=False)                                                                                  
-
-            # Remove temporary file in GCV
-            _cmd = f"/usr/bin/rm -f {GUEST_IMAGES}/{_vmName}/{UNDER_MIGRATION_VM_GCV}"
-            node_exec_cmd(_tgtNode, _cmd)
 
         # setup serial console on target host
         try:
@@ -2222,7 +2235,7 @@ class ebCluExaScale:
                 if _tgtNode.mFileExists(_flag):
                     _VMFilesMigrating.add(_vm)
             _vm_files_considered = _VMFiles - _VMFilesMigrating
-            if _tgtVMs != _vm_files_considered:
+            if _vm_files_considered - _tgtVMs:
                 self.fail(
                     "STALE_VM_FILES",
                     aCausePlaceholders={
@@ -3335,47 +3348,8 @@ class ebCluExaScale:
             }
         ]
 
-        with connect_to_host(aOptions.jsonconf["source_dom0_name"], get_gcontext()) as _node:
-            _, _out, _ = node_exec_cmd(_node, f"ls /EXAVMIMAGES/GuestImages/{aOptions.jsonconf['vm_name']}/*u01*xml")
-            _snapdev = []   
-            #  Get the u01 snapshot thin clone device if present
-            if _out:
-                _u01snapshot = _out.split('/')[-1].split('.')[0]
-                _snapdev.append(_u01snapshot)
-
-            # Get the u02 snapshot thin clone device if present.
-            _, _out, _ = node_exec_cmd(_node, f"ls /EXAVMIMAGES/GuestImages/{aOptions.jsonconf['vm_name']}/*u02*xml")
-            if _out:
-                _u02snapshot = _out.split('/')[-1].split('.')[0]
-                _snapdev.append(_u02snapshot)
-
-            # If snapshot of u01-u02 is present then remove the partitions from the source dom0 as well
-            if not _live and not _undo and _snapdev:
-
-                for _dev in _snapdev:
-                    # remove the logical volume for u01/u02 snapshot
-                    _rc, _out, _ = node_exec_cmd(_node, f"kpartx -l /dev/exc/{_dev}")
-                    if not _rc:
-                        _part = _out.splitlines()[0].split(' ')[0].strip()
-
-                        _rc, _out, _ = node_exec_cmd(_node, f"pvdisplay -c /dev/mapper/{_part}")
-                        if not _rc:
-                            _vg = _out.splitlines()[0].split(":")[1]
-
-                            _, _out, _ = node_exec_cmd(_node, f"vgchange -an {_vg}")
-
-                            _rc, _out, _ = node_exec_cmd(_node, f"kpartx -d /dev/exc/{_dev}")
-                        if _rc:
-                            #_, _out, _ = node_exec_cmd(_node, f"lvdisplay -c {_vg}")
-                            #_lv = _out.splitlines()[0].split(":")[0].strip()
-
-                            _rc, _out, _ = node_exec_cmd(_node, f"lsblk -f | grep -A1 {_part} | tail -1")
-                            if _out:
-                                _lvpart = _out.splitlines()[0].split('xfs')[0].strip()[2:]
-                                _, _out, _ = node_exec_cmd(_node, f"dmsetup remove {_lvpart}")
-                            _, _out, _ = node_exec_cmd(_node, f"dmsetup remove {_part}")
-
-        _live = str(aOptions.jsonconf.get('mode')).lower() == 'live'
+        if not _live and not _undo:
+            self.mUnmountVMSnapshots(_netInfo["source_dom0_name"], _netInfo["source_dom0_name"], aOptions.jsonconf["vm_name"])
         if not _live:
             self.mUmountVolumesVmMove(_netInfo["source_dom0_name"], aOptions.jsonconf["vm_name"], _netInfo)
         elif not _undo and _live:
@@ -3571,6 +3545,76 @@ class ebCluExaScale:
         node_write_text_file(aNode, _rulesFile, '\n'.join(_rules + ['']))
 
 
+    def mIsVMSnapshotMounted(self, aNode, aVmName, aSnapshotXML):
+        _, _out, _ = node_exec_cmd(aNode, f"/bin/cat {aSnapshotXML}")
+        match = re.search(r"<source dev='(.*?)'", _out)
+        if not match:
+            return False
+
+        _srcDev = match.group(1)
+        _out = node_exec_cmd(aNode, f"/usr/bin/test -e {_srcDev}")
+        if not _out.exit_code:
+            ebLogInfo(f"Snapshot device {_srcDev} is already available for VM {aVmName}")
+            return True
+
+        return False
+
+    def mMountVMSnapshots(self, aOptions, aTgtNode, aVmName):
+        #  If snapshot of u01 or u02 are present then attach it to the VM in the new dom0 as well
+        for _snapshot in ["*u01*xml", "*u02*xml"]:
+            _, _out, _ = node_exec_cmd(aTgtNode, f"ls /EXAVMIMAGES/GuestImages/{aVmName}/snapshots/{_snapshot}")
+            if _out:
+                _dev = _out.split('/')[-1].split('.')[0]
+                _xml = f"/EXAVMIMAGES/GuestImages/{aVmName}/snapshots/{_dev}.xml"
+                if not self.mIsVMSnapshotMounted(aTgtNode, aVmName, _xml):
+                    ebLogInfo(f"Create logical volume for {_dev}")
+
+                    _json = {"storageType": "EXASCALE", "snapshot_device_name": _dev, "dom0": aTgtNode.mGetHostname(), "vm": aVmName}
+                    self.mMountVolume(aOptions, _json, aLive=False)
+
+
+    def mUnmountVMSnapshots(self, aXMLsDom0, aMountedDom0, aVmName):
+        # First retrieve the snapshot device from the given Dom0.
+        _snapdev = []
+        with connect_to_host(aXMLsDom0, get_gcontext()) as _node:
+            #  Get the u01 & u02 snapshots thin clone device if present
+            for _snapshot in ["*u01*xml", "*u02*xml"]:
+                _, _out, _ = node_exec_cmd(_node, f"ls /EXAVMIMAGES/GuestImages/{aVmName}/snapshots/{_snapshot}")
+                if _out:
+                    _dev = _out.split('/')[-1].split('.')[0]
+                    _snapdev.append(_dev)
+
+        # If snapshot of u01-u02 is present then remove the partitions from the source dom0 as well
+        if not _snapdev:
+            return
+
+        with connect_to_host(aMountedDom0, get_gcontext()) as _node:
+            for _dev in _snapdev:
+                # remove the logical volume for u01/u02 snapshot
+                _rc, _out, _ = node_exec_cmd(_node, f"kpartx -l /dev/exc/{_dev}")
+                if _rc:
+                    continue
+
+                _part = _out.splitlines()[0].split(' ')[0].strip()
+
+                _rc, _out, _ = node_exec_cmd(_node, f"pvdisplay -c /dev/mapper/{_part}")
+                if not _rc:
+                    _vg = _out.splitlines()[0].split(":")[1]
+
+                    _, _out, _ = node_exec_cmd(_node, f"vgchange -an {_vg}", log_warning=True, log_stdout_on_error=True)
+
+                    _rc, _out, _ = node_exec_cmd(_node, f"kpartx -dv /dev/exc/{_dev}", log_warning=True, log_stdout_on_error=True)
+                if _rc:
+                    #_, _out, _ = node_exec_cmd(_node, f"lvdisplay -c {_vg}")
+                    #_lv = _out.splitlines()[0].split(":")[0].strip()
+
+                    _rc, _out, _ = node_exec_cmd(_node, f"lsblk -f | grep -A1 {_part} | tail -1")
+                    if _out:
+                        _lvpart = _out.splitlines()[0].split('xfs')[0].strip()[2:]
+                        _, _out, _ = node_exec_cmd(_node, f"dmsetup remove {_lvpart}")
+                    _, _out, _ = node_exec_cmd(_node, f"dmsetup remove {_part}")
+
+
     def mPerformVmMoveOEDA(self, aOptions, aUndo=False, aForce=False):
 
         # Validate input payload
@@ -3666,9 +3710,9 @@ class ebCluExaScale:
                     ebLogInfo(f"VM {_vmName} not defined in host {_srcDom0}")
                 else:
                     _vmBridges = get_kvm_guest_bridges(_srcNode, _vmName)
-                    _cmd = f"/bin/virsh destroy {_vmName}"
+                    _cmd = f"{VM_MAKER} --stop-domain {_vmName} --destroy"
                     node_exec_cmd(_srcNode, _cmd)
-                    _cmd = f"/bin/virsh undefine {_vmName}"
+                    _cmd = f"{VM_MAKER} --remove-domain {_vmName}"
                     node_exec_cmd(_srcNode, _cmd)
                     for _bridge in _vmBridges:
                         _cmd = f"{VM_MAKER} --remove-bridge {_bridge}"
@@ -3735,10 +3779,10 @@ class ebCluExaScale:
                     aArgs["exascale_obj"].mAddRoceSshEntry(aArgs['net_info']['source_dom0_name'])
                 aArgs["exascale_obj"].mAddRoceSshEntry(aArgs['net_info']['target_dom0_name'])
 
-                # Remove the dummy bridge backups to avoid Bug 38350312
                 _tgtDom0 = aArgs['net_info']['target_dom0_name']
                 _vmName = aArgs['vm_name']
                 with connect_to_host(_tgtDom0, get_gcontext()) as _node:
+                    # Remove the dummy bridge backups to avoid Bug 38350312
                     _cmd = (f"/bin/ls /EXAVMIMAGES/GuestImages/{_vmName}"
                             "/backup/bridges/bridge.vmeth*.xml")
                     _dummyBridgeBackups = \
@@ -3752,6 +3796,9 @@ class ebCluExaScale:
                         _cmd = (f"/bin/rm -f /EXAVMIMAGES/GuestImages/{_vmName}"
                                 "/backup/bridges/bridge.vmeth*.xml")
                         node_exec_cmd(_node, _cmd, log_warning=True)
+
+                    # Manage VM snapshots on target host
+                    aArgs["exascale_obj"].mMountVMSnapshots(aArgs["aOptions"], _node, _vmName)
 
 
         def mInternalVMMakerXMLUpdateCallback(aOedacliCmd, aArgs):
@@ -3803,29 +3850,49 @@ class ebCluExaScale:
                     aArgs["dom0"], aArgs["vm_name"], aArgs["net_info"], aStrict=True)
 
         if _live:
-            _actions = [                    
-                #"STOP_GUEST",              
-                #"DETACH_INTERFACES",       
-                #"DETACH_VOLUMES",          
-                "CREATE_BRIDGES",           
-                "CREATE_NAT_BRIDGE_TGT",    
-                "MIGRATE_GUEST",            
-                #"ATTACH_VOLUMES",          
-                "ATTACH_INTERFACES",        
-                #"REMOVE_NAT_BRIDGE_SRC",    
-                #"STARTUP_GUEST"            
-            ] if not aUndo else [           
-                "STOP_GUEST",               
-                "DETACH_INTERFACES",        
-                #"DETACH_VOLUMES",          
-                #"CREATE_BRIDGES",          
-                "MIGRATE_GUEST",            
-                #"REMOVE_NAT_BRIDGE_SRC",    
-                #"CREATE_NAT_BRIDGE_TGT",   
-                #"ATTACH_VOLUMES",          
-                #"ATTACH_INTERFACES",       
-                #"STARTUP_GUEST"            
-            ]                               
+            # Check if VM has already been migrated to skip unnecesary OEDA steps.
+            _migrated = False
+            with connect_to_host(_tgtDom0, get_gcontext()) as _tgtNode:
+                _cmd = "/bin/virsh list --all --name"
+                _srcVMs = node_exec_cmd_check(_tgtNode, _cmd).stdout
+                if _vmName in _srcVMs:
+                    ebLogInfo(f"VM {_vmName} is already defined in host {_tgtDom0}")
+                    _migrated = True
+
+            _actions = [
+                #"STOP_GUEST",
+                #"DETACH_INTERFACES",
+                #"DETACH_VOLUMES",
+                "CREATE_BRIDGES",
+                "CREATE_NAT_BRIDGE_TGT",
+                "MIGRATE_GUEST",
+                #"ATTACH_VOLUMES",
+                "ATTACH_INTERFACES",
+                #"REMOVE_NAT_BRIDGE_SRC",
+                #"STARTUP_GUEST"
+            ] if not aUndo and not _migrated else [
+                #"STOP_GUEST",
+                #"DETACH_INTERFACES",
+                #"DETACH_VOLUMES",
+                #"CREATE_BRIDGES",
+                #"CREATE_NAT_BRIDGE_TGT",
+                #"MIGRATE_GUEST",
+                #"ATTACH_VOLUMES",
+                "ATTACH_INTERFACES",
+                #"REMOVE_NAT_BRIDGE_SRC",
+                #"STARTUP_GUEST"
+            ] if not aUndo else [
+                #"STOP_GUEST",
+                #"DETACH_INTERFACES",
+                #"DETACH_VOLUMES",
+                #"CREATE_BRIDGES",
+                #"MIGRATE_GUEST",
+                #"REMOVE_NAT_BRIDGE_SRC",
+                #"CREATE_NAT_BRIDGE_TGT",
+                #"ATTACH_VOLUMES",
+                #"ATTACH_INTERFACES",
+                #"STARTUP_GUEST"
+            ]
         else: 
             _actions = [
                 #"STOP_GUEST",

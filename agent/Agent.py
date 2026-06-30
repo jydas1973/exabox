@@ -14,6 +14,15 @@ NOTE:
 
 History:
    MODIFIED (MM/DD/YY)
+    aypaul     06/17/26 - SecBug#39392679 Sanitise input for network_info
+                          endpoint
+    kanmanic   06/15/26 - 39560339 - Fix ECRA DB connection close guards
+    aypaul     05/25/26 - SecBug#39392771 Remove valid proxy endpoint list
+    joysjose   05/08/26 - Bug 38385387 Memory & OH reshape partial success
+    kanmanic   03/17/26 - 37764703 AQ Status Tracker Support
+    shapatna   04/28/26 - Bug 39255986: Remove ecinstmaintenance endpoint
+    aypaul     04/28/26 - 39261045 Mitigate security issue with AGENTCTRL
+                          endpoint
     dekuckre   04/02/26 - Make agent listener lock initialization robust for
                           unit tests
     aypaul     03/03/26 - Bug#38900084 Fix code issues from codev
@@ -217,6 +226,20 @@ import six
 import glob
 import random
 
+def mGetStructuredNodeData(aNodeData):
+    if not aNodeData:
+        return None
+    if not isinstance(aNodeData, six.string_types):
+        return aNodeData
+
+    try:
+        return json.loads(aNodeData)
+    except ValueError:
+        try:
+            return literal_eval(aNodeData)
+        except (ValueError, SyntaxError, TypeError):
+            return aNodeData
+
 from exabox.tools.AttributeWrapper import wrapStrBytesFunctions
 from exabox.core.Mask import maskSensitiveData
 from exabox.core.Core import ebCoreContext
@@ -257,7 +280,6 @@ from exabox.proxy.ebProxyJobRequest import ebProxyJobRequest
 from exabox.agent.AuthenticationStorage import ebGetHTTPAuthStorage
 from six.moves.urllib.parse import urlencode
 from exabox.config.Config import ebCluCmdCheckOptions
-from exabox.agent.ProxyClient import ProxyClient, ProxyOperation
 from exabox.infrapatching.core.infrapatcherror import PATCH_SUCCESS_EXIT_CODE
 import exabox.network.HTTPSHelper as HTTPSHelper
 from exabox.network.ExaHTTPSServer import ExaHTTPSServer, ExaHTTPRequestHandler
@@ -269,6 +291,11 @@ from exabox.utils.common import get_ecradb_details
 
 ACCEPTED_DEVQA_DOMAINNAMES = ["us.oracle.com", "usdv1.oraclecloud.com", "oracle.local"]
 API_ACL_ENABLED_REGIONS = ["ap-sydney-1", "sa-vinhedo-1", "mx-monterrey-1", "r1"]
+HOSTNAME_RE = re.compile(
+    r"^(?=.{1,253}$)(?!-)(?:[A-Za-z0-9]"
+    r"(?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)*"
+    r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$"
+)
 
 gDefaultAgent   = None
 gGlobalShutdown = False
@@ -972,8 +999,6 @@ class ebRestHttpListener(ExaHTTPRequestHandler):
             "/AtpGetFile"   : HttpCb({"GET"  : self.mAtpGetFile       }, HTMLResponse), #outputs HTML / JSON / TXT / BIN
             "/WWW"          : HttpCb({"GET"  : self.mAgentWWWContent  }, HTMLResponse), #outputs HTML / CSS / JS / JSON / XML / TXT / JPG
             "/logDownload"  : HttpCb({"GET"  : self.mAgentLogDownload }, FileResponse),
-            "/ecinstmaintenance" : HttpCb({"POST"  : self.mHandleECInstance     }, JSONResponse), # ecinst to proxy
-            "/heartbeat"         : HttpCb({"GET"  : self.mHeartbeatECInstance     }, JSONResponse), # proxy to ecinst
             "/system_metrics"    : HttpCb({"GET"  : self.mReturnSystemResourceUsage     }, JSONResponse),
             "/EDV"          : _edv_request_cb
         }
@@ -984,16 +1009,6 @@ class ebRestHttpListener(ExaHTTPRequestHandler):
             del self.__callbacks["/"]
             del self.__callbacks["/css"]
             del self.__callbacks["/js"]
-
-        self.__validproxy_endpoints = [ "/ecinstmaintenance",
-                                        "/WorkerStatus",
-                                        "/AgentCmd",
-                                        "/AgentHome",
-                                        "/AgentTest",
-                                        "/AgentWorkers",
-                                        "/AgentCtrl",
-                                        "/Version",
-                                      ]
 
         if 'agent_debug' in list(_coptions.keys()) and _coptions['agent_debug'].upper() == 'TRUE':
             self.__debug = True
@@ -1058,12 +1073,63 @@ class ebRestHttpListener(ExaHTTPRequestHandler):
     def mGetMockMode(self):
         return self.__mock_mode
 
+    def mSanitizeRequestTargetForLog(self, aTarget):
+        if '?' not in aTarget:
+            return aTarget
+
+        _path, _query = aTarget.split('?', 1)
+        _sanitized_tokens = []
+
+        for _index, _token in enumerate(re.split(r'([?&])', _query)):
+            if _index % 2 == 1:
+                _sanitized_tokens.append(_token)
+                continue
+
+            if not _token:
+                continue
+
+            _key, _sep, _ = _token.partition('=')
+            if _key == 'jsonconf':
+                _token = f'{_key}{_sep}sanitized' if _sep else 'jsonconf=sanitized'
+
+            _sanitized_tokens.append(_token)
+
+        return _path + '?' + ''.join(_sanitized_tokens)
+
+    def mSanitizeRequestLineForLog(self, aRequestLine):
+        try:
+            _method, _target, _protocol = aRequestLine.split(' ', 2)
+        except ValueError:
+            if '?' in aRequestLine:
+                _prefix, _, _remainder = aRequestLine.partition('?')
+                _query_segment, _separator, _suffix = _remainder.partition(' ')
+                _sanitized_request = self.mSanitizeRequestTargetForLog(
+                    _prefix + '?' + _query_segment
+                )
+                if _separator:
+                    return _sanitized_request + _separator + _suffix
+                return _sanitized_request
+            return aRequestLine
+
+        _target = self.mSanitizeRequestTargetForLog(_target)
+        return ' '.join((_method, _target, _protocol))
+
+    def mSanitizeLogString(self, aLogString):
+        if 'jsonconf' not in aLogString:
+            return aLogString
+
+        _sanitized_log_string = self.mSanitizeRequestLineForLog(aLogString)
+        return re.sub(r'(?<=jsonconf=)[^&\s"\']*', 'sanitized', _sanitized_log_string)
+
     def log_message(self, format, *args ):
         if self.__debug:
             ebLogAgent('NFO', format % args)
         else:
-            _str = format % args
-            _str = re.sub(r"jsonconf=.*?\?","jsonconf=sanitized?", _str)
+            _args = list(args)
+            for _index, _arg in enumerate(_args):
+                if isinstance(_arg, str):
+                    _args[_index] = self.mSanitizeLogString(_arg)
+            _str = format % tuple(_args)
             # agent.log should only contains this log AND DEBUG logs for
             # instant access
             ebLogAgent('NFO', _str)
@@ -1119,63 +1185,6 @@ class ebRestHttpListener(ExaHTTPRequestHandler):
 
         _httpreq = HttpRequest(_fullpath, _method, self.headers, self.requestline)    
         _httpreq.extractParams(self, _url_parsed[4])
-
-        if self.__options.proxy and _endpoint not in self.__validproxy_endpoints:#When instance is proxy
-            _req_uuid = None
-            _endpoint = _endpoint[1:]
-            if _endpoint == "Status":
-                _split = _fullpath[1:].split('/')
-                if len(_split) == 2:
-                    _httpreq.setParam('uuid',_split[1])
-            elif _endpoint == "CLUCtrl" or _endpoint == "CLUDiags" or _endpoint == "Patch" or _endpoint == "SCGENCtrl":
-                _split = _fullpath[1:].split('/')
-                if len(_split) == 2:
-                    _httpreq.setParam('cmd',_split[1])
-
-            if 'uuid' in _httpreq.getParams():
-                _uuid_req_params = True
-                _req_uuid = _httpreq.getParam('uuid')
-            else:
-
-                if 'operation_uuid' in _httpreq.getParams():
-                    _p_uuid = _httpreq.getParam('operation_uuid')
-                    if _p_uuid:
-                        if not self.mValidateUUID(_p_uuid):
-                            raise ExacloudRuntimeError(0x0810, 0xA, f"Invalid value for operation UUID: {_p_uuid}")
-                        _db = ebGetDefaultDB()
-                        if _db.mGetRequest(_p_uuid):
-                            _req_uuid = str(uuid.uuid1())
-                            ebLogInfo(f"Request already created: {_p_uuid} using {_req_uuid}")
-                        else:
-                            _uuid_req_params = True
-                            _req_uuid = _p_uuid
-
-                    else:
-                        _req_uuid = str(uuid.uuid1())
-                else:
-                    _req_uuid = str(uuid.uuid1())
-
-            _contentType = self.headers.get('content-type')
-            _body = {}
-            if _contentType == 'application/json':
-                _bytesBody = _httpreq.getBody()
-                _strBody = _bytesBody.decode('utf-8')
-                _jsonBody = json.loads(_strBody)
-                _body = _jsonBody
-                if not _uuid_req_params:
-                    _body["uuid"] = _req_uuid
-
-            ebLogAgent('NFO', 'UUID: %s Endpoint: %s' % (str(_req_uuid), str(_endpoint)))
-
-            if self.command == "POST":
-                self.dispatchHTTPPostReqToWorker(_endpoint, self.path, _httpreq.getParams(), self.headers.items(), _body, _req_uuid)
-            elif self.command == "GET":
-                self.getResponseFromExacloud(_endpoint, self.path, _httpreq.getParams(), self.headers.items(), _req_uuid)
-            else:
-                self.sendInvalidCommandResponse()
-            if gGlobalShutdown:
-                self.__shutdown = True
-            return
 
         if self.headers.get('StatusQueue', None) is None:
             self.headers['StatusQueue'] = "Undef"
@@ -1250,7 +1259,7 @@ class ebRestHttpListener(ExaHTTPRequestHandler):
             #Load the request from the DB with the given uuid.
             #Modify the cmdtype and set it to Status.GET. Update the headers.
             _db = ebGetDefaultDB()
-            _current_status = _db.mSelectStatusFromUUIDToECInstance(_req_uuid)
+            _current_status = ""
             if _current_status == "InitialReqPending":
                 self.exaproxyWriteResponse(_req_uuid, sendMockPendingResponse=True, _cmdType=str(_endpoint).lower()+"."+_cmd, _params=aParams)
                 return
@@ -1468,10 +1477,11 @@ class ebRestHttpListener(ExaHTTPRequestHandler):
                     #End of dispatcher error code check
 
                 _request_data = _body[13]
-                if "stepProgressDetails" in _request_data:
+                if (_request_data and _request_data != "Undef" and
+                        "stepProgressDetails" in _request_data):
                     _step_progress_details = json.loads(_request_data)
                     _response["stepProgressDetails"] = _step_progress_details["stepProgressDetails"]
-                else:
+                elif not _request_data or _request_data == "Undef":
                     _response["stepProgressDetails"] = _step_status["stepProgressDetails"]
 
                 if _dispatcher_error_found is False:
@@ -1566,6 +1576,8 @@ class ebRestHttpListener(ExaHTTPRequestHandler):
                     _error_list['errorType'] = _errcode[3]
                     _error_list['retryCount'] = int(_errcode[4])
                     _error_list['detailErr'] = _errcode[5]
+                    if len(_errcode) >= 7 and _errcode[6]:
+                        _error_list['nodeData'] = mGetStructuredNodeData(_errcode[6])
                     _response['errorObject'] = _error_list
 
                     _response_json = json.dumps(_response, indent=4, separators=(',',': '))
@@ -1592,10 +1604,13 @@ class ebRestHttpListener(ExaHTTPRequestHandler):
                         _response['success'] = 'False'
 
                 _response["command"] = _cmdType
-                if _body[1] == 'Done' and "step is in progress" in _response["stepProgressDetails"]["message"].lower():
-                    _response["stepProgressDetails"]["message"] = "Step is completed"
-                    _response["stepProgressDetails"]["status"] = "Completed"
-                    _response["stepProgressDetails"]["percent_complete"] = 100
+                if _body[1] == 'Done':
+                    if "stepProgressDetails" not in _response:
+                        _response["stepProgressDetails"] = _step_status["stepProgressDetails"]
+                    if "step is in progress" in _response["stepProgressDetails"]["message"].lower():
+                        _response["stepProgressDetails"]["message"] = "Step is completed"
+                        _response["stepProgressDetails"]["status"] = "Completed"
+                        _response["stepProgressDetails"]["percent_complete"] = 100
                 # Removing sensitive customer data
                 if _body[1] == 'Done' and not get_gcontext().mCheckConfigOption('keep_customer_data'):
                     _db.mClearCustomerData(aParams['uuid'])
@@ -1612,10 +1627,19 @@ class ebRestHttpListener(ExaHTTPRequestHandler):
             if _required_information not in list(payload.keys()):
                 return f"Key: {_required_information} is missing from payload."
 
+        def is_valid_interface(interface):
+            return bool(
+                re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,14}", interface)
+            )
+        def is_valid_hostname(hostname):
+            return bool(HOSTNAME_RE.fullmatch(hostname))
+
         #Additional validations of the values passed in the paylaod.
         _interface_value = payload['interface']
         if type(_interface_value) is not str:
             return f"Interface value is expected of type string but passed {type(_interface_value)}"
+        if not is_valid_interface(_interface_value):
+            return f"Interface value is an improper string which doesn't contain standard interfaces values"
 
         _information_value = payload['information']
         if type(_information_value) is not list or len(_information_value) == 0:
@@ -1624,6 +1648,9 @@ class ebRestHttpListener(ExaHTTPRequestHandler):
         _nodes_value = payload['nodes']
         if type(_nodes_value) is not list or len(_nodes_value) == 0:
             return f"Nodes value is either not of type list or empty list is passed in payload."
+        for _node in _nodes_value:
+            if not is_valid_hostname(_node):
+                return f"Hostname: {_node} is not a valid hostname/FQDN"
 
         return ""
 
@@ -1834,7 +1861,7 @@ class ebRestHttpListener(ExaHTTPRequestHandler):
         _single_worker_patchmgr_cmds = ['infra_patch_operation']
         _exempt_cmds = ['checkcluster', 'host_state']
         _diskgroup_cmds = ['diskgroup']
-        _non_xml_cmds = ['validate_elastic_shapes','xsvault','infra_vm_states','xsput','xsget', 'enable_qinq']
+        _non_xml_cmds = ['validate_elastic_shapes','xsvault','infra_vm_states','xsput','xsget', 'enable_qinq', 'exascale_disable_normal_redundancy', 'exascale_remove_user_privilege']
 
         # Check if all Parameters are available
         if not aParams or not len(list(aParams.keys())):
@@ -2113,9 +2140,8 @@ class ebRestHttpListener(ExaHTTPRequestHandler):
         if self.__debug:
             ebLogAgent('NFO', '* Request parameters (full): %s' % (repr(aParams)))
         else:
-            _aparams_str = repr(aParams)
-            _aparams_str = re.sub(r"jsonconf=.*?\?","jsonconf=sanitized?", _aparams_str)
-            ebLogInfo('* Request parameters (sanitized): %s' % (_aparams_str))
+            _mask_params = maskSensitiveData(aParams, use_mask=False)
+            ebLogInfo('* Request parameters (sanitized): %s' % (_mask_params))
 
         # Create Job and New DB entry
         _req = ebJobRequest('vmctrl.'+_cmd, aParams, aDB=ebGetDefaultDB())
@@ -2792,12 +2818,24 @@ class ebRestHttpListener(ExaHTTPRequestHandler):
         if aParams and ("file" in list(aParams.keys())): #outputs TXT
 
             _filename = os.path.realpath(aParams["file"])
-            _current = os.path.dirname(os.path.realpath(inspect.getfile(inspect.currentframe())+"/../../"))
+            _current = get_gcontext().mGetBasePath()
             _body = None
             _error = False
 
+            _current = os.path.normpath(_current)
+            _filename = os.path.normpath(_filename)
+
+            _rel_path = os.path.relpath(_filename, _current)
+
+            # Extract the first component
+            _next_entry = _rel_path.split(os.sep)[0] if _rel_path != "." else ""
+
+            _authorised_file_paths = ["log", "oeda"]
+            if get_gcontext().mGetConfigOptions().get("authorised_file_download_paths") is not None:
+                _authorised_file_paths = get_gcontext().mGetConfigOptions().get("authorised_file_download_paths")
+
             try:
-                if _filename.startswith(_current):
+                if _filename.startswith(_current) and os.path.exists(_filename) and _next_entry in _authorised_file_paths:
                     with open(_filename) as _f:
                         _body = _f.read()
                 else:
@@ -3184,82 +3222,6 @@ class ebRestHttpListener(ExaHTTPRequestHandler):
         _response['response'] = _result
         return
 
-
-    def mHandleECInstance(self, aParams, aResponse): # ----- /ecinstmaintenance
-
-        # Check if all Parameters are available
-        _response = aResponse
-        if not aParams or not len(list(aParams.keys())):
-            _str = 'No Parameters provided'
-            _err = True
-            _response['success'] = 'False'
-            _response['status']  = 'Done'
-            return
-
-        ebLogInfo("aParams: {}".format(aParams))
-        _op = None
-        _host = None
-        _port = None
-        _vers = None
-        _reqtype = None
-        _auth_key = None
-        _oeda_vers = None
-        _key = None
-        _value = None
-        _paramslist = list(aParams.keys())
-        _response = aResponse
-
-        if 'op' in _paramslist:
-            _op = aParams['op']
-        if 'host' in _paramslist:
-            _host = aParams['host']
-        if 'port' in _paramslist:
-            _port = aParams['port']
-        if 'version' in _paramslist:
-            _vers = aParams['version']
-        if 'request_type' in _paramslist:
-            _reqtype = aParams['request_type']
-        if 'auth_key' in _paramslist:
-            _auth_key = aParams['auth_key']
-        if 'oeda_version' in _paramslist:
-            _oeda_vers = aParams['oeda_version']
-        if 'key' in _paramslist:
-            _key = aParams['key']
-        if 'value' in _paramslist:
-            _value = aParams['value']
-
-        if _op == 'register' and _host and _port and _vers and _reqtype and _auth_key and _oeda_vers:
-
-            self.__routerInstance.mRegisterECInstance(_host, _port, _vers, _auth_key, _reqtype, _oeda_vers)
-            _response['success'] = 'True'
-
-        elif _op == 'deregister' and _host and _port and _reqtype:
-
-            self.__routerInstance.mDeregisterECInstance(_host, _port, _reqtype)
-            _response['success'] = 'True'
-
-        elif _op == 'update' and _host and _port and _key and _value:
-
-            self.__routerInstance.mUpdateECInstance(_host, _port, _key, _value)
-            _response['success'] = 'True'
-
-        else:
-            ebLogError("Invalid operation/ Insufficient parameters")
-            _response['success'] = 'False'
-
-        _response['status']  = 'Done'
-        return
-
-    def mHeartbeatECInstance(self, aParams, aResponse): #--- /heartbeat
-
-       #
-       # Prepare response
-       #
-       _response = aResponse
-       _response['status']  = 'Done'
-       _response['success'] = 'True'
-       return 
-
     def mServeUI(self, aParams, aResponse): #-----------/ /css /js HTMLResponse (outputs HTML / CSS / JS / JSON / TXT / IMG / FONT)
 
         #possible content-types this method can return (every type of file in www/ecwebui)
@@ -3591,8 +3553,6 @@ class ebAgentDaemon(object):
 
         #proxy_client will only be defined if Agent is behind proxy
         self.__proxy_client     = None
-        if 'proxy_port' in _config_keys and 'proxy_host' in _config_keys:
-            self.__proxy_client = ProxyClient()
 
         if 'agent_id' in _config_keys:
             self.__agent_id = self.__config_opts['agent_id']
@@ -3711,7 +3671,7 @@ class ebAgentDaemon(object):
                 ebLogError(f"Encountered generic exception during connection setup. Details: {ex}, terminating agent startup")
                 _connected_successfully = False
             finally:
-                if 'connection' in locals() and _oraconn:
+                if _oraconn is not None:
                     _oraconn.close()
 
             if not _connected_successfully:
@@ -3719,6 +3679,12 @@ class ebAgentDaemon(object):
                 return
             else:
                 ebLogInfo("Successfully connected to the ECRA database. Oracle AQ push status support pre-check succeeded.")
+                try:
+                    from exabox.core.AQResponse import _start_aqname_sync_worker, _start_liveliness_worker
+                    _start_aqname_sync_worker()
+                    _start_liveliness_worker()
+                except Exception as ex:
+                    ebLogError(f"SYNCUP_AQ SETUP failed during agent start: {ex}")
 
         # Check Status of DB
         self.mCheckAgentState()
@@ -3746,16 +3712,6 @@ class ebAgentDaemon(object):
                                                     supervisor_running)
             else:
                 ebLogInfo('Supervisor is disabled')
-
-        # Start proxy heartbeat process.
-        if self.__args_options.proxy:
-            ebLogInfo("Starting proxy hearbeat process")
-            _cmd_list = ['bin/exaproxy', '--proxy', 'asproxy', '-dc', '--heartbeat']
-
-            # Add args that need to be propagated (e.g. --debug/--verbose)
-            _cmd_list.extend(get_gcontext().mGetPropagateProcOptions())
-
-            subprocess.run(_cmd_list, stdout=None, stderr=None)
 
         # Start scheduler
         if not self.__args_options.proxy:
@@ -3877,10 +3833,6 @@ class ebAgentDaemon(object):
                 else:
                     ebLogError(f"Failed to import data for {_table} table.")
 
-        # Register itself(exacloud instance) with proxy.
-        if self.__proxy_client:
-            self.__proxy_client.mSendOperation(ProxyOperation.REGISTER)
-
         if self.__args_options.proxy:
             #Update requestuuidtoexacloud table. Set all entries with status as Pending to InitialReqDone so that new workers could be started
             #to poll for the status request from exacloud agents.
@@ -3941,11 +3893,14 @@ class ebAgentDaemon(object):
         if self.__stopped:  # idempotency
             return
 
+        try:
+            from exabox.core.AQResponse import _stop_aqname_sync_worker, _stop_liveliness_worker
+            _stop_aqname_sync_worker()
+            _stop_liveliness_worker()
+        except Exception as ex:
+            ebLogWarn(f"SYNCUP_AQ SETUP Failed to stop AQ syncup workers during agent shutdown: {ex}")
+
         _db = ebGetDefaultDB()
-        # Deregister itself(exacloud instance) with proxy.
-        if self.__proxy_client:
-            ebLogInfo("Deregister itself(exacloud instance) with proxy")
-            self.__proxy_client.mSendOperation(ProxyOperation.DEREGISTER)
 
         ebLogInfo('Stopping special workers.')
         _process_pid_mapping = _db.mGetSpecialWorkerPIDs()
@@ -3977,12 +3932,6 @@ class ebAgentDaemon(object):
         if self.__workerFactory:
             self.__workerFactory.mShutdownFactory()
         ebLogInfo('Worker Factory stopped...')
-
-        # Stop proxy heartbeat to exacloud instances.
-        # TODO check that stop correctly, not tested in START/STOP REFACTORING
-        if self.__args_options.proxy:
-            from exabox.proxy.heartbeat import stop
-            stop()
 
         # Detach the logger
         if self.__agent_destination_handlers:

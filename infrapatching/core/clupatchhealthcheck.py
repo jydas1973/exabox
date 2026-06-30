@@ -15,6 +15,10 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    araghave    05/22/26 - Bug 39424884 - EXACS:26.1.1:BB:DOMU:LIVE
+#                           UPDATE:ALLCVSS ROLLBACK FAILING
+#    bhpati      05/05/26 - Bug 39083220 - AIM4ECS:0X03090001 - SWITCH PATCHMGR
+#                           COMMAND FAILED
 #    araghave    02/19/26 - Bug 38766026 - FAIL DOMU PATCHING IN CASE OF A
 #                           VERSION VALIDATION FAILURE
 #    ririgoye    11/26/25  - Bug 38636333 - EXACLOUD PYTHON:ADD INSTANTCLIENT
@@ -323,9 +327,17 @@ class ebCluPatchHealthCheck(LogHandler):
 
         try:
             _ret, _cur_ver_exa, _elu_info, _is_elu_apply_eligible = self.ghandler.mGetExadataLiveUpdateDetails(aNode)
+            _elu_info_present = bool(_elu_info)
+            self.mPatchLogInfo(
+                f"mCheckTargetVersionForElu: ELU details for node={aNode}, nodeType={aNodeType}, "
+                f"ret={_ret}, qmrVersion={_cur_ver_exa}, eluInfoPresent={_elu_info_present}, "
+                f"isEluApplyEligible={_is_elu_apply_eligible}, versionToCompare={aVersionToCompare}")
             if _ret == PATCH_SUCCESS_EXIT_CODE and len(_elu_info) > 0:
                 _live_version = _elu_info['elu_version']
                 _applied_elu_type_on_domu = _elu_info['elu_type']
+                self.mPatchLogInfo(
+                    f"mCheckTargetVersionForElu: ELU metadata for node={aNode}, "
+                    f"liveVersion={_live_version}, appliedEluType={_applied_elu_type_on_domu}")
 
             if _cur_ver_exa:
                 if not _cur_ver_exa.strip().lower().startswith('undefined'):
@@ -346,13 +358,17 @@ class ebCluPatchHealthCheck(LogHandler):
                             # ELU option validations applicable only to domu patching.
                             if aNodeType == PATCH_DOMU and not _is_elu_apply_eligible:
                                 _rc = 0
+                                self.mPatchLogInfo(
+                                    f"mCheckTargetVersionForElu: Setting _rc={_rc} for node={aNode} because "
+                                    f"DomU ELU apply eligibility is {_is_elu_apply_eligible}; "
+                                    f"currentVersion={_current_version}, versionToCompare={aVersionToCompare}")
                             else:
                                 self.mPatchLogInfo(f'mCheckTargetVersionForElu: Node {aNode} with QMR version {_cur_ver_exa} has a live update version {_live_version} and node will be updated to {self.ghandler.mGetTargetVersion()}')
                     else:
                         self.mPatchLogInfo(f'mCheckTargetVersionForElu: Node {aNode} with QMR version {_cur_ver_exa} has no live update version applied. Hence node will be updated to {self.ghandler.mGetTargetVersion()}')
                     self.mPatchLogInfo(f'mCheckTargetVersionForElu: Image version retrieved = {_current_version} on node - {aNode}.')
             else:
-                self.mPatchLogInfo('mCheckTargetVersionForElu: Not able to fetch Image version on node - {aNode}..')
+                self.mPatchLogInfo(f'mCheckTargetVersionForElu: Not able to fetch Image version on node - {aNode}..')
 
             if not _current_version:
                 _suggestion_msg = f"mCheckTargetVersionForElu: Unable to obtain or parse image version for {aNode}. Got: {_current_version}"
@@ -362,16 +378,30 @@ class ebCluPatchHealthCheck(LogHandler):
 
             if not aVersionToCompare or not _current_version:
                 _rc = _current_version
+                self.mPatchLogInfo(
+                    f"mCheckTargetVersionForElu: Setting _rc={_rc} for node={aNode} because "
+                    f"versionToCompare={aVersionToCompare} and currentVersion={_current_version}")
 
         except Exception as e:
             self.mPatchLogWarn(f"mCheckTargetVersionForElu: Exception {str(e)} occurred while fetching and comparing the version on DomU - {aNode}.")
             self.mPatchLogTrace(traceback.format_exc())
         finally:
-            if self.ghandler.mGetTask() in [ TASK_PATCH, TASK_PREREQ_CHECK ] and _current_version and aVersionToCompare:
+            _task = self.ghandler.mGetTask()
+            if _task in [ TASK_PATCH, TASK_PREREQ_CHECK ] and _current_version and aVersionToCompare:
                 '''
                  Assumption is that the target version is always higher than the current version in the below case.
                 '''
+                self.mPatchLogInfo(
+                    f"mCheckTargetVersionForElu: Comparing currentVersion={_current_version} with "
+                    f"versionToCompare={aVersionToCompare} for node={aNode}, task={_task}")
                 _rc = _verobj.mCompareVersions(_current_version, aVersionToCompare)
+                self.mPatchLogInfo(
+                    f"mCheckTargetVersionForElu: Version compare returned _rc={_rc} for node={aNode}, "
+                    f"currentVersion={_current_version}, versionToCompare={aVersionToCompare}")
+        self.mPatchLogInfo(
+            f"mCheckTargetVersionForElu: Returning _rc={_rc} for node={aNode}, task={_task}, "
+            f"currentVersion={_current_version}, liveVersion={_live_version}, "
+            f"isEluApplyEligible={_is_elu_apply_eligible}, versionToCompare={aVersionToCompare}")
         return _rc
 
     def mCheckTargetVersionDuringDomURollback(self, aNode):
@@ -385,19 +415,30 @@ class ebCluPatchHealthCheck(LogHandler):
         _live_update_version = None
         _is_elu_rollback = False
         _ret = PATCH_SUCCESS_EXIT_CODE
-
+  
         _ret, _cur_ver_exa, _elu_info, _ = self.ghandler.mGetExadataLiveUpdateDetails(aNode)
+        # Treat any ELU traces in imageinfo (elu_version, elu_type, outstanding-work flags)
+        # as an ELU rollback context. This ensures DomU rollback postchecks skip
+        # version-difference validations that can be polluted by residual ELU metadata.
+        _has_elu_traces = False
         if _ret == PATCH_SUCCESS_EXIT_CODE and len(_elu_info) > 0:
-            _live_update_version = _elu_info['elu_version']
-
-        if _live_update_version:
-            self.mPatchLogInfo(f"mCheckTargetVersionDuringDomURollback: Exadata live update version - {_live_update_version}")
+            _live_update_version = _elu_info.get('elu_version')
+            _elu_outstanding_work = str(_elu_info.get('elu_has_outstanding_work', '')).strip().lower()
+            _has_elu_traces = any([
+                bool(_elu_info.get('elu_version')),
+                bool(_elu_info.get('elu_type')),
+                _elu_outstanding_work in ['yes', 'true']
+            ])
+  
+        if _has_elu_traces:
+            if _live_update_version:
+                self.mPatchLogInfo(f"mCheckTargetVersionDuringDomURollback: Exadata live update version - {_live_update_version}")
             if _cur_ver_exa == _live_update_version:
                 # Both Current and Target version will be the same in case of an ELU rollback in case of elu option applied is allcvss, full and highcvss.
                 self.mPatchLogInfo(
                     f'mCheckTargetVersionDuringDomURollback: Both Current and Target version on node - {aNode} will be the same in case of an ELU rollback.')
             else:
-                # ELU applied version will be higher than QMR version in cae of applypending performed previously.
+                # ELU applied version will be higher than QMR version in case of applypending performed previously.
                 self.mPatchLogInfo(
                     f'mCheckTargetVersionDuringDomURollback: Current and Target version on node - {aNode} are different as applypending ELU operation performed and rollback is performed.')
             '''
@@ -416,13 +457,22 @@ class ebCluPatchHealthCheck(LogHandler):
         """
         _suggestion_msg = None
         _is_elu_rollback = False
+        self.mPatchLogInfo(
+            f"mCheckTargetVersion: Enter node={aNode}, nodeType={aNodeType}, "
+            f"versionToCompare={aVersionToCompare}, inactiveImage={aInactiveImage}, "
+            f"isExasplice={aIsexasplice}, domuPostCheck={aDomUPostCheck}, "
+            f"task={self.ghandler.mGetTask()}, isElu={self.ghandler.mIsElu()}")
 
         '''
          Below API will be used in case of Dom0 and Domu ELU
          patching.
         '''
         if self.ghandler.mGetTask() in [ TASK_PATCH, TASK_PREREQ_CHECK ] and self.ghandler.mIsElu() and aNodeType == PATCH_DOMU:
+            self.mPatchLogInfo(
+                f"mCheckTargetVersion: Delegating to mCheckTargetVersionForElu for node={aNode}, "
+                f"nodeType={aNodeType}, versionToCompare={aVersionToCompare}")
             _rc = self.mCheckTargetVersionForElu(aNode, aNodeType, aVersionToCompare)
+            self.mPatchLogInfo(f"mCheckTargetVersion: mCheckTargetVersionForElu returned _rc={_rc} for node={aNode}")
             return _rc
 
         '''
@@ -432,8 +482,19 @@ class ebCluPatchHealthCheck(LogHandler):
           ELU flag details sent through payload.
         '''
         if aNodeType == PATCH_DOMU and self.ghandler.mGetTask() in [ TASK_ROLLBACK ]:
+            self.mPatchLogInfo(f"Enter DomU rollback version check: node={aNode}, aDomUPostCheck={aDomUPostCheck}, versionToCompare={aVersionToCompare}")
             _rc, _is_elu_rollback = self.mCheckTargetVersionDuringDomURollback(aNode)
+            self.mPatchLogInfo(f"mCheckTargetVersionDuringDomURollback result: rc={_rc}, is_elu_rollback={_is_elu_rollback}")
             if _is_elu_rollback:
+                '''
+                 Version validations, post Domu rollback is skipped in case of 
+                 ELU specific details are found in imageinfo output post rollback.
+                '''
+                if aDomUPostCheck:
+                    self.mPatchLogInfo(f"mCheckTargetVersion: Skipping DomU rollback version validation for {aNode} due to ELU traces in imageinfo; treating as intended rollback state.")
+                    self.mPatchLogInfo(f"ELU traces found in imageinfo; aDomUPostCheck={aDomUPostCheck}. Returning 0 to treat as intended rollback state.")
+                    return 0
+                self.mPatchLogInfo(f"mCheckTargetVersion: Returning _rc={_rc} for DomU ELU rollback on node={aNode}")
                 return _rc
             elif aDomUPostCheck:
                 self.mPatchLogInfo(f'mCheckTargetVersion: DomU Rollback postchecks are performed on Domu - {aNode} and node is at an intended version, return code _rc is {_rc}.')
@@ -503,9 +564,13 @@ class ebCluPatchHealthCheck(LogHandler):
                     additional_dbserver_cmd = f" --key-api {KEY_API}"
 
                 _cmd_exit_code_checker = f"/opt/oracle.SupportTools/dbserver_backup.sh --ignore-nfs-smbfs-mounts --check-rollback --get-backup-version {additional_dbserver_cmd}"
+                self.mPatchLogInfo(
+                    f"mCheckTargetVersion: Checking rollback availability on node={aNode} "
+                    f"using command: {_cmd_exit_code_checker}")
                 _i, _o, _e = _node.mExecuteCmd(_cmd_exit_code_checker, aTimeout=SHELL_CMD_DEFAULT_TIMEOUT_IN_SECONDS)
                 mCheckAndFailOnCmdTimeout(aCmd=_cmd_exit_code_checker, aNode=_node, aHandler=self.ghandler)
                 _exit_code = int(_node.mGetCmdExitStatus())
+                self.mPatchLogInfo(f"mCheckTargetVersion: Rollback availability exit code on node={aNode} is {_exit_code}")
 
                 if int(_exit_code) == 0:
                     self.mPatchLogInfo(f"Rollback is available on {aNode}.")
@@ -532,6 +597,9 @@ class ebCluPatchHealthCheck(LogHandler):
             elif aNodeType == PATCH_CELL:
                 _cmd = "imageinfo -inactive -ver"
 
+        self.mPatchLogInfo(
+            f"mCheckTargetVersion: Executing image version command on node={aNode}, "
+            f"cmd={_cmd}, inactiveImage={aInactiveImage}, parseRollbackOutput={_parse}")
         _i, _o, _e = _node.mExecuteCmd(_cmd, aTimeout=SHELL_CMD_DEFAULT_TIMEOUT_IN_SECONDS)
         mCheckAndFailOnCmdTimeout(aCmd=_cmd, aNode=_node, aHandler=self.ghandler)
         _node.mDisconnect()
@@ -628,16 +696,26 @@ class ebCluPatchHealthCheck(LogHandler):
             raise Exception(_suggestion_msg)
 
         if not aVersionToCompare or not _current_version:
+            self.mPatchLogInfo(
+                f"mCheckTargetVersion: Returning currentVersion={_current_version} for node={aNode} "
+                f"because versionToCompare={aVersionToCompare}")
             return _current_version
 
         # if format of aVersionToCompare is like 240809, it indicates 23 or lower,
         # so keep current version 24 on current node
         # if new format it should use exacloud method
         if aIsexasplice and aNodeType == PATCH_DOM0 and mQuarterlyVersionPatternMatch(_current_version) and aVersionToCompare and len(aVersionToCompare) == 6:
+            self.mPatchLogInfo(
+                f"mCheckTargetVersion: Returning _rc=1 for Exasplice Dom0 quarterly version path "
+                f"on node={aNode}, currentVersion={_current_version}, versionToCompare={aVersionToCompare}")
             return 1
 
         """taken from  /opt/oracle.cellos/host_access_control """
-        return _verobj.mCompareVersions(_current_version, aVersionToCompare)
+        _rc = _verobj.mCompareVersions(_current_version, aVersionToCompare)
+        self.mPatchLogInfo(
+            f"mCheckTargetVersion: Version compare returned _rc={_rc} for node={aNode}, "
+            f"currentVersion={_current_version}, versionToCompare={aVersionToCompare}")
+        return _rc
 
     def mCheckIBSwitchVersion(self, aIBSwitch, aVersionToCompare=None):
         """
@@ -1949,7 +2027,13 @@ class ebCluPatchHealthCheck(LogHandler):
             _p.mSetLogTimeoutFx(self.mPatchLogWarn)
             _plist.mStartAppend(_p)
 
-        _plist.mJoinProcess()
+        try:
+            _plist.mJoinProcess()
+        except Exception as e:
+            if "Process timeout" in str(e):
+                _suggestion_msg = (f"Timeout occurred and threads are terminated while validating ssh connection on nodes {aNodeList} from {aSourceNode}. Error: {str(e)}")
+                self.ghandler.mAddError(PATCHING_NODE_SSH_CHECK_FAILED, _suggestion_msg)
+            raise
 
         if _plist.mGetStatus() == "killed":
             _suggestion_msg = f'Timeout occurred and threads are terminated while validating ssh connection prior to patching on the list of Nodes : {str(aNodeList)}.'

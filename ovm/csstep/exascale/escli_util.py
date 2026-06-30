@@ -16,6 +16,9 @@
 #      NONE
 #
 #    MODIFIED   (MM/DD/YY)
+#    pbellary    05/12/26 - Bug 39120670 - VALIDATE EXASCALE SERVICES POST CONFIGURE EXASCALE
+#    pbellary    04/30/26 - ER 39187148 - ECRACLI API TO UPDATE HIGH REDUNDANCY AND 
+#                           ENSURE DEFAULT VLT_INSPECT PRVILEGE IS UNSET FOR VMCLUSTER USERID
 #    pbellary    02/24/26 - Bug 38972840 - DELETE-SERVICE WF FAILED TO VERIFY ACL USER ID
 #    pbellary    02/24/26 - Bug 38858318 - IF CHACL COMMAND FAILS CREATE SERVICE FLOW SHOULD FAIL
 #    pbellary    02/24/26 - Bug 38883255 - VM BACKUP OPERATION IS NOT TAKING BACKUP OF 3RD NODE
@@ -94,46 +97,92 @@ class ebEscliUtils(object):
             _current = _current.get(_key)
         return _current
     
-    def mParseEscliJson(self, json_output, match_dict, return_keys=None):
+    def mParseEscliJson(self, json_output, match_dict=None, return_keys=None, exclude=None):
         ebLogTrace(f"*** JSON output is as follows: {json_output}")
         
         if not json_output:
-            return {}
+            return []
 
         _data_list = json_output.get("data", [])
-        
         if not _data_list:
-            return {}
+            return []
 
+        if match_dict is None:
+            _match_mode = "none"
+            _match_items = []
+        elif isinstance(match_dict, dict):
+            _match_mode = "key_value"
+            _match_items = list(match_dict.items())
+        else:
+            _match_mode = "keys"
+            _match_items = list(match_dict)
+
+        if exclude is None:
+            _exclude_mode = "none"
+            _exclude_items = []
+        elif isinstance(exclude, dict):
+            _exclude_mode = "key_value"
+            _exclude_items = list(exclude.items())
+        else:
+            _exclude_mode = "keys"
+            _exclude_items = list(exclude)
+
+        _matches = []
         for _item in _data_list:
-            _match_found = True
-            
             if not isinstance(_item, dict):
                 continue
-            
-            for _match_key, _match_value in match_dict.items():
-                _value_to_check = self.mGetByPath(_item, _match_key)
-                
-                if(callable(_match_value)):
-                    _match_found = _match_value(_value_to_check)
-                else:
-                    _match_found = (_value_to_check == _match_value)
+
+            _exclude_hit = False
+            if _exclude_mode == "key_value":
+                for _ex_key, _ex_value in _exclude_items:
+                    _value_to_check = self.mGetByPath(_item, _ex_key)
+                    if callable(_ex_value):
+                        if _ex_value(_value_to_check):
+                            _exclude_hit = True
+                            break
+                    else:
+                        if _value_to_check == _ex_value:
+                            _exclude_hit = True
+                            break
+            elif _exclude_mode == "keys":
+                for _ex_key in _exclude_items:
+                    _value_to_check = self.mGetByPath(_item, _ex_key)
+                    if _value_to_check is not None:
+                        _exclude_hit = True
+                        break
+
+            if _exclude_hit:
+                continue
+
+            _match_found = True
+            if _match_mode == "key_value":
+                for _match_key, _match_value in _match_items:
+                    _value_to_check = self.mGetByPath(_item, _match_key)
+
+                    if(callable(_match_value)):
+                        _match_found = _match_value(_value_to_check)
+                    else:
+                        _match_found = (_value_to_check == _match_value)
                     
-                if not _match_found:
-                    break
+                    if not _match_found:
+                        break
+            elif _match_mode == "keys":
+                for _match_key in _match_items:
+                    _value_to_check = self.mGetByPath(_item, _match_key)
+                    if _value_to_check is None:
+                        _match_found = False
+                        break
 
             if not _match_found:
                 continue
-            
-            _result = {}
 
+            _result = {}
             for _key in return_keys or []:
                 _last_splitted_key = _key.split(".")[-1]
                 _result[_last_splitted_key] = self.mGetByPath(_item, _key)
+            _matches.append(_result)
 
-            return _result
-        
-        return {}        
+        return _matches       
     
     def mGetDictFromOutputString(self, out, cmd, eBox):
         """
@@ -341,18 +390,44 @@ class ebEscliUtils(object):
             _cmd_line = f"{ESCLI} --wallet {WALLET_LOC} --ctrl {_ctrl_ip}:{_ctrl_port} --json lsuser"
             _i, _o, _e = _node.mExecuteCmd(_cmd_line)
             _rc = _node.mGetCmdExitStatus()
-            
+
             if _rc == 0:
                 _json_output = self.mGetDictFromOutputString(_o, _cmd_line, _ebox)
                 _result = self.mParseEscliJson(_json_output, match_dict = {"id" : "grid" + _clusterName}, return_keys=["id"])
-                if _result:
-                    if "id" in _result:
+                for _res in _result:
+                    if "id" in _res:
                         _giclusterName = "grid" + _clusterName
+                        break
                     else:
                         _giclusterName = ""
-            
+
         ebLogInfo(f"UserId: {_giclusterName} for the Cluster:{_clusterName}")
         return _giclusterName
+
+    def mGetUserDetails(self, aCell, aOptions, aMatchDict=None, aReturnKeys=[]):
+        _match_dict = aMatchDict
+        _return_keys = aReturnKeys
+        _ebox = self.__cluctrl
+        _cell = aCell
+
+        try:
+            _exascale_attr = self.mParseExascaleAttrib(aOptions)
+            _ctrl_ip = str(_exascale_attr['ctrl_network']['ip']).strip()
+            _ctrl_port = str(_exascale_attr['ctrl_network']['port']).strip()
+        except Exception as e:
+            ebLogWarn(f"*** mGetUser failed with Exception: {str(e)}")
+            _ctrl_ip, _ = self.mGetCtrlIP()
+            _ctrl_port = CTRL_PORT
+
+        with connect_to_host(_cell, get_gcontext(), username="root") as _node:
+            _cmd_line = f"{ESCLI} --wallet {WALLET_LOC} --ctrl {_ctrl_ip}:{_ctrl_port} --json lsuser --detail"
+            _i, _o, _e = _node.mExecuteCmd(_cmd_line)
+            _rc = _node.mGetCmdExitStatus()
+
+            if _rc == 0:
+                _json_output = self.mGetDictFromOutputString(_o, _cmd_line, _ebox)
+                _result = self.mParseEscliJson(_json_output, match_dict = _match_dict, return_keys=_return_keys)
+        return _result
 
     def mGetEDVInitiator(self, aCell, aHostName, aOptions):
         _cell = aCell
@@ -380,10 +455,11 @@ class ebEscliUtils(object):
 
             _json_output = self.mGetDictFromOutputString(_o, _cmd_line, _ebox)
             _result = self.mParseEscliJson(_json_output, match_dict = {"attributes.hostName" : _host_name}, return_keys=["id"]) 
-            
-            if _result:
-                _initiatorId = _result.get("id")  
-            
+
+            for _res in _result:
+                if "id" in _res:
+                    _initiatorId = _res.get("id")  
+
         ebLogInfo(f"Initiator ID:{_initiatorId} for the host:{_host_name}")
         return _initiatorId
 
@@ -417,11 +493,11 @@ class ebEscliUtils(object):
             _json_output = self.mGetDictFromOutputString(_o, _cmd_line, _ebox)
             _result = self.mParseEscliJson(_json_output, match_dict = {"attributes.giClusterName" : _clusterName}, return_keys=["attributes.giClusterName", "attributes.giClusterId"]) 
             
-            if _result:
-                 _giclusterName = self.mGetUser(_cell, _clusterName, aOptions)
-                 
-                 if _giclusterName:
-                     _giClusterId = _result.get("giClusterId")
+            _giclusterName = self.mGetUser(_cell, _clusterName, aOptions)
+            for _res in _result:
+                if _giclusterName and "giClusterId" in _res:
+                    _giClusterId = _res.get("giClusterId")
+                    break
                
         ebLogInfo(f"giClusterName:{_giclusterName} giClusterId:{_giClusterId}")
         return _giclusterName, _giClusterId
@@ -473,11 +549,13 @@ class ebEscliUtils(object):
                     "attributes.owners"
                 ]
             )
-            
-            if _result:
-                _vol_id = _result.get("id")
-                _owners = _result.get("owners")
-            
+
+            for _res in _result:
+                if "id" in _res and "owners" in _res:
+                    _vol_id = _res.get("id")
+                    _owners = _res.get("owners")
+                    break
+
         ebLogInfo(f"VOLUME ID:{_vol_id}, OWNERS:{_owners}")
         return _vol_id, _owners
 
@@ -509,12 +587,13 @@ class ebEscliUtils(object):
 
             _json_output = self.mGetDictFromOutputString(_o, _cmd_line, _ebox)
             _result = self.mParseEscliJson(_json_output, match_dict = {"attributes.volume" : _vol_id}, return_keys=["id", "attributes.volume", "attributes.deviceName"]) 
-            
-            if _result:
-                _id = _result.get("id")
-                _volume = _result.get("volume")
-                _device_name = _result.get("deviceName")
-            
+
+            for _res in _result:
+                if "id" in _res and "volume" in _res and "deviceName" in _res:
+                    _id = _res.get("id")
+                    _volume = _res.get("volume")
+                    _device_name = _res.get("deviceName")
+
         ebLogInfo(f"VOLUME ATTCHMENT ID:{_id} VOLUME ID:{_volume} DEVICE NAME:{_device_name}")
         return _id, _volume, _device_name
 
@@ -547,20 +626,21 @@ class ebEscliUtils(object):
             _json_output = self.mGetDictFromOutputString(_o, _cmd_line, _ebox)
             _result = self.mParseEscliJson(_json_output, match_dict = {"attributes.volume" : _vol_id}, return_keys=["id", "attributes.mountPath", "attributes.size", "attributes.totalFree"]) 
             
-            if _result:
-                _acfs_id = _result.get("id")
-                _mount_path = _result.get("mountPath")
-                try:
-                    _size = int(_result.get("size")) / BYTES_TO_GB_CONVERSION
-                except (TypeError, ValueError):
-                    ebLogError(f"Cannot convert {_result.get('size')} to a valid integer")
-                    _size = ""
+            for _res in _result:
+                if "id" in _res and "mountPath" in _res:
+                    _acfs_id = _res.get("id")
+                    _mount_path = _res.get("mountPath")
+                    try:
+                        _size = int(_res.get("size")) / BYTES_TO_GB_CONVERSION
+                    except (TypeError, ValueError):
+                        ebLogError(f"Cannot convert {_res.get('size')} to a valid integer")
+                        _size = ""
 
-                try:
-                    _total_free = int(_result.get("totalFree")) / BYTES_TO_GB_CONVERSION
-                except (TypeError, ValueError):
-                    ebLogError(f"Cannot convert {_result.get('totalFree')} to a valid integer")
-                    _total_free = ""
+                    try:
+                        _total_free = int(_res.get("totalFree")) / BYTES_TO_GB_CONVERSION
+                    except (TypeError, ValueError):
+                        ebLogError(f"Cannot convert {_res.get('totalFree')} to a valid integer")
+                        _total_free = ""
             
         ebLogInfo(f"ACFS FILESYSTEM ID:{_acfs_id} MOUNT PATH:{_mount_path} SIZE:{_size} TOTAL_FREE:{_total_free}")
         return _acfs_id, _mount_path, _size, _total_free
@@ -600,6 +680,7 @@ class ebEscliUtils(object):
         _cell = aCell
         _acl_priv = aAclPriv
         _clusterName = aClusterName
+        _vault_name = aVaultName
         _ebox = self.__cluctrl
         try:
             _exascale_attr = self.mParseExascaleAttrib(aOptions)
@@ -609,7 +690,8 @@ class ebEscliUtils(object):
             _ctrl_port = str(_exascale_attr['ctrl_network']['port']).strip()
         except Exception as e:
             ebLogWarn(f"*** mChangeACL failed with Exception: {str(e)}")
-            _vault_name = self.mGetDBVaultName()
+            if not aVaultName:
+                _vault_name = self.mGetDBVaultName()
             _ctrl_ip, _ = self.mGetCtrlIP()
             _ctrl_port = CTRL_PORT
 
@@ -625,7 +707,11 @@ class ebEscliUtils(object):
                 _err_str = f"ESNP service is not configured on compute node {_hostname}. Skip updating acl permissions"
                 ebLogWarn(_err_str)
                 return
-            if _esnp_status and _esnp_status.lower() != "running":
+            if _esnp_status and _esnp_status.lower() == "disabled":
+                _err_str = f"ESNP service is disabled on compute node {_hostname}. Skip updating acl permissions"
+                ebLogWarn(_err_str)
+                return
+            elif _esnp_status and _esnp_status.lower() != "running":
                 _err_str = f"{_hostname}: DBSERVER esnpStatus is '{_esnp_status}'. Expected 'running'."
                 ebLogError(_err_str)
                 _ebox.mUpdateErrorObject(gExascaleError["UPDATE_ACL"], _err_str)
@@ -941,27 +1027,46 @@ class ebEscliUtils(object):
         with connect_to_host(_cell, get_gcontext(), username="root") as _node:
             _node.mExecuteCmdLog(f"{ESCLI} --wallet {WALLET_LOC} --ctrl {_ctrl_ip}:{_ctrl_port} rmuser {_cluster_name}")
 
-    def mListFiles(self, aCell, aFiles, aOptions):
+    def mListFiles(self, aCell, aFiles=None, aOptions=None, aJson=False, aVault=None, aFilter={}):
         _cell = aCell
         _files = aFiles
         _output = []
         _ebox = self.__cluctrl
         try:
             _exascale_attr = self.mParseExascaleAttrib(aOptions)
-            _vault_name = str(_exascale_attr['db_vault']['name']).strip()
             _ctrl_ip = str(_exascale_attr['ctrl_network']['ip']).strip()
             _ctrl_port = str(_exascale_attr['ctrl_network']['port']).strip()
         except Exception as e:
             ebLogWarn(f"*** mListFiles failed with Exception: {str(e)}")
-            _vault_name = self.mGetDBVaultName()
             _ctrl_ip, _ = self.mGetCtrlIP()
             _ctrl_port = CTRL_PORT
 
-        _cmd_str = f"{ESCLI} --wallet {WALLET_LOC} --ctrl {_ctrl_ip}:{_ctrl_port} ls {_files}"
-        with connect_to_host(_cell, get_gcontext(), username="root") as _node:
-            _ret, _out, _err = self.mExecuteEscliCmd(_cell, _cmd_str)
-            if _out:
-                _output = _out.splitlines()
+        if aJson:
+            with connect_to_host(_cell, get_gcontext(), username="root") as _node:
+                if aFilter:
+                    _filter_cmd = ""
+                    for _key, _value in list(aFilter.items()):
+                        _filter_cmd += f"{_key}={_value} "
+                    if aVault:
+                        _cmd_str = f'{ESCLI} --wallet {WALLET_LOC} --ctrl {_ctrl_ip}:{_ctrl_port} --json ls {aVault}/ --filter {_filter_cmd}'
+                    else:
+                        _cmd_str = f'{ESCLI} --wallet {WALLET_LOC} --ctrl {_ctrl_ip}:{_ctrl_port} --json ls {_filter_cmd}'
+                else:
+                    _cmd_str = f'{ESCLI} --wallet {WALLET_LOC} --ctrl {_ctrl_ip}:{_ctrl_port} --json ls'
+                _i, _o, _e = _node.mExecuteCmd(_cmd_str)
+                _rc = _node.mGetCmdExitStatus()
+
+            if _rc == 0:
+                _json_output = self.mGetDictFromOutputString(_o, _cmd_str, _ebox)
+                _output = self.mParseEscliJson(_json_output, match_dict = {f"attributes.name"}, 
+                                               return_keys=[f"attributes.name"],
+                                               exclude={"id": lambda v: isinstance(v, str) and v.startswith("$")})
+        else:
+            _cmd_str = f"{ESCLI} --wallet {WALLET_LOC} --ctrl {_ctrl_ip}:{_ctrl_port} ls {_files}"
+            with connect_to_host(_cell, get_gcontext(), username="root") as _node:
+                _ret, _out, _err = self.mExecuteEscliCmd(_cell, _cmd_str)
+                if _out:
+                    _output = _out.splitlines()
         return _output
 
     def mCreateVault(self, aCell, aEFRack, aVaultName, aSize, aOptions):
@@ -1004,7 +1109,7 @@ class ebEscliUtils(object):
             _ctrl_port = CTRL_PORT
 
         if aAttributes:
-            _attribute = ' '.join(aAttributes)
+            _attribute = ','.join(aAttributes)
             _cmd_str = f'{ESCLI} --wallet {WALLET_LOC} --ctrl {_ctrl_ip}:{_ctrl_port} lsvault @{_vault_name} --attributes {_attribute}'
             if aJson:
                 _cmd_str = f'{ESCLI} --wallet {WALLET_LOC} --ctrl {_ctrl_ip}:{_ctrl_port} --json lsvault @{_vault_name} --attributes {_attribute}'
@@ -1157,16 +1262,19 @@ class ebEscliUtils(object):
         ebLogTrace(f"Out is '{_out}' and err is '{_err}'")
         return _ret
 
-    def mGetClusterAttribute(self, aCell, aAttribute, aOptions):
+    def mGetClusterAttribute(self, aCell, aAttributes=[], aOptions=None, aJson=False):
         """
         :param aCell: cell used to run escli command
         :param aOptions: aOptions object
-        :param aAttribute: the cluster attribute to check
+        :param aAttributes: the cluster attributes to check
         """
 
         _cell = aCell
         _ebox = self.__cluctrl
-        ebLogInfo(f"List cluster attribute {aAttribute}")
+        _attributes = ""
+        if aAttributes:
+            _attributes = ','.join(aAttributes)
+        ebLogInfo(f"List cluster attributes {_attributes}")
 
         try:
             _exascale_attr = self.mParseExascaleAttrib(aOptions)
@@ -1177,7 +1285,124 @@ class ebEscliUtils(object):
             _ctrl_ip, _ = self.mGetCtrlIP()
             _ctrl_port = CTRL_PORT
 
-        _cmd_str = f'{ESCLI} --wallet {WALLET_LOC} --ctrl {_ctrl_ip}:{_ctrl_port} lscluster --attributes {aAttribute}'
-        _ret, _out, _err = self.mExecuteEscliCmd(_cell, _cmd_str)
-        ebLogTrace(f"Out is '{_out}' and err is '{_err}'")
+        if aJson:
+            with connect_to_host(_cell, get_gcontext(), username="root") as _node:
+                _cmd_str = f'{ESCLI} --wallet {WALLET_LOC} --ctrl {_ctrl_ip}:{_ctrl_port} --json lscluster --attributes {_attributes}'
+                _i, _o, _e = _node.mExecuteCmd(_cmd_str)
+                _rc = _node.mGetCmdExitStatus()
+
+            if _rc == 0:
+                _json_output = self.mGetDictFromOutputString(_o, _cmd_str, _ebox)
+                _result = self.mParseEscliJson(_json_output, match_dict = {f"attributes.{attribute}" for attribute in aAttributes}, 
+                                               return_keys=[f"attributes.{attribute}" for attribute in aAttributes])
+                return _rc, _result, ""
+            else:
+                return _rc, [], ""
+        else:
+            _cmd_str = f'{ESCLI} --wallet {WALLET_LOC} --ctrl {_ctrl_ip}:{_ctrl_port} lscluster --attributes {_attributes}'
+            _ret, _out, _err = self.mExecuteEscliCmd(_cell, _cmd_str)
+            ebLogTrace(f"Out is '{_out}' and err is '{_err}'")
         return _ret, _out, _err
+    
+    def mRemoveVMUserPrivilege(self, aCell, aUserId, aOptions):
+        _cell = aCell
+        _userId = aUserId
+        _ebox = self.__cluctrl
+
+        try:
+            _exascale_attr = self.mParseExascaleAttrib(aOptions)
+            _ctrl_ip = str(_exascale_attr['ctrl_network']['ip']).strip()
+            _ctrl_port = str(_exascale_attr['ctrl_network']['port']).strip()
+        except Exception as e:
+            ebLogWarn(f"*** mRemoveVMUserPrivilege failed with Exception: {str(e)}")
+            _ctrl_ip, _ = self.mGetCtrlIP()
+            _ctrl_port = CTRL_PORT
+
+        with connect_to_host(_cell, get_gcontext(), username="root") as _node:
+            _cmd_str = f'{ESCLI} --wallet {WALLET_LOC} --ctrl {_ctrl_ip}:{_ctrl_port} chuser {_userId} --attributes privilege="no_privilege"'
+            _node.mExecuteCmdLog(_cmd_str)
+
+    def mChangeClusterAtributes(self, aCell, aOptions, aAttribute={}):
+        """
+        :param aCell: cell used to run escli command
+        :param aEnable: True to enable auto file encryption, False otherwise
+        :param aOptions: aOptions object
+        """
+
+        _cell = aCell
+        _ebox = self.__cluctrl
+        _rc = -1
+
+        try:
+            _exascale_attr = self.mParseExascaleAttrib(aOptions)
+            _ctrl_ip = str(_exascale_attr['ctrl_network']['ip']).strip()
+            _ctrl_port = str(_exascale_attr['ctrl_network']['port']).strip()
+        except Exception as e:
+            ebLogWarn(f"*** mChangeClusterAtributes failed with Exception: {str(e)}")
+            _ctrl_ip, _ = self.mGetCtrlIP()
+            _ctrl_port = CTRL_PORT
+
+        _attr_cmd = ""
+        if aAttribute:
+            for _key, _value in list(aAttribute.items()):
+                _attr_cmd += f"{_key}={_value} "
+
+        with connect_to_host(_cell, get_gcontext(), username="root") as _node:
+            _cmd_str = f'{ESCLI} --wallet {WALLET_LOC} --ctrl {_ctrl_ip}:{_ctrl_port} chcluster --attributes {_attr_cmd}'
+            _node.mExecuteCmdLog(_cmd_str)
+            _rc = _node.mGetCmdExitStatus()
+
+        return _rc
+
+    def mListExascaleServices(self, aCell, aOptions):
+        _cell = aCell
+        _ebox = self.__cluctrl
+        try:
+            _exascale_attr = self.mParseExascaleAttrib(aOptions)
+            _ctrl_ip = str(_exascale_attr['ctrl_network']['ip']).strip()
+            _ctrl_port = str(_exascale_attr['ctrl_network']['port']).strip()
+        except Exception as e:
+            ebLogWarn(f"*** mListExascaleServices failed with Exception: {str(e)}")
+            _ctrl_ip, _ = self.mGetCtrlIP()
+            _ctrl_port = CTRL_PORT
+
+        with connect_to_host(_cell, get_gcontext()) as _node:
+            _cmd_str = f"{ESCLI} --wallet {WALLET_LOC} --ctrl {_ctrl_ip}:{_ctrl_port} --json lsservice --attributes name,status"
+            _i, _o, _e = _node.mExecuteCmd(_cmd_str)
+            _rc = _node.mGetCmdExitStatus()
+            if _rc:
+                _err_str = f"{_cell}: Failed to fetch exascale services"
+                ebLogInfo(_err_str)
+                _ebox.mUpdateErrorObject(gExascaleError["GET_EXASCALE_SERVICE_FAILED"], _err_str)
+                raise ExacloudRuntimeError(aErrorMsg=_err_str)
+
+            _json_output = self.mGetDictFromOutputString(_o, _cmd_str, _ebox)
+            _result = self.mParseEscliJson(_json_output, return_keys=["attributes.name", "attributes.status"]) 
+
+        return _result
+
+    def mCheckWalletExists(self, aHost, aOptions, aType="cell"):
+        _host = aHost
+        _type = aType
+        _ebox = self.__cluctrl
+        _rc = -1
+
+        try:
+            _exascale_attr = self.mParseExascaleAttrib(aOptions)
+            _ctrl_ip = str(_exascale_attr['ctrl_network']['ip']).strip()
+            _ctrl_port = str(_exascale_attr['ctrl_network']['port']).strip()
+        except Exception as e:
+            ebLogWarn(f"*** mCheckWalletExists failed with Exception: {str(e)}")
+            _ctrl_ip, _ = self.mGetCtrlIP()
+            _ctrl_port = CTRL_PORT
+
+        with connect_to_host(_host, get_gcontext()) as _node:
+            if _type == "cell":
+                _wallet = "/opt/oracle/cell/cellsrv/deploy/config/eswallet"
+            elif _type == "dom0":
+                _wallet = "/opt/oracle/dbserver/dbms/deploy/config/eswallet"
+
+            _cmd_str = f"/usr/bin/test -e {_wallet}"
+            _i, _o, _e = _node.mExecuteCmd(_cmd_str)
+            _rc = _node.mGetCmdExitStatus()
+        return _rc

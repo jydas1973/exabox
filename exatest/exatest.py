@@ -16,6 +16,12 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    jfsaldan    05/27/26 - Bug 39447473 - EXACLOUD UNITTEST FAILING IN LOCAL
+#                           ADE VIEWS | SUPPORT FOR NO JAVA_HOME REQUIRES JAVA
+#                           TO BE INSTALLED BUT DOES NOT INSTALL IT FOR
+#                           UNITTESTS
+#    joysjose    04/15/26 - Bug 38900232 - skip directories in ADE coverage
+#                           calculation
 #    ecejacru    03/13/26 - Enh 38961230 - Pylint configuration improvements
 #    prsshukl    02/26/26 - Bug 39013297 - As python3 is default, replacing
 #                           SimpleHTTPServer with http.server
@@ -53,6 +59,7 @@
 #
 
 import os
+import platform
 import re
 import sys
 import uuid
@@ -312,6 +319,7 @@ class ebExatestManager:
         self.__reportType = None
         self.__logger = ebExatestLogger(self.__workdir)
         self.__scriptArgs = None
+        self.__coverageHtmlStatus = None
 
         self.mReadConfig()
 
@@ -788,6 +796,93 @@ class ebExatestManager:
         _pythonVersion = self.mCheckPythonInstallation()
         self.mGenerateTestResult(ebExatestState.PASS, "installed_python", _pythonVersion)
 
+    def mGetJavaArchiveArch(self):
+
+        _machine = platform.machine()
+
+        if _machine == "x86_64":
+            return "x64"
+
+        if _machine == "aarch64":
+            return "aarch64"
+
+        self.mGetLog().warning(
+            "Unknown platform architecture '{0}', defaulting Java archive "
+            "selection to x64".format(_machine)
+        )
+        return "x64"
+
+    def mNaturalSortKey(self, aValue):
+
+        return [int(_part) if _part.isdigit() else _part
+                for _part in re.split(r"([0-9]+)", aValue)]
+
+    def mFindLatestJavaArchive(self, aSearchRoot, aArch):
+
+        _suffix = "linux-{0}_bin.tar.gz".format(aArch)
+        _archives = []
+
+        if not os.path.isdir(aSearchRoot):
+            return None
+
+        for _dirPath, _, _fileNames in os.walk(aSearchRoot, followlinks=True):
+
+            if not any([_part.startswith("java_")
+                        for _part in _dirPath.split(os.sep)]):
+                continue
+
+            for _fileName in _fileNames:
+                if _fileName.endswith(_suffix):
+                    _archives.append(os.path.join(_dirPath, _fileName))
+
+        if not _archives:
+            return None
+
+        return sorted(_archives, key=self.mNaturalSortKey)[-1]
+
+    def mInstallJava(self):
+
+        self.mGetLog().info("*** Installing Java ***")
+
+        _adeViewRoot = os.environ.get("ADE_VIEW_ROOT")
+        if not _adeViewRoot:
+            _msg = "ADE_VIEW_ROOT is undefined"
+            self.mGenerateTestResult(ebExatestState.FAIL, "install_java", _msg)
+            raise ExatestRuntimeError(ebExatestRC.ENV_ERROR)
+
+        _arch = self.mGetJavaArchiveArch()
+        _sdosEcraPath = os.path.join(_adeViewRoot, "sdos4ecs", "ecs", "ecra")
+        _archive = self.mFindLatestJavaArchive(_sdosEcraPath, _arch)
+
+        if not _archive:
+            _msg = ("Java archive not found under {0} matching "
+                    "*linux-{1}_bin.tar.gz").format(_sdosEcraPath, _arch)
+            self.mGenerateTestResult(ebExatestState.FAIL, "install_java", _msg)
+            raise ExatestRuntimeError(ebExatestRC.ENV_ERROR)
+
+        _javaPath = os.path.join(self.mGetExacloudPath(), "java")
+
+        if os.path.islink(_javaPath) or os.path.isfile(_javaPath):
+            os.unlink(_javaPath)
+        elif os.path.isdir(_javaPath):
+            shutil.rmtree(_javaPath)
+
+        os.makedirs(_javaPath)
+
+        _cmd = ["tar", "xzf", _archive, "-C", _javaPath,
+                "--strip-components=1"]
+        _rc, _out, _err = self.mExecuteLocal(_cmd)
+
+        if _rc != 0:
+            _msg = "Java extraction failed from {0}\n{1}\n{2}".format(
+                _archive, _out, _err
+            ).strip()
+            self.mGenerateTestResult(ebExatestState.FAIL, "install_java", _msg)
+            raise ExatestRuntimeError(ebExatestRC.ENV_ERROR)
+
+        _msg = "Installed Java from {0} into {1}".format(_archive, _javaPath)
+        self.mGenerateTestResult(ebExatestState.PASS, "install_java", _msg)
+
     def mRunMultiple(self, aFileList, aMethod, aTag, aRc, aArgs={}):
 
         _error = False
@@ -1137,6 +1232,49 @@ class ebExatestManager:
         self.mGetLog().debug("(cd {0}/coverage_html; python -m http.server 8000)".format(self.mGetResultDir()))
 
 
+    def mGetCoverageHtmlReportPath(self, aFile):
+
+        _coverageHtmlDir = os.path.join(self.mGetResultDir(), "coverage_html")
+        _statusPath = os.path.join(_coverageHtmlDir, "status.json")
+
+        if self.__coverageHtmlStatus is None:
+            self.__coverageHtmlStatus = {}
+
+            if os.path.exists(_statusPath):
+                with open(_statusPath, "r") as _f:
+                    _statusJson = json.load(_f)
+
+                for _entry in _statusJson.get("files", {}).values():
+                    _index = _entry.get("index", {})
+                    _relativeFilename = _index.get("relative_filename")
+                    _htmlFilename = _index.get("html_filename")
+
+                    if _relativeFilename and _htmlFilename:
+                        _relativeFilename = os.path.normpath(_relativeFilename)
+                        self.__coverageHtmlStatus[_relativeFilename] = _htmlFilename
+
+        _candidatePaths = [os.path.normpath(aFile)]
+
+        try:
+            _candidatePaths.append(os.path.normpath(os.path.relpath(aFile, self.mGetExacloudPath())))
+        except ValueError:
+            pass
+
+        for _candidate in _candidatePaths:
+            _htmlFilename = self.__coverageHtmlStatus.get(_candidate)
+            if _htmlFilename:
+                _htmlPath = os.path.join(_coverageHtmlDir, _htmlFilename)
+                if os.path.exists(_htmlPath):
+                    return _htmlPath
+
+        _fileS = os.path.basename(aFile).replace(".", "_")
+        _fileGlob = glob.glob("{0}/*{1}*".format(_coverageHtmlDir, _fileS))
+        if _fileGlob:
+            return _fileGlob[0]
+
+        return None
+
+
     def mCalculateAdeCoverage(self, aAdeFiles):
 
         self.mGetLog().info("****** Running ADE Coverage ********")
@@ -1157,11 +1295,13 @@ class ebExatestManager:
             _affectedLines = re.findall("\n[0-9,]{1,}[ac]{0,1}([0-9,]{1,})", _o)
 
             # New created files
-            if os.path.exists(_file) and not _affectedLines:
+            if os.path.isfile(_file) and not _affectedLines:
 
                 with open(_file, "r") as _f:
                     _linesInNewFile = _f.readlines()
                     _affectedLines = ["1," + str(len(_linesInNewFile))]
+            elif os.path.exists(_file) and not _affectedLines:
+                self.mGetLog().info("* Skipping non-file path in ADE coverage: {0}".format(_file))
 
             # Expand lines
             _lineList = []
@@ -1175,13 +1315,13 @@ class ebExatestManager:
                         _lineList.append(int(_lines))
 
             # Fetch if the affected lines was executed
-            _fileS = os.path.basename(_file).replace(".", "_")
-            _fileGlob = glob.glob("{0}/coverage_html/*{1}*".format(self.mGetResultDir(), _fileS))
             _coverageResult = ""
 
-            if _fileGlob:
+            _coverageHtmlPath = self.mGetCoverageHtmlReportPath(_file)
 
-                with open(_fileGlob[0], "r") as _f:
+            if _coverageHtmlPath:
+
+                with open(_coverageHtmlPath, "r") as _f:
                     _coverageResult = _f.read()
 
             # Fetch all the HTML tags
@@ -1405,7 +1545,9 @@ class ebExatestManager:
         if _diff_output:
             if not aFixStyleRequested:
                 _file_name = os.path.basename(aAbsFilePath)
-                with tempfile.NamedTemporaryFile(dir=self.mGetResultDir(),
+                with tempfile.NamedTemporaryFile(mode="w", 
+                                                 encoding="utf-8", 
+                                                 dir=self.mGetResultDir(),
                                                  prefix=_file_name+"_",
                                                  suffix=".dif",
                                                  delete=False) as fd:
@@ -1670,6 +1812,7 @@ class ebExatestScript:
             # Do Installations
             self.mGetManager().mCreateWorkdir()
             self.mGetManager().mInstallPython()
+            _javaInstalled = False
 
             # Calculate files
             _files = []
@@ -1742,11 +1885,17 @@ class ebExatestScript:
                     _filesTest = self.mGetManager().mFilterTestFiles(_files)
                     
                 _filesTest = list(set(_filesTest))
+                if not _javaInstalled:
+                    self.mGetManager().mInstallJava()
+                    _javaInstalled = True
                 self.mGetManager().mRunUnittest(_filesTest)
 
             if self.mGetScriptArgs().coverage:
                 _optionSelected = True
                 _filesTest = self.mGetManager().mFilterTestFiles(_files)
+                if not _javaInstalled:
+                    self.mGetManager().mInstallJava()
+                    _javaInstalled = True
                 self.mGetManager().mRunCoverage(_filesTest)
 
                 if self.mGetScriptArgs().ade_coverage:

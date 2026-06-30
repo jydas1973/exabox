@@ -4,7 +4,7 @@
 #
 # handler_exabox_conf_operations.py
 #
-# Copyright (c) 2024, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2024, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      handler_exabox_conf_operations.py - <one-line expansion of the name>
@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    joysjose    05/04/26 - Restrict exabox conf operation key policy
+#    joysjose    04/29/26 - Implement exabox conf sensitive key deny policy
 #    aypaul      04/23/25 - Bug#37535214 Use consistent backup before copying file.
 #    joysjose    07/25/24 - Handler to control the flow of exabox.conf file
 #                           operations
@@ -36,6 +38,45 @@ from exabox.tools.AttributeWrapper import wrapStrBytesFunctions
 from exabox.tools.Utils import mBackupFile
 
 class ExaboxConfOperationsHandler(JDHandler):
+    SENSITIVE_EXABOX_CONF_KEYS = frozenset((
+        "admin_switchkeys",
+        "agent_auth",
+        "agent_authkey",
+        "default_pwd",
+        "db_connstr",
+        "default_tls_conf",
+        "disable_spwd",
+        "dom0client_certificate_path",
+        "dom0client_key_path",
+        "ec_agent_port",
+        "enable_block_opctl",
+        "exacc_auth_principals",
+        "exacc_mtls",
+        "ilom_compute_pwd_b64",
+        "ilom_pwd_b64",
+        "ilom_cell_pwd_b64",
+        "oeda_pwd",
+        "root_spwd",
+        "ssh_private_key"
+    ))
+    ALLOWED_UPDATE_EXABOX_CONF_KEYS = frozenset((
+        "delete_vmbackup",
+        "idle_worker_count",
+        "idle_worker_count_nonexacs",
+        "max_oss_vmbackups",
+        "vmerase_pass",
+        "vmbackup2oss_skip_image",
+        "worker_connection_timeout",
+        "worker_count",
+        "worker_count_nonexacs",
+        "worker_idle_timeout_minutes",
+        "worker_port",
+        "worker_port_extravalidation",
+        "worker_thread_limit"
+    ))
+    ALLOWED_VIEW_EXABOX_CONF_KEYS = ALLOWED_UPDATE_EXABOX_CONF_KEYS.union((
+        "vmbackup",
+    ))
 
     def __init__(self, aOptions, aRequestObj = None, aDb=None):
 
@@ -80,6 +121,17 @@ class ExaboxConfOperationsHandler(JDHandler):
             ebLogTrace(f"*** mExecuteLocal: Output: \n{_std_out} Error: \n{_std_err}")
         return _rc, None, _std_out, _std_err
         
+    @classmethod
+    def _mNormalizeKey(cls, aKey):
+        return str(aKey).strip().lower()
+
+    def _mGetAllowedKeys(self, aOperation):
+        if aOperation == "view":
+            return self.ALLOWED_VIEW_EXABOX_CONF_KEYS
+        if aOperation == "update":
+            return self.ALLOWED_UPDATE_EXABOX_CONF_KEYS
+        return frozenset()
+
     def mUpdateExaboxConfParam(self, aJsonInput):
         _json_input = aJsonInput
         _exabox_conf_params = {}
@@ -91,14 +143,10 @@ class ExaboxConfOperationsHandler(JDHandler):
             if "key_value_pair" in list(_json_input.keys()):
                 _update_params = _json_input["key_value_pair"]
                 ebLogTrace(f"update params : {_update_params}")
+                self._mValidateUpdateKeyValuePair(_update_params, _exabox_conf_params)
                 for _key,_value in _update_params.items():
-                    _ret = _exabox_conf_params.get(_key,None)
-                    if _ret or _ret== "":
-                        _exabox_conf_params[_key] = _value
-                    elif _ret == None:
-                        _err_str = f"Key {_key} is not a valid parameter in exabox.conf. Please verify the keys in input json. Exiting"
-                        ebLogError(_err_str)
-                        raise ExacloudRuntimeError(0x0837, 0xA, _err_str)
+                    _normalized_key = self._mNormalizeKey(_key)
+                    _exabox_conf_params[_normalized_key] = _value
             else:
                 _err_str = f"key_value_pair not present in json payload. Exiting"
                 ebLogError(_err_str)
@@ -136,6 +184,68 @@ class ExaboxConfOperationsHandler(JDHandler):
                 _unordered_dict[key] = aDict[key] #strings stay strings
 
         return _unordered_dict
+
+    def _mGetRequestedKeys(self, aOperation, aJsonInput):
+        if aOperation == "view":
+            return aJsonInput.get("keys", [])
+        if aOperation == "update":
+            _key_value_pair = aJsonInput.get("key_value_pair", {})
+            if isinstance(_key_value_pair, dict):
+                return list(_key_value_pair.keys())
+        return []
+
+    def _mGetDeniedKeys(self, aOperation, aRequestedKeys):
+        _allowed_keys = self._mGetAllowedKeys(aOperation)
+        return sorted({
+            self._mNormalizeKey(_key)
+            for _key in aRequestedKeys
+            if self._mNormalizeKey(_key) not in _allowed_keys
+        })
+
+    def _mBuildDeniedResponse(self, aOperation, aDeniedKeys):
+        _sensitive_keys = sorted(
+            _key for _key in aDeniedKeys
+            if _key in self.SENSITIVE_EXABOX_CONF_KEYS
+        )
+        if _sensitive_keys:
+            _reason = "sensitive_keys_not_allowed"
+            _message = (
+                f"Operation '{aOperation}' denied because the request contains "
+                f"sensitive exabox.conf keys: {', '.join(aDeniedKeys)}"
+            )
+        else:
+            _reason = "keys_not_allowed_for_operation"
+            _message = (
+                f"Operation '{aOperation}' denied because the request contains "
+                f"keys that are not allowed for this endpoint: {', '.join(aDeniedKeys)}"
+            )
+        ebLogError(_message)
+        return {
+            "status": "denied",
+            "operation": aOperation,
+            "reason": _reason,
+            "denied_keys": aDeniedKeys,
+            "message": _message
+        }
+
+    def _mValidateUpdateKeyValuePair(self, aUpdateParams, aExistingParams):
+        for _key, _value in aUpdateParams.items():
+            _normalized_key = self._mNormalizeKey(_key)
+            _existing_value = aExistingParams.get(_normalized_key, None)
+            if _existing_value is None and _normalized_key not in aExistingParams:
+                _err_str = (
+                    f"Key {_normalized_key} is not a valid parameter in exabox.conf. "
+                    f"Please verify the keys in input json. Exiting"
+                )
+                ebLogError(_err_str)
+                raise ExacloudRuntimeError(0x0837, 0xA, _err_str)
+            if type(_value) is not type(_existing_value):
+                _err_str = (
+                    f"Key {_normalized_key} must preserve the existing exabox.conf value type. "
+                    f"Expected {type(_existing_value).__name__}, got {type(_value).__name__}. Exiting"
+                )
+                ebLogError(_err_str)
+                raise ExacloudRuntimeError(0x0837, 0xA, _err_str)
         
     def mViewExaboxConfParam(self, aJsonInput):
         _json_input = aJsonInput
@@ -145,11 +255,12 @@ class ExaboxConfOperationsHandler(JDHandler):
             ebLogInfo(f"view params : {_view_params}")
             _result = {}
             for _item in _view_params:
-                _ret = get_gcontext().mCheckConfigOption(_item)
-                if _ret:
-                    _result[_item] = _ret
+                _lookup_key = self._mNormalizeKey(_item)
+                _ret = get_gcontext().mCheckConfigOption(_lookup_key)
+                if _ret is not None:
+                    _result[_lookup_key] = _ret
                 else:
-                    ebLogError(f"Key {_item} is not present in exabox.conf")
+                    ebLogError(f"Key {_lookup_key} is not present in exabox.conf")
                     _rc = 1
                     
             _unordered_result_dict = self.unorderDict(_result) #to convert ReadOnlyDicts to normal dict
@@ -175,6 +286,13 @@ class ExaboxConfOperationsHandler(JDHandler):
                 if isinstance(_json_input, dict):
                     if "operation" in list(_json_input.keys()):
                         _operation = _json_input["operation"]
+                        _requested_keys = self._mGetRequestedKeys(_operation, _json_input)
+                        _denied_keys = self._mGetDeniedKeys(_operation, _requested_keys)
+
+                        if _denied_keys:
+                            _rc = 1
+                            _response = self._mBuildDeniedResponse(_operation, _denied_keys)
+                            return _rc, _response
                             
                         if _operation == "update":
                             self.mBackupExaboxConf()

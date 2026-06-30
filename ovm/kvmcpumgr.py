@@ -939,7 +939,12 @@ class exaBoxKvmCpuMgr(object):
                         ebLogInfo(f"Shutting down VM {_dom} since we are trying to resize from/to 1 core !")
                         _vmhandle = ebVgLifeCycle()
                         _vmhandle.mSetOVMCtrl(aCtx=get_gcontext(), aNode=_node)
-                        _rc = _vmhandle.mDispatchEvent('shutdown', aOptions=None, aVMId=_dom)
+                        _rc = _vmhandle.mDispatchEvent(
+                            'shutdown',
+                            aOptions=None,
+                            aVMId=_dom,
+                            aCluCtrlObj=self.__ecc
+                        )
                         if _rc == 0:
                             ebLogInfo('Shutdown of VM is successful!')
                             _restart = True
@@ -968,7 +973,12 @@ class exaBoxKvmCpuMgr(object):
 
                 if _restart:
                     ebLogInfo(f"Starting VM {_dom} after cpu reshape !")
-                    _rc = _vmhandle.mDispatchEvent('start', aOptions=None, aVMId=_dom)
+                    _rc = _vmhandle.mDispatchEvent(
+                        'start',
+                        aOptions=None,
+                        aVMId=_dom,
+                        aCluCtrlObj=self.__ecc
+                    )
                     if _rc == 0:
                         ebLogInfo('Start of VM is successful!')
                         _is_pingable = True

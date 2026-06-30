@@ -4,7 +4,7 @@
 #
 # ExaKmsEntryOCIRSA.py
 #
-# Copyright (c) 2021, 2023, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      ExaKmsEntryOCIRSA.py - <one-line expansion of the name>
@@ -108,13 +108,13 @@ class ExaKmsEntryOCI(ExaKmsEntry):
             self.mSetPublicKey(self.mCalculatePublicKey())
             self.mSetHash(self.mCalculateHash())
 
-    def mGetPublicKey(self, aComment=""):
+    def mGetPublicKey(self, aComment="", aRaw=False):
 
         # Generate private key and public key pair
         self.mGetPrivateKey()
 
         # Return public key
-        return super().mGetPublicKey(aComment)
+        return super().mGetPublicKey(aComment, aRaw=aRaw)
 
     def mCreatePrivateKeyFromEncData(self):
         _encryptedKey = self.mGetEncData()

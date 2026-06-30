@@ -4,7 +4,7 @@
 #
 # handler_ilom_pwd.py
 #
-# Copyright (c) 2025, Oracle and/or its affiliates.
+# Copyright (c) 2025, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      handler_ilom_pwd.py - <one-line expansion of the name>
@@ -17,12 +17,16 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    ecejacru    04/28/26 - Bug 39269446: harden ilom password reset command
+#                           handling
 #    gparada     07/07/25 - 37996087-jsondisp-reset-ilom-pwd
 #    gparada     07/07/25 - Creation
 #
 # Python libs
 import base64
+import binascii
 import os
+import shlex
 import subprocess
 from tempfile import NamedTemporaryFile
 from typing import Tuple
@@ -174,7 +178,7 @@ class IlomPasswordHandler(JDHandler):
 
         # Adding validation since this value will come from ecra payload
         # See comment/update in the original bug 37996087
-        if _pwd is None:
+        if _pwd is None or _pwd == "":
             ebLogError("Missing new_sct value")
             return -1
 
@@ -186,18 +190,9 @@ class IlomPasswordHandler(JDHandler):
 
         _host = aHost
 
-        _encoded_command_1 = 'cGFzc3dvcmQ='
-        _encoded_command_2 = 'd2VsY29tZTE='
-
-        _secret = _pwd if _pwd else _encoded_command_2
-        try:
-            _decoded_sct = base64.b64decode(_encoded_command_2).decode("utf-8")
-        except Exception as ex:
-            ebLogError(ex)
+        _decoded_sct = self.mDecodeNewSecret(_pwd)
+        if _decoded_sct is None:
             return -1
-
-        _decoded_sct = base64.b64decode(_secret).decode("utf-8")
-
 
         _std_out = subprocess.PIPE
         _std_err = subprocess.PIPE
@@ -228,13 +223,20 @@ class IlomPasswordHandler(JDHandler):
             else:
                 return -1
 
-            # Now we set the default password to the hex user
-            # Syntax is: ipmitool user set <word1> <user_hexa> <word2>            
-            _cmd = 'ipmitool user set ' \
-                + base64.b64decode(_encoded_command_1).decode("utf-8") \
-                + ' ' + _hex_user + ' '\
-                + _decoded_sct
+            # Quote the password so metacharacters remain data on the remote
+            # shell command path.
+            _cmd = 'ipmitool user set password ' \
+                + _hex_user + ' '\
+                + shlex.quote(_decoded_sct)
             _node.mExecuteCmdLog(_cmd, aStdOut=_std_out, aStdErr=_std_err)
             _rc = _node.mGetCmdExitStatus()
 
         return _rc
+
+    def mDecodeNewSecret(self, aSecret:str):
+        """Decode the base64-encoded password payload with strict checks."""
+        try:
+            return base64.b64decode(aSecret, validate=True).decode("utf-8")
+        except (binascii.Error, UnicodeDecodeError, ValueError) as ex:
+            ebLogError(f"Invalid new_sct payload: {ex}")
+            return None

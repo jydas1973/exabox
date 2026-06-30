@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    jesandov    04/28/26 - Bug#39263025 Fix security issues found using IA
 #    illamas     03/18/26 - Enh 39058830 add exakms create_key
 #    jesandov    01/06/25 - Add PKCS8 and TraditionalOpenSSL Format export
 #    jfsaldan    11/08/24 - Bug 37239457 - EXACLOUD EXACC FEDRAMP ; FS
@@ -47,14 +48,15 @@
 
 import os
 import json
+import uuid
 
 from exabox.core.Context import get_gcontext
 from exabox.log.LogMgr import ebLogError, ebLogInfo, ebLogWarn, ebLogDebug, ebLogVerbose
 from exabox.exakms.ExaKmsEntry import ExaKmsEntry, ExaKmsHostType, ExaKmsOperationType, ExaKmsKeyFormat
-from exabox.agent.ebJobRequest import nsOpt 
+from exabox.agent.ebJobRequest import nsOpt
 from exabox.agent.Client import ebExaClient
 from exabox.exakms.ExaKmsSingleton import ExaKmsSingleton
-from exabox.utils.node import connect_to_host, node_exec_cmd_check, node_exec_cmd
+from exabox.utils.node import connect_to_host, node_exec_cmd_check, node_exec_cmd, node_read_text_file, node_write_text_file
 from exabox.exakms.ExaKmsOCI import ExaKmsOCI
 from exabox.exakms.ExaKmsKVDB import ExaKmsKVDB
 from exabox.kms.crypt import cryptographyAES_CBC
@@ -392,6 +394,7 @@ class ExaKmsEndpoint:
         ebLogInfo(f"Total entries found: {_count}")
         return _count
 
+
     def mCreateKey(self):
 
         if "hostname" not in self.__options or not self.__options["hostname"]:
@@ -442,22 +445,10 @@ class ExaKmsEndpoint:
             )
 
             with connect_to_host(_hostname, get_gcontext()) as _node:
-
-                _cmd = f'/bin/echo "{_newEntry.mGetPublicKey()}"'
-                if _newEntry.mGetUser() == "root":
-                    _cmd = f'{_cmd} >> /root/.ssh/authorized_keys'
-                else:
-                    _cmd = f'{_cmd} >> /home/{_newEntry.mGetUser()}/.ssh/authorized_keys'
-                node_exec_cmd(_node, _cmd)
+                _exakms.mModifyAuthorizeKey(_node, _newEntry, ExaKmsOperationType.INSERT)
 
                 for _entry in _entriesToRemove:
-                    ebLogInfo(f"Removing existing key for {_user}@{_hostname}")
-                    _delCmd = f"/bin/sed -i 's@{_entry.mGetPublicKey().strip()}@@g'"
-                    if _entry.mGetUser() == "root":
-                        _delCmd = f'{_delCmd} /root/.ssh/authorized_keys'
-                    else:
-                        _delCmd = f'{_delCmd} /home/{_entry.mGetUser()}/.ssh/authorized_keys'
-                    node_exec_cmd(_node, _delCmd)
+                    _exakms.mModifyAuthorizeKey(_node, _entry, ExaKmsOperationType.DELETE)
                     _exakms.mDeleteExaKmsEntry(_entry)
 
             _exakms.mInsertExaKmsEntry(_newEntry)
@@ -545,7 +536,7 @@ class ExaKmsEndpoint:
             priv_key_type = _exakms.mCheckSshPrivKeyType(_privateFile)
             if priv_key_type == "RSA":
                 self.__options["exakms_key_type"]="RSA"
-            elif priv_key_type == "ECDSA": 
+            elif priv_key_type == "ECDSA":
                 self.__options["exakms_key_type"]="ECDSA"
             else:
                 ebLogError(f" exakms_key_type not found on options")
@@ -698,7 +689,7 @@ class ExaKmsEndpoint:
         if not _remoteCps:
             ebLogInfo("No remote host to sync up")
             return 0
-        
+
         # Get KVDB history
         _exakms = self.mGetExaKms()
 
@@ -710,7 +701,7 @@ class ExaKmsEndpoint:
         if not _history:
             ebLogInfo("KVDB is already up-to-date")
             return 0
-        
+
         _options = nsOpt({
             "exakms": 'kvdb_sync',
             "jsonconf": {
@@ -788,15 +779,7 @@ class ExaKmsEndpoint:
 
                 # Insert all the public keys in the /home of the hosts
                 for _newEntry in _newEntries:
-
-                    _cmd = f'/bin/echo "{_newEntry.mGetPublicKey()}"'
-
-                    if _newEntry.mGetUser() == "root":
-                        _cmd = f'{_cmd} >> /root/.ssh/authorized_keys'
-                    else:
-                        _cmd = f'{_cmd} >> /home/{_newEntry.mGetUser()}/.ssh/authorized_keys'
-
-                    node_exec_cmd(_node, _cmd)
+                    self.mGetExaKms().mModifyAuthorizeKey(_node, _newEntry, ExaKmsOperationType.INSERT)
 
                 # Delete ExaKms Entries
                 for _entry in _entries:
@@ -804,14 +787,7 @@ class ExaKmsEndpoint:
                     if _entry.mGetUser() not in _users:
                         continue
 
-                    _cmd = f"/bin/sed -i 's@{_entry.mGetPublicKey().strip()}@@g'"
-
-                    if _entry.mGetUser() == "root":
-                        _cmd = f'{_cmd} /root/.ssh/authorized_keys'
-                    else:
-                        _cmd = f'{_cmd} /home/{_entry.mGetUser()}/.ssh/authorized_keys'
-
-                    node_exec_cmd(_node, _cmd)
+                    self.mGetExaKms().mModifyAuthorizeKey(_node, _entry, ExaKmsOperationType.DELETE)
                     self.mGetExaKms().mDeleteExaKmsEntry(_entry)
 
             # Add ExaKms Entries
@@ -873,7 +849,7 @@ class ExaKmsEndpoint:
         for _entry in _entries:
 
             _newEntry = _exakms2.mBuildExaKmsEntry(
-                _entry.mGetFQDN(), 
+                _entry.mGetFQDN(),
                 _entry.mGetUser(),
                 _entry.mGetPrivateKey(),
                 aClassName=_entry.mGetVersion()

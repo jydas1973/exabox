@@ -4,7 +4,7 @@
 #
 # ExaKms.py
 #
-# Copyright (c) 2021, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      ExaKms.py - <one-line expansion of the name>
@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    jesandov    04/28/26 - Bug#39263025 Fix security issues found using IA
 #    jesandov    01/06/25 - Add PKCS8 and TraditionalOpenSSL Format export
 #    joysjose    08/12/24 - Bug 36283884 - Replace debug logs with trace logs
 #    talagusu    07/09/24 - Bug 36572957 - DEFAULT --EXAKMS-KEY-TYPE WHEN
@@ -222,14 +223,14 @@ class ExaKms:
         _rc = _proc.returncode
 
         return _rc, _stdOut
-    
+
     def mCheckSshPrivKeyType(self, aPrivKeyFile):
         _cmd = "ssh-keygen -l -f %s " % aPrivKeyFile
         try:
              _rc, _out = self.mExecuteLocal(_cmd)
-             if "RSA" in _out.upper(): 
+             if "RSA" in _out.upper():
                  return "RSA"
-             elif "ECDSA" in _out.upper() and _out.upper().startswith("384"): 
+             elif "ECDSA" in _out.upper() and _out.upper().startswith("384"):
              # For ECDSA we only support SHA 384
                  return "ECDSA"
              else:
@@ -238,7 +239,7 @@ class ExaKms:
              ebLogWarn("mCheckSshPrivKeyType: Failed to identify the key type ")
              ebLogWarn(f"Caused by: {e}")
              return "UNKNOWN"
-                        
+
 
 
     def mFilterCache(self, aRegexDict):
@@ -311,6 +312,48 @@ class ExaKms:
 
         _json.extend(self.mGetHistoryJson())
         return _json
+
+    def mModifyAuthorizeKey(self, aNode, aKmsEntry, aOperation):
+
+        # Add import here to avoid circular dependencies with node class
+        from exabox.utils.node import node_read_text_file, node_write_text_file
+
+        _username = aKmsEntry.mGetUser()
+        _publicKeyClean = aKmsEntry.mGetPublicKey(aRaw=True).strip()
+        _publicKey = aKmsEntry.mGetPublicKey().strip()
+
+        if aOperation not in [ExaKmsOperationType.DELETE, ExaKmsOperationType.INSERT]:
+            raise ValueError("Invalid operation type, expected: ADD/DELETE")
+
+        _prePath = f"/home/{_username}"
+        if _username == "root":
+            _prePath = "/root/"
+        if not aNode.mFileExists(_prePath):
+            raise ValueError(f"Invalid username detected, missing {_prePath}")
+
+        _authorizedKeyFile = f"/home/{_username}/.ssh/authorized_keys"
+        if _username == "root":
+            _authorizedKeyFile = "/root/.ssh/authorized_keys"
+
+        if not aNode.mFileExists(_authorizedKeyFile):
+            raise ValueError(f"Missing authorized keys file: {_authorizedKeyFile}")
+
+        _content = node_read_text_file(aNode, _authorizedKeyFile)
+
+        _newContent = []
+        for _row in _content.split("\n"):
+            if not _row.strip():
+                continue
+            elif _publicKeyClean in _row:
+                continue
+            else:
+                _newContent.append(_row.strip())
+        if aOperation == ExaKmsOperationType.INSERT:
+            _newContent.append(_publicKey)
+
+        _content = "\n".join(_newContent) + "\n"
+        node_write_text_file(aNode, _authorizedKeyFile, _content)
+
 
 
     def mGetExaKmsEntry(self, aPatternDict, aRefreshKey=False):

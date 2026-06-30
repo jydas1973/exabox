@@ -10,6 +10,7 @@ from exabox.ovm.vmcontrol import exaBoxOVMCtrl, ebVgLifeCycle
 import warnings
 from ast import literal_eval
 from exabox.core.Context import get_gcontext
+from exabox.utils.node import CmdRet
 from unittest.mock import patch
 
 cmdOutput1="""xen
@@ -375,6 +376,89 @@ class ebTestexaBoxVMCMD(ebTestClucontrol):
         cluctrl.mSetOptions(_options)
         _rc = cluctrl.mHandlerVmCmd()
         self.assertEqual(_rc, 0)
+
+    @patch("exabox.ovm.clucontrol.node_exec_cmd")
+    @patch("exabox.ovm.clucontrol.node_cmd_abs_path_check", return_value="xm")
+    @patch("exabox.ovm.clucontrol.getHVInstance")
+    def test_vmcmd_vm_resume_paused(self, aMockHVInstance, aMockCmdAbsPath, aMockNodeExec):
+        get_gcontext().mSetConfigOption('vm_handler','virsh')
+
+        aMockHVInstance.return_value.mGetDomains.return_value = ["scaqab10client01vm08.us.oracle.com"]
+        aMockNodeExec.side_effect = [
+            CmdRet(0, "paused\n", ""),
+            CmdRet(0, "running\n", ""),
+        ]
+
+        mockCommands = {
+            self.mGetRegexDom0(): [
+                [
+                    exaMockCommand("/bin/ping -c 1 scaqab10adm01nat08.us.oracle.com", aRc=0),
+                    exaMockCommand("imageinfo | grep 'Node type:'", aRc=0, aStdout="Node type: DOM0", aPersist=True)
+                ],
+                [
+                    exaMockCommand("cat /sys/hypervisor/type /sys/hypervisor/uuid", aRc=0, aStdout=cmdOutput1, aPersist=True),
+                    exaMockCommand("xm list", aStdout=_xmList, aPersist=True),
+                    exaMockCommand("ls /EXAVMIMAGES/GuestImages/", aStdout=_guestImages, aPersist=True),
+                    exaMockCommand("xm unpause", aRc=0, aPersist=True),
+                ],
+            ],
+            self.mGetRegexLocal(): [
+                [
+                    exaMockCommand("/bin/ping -c 1 scaqab10adm01nat08.us.oracle.com", aRc=0),
+                    exaMockCommand("/bin/echo EXIT | /usr/bin/nc scaqab10adm01nat08.us.oracle.com 22", aRc=0)
+                ],
+            ]
+        }
+
+        self.mPrepareMockCommands(mockCommands)
+        _options = self.mGetPayload()
+        cluctrl = self.mGetClubox()
+        _options.jsonconf['vms'] = ['_all_']
+
+        _options.vmid = 'scaqab10client01vm08.us.oracle.com'
+        _options.vmcmd = 'resume'
+        _options.debug = '1'
+        cluctrl.mSetOptions(_options)
+        _rc = cluctrl.mHandlerVmCmd()
+        self.assertEqual(_rc, 0)
+
+    @patch("exabox.ovm.clucontrol.node_exec_cmd")
+    @patch("exabox.ovm.clucontrol.node_cmd_abs_path_check", return_value="xm")
+    @patch("exabox.ovm.clucontrol.getHVInstance")
+    def test_vmcmd_vm_resume_not_paused(self, aMockHVInstance, aMockCmdAbsPath, aMockNodeExec):
+        get_gcontext().mSetConfigOption('vm_handler','virsh')
+
+        aMockHVInstance.return_value.mGetDomains.return_value = []
+        aMockNodeExec.return_value = CmdRet(0, "shut off\n", "")
+
+        mockCommands = {
+            self.mGetRegexDom0(): [
+                [
+                    exaMockCommand("/bin/ping -c 1 scaqab10adm01nat08.us.oracle.com", aRc=1),
+                    exaMockCommand("imageinfo | grep 'Node type:'", aRc=0, aStdout="Node type: DOM0", aPersist=True)
+                ],
+            ],
+            self.mGetRegexLocal(): [
+                [
+                    exaMockCommand("/bin/ping -c 1 scaqab10adm01nat08.us.oracle.com", aRc=1),
+                    exaMockCommand("/bin/ping -c 1 scaqab10adm01nat08.us.oracle.com", aRc=1),
+                    exaMockCommand("/bin/ping -c 1 scaqab10adm01nat08.us.oracle.com", aRc=1),
+                    exaMockCommand("/bin/ping -c 1 scaqab10adm01nat08.us.oracle.com", aRc=1),
+                ],
+            ]
+        }
+
+        self.mPrepareMockCommands(mockCommands)
+        _options = self.mGetPayload()
+        cluctrl = self.mGetClubox()
+        _options.jsonconf['vms'] = ['_all_']
+
+        _options.vmid = 'scaqab10client01vm08.us.oracle.com'
+        _options.vmcmd = 'resume'
+        _options.debug = '1'
+        cluctrl.mSetOptions(_options)
+        _rc = cluctrl.mHandlerVmCmd()
+        self.assertNotEqual(_rc, 0)
 
 
 if __name__ == "__main__":

@@ -504,7 +504,8 @@ class ebTestCluElasticComp(ebTestClucontrol):
         # This method in intended to test only until mAddDomU method
         # after that the connectivy change will fail
         try:
-            _reshape_obj.mAddNode(fullOptions)
+            with patch("exabox.ovm.clumisc.ebCluPreChecks.mNetworkDom0PreChecks"):
+                _reshape_obj.mAddNode(fullOptions)
         except Exception as e:
             self.assertTrue("Connectivity checks" or "mConnectivityChecks" in str(e))
 
@@ -1717,9 +1718,10 @@ class ebTestCluElasticComp(ebTestClucontrol):
     @mock.patch("exabox.ovm.clucontrol.exaBoxCluCtrl.mSaveClusterConfiguration")
     @mock.patch("exabox.ovm.cluelasticcompute.ebCluReshapeCompute.mConfigureVMBackup")
     @mock.patch("exabox.ovm.cluelasticcompute.ebCluReshapeCompute.mPostReshapeValidation")
+    @mock.patch('exabox.ovm.csstep.cs_util.csUtil.mRemoveDeprecatedSshAlgorithms')
     def test_mExecuteEndStep(self, mock_saveconfig, mock_clusterChecks, mock_installVMbackup, mock_getSrcDomU, mock_getSrcDom0, mock_sync_keys,\
                              mock_store_ic_ips, mock_save_config, mock_configure_vm_bkp, mock_post_reshape_validation, mock_mGetOracleBaseDirectories, 
-                             mock_mConfigureEDVbackup, mock_mUpdateSystemVaultAccess):
+                             mock_mConfigureEDVbackup, mock_mUpdateSystemVaultAccess, mock_SSHAlgorithms):
         ebLogInfo("Running unit test on cluelasticcompute.py:test_mExecuteEndStep")
 
         _cmds = { 
@@ -4142,7 +4144,8 @@ class ebTestCluElasticComp(ebTestClucontrol):
         # This method in intended to test only until mAddDomU method
         # after that the connectivy change will fail
         try:
-            _reshape_obj.mAddNode(fullOptions)
+            with patch("exabox.ovm.clumisc.ebCluPreChecks.mNetworkDom0PreChecks"):
+                _reshape_obj.mAddNode(fullOptions)
         except Exception as e:
             self.assertTrue("Connectivity checks" or "mConnectivityChecks" in str(e))
 
@@ -4529,6 +4532,60 @@ class ebTestCluElasticComp(ebTestClucontrol):
 
         release_mock.assert_not_called()
         mock_expand.assert_called_once_with(clubox)
+
+
+class ebTestCluElasticComputeRemoveNodeFromCRS(unittest.TestCase):
+
+    def test_skips_unconnectable_orig_domu(self):
+
+        ebLogInfo("Running unit test on cluelasticcompute.py:mRemoveNodeFromCRS skips unconnectable DomU")
+
+        _ebox = MagicMock()
+        _ebox.mIsExabm.return_value = False
+        _ebox.mIsOciEXACC.return_value = False
+        _ebox.mGetOracleBaseDirectories.return_value = ('/u01/app/19.0.0.0/grid', None, None)
+        _ebox.mGetOrigDom0sDomUs.return_value = [
+            ('dom0-unreachable.example', 'unreachable.example'),
+            ('dom0-reachable.example', 'reachable.example')
+        ]
+
+        _src_node = MagicMock()
+        _src_node.mExecuteCmd.return_value = (None, MagicMock(), None)
+        _src_node.mGetCmdExitStatus.side_effect = [1, 1, 1]
+        _src_context = MagicMock()
+        _src_context.__enter__.return_value = _src_node
+
+        _reachable_node = MagicMock()
+        _reachable_node.mGetCmdExitStatus.return_value = 1
+        _reachable_context = MagicMock()
+        _reachable_context.__enter__.return_value = _reachable_node
+
+        with ExitStack() as stack:
+            _connect_mock = stack.enter_context(
+                patch('exabox.ovm.cluelasticcompute.connect_to_host',
+                      side_effect=[_src_context, _reachable_context]))
+            _node_cls_mock = stack.enter_context(patch('exabox.ovm.cluelasticcompute.exaBoxNode'))
+            _ping_node = _node_cls_mock.return_value
+            _ping_node.mIsConnectable.side_effect = [False, True]
+            stack.enter_context(patch('exabox.ovm.cluelasticcompute.mRunCrsCommandsWithRetry'))
+
+            _obj = object.__new__(ebCluReshapeCompute)
+            _obj._ebCluReshapeCompute__eboxobj = _ebox
+            _obj.mSetSrcDomU('srcdomu.example')
+            _obj.mRemoveNodeFromCRS('deleted.example')
+
+        _ping_node.mIsConnectable.assert_has_calls([
+            mock.call('unreachable.example'),
+            mock.call('reachable.example')
+        ])
+        self.assertEqual(
+            ['srcdomu.example', 'reachable.example'],
+            [_call.args[0] for _call in _connect_mock.call_args_list])
+        _reachable_node.mExecuteCmdLog.assert_has_calls([
+            mock.call("/bin/sed -i '/deleted/d' /etc/hosts"),
+            mock.call("/bin/sed -i '/deleted/d' /etc/hosts")
+        ])
+
 
 if __name__ == '__main__':
     unittest.main() 

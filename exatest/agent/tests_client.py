@@ -4,7 +4,7 @@
 #
 # tests_client.py
 #
-# Copyright (c) 2021, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_client.py
@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    aypaul      05/11/26 - Add unit tests
 #    aypaul      12/09/25 - Bug#38736166 Enhance code coverage with Cline
 #    abflores    07/18/25 - Fix sop ETF
 #    abflores    06/18/25 - Bug 38022923 - Increase coverage
@@ -30,6 +31,8 @@ import os
 import json
 import unittest
 import copy
+import shutil
+import tempfile
 from unittest.mock import patch, MagicMock, PropertyMock, mock_open
 from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
 from exabox.core.Node import exaBoxNode
@@ -105,6 +108,30 @@ class ebTestExaClient(ebTestClucontrol):
 
     @classmethod
     def setUpClass(self):
+        self._mysql_socket_dir = tempfile.mkdtemp(prefix="exatest_mysql_", dir="/tmp")
+
+        def _ensure_socket_dir(*args, **kwargs):
+            os.makedirs(self._mysql_socket_dir, exist_ok=True)
+            return self._mysql_socket_dir
+
+        self._https_patch = patch(
+            "exabox.network.HTTPSHelper.build_opener",
+            side_effect=lambda *args, **kwargs: MagicMock(read=lambda: json.dumps(SAMPLE_RESPONSE_JSON).encode("utf-8")),
+        )
+        self._https_patch.start()
+
+        self._socket_patch = patch(
+            "exabox.agent.DBService.CreateValidMysqlSocketDir.mGetValidPath",
+            side_effect=_ensure_socket_dir,
+            create=True,
+        )
+        self._socket_patch.start()
+
+        self._db_patch = patch("exabox.core.DBStore3.ebGetDefaultDB")
+        self._mock_get_default_db = self._db_patch.start()
+        self._db_mock = MagicMock()
+        self._mock_get_default_db.side_effect = lambda: self._db_mock
+
         super(ebTestExaClient, self).setUpClass(aGenerateDatabase=True, aUseAgent=False)
         warnings.filterwarnings("ignore")
         #Uncomment this once Agent issue in exatest is fixed
@@ -116,6 +143,17 @@ class ebTestExaClient(ebTestClucontrol):
             self.mGetUtil(self).mGetInstallerAgent().mStopAgent()
         except Exception as e:
             pass
+        if getattr(self, "_https_patch", None):
+            self._https_patch.stop()
+            self._https_patch = None
+        if getattr(self, "_socket_patch", None):
+            self._socket_patch.stop()
+            self._socket_patch = None
+        if getattr(self, "_db_patch", None):
+            self._db_patch.stop()
+            self._db_patch = None
+        if getattr(self, "_mysql_socket_dir", None):
+            shutil.rmtree(self._mysql_socket_dir, ignore_errors=True)
 
     def test_ebJobResponse(self):
         ebLogInfo("")
@@ -426,17 +464,17 @@ class ebTestExaClient(ebTestClucontrol):
         ebLogInfo("Running unit test on mGetSystemMetricsFromDB")
         thisClient = ebExaClient()
 
-        with patch('exabox.core.DBStore3.ebExacloudDB.mSelectAllFromEnvironmentResourceDetails', return_value=(None, None, None)),\
-             patch('exabox.core.DBStore3.ebExacloudDB.mGetNumberOfIdleWorkers', return_value=0):
-            self.assertEqual(thisClient.mGetSystemMetricsFromDB(), (0.0,0.0,0))
+        self._db_mock.mSelectAllFromEnvironmentResourceDetails.return_value = (None, None, None)
+        self._db_mock.mGetNumberOfIdleWorkers.return_value = 0
+        self.assertEqual(thisClient.mGetSystemMetricsFromDB(), (0.0, 0.0, 0))
 
-        with patch('exabox.core.DBStore3.ebExacloudDB.mSelectAllFromEnvironmentResourceDetails', return_value=(18.23, 93.59, None)),\
-             patch('exabox.core.DBStore3.ebExacloudDB.mGetNumberOfIdleWorkers', return_value=3):
-            self.assertEqual(thisClient.mGetSystemMetricsFromDB(), (18.23, 93.59, 3))
+        self._db_mock.mSelectAllFromEnvironmentResourceDetails.return_value = (18.23, 93.59, None)
+        self._db_mock.mGetNumberOfIdleWorkers.return_value = 3
+        self.assertEqual(thisClient.mGetSystemMetricsFromDB(), (18.23, 93.59, 3))
 
-        with patch('exabox.core.DBStore3.ebExacloudDB.mSelectAllFromEnvironmentResourceDetails', return_value=(85.75, 93.12, None)),\
-             patch('exabox.core.DBStore3.ebExacloudDB.mGetNumberOfIdleWorkers', return_value=15):
-            self.assertEqual(thisClient.mGetSystemMetricsFromDB(), (85.75, 93.12, 15))
+        self._db_mock.mSelectAllFromEnvironmentResourceDetails.return_value = (85.75, 93.12, None)
+        self._db_mock.mGetNumberOfIdleWorkers.return_value = 15
+        self.assertEqual(thisClient.mGetSystemMetricsFromDB(), (85.75, 93.12, 15))
 
         ebLogInfo("test on mGetSystemMetricsFromDB succeeded.")
 

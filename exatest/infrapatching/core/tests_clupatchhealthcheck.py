@@ -4,7 +4,7 @@
 #
 # tests_clupatchhealthcheck.py
 #
-# Copyright (c) 2025, Oracle and/or its affiliates.
+# Copyright (c) 2025, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_clupatchhealthcheck.py - <one-line expansion of the name>
@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    bhpati      05/06/26 - Bug 39083220 - AIM4ECS:0X03090001 - SWITCH PATCHMGR
+#                           COMMAND FAILED
 #    gojoseph    08/07/25 - Enh 38262352 Unit test cases to check ES services
 #                           are online
 #    bhpati      04/18/25 - Create file
@@ -31,8 +33,8 @@ from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
 from exabox.log.LogMgr import ebLogInfo
 from exabox.agent.ebJobRequest import ebJobRequest
 from exabox.infrapatching.utils.utility import mGetInfraPatchingConfigParam
-from exabox.infrapatching.core.clupatchhealthcheck import ebCluPatchHealthCheck
 from exabox.infrapatching.handlers.generichandler import GenericHandler
+from exabox.infrapatching.core.clupatchhealthcheck import ebCluPatchHealthCheck, PATCHING_NODE_SSH_CHECK_FAILED
 from exabox.core.MockCommand import exaMockCommand
 from exabox.ovm.clumisc import ebCluSshSetup
 
@@ -185,6 +187,166 @@ class ebTestCluPatchHealthCheck(ebTestClucontrol):
             #patch("exabox.ovm.clumisc.ebCluSshSetup.mValidateSecureSsh", return_value="True"):
             #_clupatchhealthcheck.mVerifyPatchmgrSshConnectivityBetweenExadataHosts(aNodeList, aSourceNode)
             self.assertRaises(Exception, _clupatchhealthcheck.mVerifyPatchmgrSshConnectivityBetweenExadataHosts, aNodeList, aSourceNode)
+    
+    @patch("exabox.infrapatching.handlers.generichandler.ebGetDefaultDB")
+    @patch("exabox.infrapatching.core.clupatchhealthcheck.ProcessStructure")
+    @patch("exabox.infrapatching.core.clupatchhealthcheck.ProcessManager")
+    @patch("exabox.core.Node.exaBoxNode")
+    def tests_mVerifyPatchmgrSshConnectivityBetweenExadataHosts_timeout_sets_patch_code(
+        self,
+        mock_node_cls,
+        mock_pm_cls,
+        mock_proc_cls,
+        mock_get_db,
+    ):
+        """Force ProcessManager timeout and ensure PATCHING_NODE_SSH_CHECK_FAILED is logged."""
+        mock_db = MagicMock()
+        mock_db.mCheckIBFabricClusterTable.return_value = None
+        mock_get_db.return_value = mock_db
+
+        class _FakeProcessStructure:
+            def __init__(self, *_args, **_kwargs):
+                pass
+            def mSetMaxExecutionTime(self, *_args):
+                pass
+            def mSetJoinTimeout(self, *_args):
+                pass
+            def mSetLogTimeoutFx(self, *_args):
+                pass
+
+        class _TimeoutProcessManager:
+            def __init__(self):
+                self._manager = MagicMock()
+                self._manager.list.return_value = []
+            def mGetManager(self):
+                return self._manager
+            def mStartAppend(self, _proc):
+                pass
+            def mJoinProcess(self):
+                raise Exception("Process timeout")
+            def mGetStatus(self):
+                return "done"
+
+        mock_proc_cls.side_effect = lambda *a, **k: _FakeProcessStructure(*a, **k)
+        mock_pm_cls.side_effect = lambda *a, **k: _TimeoutProcessManager()
+
+        ghandler = GenericHandler({
+            "CluControl": MagicMock(),
+            "LocalLogFile": "exabox/exatest/infrapatching/resources/patchmgr_logs",
+            "TargetType": ["domu"],
+            "Operation": "patch_prereq_check",
+            "OperationStyle": 'rolling',
+            "PayloadType": "exadata_release",
+            "TargetEnv": "production",
+            "EnablePlugins": "no",
+            "PluginTypes": "none",
+            "CellIBSwitchesPatchZipFile": "exabox/exatest/infrapatching/resources/PatchPayloads/21.2.11.0.0.220414.1/CellPatchFile/21.2.11.0.0.220414.1.patch.zip",
+            "Dom0DomuPatchZipFile": "exabox/exatest/infrapatching/resources/PatchPayloads/21.2.11.0.0.220414.1/CellPatchFile/21.2.11.0.0.220414.1.patch.zip",
+            "TargetVersion": "21.2.11.0.0.220414.1",
+            "ClusterID": 1,
+            "BackupMode": "yes",
+            "Fedramp": "DISABLED",
+            "Retry": "no",
+            "RequestId": "e2f947dd-b902-4949-bc04-8b8c52ec170b",
+            "RackName": "slcs27",
+            "isMVM": "no",
+            "ComputeNodeList": [
+                "iad123456exdd001.oraclecloud.internal",
+                "iad123456exdd004.oraclecloud.internal",
+                "iad123456exdd002.oraclecloud.internal",
+                "iad123456exdd003.oraclecloud.internal",
+            ],
+            "StorageNodeList": [
+                "iad123456exdcl02.oraclecloud.internal",
+                "iad123456exdcl05.oraclecloud.internal",
+                "iad123456exdcl01.oraclecloud.internal",
+                "iad123456exdcl06.oraclecloud.internal",
+                "iad123456exdcl04.oraclecloud.internal",
+                "iad123456exdcl03.oraclecloud.internal",
+            ],
+            "Dom0domUDetails": {
+                "iad123456exdd001.oraclecloud.internal": {
+                    "domuDetails": [{
+                        "customerHostname": "ora12db01.oradb.in.cloud.com",
+                        "domuNatHostname": "iad123456exdd001nat01.oraclecloud.internal",
+                        "clusterName": "iad123456exd-oracle-ora12XXXXXXX-clu01",
+                        "meterocpus": "0",
+                    }],
+                },
+                "iad123456exdd004.oraclecloud.internal": {
+                    "domuDetails": [{
+                        "customerHostname": "ora12db04.oradb.in.cloud.com",
+                        "domuNatHostname": "iad123456exdd004nat01.oraclecloud.internal",
+                        "clusterName": "iad123456exd-oracle-ora12XXXXXXX-clu01",
+                        "meterocpus": "0",
+                    }],
+                },
+                "iad123456exdd002.oraclecloud.internal": {
+                    "domuDetails": [{
+                        "customerHostname": "ora12db02.oradb.in.cloud.com",
+                        "domuNatHostname": "iad123456exdd002nat01.oraclecloud.internal",
+                        "clusterName": "iad123456exd-oracle-ora12XXXXXXX-clu01",
+                        "meterocpus": "0",
+                    }],
+                },
+                "iad123456exdd003.oraclecloud.internal": {
+                    "domuDetails": [{
+                        "customerHostname": "ora12db03.oradb.in.cloud.com",
+                        "domuNatHostname": "iad123456exdd003nat01.oraclecloud.internal",
+                        "clusterName": "iad123456exd-oracle-ora12XXXXXXX-clu01",
+                        "meterocpus": "0",
+                    }],
+                },
+            },
+            "ComputeNodeListByAlias": [],
+            "AdditionalOptions": [{
+                "AllowActiveNfsMounts": "yes",
+                "ClusterLess": "no",
+                "EnvType": "ecs",
+                "ForceRemoveCustomRpms": "no",
+                "IgnoreAlerts": "no",
+                "IgnoreDateValidation": "yes",
+                "IncludeNodeList": "none",
+                "LaunchNode": "none",
+                "ExcludedNodeList": [],
+                "OneoffCustomPluginFile": "none",
+                "OneoffScriptArgs": "none",
+                "RackSwitchesOnly": "no",
+                "SingleUpgradeNodeName": "none",
+                "SkipDomuCheck": "no",
+                "exasplice": "no",
+                "isSingleNodeUpgrade": "no",
+                "serviceType": "EXACC",
+                "exaunitId": 0,
+            }],
+        })
+
+        ghandler.mGetMaxNumberofSshRetries = MagicMock(return_value=1)
+        ghandler.mAddError = MagicMock()
+        ghandler.mGetCluControl = MagicMock()
+        ghandler.mGetCluControl.return_value.mCheckConfigOption.return_value = False
+
+        patch_hc = ebCluPatchHealthCheck(aCluCtrlObj=MagicMock(), aGenericHandler=ghandler)
+        patch_hc.mPatchLogWarn = MagicMock()
+        patch_hc.mPatchLogInfo = MagicMock()
+
+        try:
+            patch_hc.mVerifyPatchmgrSshConnectivityBetweenExadataHosts(
+                aNodeList=["scaqan10dv0708.us.oracle.com"],
+                aSourceNode="scaqan10dv0808.us.oracle.com",
+                aStage="PrePatch",
+            )
+        except Exception:
+            pass
+
+        self.assertTrue(
+            any(
+                call.args and call.args[0] == PATCHING_NODE_SSH_CHECK_FAILED
+                for call in ghandler.mAddError.call_args_list
+            ),
+            "PATCHING_NODE_SSH_CHECK_FAILED was not reported for ProcessManager timeout",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

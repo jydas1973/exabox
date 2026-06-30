@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2022, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     EditorHandler - Basic functionality
@@ -11,6 +11,10 @@ NOTE:
     None    
 
 History:
+
+    hgaldame    04/23/2026 - exacc:security: authenticated whitelist bypass in
+                             remoteec editor endpoint allows arbitrary file read
+                             outside approved paths
     hgaldame    11/01/2022 - 33995798 - exacc remoteec enhancements 
                              exaccops-hot 
     hgaldame    09/30/2022 - 34627398 - exacc:bb:22.3.1:cps-sw upgrade: provide
@@ -77,8 +81,8 @@ class EditorEndpoint(BaseEndpoint):
             _is_exacloud_log = _local_path == _param_path
             
             _exacloud_blacklist = self.__exacloudLogsBlackList 
-            _expr_blacklist = [ re.escape(_pattern) for _pattern in _exacloud_blacklist]
-            _regex_blacklist = re.compile("|".join(_expr_blacklist))
+            _expr_blacklist = [re.escape(p) for p in _exacloud_blacklist if p]
+            _regex_blacklist = re.compile("|".join(_expr_blacklist)) if _expr_blacklist else None
             for _file in set(os.listdir(aPath)):
                 if aRegex is not None:
                     if re.search(aRegex, _file) is not None:
@@ -86,7 +90,7 @@ class EditorEndpoint(BaseEndpoint):
                 else:
                     if _is_exacloud_log:
                         # filter exacloud log files from blacklist when no regex
-                        if re.search(_regex_blacklist, _file):
+                        if _regex_blacklist and re.search(_regex_blacklist, _file):
                             continue
                         _files.append(_file)                                    
                     else:
@@ -103,6 +107,7 @@ class EditorEndpoint(BaseEndpoint):
                 _sorted_list = sorted(_files, key=mGetmtimeFromPath, reverse=True)
                 _sliced_files = _sorted_list[:int_limit]
                 _files = [ self.mBuildDictFromFile(aPath, _path) for _path in _sliced_files]
+                
         except Exception as e:
             self.mGetResponse()['text'] = "Could not list directory: {0}".format(e)
             self.mGetResponse()['error'] = "Could not list directory: {0}".format(e)
@@ -111,25 +116,25 @@ class EditorEndpoint(BaseEndpoint):
         return _files
 
     def mGetPath(self, aFile=None):
+        whitelist = [Path(entry).resolve() for entry in self.mGetWhiteList()]
+        if not whitelist:
+            return None
 
         if aFile is None:
-            return self.mGetWhiteList()[0]
+            return str(whitelist[0])
 
-        else:
+        candidate = Path(aFile)
+        if not candidate.is_absolute():
+            candidate = Path(self.mGetConfig().mGetExacloudPath()) / candidate
 
-            if aFile.startswith("/"):
-                _path = os.path.abspath(aFile)
-                for _white in self.mGetWhiteList():
-                    if _path.startswith(_white):
-                        return _path
+        resolved = candidate.resolve(strict=False)
 
-            else:
-                _path = os.path.abspath("{0}/{1}".format(self.mGetConfig().mGetExacloudPath(), aFile))
+        for allowed in whitelist:
+            if resolved == allowed or allowed in resolved.parents:
+                return str(resolved)
 
-                if _path.startswith(self.mGetConfig().mGetExacloudPath()):
-                    return _path
+        return None
 
-            return None
 
     def mGetFileContent(self, aFile, aOffset=None, aLimit=None, aRegex=None):
 

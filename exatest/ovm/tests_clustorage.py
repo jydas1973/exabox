@@ -16,6 +16,11 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    joysjose    06/08/26 - Fix tests_clustorage celldisk freespace mock
+#    jfsaldan    04/27/26 - Bug 39236016 - EXADB-D: EXACLOUD: STORAGE RESIZE
+#                           (SHRINK) AFTER ADD STORAGE IS ESTIMATING PERCENTAGE
+#                           BEYOND CURRENT DISKGROUP SIZE
+#    rajsag      04/15/26 - Add unit tests for storage precision
 #    ririgoye    03/02/26 - Bug 39025598 - ECS_MAIN ->
 #                           TESTS_DISKREBALANCE_PY.DIF AND
 #                           TESTS_CLUSTORAGE_PY.DIF FROM
@@ -65,6 +70,7 @@ import math
 import time
 import unittest
 import xml.etree.ElementTree as etree
+import copy
 
 from unittest.mock import patch
 from unittest.mock import MagicMock, Mock
@@ -969,7 +975,7 @@ status: normal
     def test_mPatchClusterDiskgroup(self, 
         mock_mGetDgVolsize, mock_mAddDG, mock_mGetDiskGroupSize, mock_mCheckSharedEnvironment, mock_mGetRackSize,
         mock_mGetEsracks, mock_mGetDiskSize, mock_mCompare):
-        mock_mGetDiskGroupSize.return_value = '1234G'
+        mock_mGetDiskGroupSize.return_value = '21503.81G'
         mock_mGetDgVolsize.return_value = (100, 200, 300, 10, 20, 30)
 
         mock_mGetDiskSize.return_value = 7
@@ -982,10 +988,11 @@ status: normal
         _ebox.mGetMachines.return_value.mGetMachineConfig.return_value = MagicMock(
             mGetLocaldisksCount=MagicMock(return_value=12)
         )
+        _ebox.mReturnCellNodes = MagicMock(return_value={'cell1': {}})
         _clustorage = _ebox.mGetStorage()
-        _dg_xml = etree.fromstring('<diskGroup id="DG1"><diskGroupName>DATA01</diskGroupName><redundancy>HIGH</redundancy><sliceSize>100G</sliceSize><diskGroupSize>200G</diskGroupSize><ocrVote>false</ocrVote><machines><machine id="m1"/></machines></diskGroup>')
+        _dg_xml = etree.fromstring('<diskGroup id="DG1"><diskGroupName>DATA01</diskGroupName><redundancy>HIGH</redundancy><sliceSize>100.5G</sliceSize><diskGroupSize>21503.81G</diskGroupSize><ocrVote>false</ocrVote><machines><machine id="m1"/></machines></diskGroup>')
         _dg_cfg = ebCluDiskGroupConfig(_dg_xml)
-        _dg_cfg.mGetDiskGroupSize = MagicMock(return_value='1234G')
+        _dg_cfg.mGetDiskGroupSize = MagicMock(return_value='21503.81G')
         _clustorage.mGetDiskGroupConfig = MagicMock(return_value=_dg_cfg)
         _clustorage.mGetDiskSizeInInt = MagicMock(return_value=2000)
         _options = _ebox.mGetArgsOptions()
@@ -1277,7 +1284,11 @@ status: normal
         _cmds = {
             self.mGetRegexCell(): [
                 [
-                    exaMockCommand("cellcli -e LIST CELLDISK WHERE", aRc=0, aStdout="CD_01_fra180182exdcl01 16T 1T\n")
+                    exaMockCommand("attributes name;", aRc=0, aStdout="")
+                ],
+                [
+                    exaMockCommand("attributes name,size,freespace;",
+                                   aRc=0, aStdout="CD_01_fra180182exdcl01 16T 1T\n")
                 ]
             ]
         }
@@ -3004,6 +3015,70 @@ status: normal
         _mock_record.assert_called_with(gDiskgroupError['InvalidPropValue'],
                                         '*** Invalid usedspace of diskgroup DATAC1')
 
+    def test_mGetDiskgroupsNewSizes_sets_resize_flags_for_small_deltas(self):
+        _ebox = self.mGetClubox()
+        _options = copy.deepcopy(_ebox.mGetArgsOptions())
+        _options.jsonconf = {
+            'newsize': 101,
+            'backup_disk': 'false',
+            'create_sparse': 'false',
+            'storage_distribution': '80:20:0'
+        }
+        _clustorage = ebCluManageStorage(_ebox, _options)
+
+        _dgObj = MagicMock()
+        _dgObj.mSetDiskGroupOperationData.return_value = None
+        _dgObj.mUtilGetDiskgroupSize.side_effect = [
+            160 * 1024,
+            150 * 1024,
+            40 * 1024,
+            20 * 1024
+        ]
+
+        _constants = _clustorage.mGetConstantsObj()
+
+        _data_dg = MagicMock()
+        _data_dg.mGetDiskGroupType.return_value = _constants._data_dg_type_str
+        _data_dg.mGetDgName.return_value = 'DATAC1'
+        _data_dg.mGetDiskGroupSize.return_value = '160G'
+        _data_dg.mGetDgRedundancy.return_value = 'NORMAL'
+
+        _reco_dg = MagicMock()
+        _reco_dg.mGetDiskGroupType.return_value = _constants._reco_dg_type_str
+        _reco_dg.mGetDgName.return_value = 'RECOC1'
+        _reco_dg.mGetDiskGroupSize.return_value = '40G'
+
+        _cluster = MagicMock()
+        _cluster.mGetCluDiskGroups.return_value = ['dg_data', 'dg_reco']
+
+        _ebox_clusters = MagicMock()
+        _ebox_clusters.mGetCluster.return_value = _cluster
+
+        _ebox_storage = MagicMock()
+        _ebox_storage.mGetDiskGroupConfig.side_effect = [_data_dg, _reco_dg]
+
+        _request_obj = MagicMock()
+        _ebox_ctrl = MagicMock()
+        _ebox_ctrl.mGetClusters.return_value = _ebox_clusters
+        _ebox_ctrl.mGetStorage.return_value = _ebox_storage
+        _ebox_ctrl.mGetRequestObj.return_value = _request_obj
+
+        _dgmap = {}
+
+        with patch.object(_clustorage, 'mGetEbox', return_value=_ebox_ctrl), \
+                patch.object(_clustorage, 'mCheckGridDisksResizedCells', return_value=True), \
+                patch('exabox.ovm.clustorage.ebGetDefaultDB') as _mock_db:
+            _mock_db.return_value = MagicMock()
+            _rc = _clustorage.mGetDiskgroupsNewSizes(_options, _dgObj, 101, _dgmap)
+
+        self.assertEqual(_rc, 0)
+        self.assertTrue(_clustorage._ebCluManageStorage__resizedata)
+        self.assertTrue(_clustorage._ebCluManageStorage__resizereco)
+        self.assertGreater(_dgmap[_clustorage.DATA][_clustorage.DG_NEWSIZE],
+                           _dgmap[_clustorage.DATA][_clustorage.DG_CURRSIZE])
+        self.assertGreater(_dgmap[_clustorage.RECO][_clustorage.DG_NEWSIZE],
+                           _dgmap[_clustorage.RECO][_clustorage.DG_CURRSIZE])
+
     # Auto-generated test for mListCellDG
     def test_mListCellDG_calls_execute_twice(self):
         _ebox = self.mGetClubox()
@@ -3910,7 +3985,7 @@ status: normal
         self.assertEqual(_sizes['DATA01']['totalgb'], 2)
         self.assertEqual(_sizes['DATA01']['usedgb'], 0.5)
         self.assertEqual(_sizes['SPRC01']['totalgb'], 1)
-        self.assertEqual(_sizes['SPRC01']['usedgb'], 2)
+        self.assertEqual(_sizes['SPRC01']['usedgb'], 0.2)
 
     # Auto-generated test for ebCluManageStorage.mFetchAndSaveDGSizes
     def test_mFetchAndSaveDGSizes_returns_error_on_fetch_failure(self):
@@ -3969,6 +4044,36 @@ status: normal
             _manage.mCalculateDgResize(['DG1'], _sizes_before, _sizes_after)
 
         self.assertGreater(_sizes_before['DATA01']['totalgb'], 100)
+
+    def test_mCalculateDgResize_raises_when_growth_exceeds_limit(self):
+        _cfg = MagicMock()
+        _cfg.mGetConfigOptions.return_value = {}
+
+        with patch('exabox.ovm.clustorage.get_gcontext', return_value=_cfg):
+            _manage = ebCluManageStorage(self.mGetClubox(), self.mGetClubox().mGetArgsOptions())
+
+        _data_dg = MagicMock()
+        _data_dg.mGetDiskGroupType.return_value = 'data'
+        _data_dg.mGetDgName.return_value = 'DATA01'
+
+        _storage = MagicMock()
+        _storage.mGetDiskGroupConfig.return_value = _data_dg
+
+        _ebox = self.mGetClubox()
+
+        _sizes_before = {'DATA01': {'totalgb': 100, 'usedgb': 200}}
+        _sizes_after = {'DATA01': {'totalgb': 100, 'usedgb': 200}}
+
+        with patch.object(_manage, 'mGetEbox', return_value=_ebox), \
+             patch.object(_ebox, 'mGetStorage', return_value=_storage), \
+             patch.object(_ebox, 'mReturnCellNodes', return_value={f'cell{i}': None for i in range(6)}), \
+             patch.object(_ebox, 'mUpdateErrorObject') as _mock_update:
+            with self.assertRaises(ExacloudRuntimeError):
+                _manage.mCalculateDgResize(['DG1'], _sizes_before, _sizes_after)
+
+        _mock_update.assert_called_once()
+        self.assertEqual(_sizes_before['DATA01']['totalgb'], 100)
+
 
     # Auto-generated test for ebCluQuorumManager.mRemoveQuorumDisk
     @patch('exabox.ovm.clustorage.ebCluManageDiskgroup')

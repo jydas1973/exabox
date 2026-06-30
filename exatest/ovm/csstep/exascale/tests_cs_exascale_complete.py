@@ -4,7 +4,7 @@
 #
 # tests_cs_exascale_complete.py
 #
-# Copyright (c) 2022, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2022, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_cs_exascale_complete.py - <one-line expansion of the name>
@@ -74,6 +74,7 @@ class ebTestExascaleComplete(ebTestClucontrol):
         self.mGetClubox(self).mSetUt(True)
         warnings.filterwarnings("ignore")
 
+   @patch('exabox.ovm.csstep.exascale.exascaleutils.ebExascaleUtils.mRemoveClusterUserPrivilege')
    @patch('exabox.ovm.csstep.exascale.exascaleutils.ebExascaleUtils.mAlterVolumeAccess')
    @patch('exabox.ovm.csstep.exascale.exascaleutils.ebExascaleUtils.mUpdateACL')
    @patch('exabox.ovm.csstep.exascale.exascaleutils.ebExascaleUtils.mConfigureEDVbackup')
@@ -107,6 +108,7 @@ class ebTestExascaleComplete(ebTestClucontrol):
    @patch('exabox.ovm.csstep.exascale.cs_exascale_complete.expand_domu_filesystem')
    @patch('exabox.ovm.csstep.exascale.exascaleutils.ebExascaleUtils.mCreateDefaultAcfs')
    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mCheckCrsIsUp')
+   @patch('exabox.ovm.csstep.cs_util.csUtil.mRemoveDeprecatedSshAlgorithms')
    def test_doExecute(self, mock_mCreateDefaultAcfs, mock_expand_domu_filesystem, mock_resizeEncryptedVolume, 
             mock_isEncryptionRequested, mock_mExecuteOEDAStep, mock_mCopyVmexacsRpm, mock_mAddUserPubKey,
             mock_mCopySAPfile, mock_mUpdateRpm, mock_mSetOraInventoryPermissions, mock_mInstallAhfonDomU,
@@ -116,7 +118,8 @@ class ebTestExascaleComplete(ebTestClucontrol):
             mock_mSetWalletEntry, mock_mUpdateCloudUser, mock_mEnableRemotePwdChange,
             mock_mATPUnlockListeners, mock_mEnableTFABlackout,
             mock_mRemoveCloudPropertiesPayload, mock_mUpdateVmetrics, mock_mStartVMExacsService, 
-            mock_mUpdateListenerPort, mock_mConfigureEDVbackup, mock_mUpdateACL, mock_mAlterVolumeAccess, mock_mCheckCrsIsUp):
+            mock_mUpdateListenerPort, mock_mConfigureEDVbackup, mock_mUpdateACL, mock_mAlterVolumeAccess,
+            mock_mCheckCrsIsUp, mock_SSHAlgorithms, mock_mRemoveClusterUserPrivilege):
       _ebox = self.mGetClubox()
       _options = copy.deepcopy(self.mGetClubox().mGetArgsOptions())
       _step_list = ["ESTP_EXASCALE_COMPLETE"]

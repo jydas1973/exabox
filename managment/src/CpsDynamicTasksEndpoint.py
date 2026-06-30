@@ -4,7 +4,7 @@
 #
 # CpsDynamicTasksEndpoint.py
 #
-# Copyright (c) 2022, 2023, Oracle and/or its affiliates.
+# Copyright (c) 2022, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      CpsDynamicTasksEndpoint.py - <one-line expansion of the name>
@@ -16,6 +16,11 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    hgaldame    04/30/26 - 39253885 - exacc:security: authenticated rce in
+#                           remoteec dyntasks via attacker-controlled signed
+#                           bundle
+#    hgaldame    04/27/26 - 39263015 - exacs - security scan findings in
+#                           exabox/managment/src/cpsdynamictasksendpoint.py
 #    hgaldame    01/25/23 - 35011646 - exacc cps sw/os upgrade v2: : dynamic
 #                           tasks/one_off bundle ecra sending incorrect file
 #                           name to cps
@@ -37,6 +42,7 @@ import json
 import uuid
 import socket
 import base64
+import re
 import shlex
 import traceback
 from datetime import datetime, timedelta
@@ -51,7 +57,18 @@ from exabox.managment.src.utils.CpsExaccUtils import mGenerateUUID, mProcessCpsL
 from pathlib import Path
 
 class CpsDynamicTasksEndpoint(AsyncTrackEndpoint):
-
+    _TASK_NAME_PATTERN = re.compile(r"^[A-Za-z0-9._-]+$")
+    @classmethod
+    def _normalize_task_name(cls, raw_name: str) -> str:
+        if not raw_name or not isinstance(raw_name, str):
+            raise ValueError("Invalid task name")
+        name = Path(raw_name).name
+        if name.endswith(".tgz"):
+            name = Path(name).stem
+        if not cls._TASK_NAME_PATTERN.fullmatch(name):
+            raise ValueError("Invalid task name")
+        return name
+    
     def __init__(self, aHttpUrlArgs, aHttpBody, aHttpResponse, aSharedData):
         AsyncTrackEndpoint.__init__(self, aHttpUrlArgs, aHttpBody, aHttpResponse, aSharedData)
         self.mSetAsyncLogTag("CPSDYN")
@@ -69,29 +86,45 @@ class CpsDynamicTasksEndpoint(AsyncTrackEndpoint):
         return
  
     def mDynamicTaskCleanupHandler(self):
-        _args = ""
-        if "args" in self.mGetBody().keys():
-            _args =  self.mGetBody()['args']
-        _task_name = self.mGetBody()['name']
-        _name = "CPS Cleanup Dynamic Task Name: {0} args: [{1}]".format(_task_name, _args)
-        self.mGetResponse()["text"] = self.mCreatePythonProcess(self.mAsyncmCleanupDynamicTask, _args, aName=_name)
+        _task_name = ""
+        try:
+            _task_name = CpsDynamicTasksEndpoint._normalize_task_name(self.mGetBody()['name'])
+        except (KeyError, ValueError):
+            self.mGetResponse()['status'] = 400  
+            self.mGetResponse()['error'] = 'Invalid task name'
+            self.mGetResponse()['text'] = 'Invalid task name'
+            return        
+        _custom_args = {"name": _task_name}   
+        _name = "CPS Cleanup Dynamic Task Name: {0}".format(_task_name)
+        self.mGetResponse()["text"] = self.mCreatePythonProcess(self.mAsyncmCleanupDynamicTask, _custom_args, aName=_name)
         return
 
     def mDynamicTaskExecutorHandler(self):
-        _args = ""
-        if "args" in self.mGetBody().keys():
-            _args =  self.mGetBody()['args']
-        _task_name = self.mGetBody()['name']
-        _name = "CPS Execute  Dynamic Task Name: {0} args: [{1}]".format(_task_name, _args)
+        _task_name = ""
+        try:
+            _task_name = CpsDynamicTasksEndpoint._normalize_task_name(self.mGetBody()['name'])
+        except (KeyError, ValueError):
+            self.mGetResponse()['status'] = 400  
+            self.mGetResponse()['error'] = 'Invalid task name'
+            self.mGetResponse()['text'] = 'Invalid task name'
+            return  
+        _name = "CPS Execute  Dynamic Task Name: {0}".format(_task_name)
         _uuid = mGenerateUUID()
         _on_finish_args = { "aId": _uuid }
-        self.mGetResponse()["text"] = self.mCreatePythonProcess(self.mAsyncmExecuteDynamicTask, _args,\
+        _custom_args = {"name": _task_name}  
+        self.mGetResponse()["text"] = self.mCreatePythonProcess(self.mAsyncmExecuteDynamicTask, _custom_args,\
              aId=_uuid, aOnFinish=self.mProcessCpsLogOnFinish ,aOnFinishArgs=[_on_finish_args], aName=_name)
         return
 
     def mStatusHandler(self):
-        _name = self.mGetUrlArgs()['name']
-        _name = Path(_name).stem if _name.endswith(".tgz") is True else _name
+        _task_name = ""
+        try:
+            _task_name = self._normalize_task_name(self.mGetUrlArgs()['name'])
+        except (KeyError, ValueError):
+            self.mGetResponse()['status'] = 400  
+            self.mGetResponse()['error'] = 'Invalid task name'
+            self.mGetResponse()['text'] = 'Invalid task name'
+            return  
         _trace = "n"
         if "trace" in list(self.mGetUrlArgs().keys()):
             _arg_trace = self.mGetUrlArgs()['trace']
@@ -101,13 +134,12 @@ class CpsDynamicTasksEndpoint(AsyncTrackEndpoint):
         _tasks_list = []
         _cps_host_list = self.mGetCpsHostList()
         for _cps_host in _cps_host_list: 
-            _tasks_list.append(self.mGetStatusFromDynamicTask(_name, _trace, _cps_host))
-        self.mGetResponse()['text'] = { _name: _tasks_list }
+            _tasks_list.append(self.mGetStatusFromDynamicTask(_task_name, _trace, _cps_host))
+        self.mGetResponse()['text'] = { _task_name: _tasks_list }
         return 
 
     def mAsyncmCleanupDynamicTask(self, aLogFilename, aProcessId, aCustomArgs):
-        _task_name = self.mGetBody()['name']
-        _task_name = Path(_task_name).stem if _task_name.endswith(".tgz") is True else _task_name
+        _task_name = aCustomArgs.get("name")
         _base_signing_dir = os.path.join(self.mGetBaseCpsWaInstallDir(), "signing")
         _bundle = os.path.join(self.mGetBaseCpsWaInstallDir(), "bundles", "{0}.tgz".format(_task_name))
         _bundle_payload = os.path.join(_base_signing_dir, "{0}.tgz".format(_task_name))
@@ -126,11 +158,11 @@ class CpsDynamicTasksEndpoint(AsyncTrackEndpoint):
                     _errorMsg = "Error detected on host:'{0}' cmd: '{1}' , rc: '{2}', sysout: '{3}' syserror: '{4}'".format(\
                         _cps_host, _cmd, _rc, _sysout, _syserr)
                     self.mAsyncLog(_log, aProcessId, _errorMsg, aDebug=True)
+                    return _rc
         return return_code
 
     def mAsyncmExecuteDynamicTask(self, aLogFilename, aProcessId, aCustomArgs):
-        _task_name = self.mGetBody()['name']
-        _task_name =  Path(_task_name).stem if _task_name.endswith(".tgz") is True else _task_name
+        _task_name =  aCustomArgs.get("name")
         _base_dir = os.path.join(self.mGetBaseCpsWaInstallDir(), "exectasks")
         _base_bundle_dir = os.path.join(self.mGetBaseCpsWaInstallDir(), "bundles")
         _local_tgz = self.mGetBody().get('local', None)
@@ -168,12 +200,12 @@ class CpsDynamicTasksEndpoint(AsyncTrackEndpoint):
                     self.mAsyncLog(_log, aProcessId, error_message, aDebug=True)
                     return 1 
             for _cps_host in _cps_host_list:
-                return_code = self.mExecuteDynamicTask(_log ,aProcessId, aCustomArgs, _task_name, _cps_host)
+                return_code = self.mExecuteDynamicTask(_log ,aProcessId, _task_name, _cps_host)
                 if return_code != 0:
                     return return_code
         return return_code
 
-    def mExecuteDynamicTask(self, aLogFile : TextIO ,aProcessId : str, aCustomArgs : list, aTaskName: str, aCpsHost: str):
+    def mExecuteDynamicTask(self, aLogFile : TextIO ,aProcessId : str, aTaskName: str, aCpsHost: str):
         _base_dir = os.path.join(self.mGetBaseCpsWaInstallDir(),"exectasks")
         _base_bundle_dir = os.path.join(self.mGetBaseCpsWaInstallDir(),"bundles")
         _code_sign_key = None
@@ -193,7 +225,7 @@ class CpsDynamicTasksEndpoint(AsyncTrackEndpoint):
         _cmdList.append("/usr/bin/mkdir -p  {0}".format(_dir_task))
         _cmdList.append("/usr/bin/tar xzf {0} -C {1}".format(_bundle, _dir_task))
         _cmdList.append("/usr/bin/chmod +x {0}/entrypoint.sh".format(_dir_task))
-        _cmdList.append("{0}/entrypoint.sh -c {1} {2}".format(_dir_task, _token, aCustomArgs))
+        _cmdList.append("{0}/entrypoint.sh -c {1}".format(_dir_task, _token))
         for _cmd in _cmdList:
             _rc, _sysout, _syserr = self.mExecuteCmdByHost(_cmd, aLogFile, aCpsHost)
             if _rc != 0 :
@@ -495,6 +527,13 @@ class CpsDynamicTasksEndpoint(AsyncTrackEndpoint):
         _bundle_payload = os.path.join(_base_signing_dir, "{0}.tgz".format(_task_name))
         _bundle = os.path.join(_base_bundle_dir, "{0}.tgz".format(_task_name))
         _local_host = CpsDynamicTasksEndpoint.mGetLocalHostname()
+        _code_sign_key_path = os.path.join(self.mGetBaseCpsWaInstallDir(), "oracle.Java")
+        _result = False
+        if not os.path.exists(_code_sign_key_path):
+            _errorMsg = f'Expected file {_code_sign_key_path} not found in host {_local_host}'
+            self.mAsyncLog(aLog, aProcessId, _errorMsg, aDebug=True)
+            return _result
+
         if not os.path.exists(_base_signing_dir):
             self.mExecuteCmdByHost("/usr/bin/sudo -n /usr/bin/mkdir -p {0}".format(_base_signing_dir),
                                    aLog, _local_host)
@@ -504,7 +543,6 @@ class CpsDynamicTasksEndpoint(AsyncTrackEndpoint):
             self.mExecuteCmdByHost("/usr/bin/sudo -n /usr/bin/chown {0} -R {1}".format(
                     _ownership, self.mGetBaseCpsWaInstallDir()), aLog, _local_host)
 
-        _result = False
         self.mExecuteCmdByHost("/usr/bin/sudo -n /usr/bin/rm -f {0}".format(_bundle), aLog, _local_host)
         if _local_tgz:
             try:
@@ -520,6 +558,7 @@ class CpsDynamicTasksEndpoint(AsyncTrackEndpoint):
                 self.mAsyncLog(aLog, aProcessId, _errorMsg, aDebug=True)
                 return _result
             _temp_dir = os.path.join(_base_signing_dir, _task_name)
+            _code_sign_key_path_temp = os.path.join(_temp_dir, "oracle.Java")
             _cmdList = []
             _cmdList.append("/usr/bin/rm -rf {0} ".format(_temp_dir))
             _cmdList.append("/usr/bin/mkdir -p {0} ".format(_temp_dir))
@@ -531,10 +570,9 @@ class CpsDynamicTasksEndpoint(AsyncTrackEndpoint):
                         _local_host, _cmd, _rc, _sysout, _syserr)
                     self.mAsyncLog(aLog, aProcessId, _errorMsg, aDebug=True)
                     return _result
-            _code_sign_key_path = os.path.join(_temp_dir, "oracle.Java")
+            self.mExecuteCmdByHost("/usr/bin/rm -rf {0} ".format(_code_sign_key_path_temp), aLog, CpsDynamicTasksEndpoint.mGetLocalHostname())
             _signature_path = os.path.join(_temp_dir, "{0}.dat".format(_task_name))
             _dyn_task_path = os.path.join(_temp_dir, "{0}.tgz".format(_task_name))
-
             _code_sign_key_exists = os.path.exists(_code_sign_key_path)
             _signature_exists = os.path.exists(_signature_path)
             _dyn_tasks_exists = os.path.exists(_dyn_task_path)

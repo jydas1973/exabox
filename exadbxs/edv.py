@@ -4,7 +4,7 @@
 #
 # edv.py
 #
-# Copyright (c) 2023, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2023, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      edv.py - Entrypoint of EDV endpoint.
@@ -16,6 +16,8 @@
 #      None.
 #
 #    MODIFIED   (MM/DD/YY)
+#    scoral      05/25/25 - Bug 39174897 - Improve unmount_stale_gcv_edv to skip
+#                           GCVs of VMs under migration.
 #    jfsaldan    12/01/25 - Bug 38694363 - EXADB-XS-PP: VMC PROVISION FAILED AT
 #                           THE TASK OF CREATEVM WITH ERROR OF "NO SUCH FILE OR
 #                           DIRECTORY: DISK_CONFIG.XML" | EXACLOUD UNMOUNTS GCV
@@ -58,6 +60,15 @@ from exabox.ovm.cludomufilesystems import (GIB, get_node_filesystems,
                                            ebNodeFilesystemInfo)
 from exabox.utils.node import (node_exec_cmd, node_exec_cmd_check,
     node_cmd_abs_path_check, connect_to_host, node_list_process)
+
+
+#################
+### CONSTANTS ###
+#################
+
+GUEST_IMAGES = '/EXAVMIMAGES/GuestImages'
+UNDER_MIGRATION_VM_GCV = 'under_migration'
+
 
 
 ##################
@@ -520,7 +531,7 @@ def unmount_stale_gcv_edv(host: exaBoxNode) -> List[ebNodeFilesystemInfo]:
     for fs in filesystems:
         if not fs.device.startswith('/dev/exc/'):
             continue
-        if not fs.mountpoint.startswith('/EXAVMIMAGES/GuestImages/'):
+        if not fs.mountpoint.startswith(f'{GUEST_IMAGES}/'):
             continue
         if any(map(fs.mountpoint.endswith, guests)):
             continue
@@ -532,6 +543,14 @@ def unmount_stale_gcv_edv(host: exaBoxNode) -> List[ebNodeFilesystemInfo]:
             host, f"vm_maker.*{fs_mountpoint_vm_name}")
         if list_proc:
             ebLogWarn("A vm_maker process was detected in "
+                f"{host.mGetHostname()} for {fs_mountpoint_vm_name}. "
+                f"Skipping undefine/removal for it.")
+            continue
+
+        # Skip also GCVs of VMs under migration
+        migration = f'{fs.mountpoint}/{UNDER_MIGRATION_VM_GCV}'
+        if host.mFileExists(migration):
+            ebLogWarn("An ongoing VM migration was detected in "
                 f"{host.mGetHostname()} for {fs_mountpoint_vm_name}. "
                 f"Skipping undefine/removal for it.")
             continue

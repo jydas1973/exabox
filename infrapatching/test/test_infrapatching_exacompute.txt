@@ -17,6 +17,9 @@
 #
 #
 #    MODIFIED   (MM/DD/YY)
+#    sdevasek    05/14/26 - Bug 39365815 - INFRAPATCHING TEST AUTOMATION -
+#                           X9M - DOM0_PATCH_PREREQ_CHECK_WITH_RACK_MODEL TEST
+#                           FAILURE TRACKING
 #    sdevasek    03/09/26 - Enh 39044163 - INFRAPATCHING TEST AUTOMATION - UPDATE
 #                           TESTS FOR FREE POOL NODE PATCHING IN EXACOMPUTE
 #                           PATCHING TOVALIDATE NODE_PROGRESS_DATA
@@ -115,7 +118,7 @@ class Test_exacompute_class(unittest.TestCase):
         mUpdateParamInPayload("LaunchNodes", Test_exacompute_class.__dom0s[0])
         mUpdateParamInPayload("NodeList", Test_exacompute_class.__dom0s[1:])
         self.__ssh_equivalence_configured, self.__ssh_equivalence_cleanup_required = ConfigureSSHKeys(Test_exacompute_class.__dom0s[0], Test_exacompute_class.__dom0s[1:])
-        mExecuteRemoteExasshCmd("/bin/sed  \\'s/ClientAliveInterval.*/ClientAliveInterval 600/\\' -i /etc/ssh/sshd_config",Test_exacompute_class.__dom0s)
+        mExecuteRemoteExasshCmd("/bin/sed -i 's/ClientAliveInterval.*/ClientAliveInterval 600/' /etc/ssh/sshd_config",Test_exacompute_class.__dom0s)
 
     # This method is to remove ssh equivalance between the nodes
     def tearDown(self):
@@ -205,7 +208,7 @@ class Test_exacompute_class(unittest.TestCase):
 
         # Change the ClientAliveInterval interval setting in /etc/ssh/sshd_config file to 590 so that it triggers patch_mgr failure.
         # The error code that gets returned is EXAUPG-00002
-        mExecuteRemoteExasshCmd("/bin/sed  \\'s/ClientAliveInterval.*/ClientAliveInterval 590/\\' -i /etc/ssh/sshd_config",Test_exacompute_class.__dom0s)
+        mExecuteRemoteExasshCmd("/bin/sed -i 's/ClientAliveInterval.*/ClientAliveInterval 590/' /etc/ssh/sshd_config",Test_exacompute_class.__dom0s)
 
         '''
         Example output for status call:
@@ -518,7 +521,7 @@ class Test_exacompute_class(unittest.TestCase):
         self.assertTrue(_ret, "Problem while shutting down domus on %s" % _target_node)
 
         # Change the ClientAliveInterval interval setting in /etc/ssh/sshd_config file to 590 so that it triggers patch_mgr failure.
-        mExecuteRemoteExasshCmd("/bin/sed  \\'s/ClientAliveInterval.*/ClientAliveInterval 590/\\' -i /etc/ssh/sshd_config",[Test_exacompute_class.__dom0s[-2]])
+        mExecuteRemoteExasshCmd("/bin/sed -i 's/ClientAliveInterval.*/ClientAliveInterval 590/' /etc/ssh/sshd_config",[Test_exacompute_class.__dom0s[-2]])
 
         self.__operation = TASK_PATCH
 

@@ -4,7 +4,7 @@
 #
 # tests_httpsignatureverification.py
 #
-# Copyright (c) 2025, Oracle and/or its affiliates.
+# Copyright (c) 2025, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_httpsignatureverification.py - <one-line expansion of the name>
@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    aypaul      06/02/26 - Add unit tests for security bug 39471474
+#    jbrigido    05/07/26 - Add HTTPSignatureVerification delete cell tests
 #    shapatna    11/13/25 - Enh 38574081: Add unit tests to improve the
 #                           coverage using Cline
 #    shapatna    11/13/25 - Creation
@@ -39,19 +41,24 @@ from exabox.agent.HTTPSignatureVerification import (
     APIACCESS_CONTROL_ENDPOINTS,
     HTTP_HEADER_EXA_AUTH,
     HTTP_HEADER_EXA_OPC_PRINCIPAL,
+    MALFORMED_URL,
 )
 
 
 class _FakeHttpReq(object):
-    def __init__(self, headers, request_line):
+    def __init__(self, headers, request_line, body=None):
         self._headers = headers
         self._request_line = request_line
+        self._body = body
 
     def getHeaders(self):
         return self._headers
 
     def getRequestLine(self):
         return self._request_line
+
+    def getBody(self):
+        return self._body
 
 
 def _build_exa_opc_principal(ptype="service", svc="database"):
@@ -105,6 +112,96 @@ def _mock_open_bytes():
     return m
 
 
+REQUEST_LINE_TARGET_CASES = [
+    ("GET / HTTP/1.1", "GET", "/"),
+    ("POST /CLUCtrl/sim_install HTTP/1.1", "POST", "/CLUCtrl/sim_install"),
+    ("PUT /api/v1/resource HTTP/1.1", "PUT", "/api/v1/resource"),
+    ("DELETE /users/123 HTTP/1.0", "DELETE", "/users/123"),
+    ("POST /HTTP HTTP/1.1", "POST", "/HTTP"),
+    ("POST /HTTP/foo HTTP/1.1", "POST", "/HTTP/foo"),
+    ("POST /fooHTTP HTTP/1.1", "POST", "/fooHTTP"),
+    ("POST /fooHTTPbar HTTP/1.1", "POST", "/fooHTTPbar"),
+    ("POST /foo/HTTP/bar HTTP/1.1", "POST", "/foo/HTTP/bar"),
+    ("POST /CLUCtrl/HTTP/sim_install HTTP/1.1", "POST", "/CLUCtrl/HTTP/sim_install"),
+    ("POST /CLUCtrl/simHTTPinstall HTTP/1.1", "POST", "/CLUCtrl/simHTTPinstall"),
+    (
+        "POST /fooHTTPbar/CLUCtrl/sim_install HTTP/1.1",
+        "POST",
+        "/fooHTTPbar/CLUCtrl/sim_install",
+    ),
+    ("GET /api?param=HTTP HTTP/1.1", "GET", "/api?param=HTTP"),
+    ("GET /api?cmd=fooHTTPbar HTTP/1.1", "GET", "/api?cmd=fooHTTPbar"),
+    ("GET /api?url=http://example.com HTTP/1.1", "GET", "/api?url=http://example.com"),
+    (
+        "GET /api?redirect=https://foo.com/HTTP/bar HTTP/1.1",
+        "GET",
+        "/api?redirect=https://foo.com/HTTP/bar",
+    ),
+    (
+        "POST /CLUCtrl/sim_install?cmd=HTTP HTTP/1.1",
+        "POST",
+        "/CLUCtrl/sim_install?cmd=HTTP",
+    ),
+    (
+        "POST /fooHTTPbar?target=CLUCtrl/sim_install HTTP/1.1",
+        "POST",
+        "/fooHTTPbar?target=CLUCtrl/sim_install",
+    ),
+    (
+        "POST /fooHTTPbar/CLUCtrl?cmd=installHTTPnow HTTP/1.1",
+        "POST",
+        "/fooHTTPbar/CLUCtrl?cmd=installHTTPnow",
+    ),
+    ("GET /%48%54%54%50 HTTP/1.1", "GET", "/%48%54%54%50"),
+    ("GET /foo%48%54%54%50bar HTTP/1.1", "GET", "/foo%48%54%54%50bar"),
+    (
+        "GET /CLUCtrl/%48%54%54%50/sim_install HTTP/1.1",
+        "GET",
+        "/CLUCtrl/%48%54%54%50/sim_install",
+    ),
+    ("GET http://example.com/ HTTP/1.1", "GET", "http://example.com/"),
+    (
+        "GET http://example.com/fooHTTPbar HTTP/1.1",
+        "GET",
+        "http://example.com/fooHTTPbar",
+    ),
+    (
+        "GET https://example.com/CLUCtrl/sim_install HTTP/1.1",
+        "GET",
+        "https://example.com/CLUCtrl/sim_install",
+    ),
+    (
+        "GET /CLUCtrl/../CLUCtrl/sim_install HTTP/1.1",
+        "GET",
+        "/CLUCtrl/../CLUCtrl/sim_install",
+    ),
+    ("GET /CLUCtrl/./sim_install HTTP/1.1", "GET", "/CLUCtrl/./sim_install"),
+    ("GET /CLUCtrl//sim_install HTTP/1.1", "GET", "/CLUCtrl//sim_install"),
+    (
+        "GET /CLUCtrl/%2e%2e/sim_install HTTP/1.1",
+        "GET",
+        "/CLUCtrl/%2e%2e/sim_install",
+    ),
+]
+
+
+MALFORMED_REQUEST_LINES = [
+    "",
+    "POST",
+    "POST /CLUCtrl/deleteservice",
+    "POST /CLUCtrl/deleteservice FTP/1.0",
+    "POST /CLUCtrl/delete service HTTP/1.1",
+    "GET",
+    "GET /foo",
+    "GET /foo HTTP",
+    "GET  /foo HTTP/1.1",
+    "GET /foo  HTTP/1.1",
+    "GET   /foo   HTTP/1.1",
+    "GET\t/foo HTTP/1.1",
+    "GET /foo\tHTTP/1.1",
+]
+
+
 class ebTestHTTPSignatureVerification(ebTestClucontrol):
     @classmethod
     def setUpClass(self):
@@ -155,6 +252,8 @@ class ebTestHTTPSignatureVerification(ebTestClucontrol):
         self.date_val = "Wed, 01 Jan 2025 00:00:00 GMT"
         self.request_line_restricted = "POST /CLUCtrl/deleteservice HTTP/1.1"
         self.request_line_unrestricted = "POST /CLUCtrl/info HTTP/1.1"
+        self.request_line_elastic_cell_update = "POST /CLUCtrl/elastic_cell_update HTTP/1.1"
+        self.request_line_exascale_cell_update = "POST /CLUCtrl/exascale_cell_update HTTP/1.1"
 
     def tearDown(self):
         self.p_open.stop()
@@ -163,11 +262,147 @@ class ebTestHTTPSignatureVerification(ebTestClucontrol):
         self.p_kms.stop()
         self.p_ctx.stop()
 
-    def _make_req(self, headers=None, restricted=True):
+    def _make_req(self, headers=None, restricted=True, request_line=None, body=None):
         if headers is None:
             headers = {}
-        rl = self.request_line_restricted if restricted else self.request_line_unrestricted
-        return _FakeHttpReq(headers, rl)
+        if request_line is None:
+            request_line = self.request_line_restricted if restricted else self.request_line_unrestricted
+        return _FakeHttpReq(headers, request_line, body)
+
+    def _make_verifier_for_request_line(self, request_line, headers=None):
+        if headers is None:
+            headers = {}
+        req = _FakeHttpReq(headers, request_line)
+        return HTTPSignatureVerify(req)
+
+    def _set_signature_headers(self, verifier, header_names):
+        verifier._HTTPSignatureVerify__current_signature_headers = header_names
+
+    def _set_restricted_endpoints(self, verifier, endpoints):
+        verifier._HTTPSignatureVerify__endpoints = endpoints
+
+    def test_mGenerateExaCCHTTPSignature_builds_expected_plaintext(self):
+        exa_principal = _build_exa_opc_principal(ptype="service", svc="database_preprod")
+        headers = {
+            "date": self.date_val,
+            "opc-request-id": "req-123",
+            HTTP_HEADER_EXA_OPC_PRINCIPAL: exa_principal,
+        }
+        request_line = "POST /CLUCtrl/deleteservice?database=db1&force=true HTTP/1.1"
+        verifier = self._make_verifier_for_request_line(request_line, headers)
+        self._set_signature_headers(
+            verifier,
+            ["(request-target)", "date", "opc-request-id", HTTP_HEADER_EXA_OPC_PRINCIPAL],
+        )
+
+        plaintext_signature = verifier.mGenerateExaCCHTTPSignature()
+
+        self.assertEqual(
+            plaintext_signature,
+            "POST /CLUCtrl/deleteservice?database=db1&force=true "
+            + self.date_val
+            + " req-123 "
+            + exa_principal,
+        )
+
+    def test_mGenerateExaCCHTTPSignature_ignores_pseudo_headers(self):
+        headers = {
+            "date": self.date_val,
+            "x-exacc-operation": "scale-storage",
+        }
+        verifier = self._make_verifier_for_request_line(
+            "PUT /CLUCtrl/storage_resize HTTP/1.1",
+            headers,
+        )
+        self._set_signature_headers(
+            verifier,
+            ["(request-target)", "(created)", "date", "x-exacc-operation"],
+        )
+
+        plaintext_signature = verifier.mGenerateExaCCHTTPSignature()
+
+        self.assertEqual(
+            plaintext_signature,
+            "PUT /CLUCtrl/storage_resize " + self.date_val + " scale-storage",
+        )
+
+    def test_mGenerateExaCCHTTPSignature_preserves_valid_request_targets(self):
+        for request_line, method, expected_target in REQUEST_LINE_TARGET_CASES:
+            verifier = self._make_verifier_for_request_line(
+                request_line,
+                {"date": self.date_val},
+            )
+            self._set_signature_headers(verifier, ["(request-target)", "date"])
+
+            with self.subTest(request_line=request_line):
+                self.assertEqual(
+                    verifier.mGenerateExaCCHTTPSignature(),
+                    f"{method} {expected_target} {self.date_val}",
+                )
+
+    def test_mGenerateExaCCHTTPSignature_returns_none_for_malformed_request_lines(self):
+        for request_line in MALFORMED_REQUEST_LINES:
+            verifier = self._make_verifier_for_request_line(
+                request_line,
+                {"date": self.date_val},
+            )
+            self._set_signature_headers(verifier, ["(request-target)", "date"])
+
+            with self.subTest(request_line=request_line):
+                self.assertEqual(verifier.mGenerateExaCCHTTPSignature(), MALFORMED_URL)
+
+    def test_mCheckIfApiAccessRestricted_matches_configured_endpoint_substrings(self):
+        restricted_targets = [
+            "POST /CLUCtrl/deleteservice HTTP/1.1",
+            "POST /CLUCtrl/deleteservice?database=db1 HTTP/1.1",
+            "PATCH /CLUCtrl/vmgi_delete/vm1 HTTP/1.1",
+        ]
+
+        for request_line in restricted_targets:
+            verifier = self._make_verifier_for_request_line(request_line)
+            self._set_restricted_endpoints(verifier, ["deleteservice", "vmgi_delete"])
+
+            with self.subTest(request_line=request_line):
+                self.assertTrue(verifier.mCheckIfApiAccessRestricted())
+
+    def test_mCheckIfApiAccessRestricted_returns_false_for_unrestricted_endpoint(self):
+        verifier = self._make_verifier_for_request_line(
+            "GET /CLUCtrl/listdatabases HTTP/1.1",
+        )
+        self._set_restricted_endpoints(verifier, ["deleteservice", "vmgi_delete"])
+
+        self.assertFalse(verifier.mCheckIfApiAccessRestricted())
+
+    def test_mCheckIfApiAccessRestricted_preserves_valid_request_targets(self):
+        for request_line, method, expected_target in REQUEST_LINE_TARGET_CASES:
+            verifier = self._make_verifier_for_request_line(request_line)
+            self._set_restricted_endpoints(verifier, [expected_target])
+
+            with self.subTest(request_line=request_line):
+                self.assertTrue(
+                    verifier.mCheckIfApiAccessRestricted(),
+                    f"{method} target {expected_target} should be access restricted",
+                )
+
+    def test_mCheckIfApiAccessRestricted_returns_false_for_exacs_deployment(self):
+        self.m_ctx.return_value.mCheckConfigOption.side_effect = lambda key, default=None: {
+            "ociexacc": False,
+            "wsclient_sessionkeypath": "/tmp/wsclient",
+        }.get(key, default)
+        verifier = self._make_verifier_for_request_line(
+            "POST /CLUCtrl/deleteservice HTTP/1.1",
+        )
+        self._set_restricted_endpoints(verifier, ["deleteservice"])
+
+        self.assertFalse(verifier.mCheckIfApiAccessRestricted())
+
+    def test_mCheckIfApiAccessRestricted_returns_false_for_malformed_request_lines(self):
+        for request_line in MALFORMED_REQUEST_LINES:
+            verifier = self._make_verifier_for_request_line(request_line)
+            self._set_restricted_endpoints(verifier, ["deleteservice"])
+
+            with self.subTest(request_line=request_line):
+                self.assertEqual(verifier.mCheckIfApiAccessRestricted(), MALFORMED_URL)
 
     def test_exacs_ociexacc_false_skips_verification_and_returns_true(self):
         # Simulate ExaCS deployment (ociexacc=False)
@@ -187,6 +422,90 @@ class ebTestHTTPSignatureVerification(ebTestClucontrol):
         verifier = HTTPSignatureVerify(req)
         rc = verifier.mVerifySignature()
         self.assertTrue(rc, "Expected True for non-restricted endpoint even without headers")
+
+    def test_elastic_cell_update_delete_cell_payload_requires_signature(self):
+        self.m_kms.return_value.mSearchEntry.return_value.mCreateValueFromEncData.return_value = json.dumps(
+            ["elastic_cell_update"])
+        body = json.dumps({
+            "jsonconf": {
+                "reshaped_node_subset": {
+                    "removed_cells": [{"cell_node_hostname": "cell1.example.com"}],
+                    "added_cells": []
+                }
+            }
+        }).encode("utf-8")
+
+        req = self._make_req(
+            headers={},
+            request_line=self.request_line_elastic_cell_update,
+            body=body)
+        verifier = HTTPSignatureVerify(req)
+        rc = verifier.mVerifySignature()
+
+        self.assertFalse(rc, "Expected delete-cell payload to require exa-authorization")
+
+    def test_elastic_cell_update_add_cell_payload_skips_signature(self):
+        self.m_kms.return_value.mSearchEntry.return_value.mCreateValueFromEncData.return_value = json.dumps(
+            ["elastic_cell_update"])
+        body = json.dumps({
+            "jsonconf": {
+                "reshaped_node_subset": {
+                    "removed_cells": [],
+                    "added_cells": [{"cell_hostname": "cell2"}]
+                }
+            }
+        }).encode("utf-8")
+
+        req = self._make_req(
+            headers={},
+            request_line=self.request_line_elastic_cell_update,
+            body=body)
+        verifier = HTTPSignatureVerify(req)
+        rc = verifier.mVerifySignature()
+
+        self.assertTrue(rc, "Expected add-cell payload to skip delete-cell signature enforcement")
+
+    def test_exascale_cell_update_delete_cell_payload_requires_signature(self):
+        self.m_kms.return_value.mSearchEntry.return_value.mCreateValueFromEncData.return_value = json.dumps(
+            ["exascale_cell_update"])
+        body = json.dumps({
+            "jsonconf": {
+                "reshaped_node_subset": {
+                    "removed_cells": [{"cell_node_hostname": "cell1.example.com"}],
+                    "added_cells": []
+                }
+            }
+        }).encode("utf-8")
+
+        req = self._make_req(
+            headers={},
+            request_line=self.request_line_exascale_cell_update,
+            body=body)
+        verifier = HTTPSignatureVerify(req)
+        rc = verifier.mVerifySignature()
+
+        self.assertFalse(rc, "Expected exascale delete-cell payload to require exa-authorization")
+
+    def test_exascale_cell_update_add_cell_payload_skips_signature(self):
+        self.m_kms.return_value.mSearchEntry.return_value.mCreateValueFromEncData.return_value = json.dumps(
+            ["exascale_cell_update"])
+        body = json.dumps({
+            "jsonconf": {
+                "reshaped_node_subset": {
+                    "removed_cells": [],
+                    "added_cells": [{"cell_hostname": "cell2"}]
+                }
+            }
+        }).encode("utf-8")
+
+        req = self._make_req(
+            headers={},
+            request_line=self.request_line_exascale_cell_update,
+            body=body)
+        verifier = HTTPSignatureVerify(req)
+        rc = verifier.mVerifySignature()
+
+        self.assertTrue(rc, "Expected exascale add-cell payload to skip delete-cell signature enforcement")
 
     def test_missing_exa_authorization_header_devqa_returns_true(self):
         # Force Dev/QA environment so missing header is allowed

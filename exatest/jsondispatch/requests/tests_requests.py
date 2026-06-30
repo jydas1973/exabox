@@ -4,7 +4,7 @@
 #
 # tests_SLA.py
 #
-# Copyright (c) 2022, Oracle and/or its affiliates.
+# Copyright (c) 2022, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_requests.py - Unit test for requests dispatch
@@ -16,6 +16,8 @@
 #      None
 #
 #    MODIFIED   (MM/DD/YY)
+#    joysjose    03/25/26 - Bug 38900232 : FIX FOR ISSUES FOUND BY VOXIO CODEV
+#                           AGENT IN DIR EXABOX/JSONDISPATCH
 #    jesandov    09/21/22 - Creation
 #
 
@@ -129,6 +131,17 @@ class ebTestSLA(ebTestClucontrol):
         self.assertEqual(_rc, 0)
         self.assertEqual(len(_requests), 1)
         self.assertEqual(list(_requests[0].keys()), ["uuid", "status"])
+
+    def test_002_jsonconf_none(self):
+
+        _db = ebGetDefaultDB()
+        _options = self.mGetContext().mGetArgsOptions()
+        _options.jsonconf = None
+        _handler = RequestsHandler(_options, aDb=_db)
+
+        _rc, _requests = _handler.mExecute()
+        self.assertEqual(_rc, 0)
+        self.assertEqual(len(_requests), 5)
 
 
 if __name__ == '__main__':

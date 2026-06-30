@@ -11,6 +11,7 @@ NOTE:
     None
 
 History:
+    jesandov    06/10/2026 - Bug#39462050: Add secure client
     bhpati      04/03/2026 - Bug 39067888: add NLS_LANG variable to ssh commands
     jesandov    11/03/2025 - Bug#38606181: Fix UT
     jesandov    10/27/2025 - Bug#37073667: Force key only on domus
@@ -102,7 +103,8 @@ from exabox.log.LogMgr import (ebLogError, ebLogDebug, ebLogInfo,
                                 ebLogAddDestinationToLoggers,
                                 ebGetDefaultLoggerName, ebFormattersEnum)
 from exabox.core.Error import ExacloudRuntimeError
-from exabox.recordreplay.record_replay import ebRecordReplay 
+from exabox.recordreplay.record_replay import ebRecordReplay
+from exabox.network.osds.sshclient import SshClient
 
 try:
     from subprocess import DEVNULL # Python 3X
@@ -239,7 +241,7 @@ class interactiveSSHconnection(object):
 class sshconn(object):
 
     def __init__(self, aHost, aOptions):
-        
+
         self.__client  = None
         self.__options = aOptions
         self.__user = None
@@ -258,6 +260,7 @@ class sshconn(object):
         self.__debug   = False
         self.__sudo    = None
         self.__console_raw_output = ""
+        self.__lastclient = None
 
         if aOptions is not None:
             self.__debug   = aOptions.debug
@@ -346,6 +349,9 @@ class sshconn(object):
         if self.__client:
             self.__client.close()
             self.__client = None
+        if self.__lastclient:
+            self.__lastclient.mCleanUp()
+            self.__lastclient = None
 
     def mGetMaxRetries(self):
         return self.__max_retries
@@ -537,18 +543,18 @@ class sshconn(object):
         if not _ctx.mCheckRegEntry(_localOption):
             ebLogError("DomU environment details not available. Will not create halt SRG file.")
             return
-        
+
         _oeda_req_path = _coptions['info_oeda_req_path']
         if not os.path.isdir(_oeda_req_path):
             ebLogError("OEDA request path doesnt exist.")
             return
-        
+
         if self.__host not in _ctx.mGetRegEntry('domU_set'):
             ebLogVerbose("Machine type is not DomU. Will skip halting SRG tests.")
             return
 
         _halt_srg_file = os.path.join(_oeda_req_path, 'halt-srg-tests')
-        
+
         _fd_file = open(_halt_srg_file, 'w')
         _fd_file.close()
 
@@ -727,9 +733,9 @@ class sshconn(object):
             _timewait = int(math.exp(float(_count)/2))
 
             try:
-                
-                self.__client = paramiko.SSHClient()
-                self.__client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+                self.__lastclient = SshClient(self.__host)
+                self.__client = self.__lastclient.mCreateSshClient()
 
                 if self.mGetExaKmsEntry():
 
@@ -862,21 +868,32 @@ class sshconn(object):
                         raise
                     ebLogTrace("Validation of hostname {} is successful".format(self.__host))
 
-                    _cmd_list = ["/bin/ssh-keygen", "-R"]
-                    _cmd_list.append(self.__host)
-                    execute_local(_cmd_list, aStdOut=DEVNULL, aStdErr=DEVNULL)
+                    _cli = SshClient(self.__host)
+                    _cli.mAddToKnownHost()
 
-                    ebLogTrace('mConnect: BadHostKeyException catched - clearing hostkey and retry in progress')
+                    ebLogTrace(f'mConnect: Adding host {self.__host} to known_host list in file: {_cli.mGetOrigKnownHostFile()}')
                     ebLogTrace("Retrying connection")
                     _count += 1
                 else:
                     ebLogTrace('mConnect: Could not proceed after clearing hostkey please check manually')
                     raise
+
             except paramiko.ssh_exception.SSHException as e:
 
                 ebLogDebug(f"paramiko.ssh_exception.SSHException ocurred\n{e}")
 
-                if _retry and str(e) == 'Error reading SSH protocol banner' and _count < self.__max_retries:
+                if _retry and "not found in known_hosts" in str(e) and _count < self.__max_retries:
+                    ebLogTrace(f'mConnect: Error on known_host validation: {str(e)}')
+
+                    _cli = SshClient(self.__host)
+                    _cli.mAddToKnownHost()
+
+                    ebLogTrace(f'mConnect: Adding host {self.__host} to known_host list in file: {_cli.mGetOrigKnownHostFile()}')
+                    ebLogTrace("Retrying connection in {0}s".format(_timewait))
+                    _count += 1
+                    time.sleep(_timewait)
+
+                elif _retry and str(e) == 'Error reading SSH protocol banner' and _count < self.__max_retries:
                     ebLogTrace('mConnect: Error reading SSH protocol banner and retry in progress')
                     ebLogTrace("Retrying connection in {0}s".format(_timewait))
                     _count += 1
@@ -909,7 +926,7 @@ class sshconn(object):
                 if self.__state == sc_connected:
                     return True
 
-                # In case of unsuccessful connections, close sshclient and transport 
+                # In case of unsuccessful connections, close sshclient and transport
                 # before retrying and recreating them..
                 ebLogTrace("Close SSH Client and its underlying transport")
                 if self.__transport:
@@ -918,6 +935,9 @@ class sshconn(object):
                 if self.__client:
                     self.__client.close()
                     self.__client = None
+                if self.__lastclient:
+                    self.__lastclient.mCleanUp()
+                    self.__lastclient = None
 
     def mIsConnectable(self, aTimeout=None, aKeyOnly=None):
 
@@ -1119,7 +1139,7 @@ class sshconn(object):
             _out = ""
             _err = ""
 
-            _command_exec_time = time.time()                                                                                                                                                                                                   
+            _command_exec_time = time.time()
             try:
 
                 if get_gcontext().mCheckConfigOption('enable_multilanguage_support') == 'True':
@@ -1133,7 +1153,7 @@ class sshconn(object):
 
             except Exception as e:
                 ebLogError(f"mSimpleExecuteCmd Error : {e}")
-                
+
             _command_exec_time = time.time() - _command_exec_time
             ebLogTrace("mSimpleExecuteCmd :: Executed on {0} [RC:{1}] [TIME:{2:.4}] the command <+< {3} >+>".format(self.__host, self.__exit_status, _command_exec_time, _maskedCmd))
 
@@ -1218,7 +1238,7 @@ class sshconn(object):
     def mExecuteCmdLog(self, aCmd, aCurrDir=None, aStdIn=PIPE, aStdOut=PIPE, aStdErr=PIPE, aTimeout=None):
 
         if self.__debug:
-            ebLogTrace('@@@ CMD: %s' % (aCmd)) 
+            ebLogTrace('@@@ CMD: %s' % (aCmd))
 
         if self.mGetUser() == "opc" and self.mGetSudo():
             aCmd = "sudo " + aCmd
@@ -1282,7 +1302,7 @@ class sshconn(object):
         except IOError as io:
             if io.errno == errno.ENOENT:
                 pass
-            
+
         return None
 
 
@@ -1330,7 +1350,7 @@ class sshconn(object):
                 #Especially, during continous reads/writes of image json file during globalcache update.
                 #Hence Lets flush it.
                 fd.flush()
-              
+
     # aRemotePath is the remote directory _and_ the remote filename to use
     @retry_decorator
     @ebRecordReplay.mRecordReplayWrapper
@@ -1342,12 +1362,12 @@ class sshconn(object):
         basename = os.path.basename(aFilename)
         if not aRemotePath:
             aRemotePath = './' + basename
- 
+
         _path = aRemotePath
 
         if self.mGetUser() == "opc":
-           # 'opc' user has access to /tmp, thus we can safely copy 
-           # to /tmp (without permission denied error). This is to avoid 
+           # 'opc' user has access to /tmp, thus we can safely copy
+           # to /tmp (without permission denied error). This is to avoid
            # permission denied error if aRemotePath (passed as parameter)
            # is owned by non-opc user.
            aRemotePath = "/tmp/" + basename
@@ -1422,7 +1442,7 @@ class sshconn(object):
 
         if _user == "opc":
 
-            # Extract the owner of 'aRemotePath' and connect 
+            # Extract the owner of 'aRemotePath' and connect
             # to the node as that user. Thereby, avoid getting permissions
             # denied error when fetching(self.__sftp.get) the file.
             _i, _o, _e = self.mExecuteCmd('stat -c "%U" ' + aRemotePath)
@@ -1442,13 +1462,13 @@ class sshconn(object):
 
         if _user == "opc":
             # Disconnect ssh connection as owner and
-            # restore the user for which the original connection was 
+            # restore the user for which the original connection was
             # established.
             self.mDisconnect()
 
             self.mSetUser(_user)
-    
-    
+
+
     @retry_decorator
     @ebRecordReplay.mRecordReplayWrapper
     def mMakeDir(self, aRemotePath):
@@ -1517,6 +1537,10 @@ class sshconn(object):
         if self.__sftp:
             self.__sftp.close()
             self.__sftp = None
+
+        if self.__lastclient:
+            self.__lastclient.mCleanUp()
+            self.__lastclient = None
 
         self.__state = sc_disconnected
 
@@ -1593,12 +1617,13 @@ def copy_ssh_key_on_remote_host(aSSHConn, aKey):
 
     return lRemoteName
 
+
 def setup_ssh_key(aHost, aUser, aPwd, aKey, aClearHost=False):
 
     ebLogTrace('Setup SSH Key on remote Host: ' + aHost)
 
-    ssh = paramiko.SSHClient()
-    ssh.set_missing_host_key_policy( paramiko.AutoAddPolicy())
+    client = SshClient(aHost)
+    ssh = client.mCreateSshClient()
     ssh.connect(aHost, username=aUser, password=aPwd, allow_agent=False)
 
     lRemoteName = copy_ssh_key_on_remote_host(ssh, aKey)
@@ -1629,12 +1654,13 @@ def setup_ssh_key(aHost, aUser, aPwd, aKey, aClearHost=False):
     stdin,stdout,stderr=ssh.exec_command("cat "+lRemoteName+" >> .ssh/authorized_keys")
     stdin.flush()
 
+    client.mCleanUp()
     ebLogTrace('* Done *')
 
 def add_pwdless_to_host(aHost, aUser, aPwd, aKey):
 
-    ssh = paramiko.SSHClient()
-    ssh.set_missing_host_key_policy( paramiko.AutoAddPolicy())
+    client = SshClient(aHost)
+    ssh = client.mCreateSshClient()
     ssh.connect(aHost, username=aUser, password=aPwd, allow_agent=False)
 
     lRemoteName = copy_ssh_key_on_remote_host(ssh, aKey)
@@ -1658,6 +1684,7 @@ def add_pwdless_to_host(aHost, aUser, aPwd, aKey):
     stdin.flush()
     data=stdout.readlines()
 
+    client.mCleanUp()
     ebLogTrace('* Done *')
 
 def setup_remote_host(aHost, aUser, aPwd, aKey):
@@ -1694,7 +1721,7 @@ def setup_remote_host(aHost, aUser, aPwd, aKey):
     _out_file = "{0}/.ssh/known_hosts".format(home_dir)
     _fd = open(_out_file, 'a')
     _cmd_list = ["/bin/ssh-keyscan", "-t", "rsa,dsa"]
-    _cmd_list.append(aHost)    
+    _cmd_list.append(aHost)
     execute_local(_cmd_list, aStdOut=_fd)
 
     add_pwdless_to_host(aHost, aUser, aPwd, aKey)
@@ -1745,7 +1772,7 @@ def ping_host(aHost, aCount=4):
 
     return False
 
-def validate_user(aUser): 
+def validate_user(aUser):
 
     _user = aUser
     _valid_users = ['opc', 'oracle', 'grid', 'root']

@@ -1,5 +1,5 @@
 """
- Copyright (c) 2019, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2019, 2026, Oracle and/or its affiliates.
 
 NAME:
     cs_createuser.py - Create Service CREATE USER
@@ -72,7 +72,7 @@ class csCreateUser(CSBase):
         _step_list = aSteplist
         _clu_utils = ebCluUtils(_ebox)
         _csu = csUtil()
-        _csConstants = _csu.mGetConstants(_ebox, False)
+        _csConstants = _csu.mGetConstants(_ebox, aOptions, False)
         _stepSpecificDetails = _clu_utils.mStepSpecificDetails("deleteServiceDetails", 'ONGOING', "Undo Create User in progress", 'ESTP_CREATE_USER')
         _clu_utils.mUpdateTaskProgressStatus([], 0, "Undo Create User ", "In Progress", _stepSpecificDetails)
             

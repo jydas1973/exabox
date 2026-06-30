@@ -13,6 +13,8 @@
 #    NOTES
 #      Unit test case script for clusterless Dom0 ELU operations.
 #   MODIFIED   (MM/DD/YY)
+#    araghave    04/23/26 - Enh 39152619 - MODIFY ALL SMR/ELU OPERATIONS TO
+#                           ROLLING OPERATIONS STYLE IN INFRA PATCHING CODE
 #    sdevasek    02/26/26 - Bug 39008110 - REMOVE ELUOPTIONS FROM ADDITIONAL
 #                           OPTIONS IN DOM0 TEST SETUP
 #    kdas        12/20/25 - Enh 38735521 - Automation for supporting
@@ -55,22 +57,22 @@ class Test_clusterless_dom0_elu(unittest.TestCase):
 
     @pytest.mark.clusterless_dom0_elu_prereq_check
     def test_clusterless_dom0_elu_pre_check(self):
-        result, _ = mExecuteInfraPatchCommand(TASK_PREREQ_CHECK, PATCH_DOM0, OP_STYLE_AUTO)
+        result, _ = mExecuteInfraPatchCommand(TASK_PREREQ_CHECK, PATCH_DOM0, OP_STYLE_ROLLING)
         self.assertTrue(result, "Clusterless dom0 ELU precheck failed")
 
     @pytest.mark.clusterless_dom0_elu_patch
     def test_clusterless_dom0_elu_patch(self):
-        result, _ = mExecuteInfraPatchCommand(TASK_PATCH, PATCH_DOM0, OP_STYLE_AUTO)
+        result, _ = mExecuteInfraPatchCommand(TASK_PATCH, PATCH_DOM0, OP_STYLE_ROLLING)
         self.assertTrue(result, "Clusterless dom0 ELU patch failed")
 
     @pytest.mark.clusterless_dom0_elu_postcheck
     def test_clusterless_dom0_elu_postcheck(self):
-        result, _ = mExecuteInfraPatchCommand(TASK_POSTCHECK, PATCH_DOM0, OP_STYLE_AUTO)
+        result, _ = mExecuteInfraPatchCommand(TASK_POSTCHECK, PATCH_DOM0, OP_STYLE_ROLLING)
         self.assertTrue(result, "Clusterless dom0 ELU postcheck failed")
 
     @pytest.mark.clusterless_dom0_elu_rollback
     def test_clusterless_dom0_elu_rollback(self):
-        result, _ = mExecuteInfraPatchCommand(TASK_ROLLBACK, PATCH_DOM0, OP_STYLE_AUTO)
+        result, _ = mExecuteInfraPatchCommand(TASK_ROLLBACK, PATCH_DOM0, OP_STYLE_ROLLING)
         self.assertTrue(result, "Clusterless dom0 ELU rollback failed")
 
    
@@ -86,7 +88,7 @@ class Test_clusterless_dom0_elu(unittest.TestCase):
         mUpdateAdditionalOptionsInPayload('IncludeNodeList', target_dom0s)
 
 
-        result, _ = mExecuteInfraPatchCommand(TASK_PREREQ_CHECK, PATCH_DOM0, OP_STYLE_AUTO)
+        result, _ = mExecuteInfraPatchCommand(TASK_PREREQ_CHECK, PATCH_DOM0, OP_STYLE_ROLLING)
         self.assertTrue(result, "Clusterless dom0 ELU prereq check with explicit launch node failed")
 
     @pytest.mark.clusterless_dom0_elu_patch_with_launch_node
@@ -98,7 +100,7 @@ class Test_clusterless_dom0_elu(unittest.TestCase):
         mUpdateAdditionalOptionsInPayload('LaunchNodeType', 'COMPUTE')
         mUpdateAdditionalOptionsInPayload('IncludeNodeList', target_dom0s)
 
-        result, _ = mExecuteInfraPatchCommand(TASK_PATCH, PATCH_DOM0, OP_STYLE_AUTO)
+        result, _ = mExecuteInfraPatchCommand(TASK_PATCH, PATCH_DOM0, OP_STYLE_ROLLING)
         self.assertTrue(result, "Clusterless dom0 ELU patch with explicit launch node failed")
 
     @pytest.mark.clusterless_dom0_elu_postcheck_with_launch_node
@@ -111,7 +113,7 @@ class Test_clusterless_dom0_elu(unittest.TestCase):
         mUpdateAdditionalOptionsInPayload('LaunchNodeType', 'COMPUTE')
         mUpdateAdditionalOptionsInPayload('IncludeNodeList', target_dom0s)
 
-        result, _ = mExecuteInfraPatchCommand(TASK_POSTCHECK, PATCH_DOM0, OP_STYLE_AUTO)
+        result, _ = mExecuteInfraPatchCommand(TASK_POSTCHECK, PATCH_DOM0, OP_STYLE_ROLLING)
         self.assertTrue(result, "Clusterless dom0 ELU post check with explicit launch node failed")
 
     @pytest.mark.clusterless_dom0_elu_rollback_with_launch_node
@@ -123,5 +125,5 @@ class Test_clusterless_dom0_elu(unittest.TestCase):
         mUpdateAdditionalOptionsInPayload('LaunchNodeType', 'COMPUTE')
         mUpdateAdditionalOptionsInPayload('IncludeNodeList', target_dom0s)
 
-        result, _ = mExecuteInfraPatchCommand(TASK_ROLLBACK, PATCH_DOM0, OP_STYLE_AUTO)
+        result, _ = mExecuteInfraPatchCommand(TASK_ROLLBACK, PATCH_DOM0, OP_STYLE_ROLLING)
         self.assertTrue(result, "Clusterless dom0 ELU rollback with explicit launch node failed")

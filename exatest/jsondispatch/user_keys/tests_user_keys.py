@@ -4,7 +4,7 @@
 #
 # tests_user_keys.py
 #
-# Copyright (c) 2024, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2024, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_user_keys.py - <one-line expansion of the name>
@@ -16,6 +16,10 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    joysjose    04/15/26 - add unit coverage for user_keys and
+#                           validate_volumes handlers
+#    joysjose    03/25/26 - Bug 38900232 : FIX FOR ISSUES FOUND BY VOXIO CODEV
+#                           AGENT IN DIR EXABOX/JSONDISPATCH
 #    gparada     04/15/25 - 37828983 ssh CPS' as ecra usr, exec cmds with sudo
 #    gparada     12/12/24 - Bug 36898362 Adding UT for user keys (secscan
 #                           feature) - Coverage 82% for handler_user_keys.py
@@ -210,6 +214,74 @@ class ebTestUserHandler(ebTestClucontrol):
         self.assertEqual(_rc, 0)
         self.assertEqual(_result["reason"], 
             "User creation: Success on ['scaqab10adm01', 'scaqab10celadm01', 'scaqab10adm01vm01'], Fail on [].")
+
+    @patch("exabox.jsondispatch.handler_user_keys.UserHandler.mGenerateKey", return_value={"private_key": "priv", "public_key": "pub"})
+    @patch("exabox.jsondispatch.handler_user_keys.UserHandler.mCreateUser")
+    @patch("exabox.jsondispatch.handler_user_keys.UserHandler.mRemoveKeyInCPS", return_value=(0, {"reason": ""}))
+    @patch("exabox.jsondispatch.handler_user_keys.UserHandler.mGetDestinationHosts", return_value=["scaqab10adm01", "scaqab10celadm01"])
+    def test_004_inject_failure_returns_nonzero_with_fail_keys(self,
+        mockGetDestinationHosts,
+        mockRemoveKeyInCPS,
+        mockCreateUser,
+        mockGenerateKey):
+
+        _options = self.mGetContext().mGetArgsOptions()
+        _options.jsonconf = PAYLOAD_INJECT
+
+        mockCreateUser.side_effect = [
+            (1, {"success": ["scaqab10adm01"], "fail": ["scaqab10celadm01"]}),
+            (0, {"success": [], "fail": []}),
+        ]
+
+        _handler = UserHandler(_options)
+        _rc, _result = _handler.mExecute()
+        self.assertEqual(_rc, 1)
+        self.assertEqual(_result["success"], ["scaqab10adm01"])
+        self.assertEqual(_result["fail"], ["scaqab10celadm01"])
+        self.assertEqual(_result["reason"],
+            "User creation: Success on ['scaqab10adm01'], Fail on ['scaqab10celadm01'].")
+
+    @staticmethod
+    def _ctx_manager(aNode):
+        _ctx = mock.MagicMock()
+        _ctx.__enter__.return_value = aNode
+        _ctx.__exit__.return_value = False
+        return _ctx
+
+    @patch("exabox.jsondispatch.handler_user_keys.connect_to_host")
+    @patch("exabox.jsondispatch.handler_user_keys.ebUserUtils.mSearchSecScanUser", return_value=2009)
+    @patch("exabox.jsondispatch.handler_user_keys.ebUserUtils.mCreateUser")
+    def test_005_mCreateUser_rolls_back_only_successful_hosts(self,
+        mockCreateUser,
+        mockSearchSecScanUser,
+        mockConnectToHost):
+
+        _options = self.mGetContext().mGetArgsOptions()
+        _handler = UserHandler(_options)
+        _handler.infraNodes = ["scaqab10adm01", "scaqab10celadm01"]
+
+        _node1 = mock.MagicMock()
+        _node2 = mock.MagicMock()
+        mockConnectToHost.side_effect = [
+            self._ctx_manager(_node1),
+            self._ctx_manager(_node2),
+        ]
+        mockCreateUser.side_effect = [
+            (0, "ok", ""),
+            (1, "", "boom"),
+        ]
+
+        with patch.object(_handler, "mDeleteUser", return_value=(0, {"success": ["scaqab10adm01"], "fail": []})) as mockDeleteUser:
+            _rc, _result = _handler.mCreateUser(
+                ["scaqab10adm01", "scaqab10celadm01"],
+                "secscan",
+                {"public_key": "ssh-rsa AAA"},
+            )
+
+        self.assertEqual(_rc, 1)
+        self.assertEqual(_result["success"], ["scaqab10adm01"])
+        self.assertEqual(_result["fail"], ["scaqab10celadm01"])
+        mockDeleteUser.assert_called_once_with(["scaqab10adm01"], "secscan", False)
 
 if __name__ == '__main__':
     unittest.main() 

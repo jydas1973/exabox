@@ -2,7 +2,7 @@
 
  $Header: ecs/exacloud/exabox/exatest/cluctrl/kms/tests_encrypt_decrypt.py /main/4 2022/02/23 11:47:47 ndesanto Exp $
 
- Copyright (c) 2020, 2022, Oracle and/or its affiliates.
+ Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 
     NAME
       tests_encrypt_decrypt.py - <one-line expansion of the name>
@@ -20,6 +20,7 @@
 
 import base64
 import unittest
+from exabox.core.Error import ExacloudRuntimeError
 from exabox.kms.crypt import decrypt, cryptographyAES, cryptographyAES_CBC
 
 
@@ -53,11 +54,12 @@ class TestcryptographyAES(unittest.TestCase):
 
     def test_decrypt_fallback(self):
         """
-        This method uses the class implementation of decrypt that includes the 
-        code to fallback into the previous method.
+        This method uses the class implementation of decrypt that rejects
+        payloads encrypted with the previous method.
         """
-        dec_data = self.__crypt.mDecrypt(self.__passphrase, self.__cbc_encrypted).decode("utf-8")
-        self.assertEqual(self.__plaintext, dec_data)
+        with self.assertRaisesRegex(ExacloudRuntimeError,
+                                    "Decryption failed"):
+            self.__crypt.mDecrypt(self.__passphrase, self.__cbc_encrypted)
 
     def test_not_implemented(self):
         _cbc = cryptographyAES_CBC()

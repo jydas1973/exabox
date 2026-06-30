@@ -1,7 +1,7 @@
 #
 # tests_utils_node.py
 #
-# Copyright (c) 2022, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2022, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_utils_node.py - <one-line expansion of the name>
@@ -13,6 +13,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    avimonda    04/08/26 - Bug 39084339: Add node utils unit tests
 #    aypaul      07/25/25 - Bug#38202055 Add unit test case for kill_proc_tree.
 #    jfsaldan    10/30/24 - Bug 37207274 -
 #                           EXACS:24.4.1:241021.0914:MULTI-VM:PARALLEL VM
@@ -26,7 +27,7 @@
 
 import unittest, psutil
 from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
-from exabox.utils.node import _update_key_val_str, node_list_process, connect_to_host, kill_proc_tree
+from exabox.utils.node import _update_key_val_str, node_list_process, connect_to_host, kill_proc_tree, CmdRet, node_cmd_abs_path
 from exabox.core.MockCommand import exaMockCommand
 from exabox.core.Context import get_gcontext
 from exabox.log.LogMgr import ebLogInfo
@@ -155,6 +156,51 @@ newkey=NEW_VAL
             with connect_to_host(_dom0, get_gcontext()) as _node:
                 self.assertEqual(
                     [_list_out_proc.strip()], node_list_process(_node, "elasticConfig"))
+
+    def test_node_cmd_abs_path_uses_default_lookup_first(self):
+        """Test node_cmd_abs_path without PATH fallback."""
+        mock_node = MagicMock()
+        mock_node.mFileExists.side_effect = (
+            lambda path: path == '/bin/grep'
+        )
+
+        with patch('exabox.utils.node.node_exec_cmd') as mock_node_exec:
+            self.assertEqual('/bin/grep', node_cmd_abs_path(mock_node, 'grep'))
+
+        mock_node_exec.assert_not_called()
+
+    def test_node_cmd_abs_path_falls_back_to_path(self):
+        """Test node_cmd_abs_path fallback to remote PATH lookup."""
+        mock_node = MagicMock()
+        mock_node.mFileExists.side_effect = (
+            lambda path: path == '/opt/oracle/cell25.1.2.0.0_LINUX.X64_250213.1/cellsrv/bin/cellcli'
+        )
+
+        with patch(
+                'exabox.utils.node.node_exec_cmd',
+                return_value=CmdRet(
+                    0,
+                    '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/opt/oracle/cell25.1.2.0.0_LINUX.X64_250213.1/cellsrv/bin:/sbin:/usr/sbin:/opt/MegaRAID/storcli/:/root/bin'
+                    '\n',
+                    '',
+                )) as mock_node_exec:
+            self.assertEqual(
+                '/opt/oracle/cell25.1.2.0.0_LINUX.X64_250213.1/cellsrv/bin/cellcli',
+                node_cmd_abs_path(mock_node, 'cellcli'))
+
+        mock_node_exec.assert_called_once_with(mock_node, 'echo "$PATH"')
+
+    def test_node_cmd_abs_path_returns_none_when_path_lookup_fails(self):
+        """Test node_cmd_abs_path failure when PATH fallback cannot resolve."""
+        mock_node = MagicMock()
+        mock_node.mFileExists.return_value = False
+
+        with patch(
+                'exabox.utils.node.node_exec_cmd',
+                return_value=CmdRet(1, '', 'failed')) as mock_node_exec:
+            self.assertIsNone(node_cmd_abs_path(mock_node, 'cellcli'))
+
+        mock_node_exec.assert_called_once_with(mock_node, 'echo "$PATH"')
 
     def test_kill_proc_tree(self):
         ebLogInfo("")

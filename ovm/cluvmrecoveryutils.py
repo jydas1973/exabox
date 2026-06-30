@@ -16,6 +16,8 @@
 #      NONE
 #
 #    MODIFIED   (MM/DD/YY)
+#    scoral      05/27/26 - Bug 39443833 - Configure bondmonitor during
+#                           mExecutePreVMStep.
 #    jesandov    01/12/26 - 38765088: Include admin information if avaliable
 #    akkar       08/18/25 - Bug 38313259: Fix RTG image copy during node
 #                           recovery
@@ -275,9 +277,11 @@ class NodeRecovery(object):
                 node_exec_cmd(_node, f'/bin/su - {aUser} -c "/bin/ssh-keygen -R localhost"')
                 node_exec_cmd(_node, f'/bin/su - {aUser} -c "/bin/ssh-keygen -R {_actualDomU}"')
                 node_exec_cmd(_node, f'/bin/su - {aUser} -c "/bin/ssh-keygen -R {_actualDomU.split(".")[0]}"')
-                node_exec_cmd_check(_node, f'/bin/su - {aUser} -c "/bin/ssh-keyscan -H localhost >> {_home_dir}/.ssh/known_hosts"')
-                node_exec_cmd_check(_node, f'/bin/su - {aUser} -c "/bin/ssh-keyscan -H {_actualDomU} >> {_home_dir}/.ssh/known_hosts"')
-                node_exec_cmd_check(_node, f'/bin/su - {aUser} -c "/bin/ssh-keyscan -H {_actualDomU.split(".")[0]} >> {_home_dir}/.ssh/known_hosts"')
+
+                _baseCmd = "/bin/ssh -o StrictHostKeyChecking=accept-new -o PasswordAuthentication=no"
+                node_exec_cmd_check(_node, f'/bin/su - {aUser} -c "{_baseCmd} localhost /bin/echo new_key"')
+                node_exec_cmd_check(_node, f'/bin/su - {aUser} -c "{_baseCmd} {_actualDomU} /bin/echo new_key"')
+                node_exec_cmd_check(_node, f'/bin/su - {aUser} -c "{_baseCmd} {_actualDomU.split(".")[0]} /bin/echo new_key"')
 
                 #Inject the key to the rest of the DomUs
                 for _rest in _domUs:
@@ -305,8 +309,9 @@ class NodeRecovery(object):
                     #Add the access to the rest of the hosts
                     node_exec_cmd_check(_node, f'/bin/su - {aUser} -c "/bin/ssh-keygen -R {_rest}"')
                     node_exec_cmd_check(_node, f'/bin/su - {aUser} -c "/bin/ssh-keygen -R {_rest.split(".")[0]}"')
-                    node_exec_cmd_check(_node, f'/bin/su - {aUser} -c "/bin/ssh-keyscan -T 30 -H {_rest} >> {_home_dir}/.ssh/known_hosts"')
-                    node_exec_cmd_check(_node, f'/bin/su - {aUser} -c "/bin/ssh-keyscan -T 30 -H {_rest.split(".")[0]} >> {_home_dir}/.ssh/known_hosts"')
+                    _baseCmd = "/bin/ssh -o StrictHostKeyChecking=accept-new -o PasswordAuthentication=no"
+                    node_exec_cmd(_node, f'/bin/su - {aUser} -c "{_baseCmd} {_rest} /bin/echo new_key"')
+                    node_exec_cmd(_node, f'/bin/su - {aUser} -c "{_baseCmd} {_rest.split(".")[0]} /bin/echo new_key"')
 
             except Exception as exp:
                 _msg = f'::mConfigurePasswordLessDomU failed for user {aUser} on {_actualDomU}: {exp}'
@@ -468,6 +473,11 @@ class NodeRecovery(object):
                 _ebox, payload=_payload):
             clubonding.update_bonded_bridges(_ebox, payload=_payload)
 
+        # Configure bondmonitor.
+        clubonding.configure_bonding_if_enabled(
+            _ebox, payload=_payload,
+            configure_bridge=False, configure_monitor=True)
+
         _ebox.mReleaseRemoteLock()
 
     def mExecutePostVMStep(self, aDom0, aDomU, aPayload):
@@ -477,7 +487,7 @@ class NodeRecovery(object):
         _ebox = self.__cluctrl
         _options = self.__options
 
-        # Configure bonding.
+        # Configure bonding bridge.
         #
         # Configure bridge only if static monitoring bridge is not supported.
         conf_bridge = \

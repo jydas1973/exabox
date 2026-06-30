@@ -16,6 +16,10 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    jyotdas     05/19/26 - Bug 39401571 - Handle payload directory for dom0
+#                           elu in exacc
+#    jyotdas     05/11/26 - Bug 39347652 - Perform dom0 Elu Rollback With the
+#                           Exasplice Flag Enabled
 #    araghave    04/15/26 - Bug 39173338 - EXACS:26.1.0:SET USER CONTEXT TO OPC
 #                           USER IN CASE OF CLUSTERLESS PATCHING PERFORMED
 #                           USING MGMT HOST AS THE LAUNCH NODE
@@ -44,6 +48,8 @@
 #                           SMR patching of Clusterless free nodes 
 #    jyotdas     10/31/25 - Bug 38575316 - Parallelise the dom0 shutdown across
 #                           all nodes while non-rolling qmr patching.
+#    mirrodri    10/12/25 - Enh 38521465 PROVIDE OPTIONS TO MOCK PATCHMGR
+#                           COMMAND ON AUTOMATION ENVIRONMENTS
 #    bhpati      10/23/25 - Display an Exadata Live Update (ELU) specific error
 #    araghave    09/27/25 - Enhancement Request 38457501 - EXACC GEN2 
 #                           | INFRA PATCHING |ERFORM HEARTBEAT CHECKS AND
@@ -2035,6 +2041,23 @@ class Dom0Handler(TargetHandler):
         _err_msg_template = "%s %s failed. Errors printed to screen and logs"
         try:
             self.mPatchLogInfo(f"\n\n---------------> Starting {TASK_ROLLBACK} on {PATCH_DOM0}s <---------------\n\n")
+            if self.mIsElu():
+                for _target_version, _dom0_hostnames in self.mGetEluTargetVersiontoNodeMappings().items():
+                    if len(self.mGetCustomizedDom0List()) == 1 and \
+                            self.mGetCustomizedDom0List()[0] in _dom0_hostnames:
+                        if _target_version in INVALID_REGISTERED_PATCH_VERSIONS:
+                            self.mPatchLogError(
+                                f"Exadata Live Update input image version - {_target_version} is "
+                                f"invalid and this might be because image series was not registered "
+                                f"for the QMR version for the Dom0 nodes: "
+                                f"{str(self.mGetCustomizedDom0List())}. Rollback will be skipped "
+                                f"on these nodes, and the final error code for rollback will be "
+                                f"marked as failure.")
+                            _ret = INFRA_PATCHING_ELU_IMAGE_VERSION_NOT_FOUND
+                            return _ret, _no_action_taken
+                        else:
+                            self.mSetTargetVersion(_target_version)
+                            break
             # 1. Set up environment
             _ret = self.mSetEnvironment()
             if _ret != PATCH_SUCCESS_EXIT_CODE:
@@ -3581,10 +3604,14 @@ class Dom0Handler(TargetHandler):
          Check that all the domU that were up before patching have come up
         '''
         _check_dom0_up_for_secs = 0
-        _check_domU_up_for_secs = 0
+        _check_domU_up_for_secs = 0 
         ret = PATCH_SUCCESS_EXIT_CODE
         if not aIsDiscardedNodeListCheck:
             _timeout_for_dom0_domU_up = self.mGetTimeoutForDom0DomuStartupInSeconds()
+            if self.mIsExaSplice():
+                # Elu patching does not reboot Dom0, so a smaller fixed timeout
+                # is sufficient for Dom0/DomU startup checks.
+                _timeout_for_dom0_domU_up = 10
         else:
             _timeout_for_dom0_domU_up = 10
 
@@ -3663,32 +3690,37 @@ class Dom0Handler(TargetHandler):
          independent postcheck option as we are not aware 
          whether upgrade or rollback was performed.
         '''
+
         if aTaskType not in [TASK_POSTCHECK]:
             # Check that the dom0 is at the requested version. if it was a rollback we just
             # check for the version to be lower than what it previously was.
-            _current_dom0_version = self.mGetCluPatchCheck().mCheckTargetVersion(aDom0, PATCH_DOM0,
-                                                                                 aIsexasplice= self.mIsExaSplice())
-            if aRollback:
-                if self.mGetCluPatchCheck().mCheckTargetVersion(aDom0, PATCH_DOM0, aPrePatchVersion, aIsexasplice= self.mIsExaSplice()) >= 0:
-                    ret = VERSION_MISMATCH_DURING_ROLLBACK
-                    _suggestion_msg = f"Dom0 : {aDom0} rollback was requested but the version seems to be unchanged, found version {aPrePatchVersion}, expected to be lower than {_current_dom0_version}"
+            if self.mIsMockEnabledByEcra():
+                self.mPatchLogInfo("Mock mode: skipping target-version validation during postcheck.")
+            else:
+                _current_dom0_version = self.mGetCluPatchCheck().mCheckTargetVersion(aDom0, PATCH_DOM0,
+                                                                                    aIsexasplice= self.mIsExaSplice())
+                if aRollback and not self.mIsElu():
+                    if self.mGetCluPatchCheck().mCheckTargetVersion(aDom0, PATCH_DOM0, aPrePatchVersion, aIsexasplice= self.mIsExaSplice()) >= 0:
+                        ret = VERSION_MISMATCH_DURING_ROLLBACK
+                        _suggestion_msg = f"Dom0 : {aDom0} rollback was requested but the version seems to be unchanged, found version {aPrePatchVersion}, expected to be lower than {_current_dom0_version}"
+                        self.mAddError(ret, _suggestion_msg)
+                        return ret
+                elif self.mGetCluPatchCheck().mCheckTargetVersion(aDom0, PATCH_DOM0, aPostPatchTargetVersion, aIsexasplice= self.mIsExaSplice()) < 0:
+                    """
+                    We proceed with patching only if the target version is higher than the current version.
+                    In all other cases, when currentVersion = targetVersion or currentVersion > TargetVersion (as seen in
+                    elastic node addition case, a node with higher version can be added), the node is skipped.            
+                    After successful patch completion, node would be at target version.
+                    """
+                    ret = DOM0_NOT_AT_REQUESTED_VERSION
+                    _suggestion_msg = f"Dom0 : {aDom0} is not at the requested upgrade version {aPostPatchTargetVersion}, found version {_current_dom0_version}"
                     self.mAddError(ret, _suggestion_msg)
                     return ret
-            elif self.mGetCluPatchCheck().mCheckTargetVersion(aDom0, PATCH_DOM0, aPostPatchTargetVersion, aIsexasplice= self.mIsExaSplice()) < 0:
-                """
-                We proceed with patching only if the target version is higher than the current version.
-                In all other cases, when currentVersion = targetVersion or currentVersion > TargetVersion (as seen in
-                elastic node addition case, a node with higher version can be added), the node is skipped.            
-                After successful patch completion, node would be at target version.
-                """
-                ret = DOM0_NOT_AT_REQUESTED_VERSION
-                _suggestion_msg = f"Dom0 : {aDom0} is not at the requested upgrade version {aPostPatchTargetVersion}, found version {_current_dom0_version}"
-                self.mAddError(ret, _suggestion_msg)
-                return ret
 
         if self.mIsExaSplice():
             # Check if any parallel vm_cmd operations are running during dom0 exasplice
             # if yes, log the operation details for easy debugging purpose
+        
             try:
                 _ongoing_vm_cmd_requests = mFilterRequestsForThisRack(ebGetDefaultDB(), self.mGetRackName(),
                                                                               "Pending", aCmd="cluctrl.vm_cmd",
@@ -3704,34 +3736,35 @@ class Dom0Handler(TargetHandler):
                 # Should be info , not error as this is just an informative message
                 self.mPatchLogInfo("Not able to fetch any parallel exacloud operation during Dom0 monthly infrapatching")
 
-        # Validate if Auto startup is enabled for the DomUs
-        # which were previously up and running prior to Upgrade
-        # and Rollback operations.
-        # Skip these checks for dom0 exasplice since
-        # reshape operations restarts domu and these checks fail
+        # Validate if AutoStartup is enabled for the DomUs which were
+        # previously up and running prior to Upgrade and Rollback operations.
+        # Skip only AutoStartup validation for Dom0 exasplice, but still
+        # verify that the DomUs running before ELU remain up after ELU.
         if not self.mIsExaSplice():
             if len(aDomUList) > 0:
                 ret = self.mGetCluPatchCheck().mValidateAndEnableDomuAutoStartup(aDom0,aDomUList)
                 if ret != PATCH_SUCCESS_EXIT_CODE:
                     return ret
-
-            # Check if DomUs are up.
-            self.mPatchLogInfo(f"Start verifying every {DOM0_DOMU_ONLINE_STATUS_CHECK_SLEEP_IN_SECONDS} seconds if the DomUs, up and running before the Upgrade/Rollback operations, are currently operational with a timeout of {_timeout_for_dom0_domU_up} seconds.")
-            while _check_domU_up_for_secs < _timeout_for_dom0_domU_up:
-                if self.mGetCluPatchCheck().mCheckVMsUp(aDom0, aDomUList):
-                    break
-                sleep(DOM0_DOMU_ONLINE_STATUS_CHECK_SLEEP_IN_SECONDS)
-                _check_domU_up_for_secs += DOM0_DOMU_ONLINE_STATUS_CHECK_SLEEP_IN_SECONDS
-                self.mPatchLogInfo(f"**** Dom0 online check is polled for another {DOM0_DOMU_ONLINE_STATUS_CHECK_SLEEP_IN_SECONDS} seconds and re-validated.")
-            else:
-                ret = DOMU_DOWN_ERROR
-                _suggestion_msg = f"Expected all of the following domus {str(aDomUList)} to be up on {aDom0}, but only {str(self.mGetDomUList(aDom0, aFromXmList=True))} were up"
-                self.mPatchLogError(f"DomU startup check failed. {_suggestion_msg}")
-                self.mAddError(ret, _suggestion_msg)
-                return ret
         else:
            self.mPatchLogInfo(
-                "VM AutoStart Enabled Checks and VM Up related checks will not be performed during Dom0 monthly patching")
+                "VM AutoStart Enabled Checks will not be performed during Dom0 monthly patching")
+
+        # Check if DomUs are up.
+        self.mPatchLogInfo(
+            f"Start verifying every {DOM0_DOMU_ONLINE_STATUS_CHECK_SLEEP_IN_SECONDS} seconds if the DomUs, up and running before the Upgrade/Rollback operations, are currently operational with a timeout of {_timeout_for_dom0_domU_up} seconds.")
+        while _check_domU_up_for_secs < _timeout_for_dom0_domU_up:
+            if self.mGetCluPatchCheck().mCheckVMsUp(aDom0, aDomUList):
+                break
+            sleep(DOM0_DOMU_ONLINE_STATUS_CHECK_SLEEP_IN_SECONDS)
+            _check_domU_up_for_secs += DOM0_DOMU_ONLINE_STATUS_CHECK_SLEEP_IN_SECONDS
+            self.mPatchLogInfo(
+                f"**** Dom0 online check is polled for another {DOM0_DOMU_ONLINE_STATUS_CHECK_SLEEP_IN_SECONDS} seconds and re-validated.")
+        else:
+            ret = DOMU_DOWN_ERROR
+            _suggestion_msg = f"Expected all of the following domus {str(aDomUList)} to be up on {aDom0}, but only {str(self.mGetDomUList(aDom0, aFromXmList=True))} were up"
+            self.mPatchLogError(f"DomU startup check failed. {_suggestion_msg}")
+            self.mAddError(ret, _suggestion_msg)
+            return ret
 
         # Start iptables service only in exacs envs
         # dom0_iptables_setup.sh is not present in a clusterless patching.
@@ -3765,6 +3798,7 @@ class Dom0Handler(TargetHandler):
         # Irrespective of the outcome of RDS ping validation, Heartbeat validation will
         # return a non PATCH_SUCCESS_ERROR_CODE in case of a failure and no further 
         # validations are performed.
+
         if self.mGetOpStyle() == OP_STYLE_ROLLING:
             ret = self.mValidateDomUHeartBeatRdsAndCrsPostPatching(aDomUList, aIsDiscardedNodeListCheck, aDom0=aDom0)
             if ret != PATCH_SUCCESS_EXIT_CODE:
@@ -5274,7 +5308,7 @@ class Dom0Handler(TargetHandler):
         if isEXACC == "True":
             exacc_payload_loc = self.mGetCluControl().mCheckConfigOption('ociexacc_exadata_patch_download_loc').strip()
             if exacc_payload_loc:
-                patch_payloads_directory = self.OCIEXACC_LOC + 'PatchPayloads/'
+                patch_payloads_directory = exacc_payload_loc + 'PatchPayloads/'
         else:
             self.mPatchLogInfo('*** ociexacc parameter is set to False. Get Exacloud path for EXACS')
             # Get Exacloud path for EXACS

@@ -43,6 +43,21 @@ class TestOedacliCmdMgr(unittest.TestCase):
         self.mock_ebOedacli.return_value = self.mock_oxm
         self.cmd_mgr = OedacliCmdMgr('/fake/oedacli', '/fake/save_dir')
 
+    def _make_clone_payload(self):
+        return {
+            'admin': {
+                'fqdn': 'cell-admin',
+                'ipaddr': '10.0.0.1',
+                'gateway': '10.0.0.254',
+                'netmask': '255.255.255.0'
+            },
+            'priv1': {'fqdn': 'cell-priv1', 'ipaddr': '192.168.0.1'},
+            'priv2': {'fqdn': 'cell-priv2', 'ipaddr': '192.168.1.1'},
+            'ilom': {'fqdn': 'cell-ilom', 'ipaddr': '10.0.1.1'},
+            'rack_num': '01',
+            'uloc': 'U01'
+        }
+
     def test_mUpdateNetworkSlaves_uses_master_when_provided(self):
         self.mock_oxm.reset_mock()
 
@@ -81,6 +96,26 @@ class TestOedacliCmdMgr(unittest.TestCase):
         )
         self.mock_oxm.save_action.assert_called_once_with()
         self.mock_oxm.run_oedacli.assert_called_once_with('/tmp/source.xml', '/tmp/dest.xml', None, False)
+
+    def test_mBuildCloneCell_includes_machine_type_when_provided(self):
+        self.mock_oxm.reset_mock()
+        payload = self._make_clone_payload()
+
+        self.cmd_mgr.mBuildCloneCell('src-cell', payload, aKVM=True, aMachineType='X11MEF')
+
+        first_command = self.mock_oxm.oc_cmd.call_args_list[0].kwargs['command']
+        self.assertEqual(first_command, "CLONE NEWCELL SRCNAME='src-cell' TGTNAME='cell-admin' TYPE='X11MEF'")
+        self.assertTrue(any("TYPE='X11MEF'" in call.kwargs['command'] for call in self.mock_oxm.oc_cmd.call_args_list))
+
+    def test_mBuildCloneCell_omits_machine_type_when_not_provided(self):
+        self.mock_oxm.reset_mock()
+        payload = self._make_clone_payload()
+
+        self.cmd_mgr.mBuildCloneCell('src-cell', payload, aKVM=True)
+
+        first_command = self.mock_oxm.oc_cmd.call_args_list[0].kwargs['command']
+        self.assertEqual(first_command, "CLONE NEWCELL SRCNAME='src-cell' TGTNAME='cell-admin'")
+        self.assertFalse(any("TYPE=" in call.kwargs['command'] for call in self.mock_oxm.oc_cmd.call_args_list))
 
 
 if __name__ == '__main__':

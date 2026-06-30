@@ -57,9 +57,9 @@ class ExaHTTPSServer(BaseHTTPServer.HTTPServer):
             else:
                 app_cfg = ebCertificateConfig('exacloud',
                     get_tls_config_path())
-                _rootca_certificate = app_cfg['client_certificate_file']
-                _client_certificate = app_cfg['local_certificate_file']
-                _client_privatekey = app_cfg['local_certificate_key_file']
+                _rootca_certificate = app_cfg['local_certificate_file']
+                _client_certificate = app_cfg['client_certificate_file']
+                _client_privatekey = app_cfg['client_certificate_key_file']
                 _protocol = app_cfg['protocol']
 
             context = ssl.SSLContext(getattr(ssl, _protocol))
@@ -120,8 +120,6 @@ class ExaHTTPRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                     if not is_exacs():
                         _rootca_certificate = get_ca_cert_path_exacc(app_cfg=app_cfg)
                     ssl_cert_config = ssl.CERT_REQUIRED
-                    if use_oci_certificates():
-                        ssl_cert_config = ssl.CERT_NONE
                     context.load_verify_locations(_rootca_certificate)
                     context.load_cert_chain(_client_certificate, _client_privatekey)
                     context.verify_mode = ssl_cert_config
@@ -129,3 +127,4 @@ class ExaHTTPRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                 else:
                     context.load_cert_chain(_client_certificate, _client_privatekey)
                     self.socket = context.wrap_socket(self.socket, server_side=True)
+

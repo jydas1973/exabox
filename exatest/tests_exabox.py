@@ -4,7 +4,7 @@
 #
 # tests_exabox.py
 #
-# Copyright (c) 2022, 2024, Oracle and/or its affiliates.
+# Copyright (c) 2022, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_exabox.py - <one-line expansion of the name>
@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    shapatna    04/28/26 - update exabox tests for removed proxy and agent
+#                           options
 #    gparada     14/09/23 - 35715235 Add UT: duplicated property in JSON
 #    hgaldame    11/08/22 - 34778659 - ociexacc: exacloud cli command for 
 #                           health metrics network configuration on cps host 
@@ -115,13 +117,12 @@ class ebTestExaBox(ebTestClucontrol):
             mock_options.return_value = _options
             execute_from_commandline(_options, _state)
 
-    @patch("exabox.bin.exabox.ProxyHeartbeat")
     @patch("exabox.core.DBStore3.ebExacloudDB")
     @patch("exabox.core.Core.exaBoxCoreInit")
     @patch("exabox.core.Context.exaBoxContext.mGetArgsOptions")
     @patch("exabox.bin.exabox.ebLogInit")
     def test_proxy(self, mock_logInit, mock_options, mock_ebCoreInit,
-                   mock_exacloudDB, mock_heartbeat):
+                   mock_exacloudDB):
         _state = ebExaboxState()
         _options = self.__parser.parse_args(["--proxy", "start",
                                         "--migrateproxydb", "on"])
@@ -130,9 +131,8 @@ class ebTestExaBox(ebTestClucontrol):
         mock_options.return_value = _options
         execute_from_commandline(_options, _state)
 
-        _options = self.__parser.parse_args(["--proxy", "start", "-hb"])
-        mock_options.return_value = _options
-        execute_from_commandline(_options, _state)
+        with self.assertRaises(SystemExit):
+            self.__parser.parse_args(["--proxy", "start", "-hb"])
 
     @patch("exabox.bin.exabox.ebRackControl")
     @patch("exabox.bin.exabox.ebInitDBLayer")
@@ -143,19 +143,6 @@ class ebTestExaBox(ebTestClucontrol):
                    mock_initDB, mock_rackControl):
         _state = ebExaboxState()
         _options = self.__parser.parse_args(["--rack", "list"])
-
-        mock_options.return_value = _options
-        execute_from_commandline(_options, _state)
-
-    @patch("exabox.bin.exabox.fetch_update_ecregistrationinfo")
-    @patch("exabox.bin.exabox.ebInitDBLayer")
-    @patch("exabox.core.Core.exaBoxCoreInit")
-    @patch("exabox.core.Context.exaBoxContext.mGetArgsOptions")
-    @patch("exabox.bin.exabox.ebLogInit")
-    def test_eccontrol(self, mock_logInit, mock_options, mock_ebCoreInit,
-                   mock_initDB, mock_eccontrol):
-        _state = ebExaboxState()
-        _options = self.__parser.parse_args(["--eccontrol", "list"])
 
         mock_options.return_value = _options
         execute_from_commandline(_options, _state)
@@ -395,32 +382,6 @@ class ebTestExaBox(ebTestClucontrol):
         mock_options.return_value = _options
         with self.assertRaises(TypeError):
             execute_from_commandline(_options, _state)
-
-    @patch("exabox.bin.exabox.ProxyClient")
-    @patch("exabox.bin.exabox.ebInitDBLayer")
-    @patch("exabox.bin.exabox.ebGetDefaultDB")
-    @patch("exabox.core.Core.exaBoxCoreInit")
-    @patch("exabox.core.Context.exaBoxContext.mGetArgsOptions")
-    @patch("exabox.bin.exabox.ebLogInit")
-    def test_agent_misc(self, mock_logInit, mock_options, mock_ebCoreInit,
-                        mock_defaultDB, mock_initDB, mock_proxy):
-        _state = ebExaboxState()
-
-        _options = self.__parser.parse_args(["--agent", "suspend"])
-        mock_options.return_value = _options
-        execute_from_commandline(_options, _state)
-
-        _options = self.__parser.parse_args(["--agent", "activate"])
-        mock_options.return_value = _options
-        execute_from_commandline(_options, _state)
-
-        _options = self.__parser.parse_args(["--agent", "register"])
-        mock_options.return_value = _options
-        execute_from_commandline(_options, _state)
-
-        _options = self.__parser.parse_args(["--agent", "deregister"])
-        mock_options.return_value = _options
-        execute_from_commandline(_options, _state)
 
     @patch("exabox.bin.exabox.AgentSignal")
     @patch("exabox.bin.exabox.AgentWorkerPIDListing")

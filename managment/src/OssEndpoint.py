@@ -11,6 +11,9 @@ NOTE:
     None    
 
 History:
+    hgaldame    04/23/2026 - exacc:security: authenticated whitelist bypass in
+                             remoteec editor endpoint allows arbitrary file read
+                             outside approved paths
     shapatna    02/09/2026 - Bug: 38900266 - Fix for issues pointed by Codev 
                              in exabox/management directory
     jesandov    26/03/2019 - File Creation
@@ -158,22 +161,20 @@ class OssEndpoint(AsyncTrackEndpoint):
 
         # Validate the object is on the reacheble path
         _ossObjPath = self.mGetPath(aCustomArgs["path"])
-
-        if _ossObjPath:
-            _ossObjPath = _ossObjPath.rstrip("/")
-            _ossObjName = os.path.basename(_ossObjPath)
-            _ossObjNewName = "{0}-{1}".format(aProcessId, _ossObjName)
-
-            # Create client and bucket
-            _client = self.mGetOssClient()
-            _namespace = _client.get_namespace().data
-            _compartmentId = self.mGetOssConfig()["tenancy"]
-
-        with open(aLogFilename, "w+") as _log:
-
-            if not _ossObjPath:
+        if not _ossObjPath:
+            with open(aLogFilename, "w+") as _log:
                 self.mAsyncLog(_log, aProcessId, "Invalid Path: {0}'".format(aCustomArgs["path"]), aDebug=False)
                 return 4
+        _ossObjPath = _ossObjPath.rstrip("/")
+        _ossObjName = os.path.basename(_ossObjPath)
+        _ossObjNewName = "{0}-{1}".format(aProcessId, _ossObjName)
+
+        # Create client and bucket
+        _client = self.mGetOssClient()
+        _namespace = _client.get_namespace().data
+        _compartmentId = self.mGetOssConfig()["tenancy"]
+
+        with open(aLogFilename, "w+") as _log:
 
             self.mAsyncLog(_log, aProcessId, "Start Upload Object: {0}'".format(_ossObjPath), aDebug=False)
 

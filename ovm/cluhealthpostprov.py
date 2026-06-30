@@ -4,7 +4,7 @@
 #
 # cluhealthpostprov.py
 #
-# Copyright (c) 2021, 2022, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      cluhealthpostprov.py - 
@@ -18,6 +18,8 @@
 #      ECRA has a property to determine if abort should happend based on check results
 #
 #    MODIFIED   (MM/DD/YY)
+#    prsshukl    05/12/22 - Bug 39263014 - EXACS - SECURITY SCAN FINDINGS 
+#                           IN EXABOX/OVM/CLUHEALTHPOSTPROV.PY
 #    illamas     02/04/22 - Enh 33820899 Adding data/reco checks
 #    illamas     10/12/21 - Enh 33444585 - Enhancement for postChecks
 #    illamas     07/14/21 - Bug 33116643 - The mandatory field is wrong when
@@ -34,6 +36,7 @@ from exabox.core.Context import get_gcontext
 from exabox.core.Error import ebError, ExacloudRuntimeError
 from enum import Enum
 import re
+import shlex
 
 # Useful alias to use on dictionary building
 CURR_VAL = "currentValue"
@@ -55,6 +58,8 @@ CURRENT = "currentValue"
 ARGUMENT = "argument"
 EXPECTED_RETURN_CODE = "expected_return_code"
 CURRENT_RETURN_CODE  = "current_return_code"
+
+_UNSAFE_MOUNT_CHARS = set(";|&$><`\"'")
 
 # Types of validations
 FILESYSTEM = "filesystem"
@@ -186,8 +191,17 @@ def checkDriver(aListHost: list, aDictOfChecks: dict, aTargetMachine: str)-> dic
                     _results_filesystem[index][EXPECTED] = _fs_size
                     _results_filesystem[index][METRIC] = _fs_block_size
                     _results_filesystem[index][MANDATORY] = values.get(MANDATORY)
-                    _fs_mnt_point = _fs_mnt_point.replace(_grid_home_placeholder,_grid_home_path)
+                    _fs_mnt_point = _fs_mnt_point.replace(_grid_home_placeholder,_grid_home_path).strip()
                     ebLogInfo(f"Path {_fs_mnt_point} Expected {_fs_size} {_fs_block_size}")
+                    _sanitized_mnt_point = _sanitize_mount_point(_fs_mnt_point)
+                    if not _sanitized_mnt_point:
+                        _results_filesystem[index][RESULT] = ERROR
+                        _results_filesystem[index][ERR_MSG] = (
+                            f"Invalid mount point: {_fs_mnt_point}"
+                        )
+                        ebLogInfo(f"Invalid mount point: {_fs_mnt_point}")
+                        continue
+                    _fs_mnt_point = _sanitized_mnt_point
                     #
                     # Check that we received a valid mount point,
                     # skip check if not a valid Mnt Point
@@ -200,7 +214,7 @@ def checkDriver(aListHost: list, aDictOfChecks: dict, aTargetMachine: str)-> dic
                         ebLogInfo(f"Invalid mount point: {_fs_mnt_point}")
                         continue
                     try:
-                        _cmd = f"/usr/bin/df {_fs_mnt_point} -PB{_fs_block_size}"
+                        _cmd = f"/usr/bin/df {shlex.quote(_fs_mnt_point)} -PB{_fs_block_size}"
                         _, _o, _e = aNode.mExecuteCmd(_cmd)
                         _rc = aNode.mGetCmdExitStatus()
                         _out = _o.readlines()
@@ -313,6 +327,23 @@ def checkDriver(aListHost: list, aDictOfChecks: dict, aTargetMachine: str)-> dic
             _node.mDisconnect()
     return _results_dict
 
+def _sanitize_mount_point(aMntPoint: str):
+    if not aMntPoint:
+        return None
+    _mnt_point = aMntPoint.strip()
+    if not _mnt_point:
+        return None
+    if not _mnt_point.startswith("/"):
+        return None
+    if _mnt_point.startswith("-"):
+        return None
+    if any(ord(ch) < 32 for ch in _mnt_point):
+        return None
+    if any(ch in _mnt_point for ch in _UNSAFE_MOUNT_CHARS):
+        return None
+    return _mnt_point
+
+
 def _isFsMntPoint(aNode: exaBoxNode, aMntPoint: str) -> bool:
     """
     Check if aMntPoint is a valid mount point
@@ -322,7 +353,10 @@ def _isFsMntPoint(aNode: exaBoxNode, aMntPoint: str) -> bool:
     returns :True if aMntPoint is a mount point of a filesystem,
                 False otherwise
     """
-    _cmd = f"/usr/bin/findmnt {aMntPoint}"
+    _sanitized_point = _sanitize_mount_point(aMntPoint)
+    if not _sanitized_point:
+        return False
+    _cmd = f"/usr/bin/findmnt {shlex.quote(_sanitized_point)}"
     aNode.mExecuteCmd(_cmd)
     return not aNode.mGetCmdExitStatus()
 

@@ -4,7 +4,7 @@
 #
 # tests_env_info.py
 #
-# Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_env_info.py - <one-line expansion of the name>
@@ -120,6 +120,7 @@ class ebTestEnvInfo(ebTestClucontrol):
                 [
                     exaMockCommand("ls /u01/app", aRc=1),
                     exaMockCommand(re.escape("/bin/cat /etc/oratab | /bin/grep '^+ASM.*' | /bin/cut -f 2 -d ':' "), aRc=0, aStdout="/u01/app/18.1.0.0/grid" ,aPersist=True),
+                    exaMockCommand(re.escape("cat /etc/oracle/olr.loc | grep 'crs_home' | cut -f 2 -d '='"), aStdout="/u01/app/18.1.0.0/grid"),
                     exaMockCommand(re.escape("export ORACLE_HOME=/u01/app/18.1.0.0/grid; $ORACLE_HOME/bin/oraversion -baseVersion"), aRc=0, aStdout="18.0.0.0.0" ,aPersist=True),
                     exaMockCommand(re.escape("export ORACLE_HOME=/u01/app/18.1.0.0/grid; $ORACLE_HOME/bin/orabase"), aRc=0, aStdout="/u01/app/18.1.0.0/grid" ,aPersist=True),
                 ]
@@ -248,6 +249,7 @@ class ebTestEnvInfo(ebTestClucontrol):
                 [
                     exaMockCommand("ls /u01/app", aRc=1),
                     exaMockCommand(re.escape("/bin/cat /etc/oratab | /bin/grep '^+ASM.*' | /bin/cut -f 2 -d ':' "), aRc=0, aStdout="/u01/app/18.1.0.0/grid" ,aPersist=True),
+                    exaMockCommand(re.escape("cat /etc/oracle/olr.loc | grep 'crs_home' | cut -f 2 -d '='"), aStdout="/u01/app/18.1.0.0/grid"),
                     exaMockCommand(re.escape("export ORACLE_HOME=/u01/app/18.1.0.0/grid; $ORACLE_HOME/bin/oraversion -baseVersion"), aRc=0, aStdout="18.0.0.0.0" ,aPersist=True),
                     exaMockCommand(re.escape("export ORACLE_HOME=/u01/app/18.1.0.0/grid; $ORACLE_HOME/bin/orabase"), aRc=0, aStdout="/u01/app/18.1.0.0/grid" ,aPersist=True),
                 ]

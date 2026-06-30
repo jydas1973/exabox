@@ -16,6 +16,8 @@ NOTE:
     None
 
 History:
+    joysjose  06/04/26 - Bug 39369696 Fix celldisk discovery for storage-resize prechecks
+                         on EF-rack Exadata systems
     zpallare  04/14/26 - Bug 39203556 - EXACS:25.4.1 one off3: custom
                          data-reco-sparse: reshape fails when percentage
                          stay the same: keyerror: cell_count
@@ -108,6 +110,7 @@ from .clumisc import ebCluStorageReshapePrecheck
 from exabox.log.LogMgr import ebLogError, ebLogInfo, ebLogDebug, ebLogVerbose, ebLogJson, ebLogTrace, ebLogWarn
 
 from exabox.ovm.utils.clu_utils import ebCluUtils
+from exabox.ovm.csstep.exascale.escli_util import ebEscliUtils
 
 # Function used to dump object as json
 def universal_converter(obj):
@@ -1383,7 +1386,10 @@ class ebCluManageDiskgroup(object):
                 try:
                     _list_all_griddisk  += _eBoxCluCtrl.mGetStorage().mListCellDG(_node, aDiskGroupSuffix)
                 except Exception as e:
-                    ebLogError(f"*** Exception Message Detail on host {_cell_name} {e}")
+                    _detail_error = f"Failed to get failgroup list from host {_cell_name}: {e}"
+                    ebLogError(f"*** {_detail_error}")
+                    _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_FETCHING_DETAILS_DG'], _detail_error)
+                    raise ExacloudRuntimeError(0x0825, 0xA, _detail_error)
         for _griddisk in _list_all_griddisk:
             _failgroup_list.append(_griddisk.strip().split()[0])
         ebLogInfo("*** ebCluManageDiskgroup:mGetFailGroupList list is: %s <<<"% (_failgroup_list))
@@ -2280,6 +2286,40 @@ class ebCluManageDiskgroup(object):
         
     # end
 
+    def mListCelldiskOutput(self, aCellName, aAttributes):
+        """
+        Return cellcli output for supported celldisk naming patterns.
+        """
+        _eBox = self.mGetEbox()
+        _escli = ebEscliUtils(_eBox)
+        _exadata_model_gt_X8 = False
+        _exadata_model = _eBox.mGetNodeModel(aHostName=aCellName)
+        if _exadata_model and _eBox.mCompareExadataModel(_exadata_model, 'X8') >= 0:
+            _exadata_model_gt_X8 = True
+
+        if _escli.mIsEFRack(aCellName) and _exadata_model_gt_X8:
+            _cmdstr = f'cellcli -e LIST CELLDISK WHERE name LIKE \\"CF_.*\\" attributes {aAttributes};'
+        else:
+            _cmdstr = f'cellcli -e LIST CELLDISK WHERE name LIKE \\"CD_.*\\" attributes {aAttributes};'
+
+        with connect_to_host(aCellName, get_gcontext()) as _node:
+            ebLogInfo(f"*** Executing the command - {_cmdstr} on cell - {aCellName}.")
+            _output, _error = None, None
+            _in, _out, _err = _node.mExecuteCmd(_cmdstr)
+            if _out:
+                _output = _out.readlines()
+            if _err:
+                _error = _err.read()
+            if _node.mGetCmdExitStatus() != 0:
+                ebLogError(f'Error while running cellcli command on cell. *** CMD_OUT: {_output}, ERROR: {_error}.')
+                raise ExacloudRuntimeError(0x0825, 0xA, f'mExecuteCmd Failed on {aCellName}, with cmd: {_cmdstr}')
+            if _output:
+                ebLogTrace("*** cellcli Output - %s" % _output)
+                return _output
+
+        ebLogError(f'Error while running cellcli command on cell - None output received. *** ERROR: {_error}.')
+        raise ExacloudRuntimeError(0x0825, 0xA, f'mExecuteCmd Failed on {aCellName}, with cmd: {_cmdstr}')
+
     def mGetCelldisks(self):
         """
         Get list of cell disks from cells
@@ -2287,33 +2327,17 @@ class ebCluManageDiskgroup(object):
         try:
             _eBox = self.mGetEbox()
             _cell_list = _eBox.mReturnCellNodes()
-            _cmdstr = 'cellcli -e LIST CELLDISK WHERE name LIKE \\"CD_.*\\" attributes name;'
             _cell_name_list = list(_cell_list.keys())
             _cell_disk_list = []
             if len(_cell_name_list) > 0:
                 _cell_name = _cell_name_list[0]
             else:
                 return None
-            with connect_to_host(_cell_name, get_gcontext()) as _node:
-                ebLogInfo(f"*** Executing the command - {_cmdstr} on cell - {_cell_name}.")
-                _output, _error = None, None
-                _in, _out, _err = _node.mExecuteCmd(_cmdstr)
-                if _out:
-                    _output = _out.readlines()
-                if _err:
-                    _error = _err.read()
-                if _node.mGetCmdExitStatus() != 0:
-                    ebLogError(f'Error while running cellcli command on cell. *** CMD_OUT: {_output}, ERROR: {_error}.')
-                    raise ExacloudRuntimeError(0x0825, 0xA, f'mExecuteCmd Failed on {_cell_name}, with cmd: {_cmdstr}')
-                if _output:
-                    ebLogTrace("*** cellcli Output - %s" % _output)
-                    for _cell_disk in _output:
-                        _slice_output_for_celldisk = _cell_disk.strip().split()
-                        _slice_name = _slice_output_for_celldisk[0]
-                        _cell_disk_list.append(_slice_name)
-                else:
-                    ebLogError(f'Error while running cellcli command on cell - None output received. *** ERROR: {_error}.')
-                    raise ExacloudRuntimeError(0x0825, 0xA, f'mExecuteCmd Failed on {_cell_name}, with cmd: {_cmdstr}')
+            _output = self.mListCelldiskOutput(_cell_name, "name")
+            for _cell_disk in _output:
+                _slice_output_for_celldisk = _cell_disk.strip().split()
+                _slice_name = _slice_output_for_celldisk[0]
+                _cell_disk_list.append(_slice_name)
         except Exception as ex:
             ebLogWarn(f"There was an error while checking for cell disks. Skipping precheck. Error: {ex}")
             return None
@@ -2379,7 +2403,6 @@ class ebCluManageDiskgroup(object):
         try:
             _eBox = self.mGetEbox()
             _cell_list = _eBox.mReturnCellNodes()
-            _cmdstr = 'cellcli -e LIST CELLDISK WHERE name LIKE \\"CD_.*\\" attributes name,size,freespace;'
             _total_space_output_MB = 0.0
             _free_space_output_MB = 0.0
             _cell_name_list = list(_cell_list.keys())
@@ -2387,37 +2410,22 @@ class ebCluManageDiskgroup(object):
                 _cell_name = _cell_name_list[0]
             else:
                 return None
-            with connect_to_host(_cell_name, get_gcontext()) as _node:
-                ebLogInfo(f"*** Executing the command - {_cmdstr} on cell - {_cell_name}.")
-                _output, _error = None, None
-                _in, _out, _err = _node.mExecuteCmd(_cmdstr)
-                if _out:
-                    _output = _out.readlines()
-                if _err:
-                    _error = _err.read()
-                if _node.mGetCmdExitStatus() != 0:
-                    ebLogError(f'Error while running cellcli command on cell. *** CMD_OUT: {_output}, ERROR: {_error}.')
-                    raise ExacloudRuntimeError(0x0825, 0xA, f'mExecuteCmd Failed on {_cell_name}, with cmd: {_cmdstr}')
-                if _output:
-                    ebLogTrace("*** cellcli Output - %s" % _output)
-                    _slice_size = 0.0
-                    _free_space_slice_size = 0.0
-                    for _cell_disk in _output:
-                        _slice_output_for_celldisk = _cell_disk.strip().split()
-                        _slice_name = _slice_output_for_celldisk[0]
-                        _slice_size = _slice_output_for_celldisk[1]
-                        _free_space_slice_size = _slice_output_for_celldisk[2]
-                        # 1024*1024 = 1048576
-                        _unit_factor_mapping = {'M': '1', 'G': '1024', 'T': '1048576'}
-                        _total_space_output_MB = (float(_slice_size[:-1]) * float(_unit_factor_mapping[_slice_size[-1]]))
-                        _free_space_output_MB = (float(_free_space_slice_size[:-1]) * float(_unit_factor_mapping[_free_space_slice_size[-1]]))
-                        ebLogInfo(f"*** Obtained free space as {_free_space_output_MB} MB and total space as {_total_space_output_MB} MB "\
-                                  f"for cell disk {_slice_name} on cell {_cell_name}.")
-                        # Need only single celldisk slice size
-                        break
-                else:
-                    ebLogError(f'Error while running cellcli command on cell - None output received. *** ERROR: {_error}.')
-                    raise ExacloudRuntimeError(0x0825, 0xA, f'mExecuteCmd Failed on {_cell_name}, with cmd: {_cmdstr}')
+            _output = self.mListCelldiskOutput(_cell_name, "name,size,freespace")
+            _slice_size = 0.0
+            _free_space_slice_size = 0.0
+            for _cell_disk in _output:
+                _slice_output_for_celldisk = _cell_disk.strip().split()
+                _slice_name = _slice_output_for_celldisk[0]
+                _slice_size = _slice_output_for_celldisk[1]
+                _free_space_slice_size = _slice_output_for_celldisk[2]
+                # 1024*1024 = 1048576
+                _unit_factor_mapping = {'M': '1', 'G': '1024', 'T': '1048576'}
+                _total_space_output_MB = (float(_slice_size[:-1]) * float(_unit_factor_mapping[_slice_size[-1]]))
+                _free_space_output_MB = (float(_free_space_slice_size[:-1]) * float(_unit_factor_mapping[_free_space_slice_size[-1]]))
+                ebLogInfo(f"*** Obtained free space as {_free_space_output_MB} MB and total space as {_total_space_output_MB} MB "\
+                          f"for cell disk {_slice_name} on cell {_cell_name}.")
+                # Need only single celldisk slice size
+                break
         except Exception as ex:
             ebLogWarn(f"There was an error while checking for free space on a cell disk. Skipping precheck. Error: {ex}")
             return None
@@ -2856,7 +2864,7 @@ class ebCluManageDiskgroup(object):
                 
                 _injson[_constantsObj._action_key] = "resize"
                 _newsizeGB = _inparams[_constantsObj._newsizeGB_key]
-                _newsizeMB = int(_newsizeGB) * 1024 
+                _newsizeMB = int(round(float(_newsizeGB) * 1024))
                 
                 _diskgroupData["SizeMB"] = _dg_cursize
                 
@@ -3076,7 +3084,7 @@ class ebCluManageDiskgroup(object):
                     # Resize _dg_name on cells
                     _injson[_constantsObj._action_key] = "resize"
                     _newsizeGB = _inparams[_constantsObj._newsizeGB_key]
-                    _newsizeMB = int(_newsizeGB) * 1024
+                    _newsizeMB = int(round(float(_newsizeGB) * 1024))
                     ebLogInfo("*** New MB size to resize griddisks {_newsizeMB}")
 
                     # This is the old size of diskgroup on cells currently,
@@ -3341,7 +3349,7 @@ class ebCluManageDiskgroup(object):
                 _stor_stats = _dg_stat[_constantsObj._propkey_storage]
                 if _storprop in _stor_stats and _stor_stats[_storprop]:
                     # have put float here to handle if dbaascli gives output in scientific notation like -> "2.3857E+10"
-                    _rc = int(float(_stor_stats[_storprop]))
+                    _rc = round(float(_stor_stats[_storprop]),2)
                 else:
                     _rc = self.mRecordError(gDiskgroupError['MissingReblProp'], "*** Could not find\
                      'status' property for rebalancing operation of diskgroup " + _dg)

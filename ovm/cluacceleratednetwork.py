@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    mpedapro    05/08/26 - Enh::39115674 Remove X11 check for sriov
 #    mpedapro    02/03/26 - Enh::38914367 library functions for mtu setting and
 #                           oeda bonding options
 #    mpedapro    11/24/25 - Enh::38602758 add lib functions for sriov
@@ -63,7 +64,7 @@ class ebCluAcceleratedNetwork():
         dom0Model = ebCluControlObj.mGetExadataDom0Model()
         exadataInstalledVersion = int(ebCluControlObj.mGetImageVersion(dom0Name).split('.')[0])
         ebLogInfo("Dom0 :: " + dom0Name + " is of model :: " + dom0Model  + " with exadata installed version :: " + str(exadataInstalledVersion))
-        if dom0Model != 'X11' or exadataInstalledVersion < 26:
+        if exadataInstalledVersion < 26:
             ebLogWarn("Dom0 :: " + dom0Name + " is not capable of supporting acceleratedNetwork feature")
             return False
         return True
@@ -76,7 +77,7 @@ class ebCluAcceleratedNetwork():
             ebLogError(detailedError)
             raise ExacloudRuntimeError(0x0740, 0xA, detailedError)
         if not ebCluAcceleratedNetwork.isacceleratedNetworkCapableDom0(ebCluControlObj, dom0Name):
-            detailedError = 'Dom0 :: ' + dom0Name + ' is not capable of supporting acceleratedNetwork feature. Only dom0 with X11 model and exadata version 26.x or higher supported'
+            detailedError = 'Dom0 :: ' + dom0Name + ' is not capable of supporting acceleratedNetwork feature. Only dom0 with exadata version 26.x or higher supported'
             ebCluControlObj.mUpdateErrorObject(gNetworkError['ERROR_ACCELERATEDNETWORK_INCAPABLE_DOM0'], detailedError)
             ebLogError(detailedError)
             raise ExacloudRuntimeError(0x0740, 0xA, detailedError)

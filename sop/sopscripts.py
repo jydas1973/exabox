@@ -4,7 +4,7 @@
 #
 # sopscripts.py
 #
-# Copyright (c) 2023, 2024, Oracle and/or its affiliates.
+# Copyright (c) 2023, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      sopscripts.py - <one-line expansion of the name>
@@ -16,6 +16,12 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    ririgoye    05/29/26 - EXACS-170979 ADE dependency path fix
+#    ririgoye    05/21/26 - EXACS-170979 SOP dependency support
+#    ririgoye    05/12/26 - EXACS-170977 use Exacloud Python from SOP metadata
+#    ririgoye    03/23/26 - Bug 39041362 - EXACLOUD SOP REMOTE EXECUTION
+#                           METADATA SHOULD PROVIDE AN EASY WAY TO USE EXACLOUD
+#                           PYTHON+MODULES
 #    ririgoye    06/25/24 - Enh 36741947 - ADD REMOTE EXECUTION CONFIGURATIONS
 #                           TO EXABOX.CONF FOR EXACC
 #    ririgoye    05/24/24 - Bug 36400562 - Adding list of corrupted or poorly
@@ -37,24 +43,125 @@ SCRIPT_PATH = "script_path"
 SCRIPT_PARALLEL_EXEC = "support_parallel_execution"
 SCRPIPT_SHA256SUM = "sha256sum"
 SCRIPT_EXEC = "script_exec"
+SCRIPT_USE_EXACLOUD_PYTHON = "use_exacloud_python"
+SCRIPT_DEPENDENCIES = "dependencies"
 SCRIPT_RETURN_JSON_SUPPORT = "return_json_support"
 SCRIPT_VERSION = "version"
 SCRIPT_COMMENTS = "comments"
 LAST_REFRESH_TIME_MARKER = "last_refresh_time"
 METADATA_CACHE_MARKER = "metadata_cache"
 
+
+def _mFormatDependencyError(aMetadataPath: str, aDependency, aReason: str) -> str:
+    _metadata_path = aMetadataPath if aMetadataPath else "SOP script metadata"
+    return f"Invalid SOP dependency in {_metadata_path}: {aDependency!r}. {aReason}"
+
+
+def _mIsPathUnderDirectory(aDirectory: str, aPath: str) -> bool:
+    try:
+        return os.path.commonpath([aDirectory, aPath]) == aDirectory
+    except ValueError:
+        return False
+
+
+def mGetValidatedScriptDependencies(aScriptMetadata: dict, aMetadataPath: str = None) -> list:
+    _script_metadata = aScriptMetadata if aScriptMetadata is not None else {}
+    if SCRIPT_DEPENDENCIES not in _script_metadata:
+        return []
+
+    _dependencies = _script_metadata.get(SCRIPT_DEPENDENCIES)
+    if not isinstance(_dependencies, list):
+        _msg = _mFormatDependencyError(aMetadataPath, _dependencies, "Expected a JSON array/list of relative path strings.")
+        ebLogError(_msg)
+        raise ExacloudRuntimeError(0x815, 0xA, _msg)
+
+    if len(_dependencies) == 0:
+        return []
+
+    _script_path = _script_metadata.get(SCRIPT_PATH)
+    if _script_path is None or _script_path == "":
+        _msg = _mFormatDependencyError(aMetadataPath, _dependencies, "Script path is not available for dependency resolution.")
+        ebLogError(_msg)
+        raise ExacloudRuntimeError(0x815, 0xA, _msg)
+
+    _script_dir = os.path.abspath(os.path.dirname(_script_path))
+    _script_real_dir = os.path.dirname(os.path.realpath(_script_path))
+    _validated_dependencies = []
+    _seen_dependencies = set()
+    for _dependency in _dependencies:
+        if not isinstance(_dependency, str):
+            _msg = _mFormatDependencyError(aMetadataPath, _dependency, "Dependency entries must be strings.")
+            ebLogError(_msg)
+            raise ExacloudRuntimeError(0x815, 0xA, _msg)
+
+        if _dependency.strip() == "":
+            _msg = _mFormatDependencyError(aMetadataPath, _dependency, "Dependency path cannot be empty.")
+            ebLogError(_msg)
+            raise ExacloudRuntimeError(0x815, 0xA, _msg)
+
+        if os.path.isabs(_dependency):
+            _msg = _mFormatDependencyError(aMetadataPath, _dependency, "Absolute dependency paths are not allowed.")
+            ebLogError(_msg)
+            raise ExacloudRuntimeError(0x815, 0xA, _msg)
+
+        if os.pardir in _dependency.split(os.sep):
+            _msg = _mFormatDependencyError(aMetadataPath, _dependency, "Parent-directory traversal is not allowed.")
+            ebLogError(_msg)
+            raise ExacloudRuntimeError(0x815, 0xA, _msg)
+
+        _relative_dependency_path = os.path.normpath(_dependency)
+        if _relative_dependency_path == os.curdir or os.path.isabs(_relative_dependency_path):
+            _msg = _mFormatDependencyError(aMetadataPath, _dependency, "Dependency path must resolve to a relative file path.")
+            ebLogError(_msg)
+            raise ExacloudRuntimeError(0x815, 0xA, _msg)
+
+        _dependency_candidate_path = os.path.abspath(os.path.join(_script_dir, _relative_dependency_path))
+        if not _mIsPathUnderDirectory(_script_dir, _dependency_candidate_path):
+            _msg = _mFormatDependencyError(aMetadataPath, _dependency, f"Dependency path {_dependency_candidate_path} is outside the SOP script directory.")
+            ebLogError(_msg)
+            raise ExacloudRuntimeError(0x815, 0xA, _msg)
+
+        _dependency_path = os.path.realpath(_dependency_candidate_path)
+        _dependency_under_script_dir = _mIsPathUnderDirectory(_script_dir, _dependency_path)
+        _dependency_under_script_real_dir = _mIsPathUnderDirectory(_script_real_dir, _dependency_path)
+        if not _dependency_under_script_dir and not _dependency_under_script_real_dir:
+            _msg = _mFormatDependencyError(aMetadataPath, _dependency, f"Resolved path {_dependency_path} is outside the SOP script directory.")
+            ebLogError(_msg)
+            raise ExacloudRuntimeError(0x815, 0xA, _msg)
+
+        if not os.path.isfile(_dependency_path):
+            _msg = _mFormatDependencyError(aMetadataPath, _dependency, f"Dependency file was not found at {_dependency_path}.")
+            ebLogError(_msg)
+            raise ExacloudRuntimeError(0x815, 0xA, _msg)
+
+        if _relative_dependency_path in _seen_dependencies:
+            ebLogInfo(f"Duplicate SOP dependency {_dependency!r} in {aMetadataPath} ignored.")
+            continue
+
+        _seen_dependencies.add(_relative_dependency_path)
+        _validated_dependencies.append((_relative_dependency_path, _dependency_path))
+
+    return _validated_dependencies
+
+
 class SOPScript():
 
     def __init__(self, aScriptName: str, aScriptPath: str, aParallelExecution = True, aSHA256Sum = None, \
-    aScriptExecutable = "/bin/sh", aScriptJSONSupport = False, aScriptVersion = "1", aScriptComments = None) -> None:
+    aScriptExecutable = "/bin/sh", aScriptJSONSupport = False, aScriptVersion = "1", aScriptComments = None, \
+    aUseExacloudPython = False, aScriptDependencies = None) -> None:
         self.__script_name = aScriptName
         self.__script_path = aScriptPath
         self.__script_parallel_execution = aParallelExecution
         self.__script_sha256sum = aSHA256Sum
         self.__script_executable = aScriptExecutable
+        self.__use_exacloud_python = aUseExacloudPython
+        self.__script_dependencies = aScriptDependencies if isinstance(aScriptDependencies, list) else []
         self.__script_returnjson_support = aScriptJSONSupport
         self.__script_version = aScriptVersion
         self.__script_comments = aScriptComments
+
+    def mUseExacloudPython(self) -> bool:
+        return self.__use_exacloud_python
 
     def mSetScriptName(self, aScriptName: str) -> None:
         self.__script_name = aScriptName
@@ -73,6 +180,9 @@ class SOPScript():
 
     def mSetScriptJSONSupport(self, aScriptJSONSupport: bool) -> None:
         self.__script_returnjson_support = aScriptJSONSupport
+
+    def mSetScriptDependencies(self, aScriptDependencies: list) -> None:
+        self.__script_dependencies = aScriptDependencies if isinstance(aScriptDependencies, list) else []
 
     def mSetScriptVersion(self, aScriptVersion: str) -> None:
         self.__script_version = aScriptVersion
@@ -97,6 +207,9 @@ class SOPScript():
 
     def mGetScriptJSONSupport(self) -> bool:
         return self.__script_returnjson_support
+
+    def mGetScriptDependencies(self) -> list:
+        return self.__script_dependencies
 
     def mGetScriptVersion(self) -> str:
         return self.__script_version
@@ -134,6 +247,8 @@ class SOPScriptsRepo():
         _sop_scripts_dir = aScriptsDir
         _all_files = os.listdir(_sop_scripts_dir)
         _complete_metadata_json = dict()
+        _files_without_metadata = list()
+        _declared_dependency_files = set()
 
         # Browse directory and populate the metadata JSON
         for _file in _all_files:
@@ -142,6 +257,9 @@ class SOPScriptsRepo():
             and not _file_abs_path.endswith(LAST_REFRESH_TIME_MARKER) and not _file_abs_path.endswith(".metadata"):
 
                 _metadata_file = f"{_file_abs_path}.metadata"
+                if not os.path.exists(_metadata_file):
+                    _files_without_metadata.append(_file_abs_path)
+                    continue
 
                 # Parse file, if parsing fails add to corrupt file list
                 _file_metadata_json = None
@@ -156,6 +274,20 @@ class SOPScriptsRepo():
                 _file_metadata_json[SCRIPT_NAME] = _file
                 _file_metadata_json[SCRIPT_PATH] = _file_abs_path
                 _complete_metadata_json[_file] = copy.deepcopy(_file_metadata_json)
+                _dependencies = _file_metadata_json.get(SCRIPT_DEPENDENCIES, [])
+                if isinstance(_dependencies, list):
+                    for _dependency in _dependencies:
+                        if isinstance(_dependency, str):
+                            _dependency_path = os.path.realpath(os.path.join(_sop_scripts_dir, os.path.normpath(_dependency)))
+                            _declared_dependency_files.add(_dependency_path)
+
+        for _file_abs_path in _files_without_metadata:
+            if os.path.realpath(_file_abs_path) in _declared_dependency_files:
+                ebLogTrace(f"Skipping declared SOP dependency file without metadata: {_file_abs_path}")
+                continue
+            _metadata_file = f"{_file_abs_path}.metadata"
+            ebLogError(f"Metadata file {_metadata_file} is missing.")
+            self.__corrupt_files.append(_metadata_file)
 
         self.mPopulateScriptsRepo(_complete_metadata_json)
         _metadata_lastrefresh_time_marker = os.path.join(_sop_scripts_dir, LAST_REFRESH_TIME_MARKER)
@@ -183,12 +315,15 @@ class SOPScriptsRepo():
             _script_parallel_execution = _complete_metadata_json[_script].get(SCRIPT_PARALLEL_EXEC, True)
             _script_sha256sum = _complete_metadata_json[_script].get(SCRPIPT_SHA256SUM, None)
             _script_executable = _complete_metadata_json[_script].get(SCRIPT_EXEC, "/bin/sh")
+            _use_exacloud_python = _complete_metadata_json[_script].get(SCRIPT_USE_EXACLOUD_PYTHON, False)
+            _script_dependencies = _complete_metadata_json[_script].get(SCRIPT_DEPENDENCIES, [])
             _script_returnjson_support = _complete_metadata_json[_script].get(SCRIPT_RETURN_JSON_SUPPORT, False)
             _script_version = _complete_metadata_json[_script].get(SCRIPT_VERSION, "1")
             _script_comments = _complete_metadata_json[_script].get(SCRIPT_COMMENTS, "")
 
             _new_script = SOPScript(_script_name, _script_path, _script_parallel_execution, _script_sha256sum, \
-            _script_executable, _script_returnjson_support, _script_version, _script_comments)
+            _script_executable, _script_returnjson_support, _script_version, _script_comments, \
+            aUseExacloudPython=_use_exacloud_python, aScriptDependencies=_script_dependencies)
             self.__scripts_repo[_script_name] = _new_script
 
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# $Header: ecs/exacloud/exabox/scheduleJobs/cleanup_log_files.py /main/8 2025/09/19 11:40:33 shapatna Exp $
+# $Header: ecs/exacloud/exabox/scheduleJobs/cleanup_log_files.py noduri_bug-38808808/1 2026/01/24 05:38:01 noduri Exp $
 #
 # cleanup_log_files.py
 #
@@ -16,7 +16,12 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    aararora    04/17/26 - Bug 39097556: Tar the contents under folders being
+#                           added to exacloud log archive directory
 #    aypaul      04/16/26 - Bug#38900303 Fix codev identified issues.
+#    noduri      01/22/25 - Bug 38808808 - /U01 FILESYSTEM UTILIZATION ON FRA2EDCSEC
+#                           RA2 IS AROUND 90%, EXACLOUDLOGARCHIVE IS CONSUMING
+#                           AROUND 421G 
 #    aararora    08/26/25 - Bug 38298135: Enhance exception handling and
 #                           logging for cleanup logs scheduler command
 #    aararora    04/07/25 - Bug 37779410: Move oeda request archive paths from
@@ -38,12 +43,12 @@ import glob
 import os
 import time
 import shutil
+import tarfile
 import traceback
 from datetime import date, datetime, timedelta
 from exabox.core.Context import get_gcontext
 from exabox.core.Core import exaBoxCoreInit
-from exabox.log.LogMgr import ebLogInit, ebLogInfo
-from exabox.log.LogMgr import ebLogInfo, ebLogWarn, ebLogError
+from exabox.log.LogMgr import ebLogInit, ebLogInfo, ebLogWarn, ebLogError, ebLogTrace
 from exabox.core.DBStore import ebGetDefaultDB
 from exabox.utils.common import exception_handler_decorator
 
@@ -61,7 +66,7 @@ class CleanUpLogFiles():
 
         self.__log_file_persist_duration_hrs = 168
         self.__log_file_archive_directory = None
-        self.__log_archive_cleanup_age_limit_in_days = 180
+        self.__log_archive_cleanup_age_limit_in_days = 30
 
         self.mParseConfig()
 
@@ -92,7 +97,7 @@ class CleanUpLogFiles():
                 os.makedirs(self.__log_file_archive_directory)
             ebLogInfo("Archiving old exacloud log files to: {0}".format(self.__log_file_archive_directory))
 
-        _log_archive_cleanup_age_limit_in_days = int(get_gcontext().mGetConfigOptions().get("log_archive_cleanup_age_limit_in_days", "180"))
+        _log_archive_cleanup_age_limit_in_days = int(get_gcontext().mGetConfigOptions().get("log_archive_cleanup_age_limit_in_days", "30"))
         if _log_archive_cleanup_age_limit_in_days:
             self.__log_archive_cleanup_age_limit_in_days = _log_archive_cleanup_age_limit_in_days
 
@@ -122,6 +127,93 @@ class CleanUpLogFiles():
                     except Exception as e:
                         ebLogError(f"Error: {e} encountered while removing old exacloud log archive directory {_absolute_log_archive_directory}")
                         ebLogError(traceback.format_exc())
+
+    def mRemoveArchivedEntries(self, aLogArchiveDir, aEntriesToArchive):
+
+        for _entry in aEntriesToArchive:
+            _entry_path = os.path.join(aLogArchiveDir, _entry)
+            if os.path.isdir(_entry_path):
+                shutil.rmtree(_entry_path)
+            else:
+                os.remove(_entry_path)
+
+    def mArchiveLogDirectories(self, aLogBaseArchiveDir):
+        """
+            Archive per-day directories (except today's) into a single tarball and drop the extracted content.
+
+            Example:
+                Before:
+                    exacloudLogArchive/2026_01_08/dflt_workermanager.trc.1
+                    exacloudLogArchive/2026_01_08/oeda_requests/request123.tar.gz
+                After:
+                    exacloudLogArchive/2026_01_08/2026_01_08.tgz  (contains the files listed above)
+            We are not changing the top directory since ops has scripts which might
+            be reading the current format of the folders under exacloudLogArchive directory
+        """
+
+        _today_archive_dirname = os.path.basename(self.__log_file_archive_directory)
+        for _child_log_dir in os.listdir(aLogBaseArchiveDir):
+            if _child_log_dir == _today_archive_dirname:
+                # Leave today's directory alone; active jobs continue writing into it.
+                continue
+
+            _absolute_log_archive_directory = os.path.join(aLogBaseArchiveDir, _child_log_dir)
+            if not os.path.isdir(_absolute_log_archive_directory):
+                continue
+
+            _tarball_name = f"{_child_log_dir}.tgz"
+            _tarball_path = os.path.join(_absolute_log_archive_directory, _tarball_name)
+            # Collect the files/folders under exacloudLogArchive/<date> while ignoring the final tarball name.
+            _entries_to_archive = [entry for entry in os.listdir(_absolute_log_archive_directory) if entry != _tarball_name]
+
+            if os.path.exists(_tarball_path) and not _entries_to_archive:
+                # A prior run already produced the archive and no extracted payload remains.
+                ebLogWarn(f"Skipping archive for {_absolute_log_archive_directory} because {_tarball_name} already exists.")
+                continue
+
+            if not _entries_to_archive:
+                continue
+
+            if os.path.exists(_tarball_path):
+                try:
+                    with tarfile.open(_tarball_path, "r:gz") as _tar_handle:
+                        _tar_handle.getmembers()
+                    self.mRemoveArchivedEntries(_absolute_log_archive_directory, _entries_to_archive)
+                    ebLogTrace(f"Removed extracted contents from {_absolute_log_archive_directory} since {_tarball_path} already exists.")
+                    continue
+                except tarfile.TarError:
+                    ebLogWarn(f"Removing invalid archive {_tarball_path} before recreating it.")
+                    try:
+                        os.remove(_tarball_path)
+                    except Exception as e:
+                        ebLogError(f"Error: {e} encountered while removing invalid archive {_tarball_path}")
+                        ebLogError(traceback.format_exc())
+                        continue
+                except Exception as e:
+                    ebLogError(f"Error: {e} encountered while removing extracted contents from {_absolute_log_archive_directory}")
+                    ebLogError(traceback.format_exc())
+                    continue
+
+            _tar_created = False
+            try:
+                # Stream the collected entries straight into the tarball named after the directory.
+                with tarfile.open(_tarball_path, "w:gz", compresslevel=3) as _tar_handle:
+                    for _entry in _entries_to_archive:
+                        _entry_path = os.path.join(_absolute_log_archive_directory, _entry)
+                        _tar_handle.add(_entry_path, arcname=_entry)
+
+                _tar_created = True
+                self.mRemoveArchivedEntries(_absolute_log_archive_directory, _entries_to_archive)
+
+                ebLogTrace(f"Archived contents of {_absolute_log_archive_directory} into {_tarball_path}")
+            except Exception as e:
+                if not _tar_created and os.path.exists(_tarball_path):
+                    try:
+                        os.remove(_tarball_path)
+                    except Exception as remove_error:
+                        ebLogError(f"Error: {remove_error} encountered while removing partial archive {_tarball_path}")
+                ebLogError(f"Error: {e} encountered while archiving/removing contents from {_absolute_log_archive_directory}")
+                ebLogError(traceback.format_exc())
 
     @exception_handler_decorator
     def mExecuteJob(self):
@@ -227,6 +319,9 @@ class CleanUpLogFiles():
                 ebLogWarn(traceback.format_exc())
 
         ebLogInfo("Moved {0} oeda request folders from oeda/requests and oeda/requests.bak folders to {1} directory.".format(len(_oeda_request_folders_to_move), _oeda_request_archive_directory))
+
+        # Collect older archive directories into a tarball so the tree keeps only <date>/<date>.tgz payloads.
+        self.mArchiveLogDirectories(_log_base_archive_directory)
 
         _all_log_files.clear()
         _log_files_to_remove.clear()

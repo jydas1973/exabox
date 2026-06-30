@@ -17,6 +17,8 @@
 #
 #
 #    MODIFIED   (MM/DD/YY)
+#    dekuckre    04/23/26 - Fix encryption unit test mocks for vm_maker and
+#                           parallel execution
 #    jfsaldan    02/19/26 - Adding wait between u01 and u02 encryption in add
 #                           node
 #    jfsaldan    08/05/25 - Bug 38268596 - EXACLOUD FEDRAMP PREVENT PROV
@@ -157,6 +159,51 @@ Last login: Tue Dec 13 03:57:45 on ttyS0
 logout
 ^M
 __END__"""
+
+
+class _InlineSharedManager(object):
+
+    def dict(self):
+        return {}
+
+
+class _InlineProcessStructure(object):
+
+    def __init__(self, callback, aArgs=None, aId=None, aMaxExecutionTime=-1,
+                 aLogFile=None):
+        self._callback = callback
+        self._args = tuple(aArgs or [])
+
+    def mSetMaxExecutionTime(self, _timeout):
+        return
+
+    def mSetJoinTimeout(self, _timeout):
+        return
+
+    def mSetLogTimeoutFx(self, _fx):
+        return
+
+    def start(self):
+        return
+
+
+class _InlineProcessManager(object):
+
+    def __init__(self, *args, **kwargs):
+        self._manager = _InlineSharedManager()
+        self._status = "done"
+
+    def mGetManager(self):
+        return self._manager
+
+    def mStartAppend(self, process):
+        process.start()
+
+    def mJoinProcess(self):
+        return
+
+    def mGetStatus(self):
+        return self._status
 
 class ebTestClusterEncryption(ebTestClucontrol):
 
@@ -2132,6 +2179,9 @@ class ebTestClusterEncryption(ebTestClucontrol):
             self.assertRaises(ExacloudRuntimeError,
                 lambda: ensureSystemFirstBootEncryptedExists(_ebox, _dom0))
 
+    @patch('exabox.ovm.cluencryption.ProcessManager', _InlineProcessManager)
+    @patch('exabox.ovm.cluencryption.ProcessStructure',
+           _InlineProcessStructure)
     def test_ensureSystemFirstBootEncryptedExistsParallelSetup_all_good(self):
         """
         This function is to test ensureSystemFirstBootEncryptedExistsParallelSetup
@@ -2782,11 +2832,11 @@ class ebTestClusterEncryption(ebTestClucontrol):
                     exaMockCommand("vm_maker --detach --disk-image /EXAVMIMAGES/GuestImages/scaqab10client0[12]vm08.us.oracle.com/u02_extra_encrypted.img --domain scaqab10client0[12]vm08.us.oracle.com", aRc=0),
                     exaMockCommand("/bin/rm -f /EXAVMIMAGES/GuestImages/scaqab10client0[12]vm08.us.oracle.com/u02_extra_encrypted.img", aRc=0),
                     exaMockCommand("/bin/test -e /bin/virsh", aRc=0, aPersist=True),
-                    exaMockCommand("virsh shutdown", aRc=0),
+                    exaMockCommand("/opt/exadata_ovm/vm_maker --stop-domain scaqab10client0[12]vm08.us.oracle.com", aRc=0),
                     exaMockCommand("virsh list --name --state-running --state-paused", aRc=0),
                     exaMockCommand("virsh list --name", aRc=0),
                     exaMockCommand("virsh list --name", aRc=0),
-                    exaMockCommand("virsh start", aRc=0),
+                    exaMockCommand("/opt/exadata_ovm/vm_maker --start-domain scaqab10client0[12]vm08.us.oracle.com", aRc=0),
                     exaMockCommand("virsh list --name --state-running --state-paused", aRc=0,
                         aStdout="scaqab10client0[12]vm08.us.oracle.com\n"),
                 ]
@@ -2857,4 +2907,3 @@ class ebTestClusterEncryption(ebTestClucontrol):
 
 if __name__ == '__main__':
     unittest.main()
-

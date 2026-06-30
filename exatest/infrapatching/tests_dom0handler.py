@@ -17,6 +17,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    jyotdas     05/11/26 - Bug 39347652 - Perform dom0 Elu Rollback With the
+#                           Exasplice Flag Enabled
 #    avimonda    03/17/26 - Unit tests for bug 38969712
 #    rbhandar    03/27/26 - Bug 38453227 - AIM4ECS:0X03030012 - INDIVIDUAL
 #                           PATCH REQUEST EXCEPTION DETECTED
@@ -347,6 +349,86 @@ class ebTestDom0Handler(ebTestClucontrol):
         self.mPrepareMockCommands(_cmds)
         _dom0handler = Dom0Handler(self.__patch_args_dict)
         self.assertEqual(_dom0handler.mRollBack(), (self.SUCCESS_ERROR_CODE, 0))
+
+    @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.Dom0Handler.mGetCRSHelper", return_value=crsHelper)
+    @patch("exabox.infrapatching.helpers.crshelper.CrsHelper.mPerformDomuCrsCheckForAllClusters", return_value=SUCCESS_ERROR_CODE)
+    @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.Dom0Handler.mGetDom0ToPatchDom0", return_value='slcs27adm03.us.oracle.com')
+    @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.Dom0Handler.mSetEnvironment", return_value=SUCCESS_ERROR_CODE)
+    @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.mGetFirstDirInZip", return_value="patch_switch_21.2.11.0.0.220414.1/")
+    @patch("exabox.infrapatching.handlers.targetHandler.targethandler.TargetHandler.mSetSSHEnvSetUp")
+    @patch("exabox.ovm.clumisc.ebCluSshSetup.mSetSSHPasswordlessForInfraPatching", return_values="")
+    @patch("exabox.infrapatching.handlers.targetHandler.targethandler.TargetHandler.mGetDom0ToPatchInitialDom0", return_values="slcs27adm03.us.oracle.com")
+    @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.Dom0Handler.mSetLaunchNodeToPatchOtherDom0Nodes", return_value=(SUCCESS_ERROR_CODE, ['slcs27adm03.us.oracle.com']))
+    @patch("exabox.infrapatching.handlers.generichandler.GenericHandler.mGetDom0DomUPatchZipFile", return_value=["exabox/exatest/infrapatching/resources/PatchPayloads/21.2.11.0.0.220414.1/DBPatchFile/dbserver.patch.zip", "exabox/exatest/infrapatching/resources/PatchPayloads/21.2.11.0.0.220414.1/Dom0YumRepository/exadata_ovs_21.2.11.0.0.220414.1_Linux-x86-64.zip,exabox/exatest/infrapatching/resources/PatchPayloads/21.2.11.0.0.220414.1/Dom0YumRepository/exadata_ol7_21.2.11.0.0.220414.1_Linux-x86-64.zip"])
+    @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.Dom0Handler.mCheckDomuAvailability", return_value=SUCCESS_ERROR_CODE)
+    @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.Dom0Handler.mGetCustomizedDom0List", return_value=['slcs27adm03.us.oracle.com'])
+    @patch("exabox.infrapatching.handlers.targetHandler.targethandler.TargetHandler.mValidateRootFsSpaceUsage", return_value=SUCCESS_ERROR_CODE)
+    @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.Dom0Handler.mFilterNodesToPatch", return_value=(SUCCESS_ERROR_CODE, "", ['slcs27adm03.us.oracle.com'], []))
+    @patch("exabox.infrapatching.core.clupatchhealthcheck.ebCluPatchHealthCheck.mPingNode", return_value=True)
+    @patch("exabox.infrapatching.core.clupatchhealthcheck.ebCluPatchHealthCheck.mCheckTargetVersion", return_value=1)
+    @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.Dom0Handler.mRollbackIsAvailable", return_value=True)
+    @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.Dom0Handler.mPatchRollbackDom0sRolling", return_value=SUCCESS_ERROR_CODE)
+    @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.Dom0Handler.mCreateDirOnNodes", return_value=SUCCESS_ERROR_CODE)
+    @patch("exabox.infrapatching.core.clupatchmetadata.mWritePatchInitialStatesToLaunchNodes", return_value=True)
+    @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.Dom0Handler.mCheckIdemPotency", return_value=(SUCCESS_ERROR_CODE, 0))
+    @patch("exabox.infrapatching.handlers.targetHandler.infrapatchmgrhandler.InfraPatchManager.mGetPatchMgrCmd", return_value='')
+    @patch("exabox.infrapatching.handlers.targetHandler.infrapatchmgrhandler.InfraPatchManager.mCreateNodesToBePatchedFile", return_value='/tmp/node_list')
+    @patch("exabox.infrapatching.handlers.targetHandler.infrapatchmgrhandler.InfraPatchManager.mCheckForPatchMgrSessionExistence", return_value=(SUCCESS_ERROR_CODE, 'slcs27adm03.us.oracle.com'))
+    @patch("exabox.infrapatching.handlers.targetHandler.infrapatchmgrhandler.InfraPatchManager.mExecutePatchMgrCmd", return_value=SUCCESS_ERROR_CODE)
+    @patch("exabox.infrapatching.handlers.targetHandler.infrapatchmgrhandler.InfraPatchManager.mWaitForPatchMgrCmdExecutionToComplete", return_value=SUCCESS_ERROR_CODE)
+    @patch("exabox.infrapatching.handlers.targetHandler.infrapatchmgrhandler.InfraPatchManager.mGetStatusCode", return_value=SUCCESS_ERROR_CODE)
+    @patch("exabox.infrapatching.handlers.generichandler.GenericHandler.mIsElu", return_value=True)
+    @patch("exabox.infrapatching.handlers.generichandler.GenericHandler.mGetEluTargetVersiontoNodeMappings", return_value={"25.2.6.0.0.260117": "slcs27adm03.us.oracle.com"})
+    @patch("exabox.infrapatching.handlers.generichandler.GenericHandler.mSetTargetVersion")
+    def test_mRollBack_mIsElu_valid_version(self, mock_mSetTargetVersion, mock_mGetEluTargetVersiontoNodeMappings, mock_mIsElu, mock_mGetStatusCode, mock_mWaitForPatchMgrCmdExecutionToComplete, mock_mExecutePatchMgrCmd, mock_mCheckForPatchMgrSessionExistence, mock_mCreateNodesToBePatchedFile, mock_mGetPatchMgrCmd, mock_mCheckIdemPotency, mock_mWritePatchInitialStatesToLaunchNodes, mock_mCreateDirOnNodes, mock_mPatchRollbackDom0sRolling, mock_mRollbackIsAvailable, mock_mCheckTargetVersion, mock_mPingNode, mock_mFilterNodesToPatch, mock_mValidateRootFsSpaceUsage, mock_mGetCustomizedDom0List, mock_mCheckDomuAvailability, mock_mGetDom0DomUPatchZipFile, mock_mSetLaunchNodeToPatchOtherDom0Nodes, mock_mGetDom0ToPatchInitialDom0, mock_mSetSSHPasswordlessForInfraPatching, mock_mSetSSHEnvSetUp, mock_mGetFirstDirInZip,mock_mSetEnvironment,mock_mGetDom0ToPatchDom0,mock_mPerformDomuCrsCheckForAllClusters, mock_mGetCRSHelper):
+        ebLogInfo("")
+        ebLogInfo("Running unit test on Dom0Handler.mRollBack with ELU valid version")
+
+        _cmds = {
+            self.mGetRegexDom0(): [
+                [
+                    exaMockCommand("virsh", aStdout="scaqan03dv0208.us.oracle.com"),
+                    exaMockCommand("date *", aStdout="", aPersist=True),
+                    exaMockCommand("stat -c '%Y' /EXAVMIMAGES/GuestImages/*/vm.cfg | sort -n | tail -n 1", aStdout="", aPersist=True),
+                    exaMockCommand("mkdir -p /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_21.2.11.0.0.220414.1_Linux-x86-64.zip/dbserver_patch_22.220412/patch_states_data", aStdout="", aPersist=True),
+                    exaMockCommand("mkdir -p /EXAVMIMAGES/dbserver.patch.zip_exadata_ol7_21.2.11.0.0.220414.1_Linux-x86-64.zip/patch_switch_21.2.11.0.0.220414.1/patch_states_data", aPersist=True)
+                ],
+                [
+                    exaMockCommand("dbmcli -e 'LIST ALERTHISTORY WHERE endtime=null AND alerttype=stateful and alertShortName=Hardware and severity=Critical' *", aStdout="", aPersist=True),
+                    exaMockCommand("date *", aStdout="", aPersist=True),
+                    exaMockCommand("stat -c '%Y' /EXAVMIMAGES/GuestImages/*/vm.cfg | sort -n | tail -n 1", aStdout="", aPersist=True)
+                ],
+                [
+                    exaMockCommand("dbmcli -e 'LIST ALERTHISTORY WHERE endtime=null AND alerttype=stateful' | egrep -i 'No link detected on required Ethernet|alert.chassis.fw.fpga-upgrade-blocked|Attribute Name : DiskFirmwareVersion *Required *: *ORAB'", aStdout="", aPersist=True)
+                ]
+            ]
+        }
+
+        self.mPrepareMockCommands(_cmds)
+        _dom0handler = Dom0Handler(self.__patch_args_dict)
+        self.assertEqual(_dom0handler.mRollBack(), (self.SUCCESS_ERROR_CODE, 0))
+        mock_mSetTargetVersion.assert_called_once_with("25.2.6.0.0.260117")
+
+    @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.mGetFirstDirInZip", return_value="patch_switch_21.2.11.0.0.220414.1/")
+    @patch("exabox.infrapatching.handlers.generichandler.GenericHandler.mGetDom0DomUPatchZipFile", return_value=["exabox/exatest/infrapatching/resources/PatchPayloads/21.2.11.0.0.220414.1/DBPatchFile/dbserver.patch.zip", "exabox/exatest/infrapatching/resources/PatchPayloads/21.2.11.0.0.220414.1/Dom0YumRepository/exadata_ovs_21.2.11.0.0.220414.1_Linux-x86-64.zip,exabox/exatest/infrapatching/resources/PatchPayloads/21.2.11.0.0.220414.1/Dom0YumRepository/exadata_ol7_21.2.11.0.0.220414.1_Linux-x86-64.zip"])
+    @patch("exabox.infrapatching.handlers.generichandler.GenericHandler.mIsElu", return_value=True)
+    @patch("exabox.infrapatching.handlers.generichandler.GenericHandler.mGetEluTargetVersiontoNodeMappings", return_value={"0.0.0.0.0.0": "slcs27adm03.us.oracle.com"})
+    @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.Dom0Handler.mGetCustomizedDom0List", return_value=['slcs27adm03.us.oracle.com'])
+    @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.Dom0Handler.mSetEnvironment", return_value=SUCCESS_ERROR_CODE)
+    def test_mRollBack_mIsElu_invalid_version(self, mock_mSetEnvironment, mock_mGetCustomizedDom0List, mock_mGetEluTargetVersiontoNodeMappings, mock_mIsElu, mock_mGetDom0DomUPatchZipFile, mock_mGetFirstDirInZip):
+        ebLogInfo("")
+        ebLogInfo("Running unit test on Dom0Handler.mRollBack with ELU invalid version")
+        _cmds = {
+            self.mGetRegexDom0(): [
+                [
+                    exaMockCommand("virsh", aStdout="scaqan03dv0208.us.oracle.com"),
+                ]
+            ]
+        }
+        self.mPrepareMockCommands(_cmds)
+        _dom0handler = Dom0Handler(self.__patch_args_dict)
+        self.assertEqual(_dom0handler.mRollBack(), (self.ELUVERSION_NOTFOUND_ERROR_CODE, 0))
+        mock_mSetEnvironment.assert_not_called()
 
     @patch("exabox.infrapatching.handlers.targetHandler.dom0handler.mGetFirstDirInZip", return_value="patch_switch_21.2.11.0.0.220414.1/")
     @patch("exabox.infrapatching.handlers.targetHandler.targethandler.TargetHandler.mSetSSHEnvSetUp")

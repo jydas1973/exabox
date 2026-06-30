@@ -19,6 +19,7 @@ History:
     MODIFIED (MM/DD/YY)
     jfsaldan  03/13/26   - Enh 37054517 - EXADB-XS:EXACLOUD:IMAGE BASE
                            PROVISIONING: SUPPORT BOM FILE IN EXACLOUD
+    remamid   03/04/26   - Blackout AIDE bug 38973298
     pbellary  11/03/25   - Bug 38605016: INSTALL CLUSTER STEP FAILING TIMEOUT WHILE EXECUTING OEDA STEP: 9 
     pbellary  10/30/25   - Enh 38596691 - ASM/EXASCALE TO SUPPORT ADD NODE WITH EDV IMAGE
     akkar     08/30/25   - Bug 38025087: dbaastool rpm for multi cloud
@@ -95,7 +96,11 @@ from exabox.ovm.clumisc import ebCluPreChecks
 from exabox.ovm.hypervisorutils import getHVInstance
 from exabox.ovm.cluhealth import ebCluHealthCheck
 from exabox.healthcheck.cluexachk import ebCluExachk
-from exabox.utils.node import connect_to_host, node_exec_cmd, node_exec_cmd_check, node_cmd_abs_path_check, node_write_text_file, node_read_text_file
+from exabox.utils.node import (
+    connect_to_host, node_exec_cmd, node_exec_cmd_check,
+    node_cmd_abs_path_check, node_write_text_file, node_read_text_file,
+    _update_key_val_str,
+)
 from exabox.ovm.clubonding import dom0_supports_static_bridge
 from exabox.exadbxs.edv import unmount_stale_gcv_edv
 import exabox.ovm.clubonding as clubonding
@@ -104,9 +109,48 @@ import hashlib
 import time, json
 import re
 import os
+import shlex
 import subprocess
 import time
+from contextlib import contextmanager
 from exabox.BaseServer.AsyncProcessing import ProcessManager, ProcessStructure, TimeoutBehavior, ExitCodeBehavior
+from exabox.tools.Utils import mRemoveSshAlgorithmsFromNode
+from typing import List
+
+_SSH_PARAM_NAME = "exacloud_sshd_conf"
+_SSH_DEFAULT_FILE = "/etc/ssh/sshd_config"
+_SSH_DROPIN_DIR = "/etc/ssh/sshd_config.d"
+_SSH_DROPIN_DEFAULT_CONFIG = f"{_SSH_DROPIN_DIR}/exacloud.config"
+_SSH_DROPIN_HEADER = "# Managed by ExaCS automation. Do not edit manually.\n"
+def _should_use_dropin(node, conf_file, ebox=None):
+    """Return True when drop-in file should be used for this host."""
+    if conf_file == _SSH_DEFAULT_FILE:
+        return False
+
+    host_value = None
+    if hasattr(node, 'mGetHostname'):
+        try:
+            host_value = node.mGetHostname()
+        except Exception:  # pragma: no cover - defensive
+            host_value = None
+
+    if host_value is not None and not isinstance(host_value, str):
+        host_value = str(host_value)
+
+    if host_value:
+        lowered = host_value.lower()
+        if '-sw-' in lowered:
+            return False
+
+    if ebox is not None and host_value:
+        try:
+            _, _, _, switches = ebox.mReturnAllClusterHosts()
+            if host_value in switches:
+                return False
+        except Exception:  # pragma: no cover - defensive
+            pass
+
+    return True
 
 # This class contains utility functions used by create service 
 # step wise execution classes
@@ -114,10 +158,179 @@ class csUtil(object):
 
     def __init__(self):
         self.__ahfProcessManager = None
+    
+    def mRemoveDeprecatedSshAlgorithms(
+            self,
+            aHostnames: List[str],
+            aAlgorithms: List[str]) -> None:
+        """
+        Remove deprecated SSH algorithms from the given DomU hostnames.
+
+        :param aHostnames: hostnames whose sshd_config should be filtered.
+        :param aAlgorithms: List of algorithms to remove.
+        """
+        if not aHostnames:
+            ebLogInfo("No DomU hostnames provided for SSH algorithm cleanup.")
+            return
+
+        for hostname in sorted({h for h in aHostnames if h}):
+            ebLogInfo(f"Updating sshd_config on {hostname} to remove deprecated algorithms.")
+            try:
+                with connect_to_host(hostname, get_gcontext()) as node:
+                    mRemoveSshAlgorithmsFromNode(node, aAlgorithms)
+            except ExacloudRuntimeError:
+                raise
+            except Exception as exc:
+                msg = (f"Failed to remove SSH algorithms on {hostname}: {exc}")
+                ebLogError(msg)
+                raise ExacloudRuntimeError(0x0116, 0xA, msg) from exc
 
      #estep is the exacloud create service step name given by ECRA
      #aOedaStep are the OEDA step constants
      #undo if set to TRUE will run the OEDA step with -u flag
+
+    def mExadataAide(self, ebox, action, aHosts=None):
+        if aHosts is None:
+            _pairs = ebox.mReturnDom0DomUPair()
+            aHosts = [domu for _, domu in _pairs]
+
+        _cmd = f"/opt/oracle.SupportTools/exadataAIDE -{action}"
+        for _host in aHosts:
+            _node = exaBoxNode(get_gcontext())
+            _node.mConnect(aHost=_host)
+            _node.mExecuteCmdLog(_cmd)
+            _node.mDisconnect()
+
+    # Bug 38973298: helper to blackout exadataAIDE during create service.
+    def mDisableAIDE(self, ebox, aHosts=None):
+        ebLogInfo("*** Disabling exadataAIDE")
+        self.mExadataAide(ebox, "disable", aHosts=aHosts)
+
+    # Bug 38973298: helper to enable exadataAIDE during create service.
+    def mEnableAIDE(self, ebox, aHosts=None):
+        ebLogInfo("*** Enabling exadataAIDE")
+        self.mExadataAide(ebox, "enable", aHosts=aHosts)
+
+    # Bug 38973298: helper to update exadataAIDE during create service.
+    def mUpdateAIDE(self, ebox, aHosts=None):
+        ebLogInfo("*** Updating exadataAIDE")
+        self.mExadataAide(ebox, "update", aHosts=aHosts)
+
+    def _resolve_sshd_conf_path(self, ebox):
+        conf_path = None
+        if ebox is not None:
+            conf_path = ebox.mCheckConfigOption(_SSH_PARAM_NAME)
+            if conf_path:
+                conf_path = str(conf_path).strip()
+
+        if not conf_path:
+            if ebox is None:
+                conf_path = _SSH_DROPIN_DEFAULT_CONFIG
+            else:
+                conf_path = _SSH_DEFAULT_FILE
+
+        return conf_path
+
+    def mUpdateExacloudSshd(self, node, key_vals, ebox=None, aHosts=None,
+                          disable_cb=None, enable_cb=None, update_cb=None,
+                          conf_file=None):
+        """Update ExaCloud sshd configuration and optionally manage AIDE."""
+
+        conf_file = conf_file or self._resolve_sshd_conf_path(ebox)
+        use_dropin_behavior = conf_file != _SSH_DEFAULT_FILE
+
+        if use_dropin_behavior and not _should_use_dropin(node, conf_file, ebox=ebox):
+            conf_file = _SSH_DEFAULT_FILE
+            use_dropin_behavior = False
+
+        conf_dir = os.path.dirname(conf_file)
+        if use_dropin_behavior:
+            dir_quoted = shlex.quote(conf_dir)
+            node_exec_cmd_check(node, f"/bin/mkdir -p {dir_quoted}")
+            if conf_dir.endswith('sshd_config.d'):
+                node_exec_cmd_check(node, f"/bin/chmod 755 {dir_quoted}")
+
+        current_content, desired_content = self._render_sshd_content(
+            node,
+            conf_file,
+            key_vals,
+            use_dropin_behavior=use_dropin_behavior,
+        )
+
+        if desired_content == current_content:
+            ebLogTrace(
+                "ExaCloud sshd configuration already contains requested settings; skipping update."
+            )
+            return conf_file, False
+
+        with self._exadata_aide_guard(
+            ebox,
+            aHosts=aHosts,
+            disable_cb=disable_cb,
+            enable_cb=enable_cb,
+            update_cb=update_cb,
+        ):
+            self._write_sshd_content(
+                node,
+                conf_file,
+                desired_content,
+                use_dropin_behavior=use_dropin_behavior,
+            )
+
+        return conf_file, True
+
+    def _render_sshd_content(self, node, conf_file, key_vals, use_dropin_behavior=False):
+        if node.mFileExists(conf_file):
+            current_content = node_read_text_file(node, conf_file)
+        else:
+            current_content = _SSH_DROPIN_HEADER if use_dropin_behavior else ""
+
+        desired_content = _update_key_val_str(
+            current_content,
+            key_vals,
+            sep=' ',
+        )
+        return current_content, desired_content
+
+    def _write_sshd_content(self, node, conf_file, desired_content, use_dropin_behavior=False):
+        node_write_text_file(node, conf_file, desired_content)
+        if use_dropin_behavior:
+            node_exec_cmd_check(node, f"/bin/chmod 644 {shlex.quote(conf_file)}")
+        return True
+
+    @contextmanager
+    def _exadata_aide_guard(self, ebox, aHosts=None, disable_cb=None, enable_cb=None, update_cb=None):
+        if not ebox and not disable_cb:
+            yield False
+            return
+
+        aide_managed = False
+        try:
+            if ebox:
+                self.mDisableAIDE(ebox, aHosts=aHosts)
+                aide_managed = True
+            elif disable_cb:
+                disable_cb()
+                aide_managed = True
+            else:
+                yield False
+                return
+
+            yield True
+        finally:
+            if aide_managed:
+                if ebox:
+                    try:
+                        self.mEnableAIDE(ebox, aHosts=aHosts)
+                    finally:
+                        self.mUpdateAIDE(ebox, aHosts=aHosts)
+                else:
+                    if enable_cb:
+                        enable_cb()
+                    if update_cb:
+                        update_cb()
+
+
     def mExecuteOEDAStep(self, aExaBoxCluCtrlObj, estep, steplist, aOedaStep, undo=False, dom0Lock=True, aSkipFail=False, aOverride=False):
         ebox = aExaBoxCluCtrlObj
         aOptions = ebox.mGetArgsOptions()
@@ -221,7 +434,6 @@ class csUtil(object):
                     ebLogError(_error_str)
                 else:
                     raise ExacloudRuntimeError(0x0411, 0xA, _error_str, aStackTrace=False)
-
 
         ebLogInfo('csUtil mExecuteOEDAStep: Completed Successfully')
 
@@ -673,7 +885,6 @@ class csUtil(object):
                 if _stale_dummy_bridges:
                     self.mDeleteBridgeUtil(_node, _stale_dummy_bridges, _ebox, aRaiseException=True)
 
-
     def mFetchBridges(self, aExaBoxCluCtrlObj, aDom0DomUPairs=None):
         _ebox = aExaBoxCluCtrlObj
         _nodes = _ebox.mReturnDom0DomUPair() if aDom0DomUPairs is None else aDom0DomUPairs
@@ -699,7 +910,6 @@ class csUtil(object):
             _node.mDisconnect()
 
         return _bridges
-
 
     def mGetDummyBridgesBrctl(self, aDom0Node):
         """
@@ -752,7 +962,6 @@ class csUtil(object):
         ebLogInfo(f"Bridges in use on {aDom0Node.mGetHostname()}: {_bridges_in_use}")
         return _bridges_in_use
 
-
     def mDeleteBridges(self, aExaBoxCluCtrlObj, aBridges):
         '''
            This will remove bridges that were not removed by oeda during vm deletion.
@@ -792,7 +1001,6 @@ class csUtil(object):
                     _to_delete_bridges.sort(reverse=True)
 
                     self.mDeleteBridgeUtil(_node, _to_delete_bridges, _ebox, aRaiseException=False)
-
 
     def mInstallAhfonDomU(self,aExaBoxCluCtrlObj,aStep=None,aStepList=None, aInit=True, aWait=True):
 
@@ -990,7 +1198,27 @@ class csUtil(object):
         aNode.mExecuteCmdLog(_cmdstr)
         if aNode.mGetCmdExitStatus():
             raise ExacloudRuntimeError(aErrorMsg=f"mExecuteCmd Failed to execute {_cmdstr} on {aNode.mGetHostname()}")
-    
+
+    def mHostAccessControlRootssh(self, node):
+        """Apply hardened sshd settings using host_access_control rootssh -k."""
+
+        if not node.mIsConnected():
+            raise ExacloudRuntimeError(aErrorMsg=f"{node.mGetHostname()} is not connected")
+
+        _cmd = "/opt/oracle.cellos/host_access_control rootssh -k"
+        node_exec_cmd_check(node, _cmd)
+        return True
+
+    def mHostAccessControlRootsshUnlock(self, node):
+        """Restore default sshd settings using host_access_control rootssh -u."""
+
+        if not node.mIsConnected():
+            raise ExacloudRuntimeError(aErrorMsg=f"{node.mGetHostname()} is not connected")
+
+        _cmd = "/opt/oracle.cellos/host_access_control rootssh -u"
+        node_exec_cmd_check(node, _cmd)
+        return True
+
     def mWhitelistCidr(self, aExaBoxCluCtrlObj, _node):
         """
         Whitelist admin Network Cidr for Exacc-Fedramp env. 
@@ -1208,3 +1436,4 @@ class csUtil(object):
             log_stdout_on_error=True)
 
         ebLogInfo(f"Service {aService} is active on {_hostname}")
+

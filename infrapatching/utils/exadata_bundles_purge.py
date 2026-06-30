@@ -25,6 +25,7 @@
 #      No
 #
 #    MODIFIED   (MM/DD/YY)
+#    remamid     06/18/26 - Bug 39575767 purge UEFI system images on Xen
 #    kdas        04/09/26 - Clarify CoDev scan false positive:
 #                           multi-line f-strings (ENH 39145031)
 #    kdas        03/18/26 - ER 34789348 - EXADATA_BUNDLES_PURGE.PY TO CLEAN
@@ -1088,8 +1089,10 @@ def main():
                 for _system_images_file in _system_images_files:
                     _system_image_version_re = re.search('(\d{1,2}\.\d{1,2}\.\d{1,2}\.\d{1,2}\.\d{1,2}\.\d{6})(.\d{1,2})*', _system_images_file)
                     if _system_image_version_re:
-                        # kvm and rtg images are not required in xen environments
-                        if _vir_type == virtualization_xen and (_system_images_file.find("kvm") > -1 or _system_images_file.find("rtg") > -1):
+                        # kvm, rtg and uefi images are not required in xen environments
+                        if _vir_type == virtualization_xen and (_system_images_file.find("kvm") > -1
+                                                                or _system_images_file.find("rtg") > -1
+                                                                or _system_images_file.find("uefi") > -1):
                             remove_system_image(_exadata_folder, _system_images_file)
                         # kvm and rtg images are required in kvm environments
                         if _vir_type == virtualization_kvm and not (_system_images_file.find("kvm") > -1) and not _system_images_file.find("rtg") > -1:

@@ -93,11 +93,18 @@ def _build_ebox():
     ebox.mAcquireRemoteLock = mock.Mock()
     ebox.mReleaseRemoteLock = mock.Mock()
     ebox.mGetCmd = mock.Mock(return_value='createservice')
+    ebox.mReturnDom0DomUPair = mock.Mock(return_value=[])
     ebox.mRemoveDNS = mock.Mock()
     return ebox
 
 
 class csPostGIInstallTests(unittest.TestCase):
+
+    def setUp(self):
+        cs_util_patch = mock.patch('ecs.exacloud.exabox.ovm.csstep.exascale.cs_postgiinstall.csUtil')
+        self.addCleanup(cs_util_patch.stop)
+        self._mock_cs_util = cs_util_patch.start()
+        self._mock_cs_util.return_value.mRemoveDeprecatedSshAlgorithms = mock.Mock()
 
     def test_doexecute_runs_core_sequence(self):
         step = csPostGIInstall()

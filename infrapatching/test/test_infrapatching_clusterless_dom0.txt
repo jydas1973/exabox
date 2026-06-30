@@ -15,12 +15,22 @@
 #      Unit test case script for all Dom0 operations.
 #
 #    MODIFIED   (MM/DD/YY)
+#    sdevasek    05/13/26 - Bug 39366856 - FIX DBNU PLUGIN LOG
+#                           VALIDATION IN DOM0 TESTS
+#       araghave 04/23/26 - Enh 39152619 - MODIFY ALL SMR/ELU OPERATIONS TO
+#                           ROLLING OPERATIONS STYLE IN INFRA PATCHING CODE
+#    sdevasek    03/24/26 - Update mock handling in clusterless dom0 test
+#    sdevasek    03/23/26 - Enh 38521465 - Handle mock node_progress_status
+#                           parsing and allow mock time stats
+#    araghave    02/04/26 - Enh 38901411 - VALIDATE AND ADD TESTS RELATED TO
+#                           PLUGIN AND CLUSTERLESS FLOW
 #       araghave 02/04/26 - Enh 38901411 - VALIDATE AND ADD TESTS RELATED TO
 #                           PLUGIN AND CLUSTERLESS FLOW
-#       apotluri 08/28/25 - Bug 38301663 - EXACS:25.2.2.1:RAISE AN ERROR WHEN
+#                           PLUGIN AND CLUSTERLESS FLOW
+#    apotluri    08/28/25 - Bug 38301663 - EXACS:25.2.2.1:RAISE AN ERROR WHEN
 #                           THE EXTERNAL LAUNCH NODE IS UNAVAILABLE DUE TO
 #                           REACHING THE MAXIMUM ALLOWED CONCURRENT SESSIONS
-#       apotluri 08/11/25 - Enhancement Request 38260898 - INFRAPATCH TEST
+#    apotluri    08/11/25 - Enhancement Request 38260898 - INFRAPATCH TEST
 #                           AUTOMATION CLUSTERLESS : CREATE TEST FOR PATCHMGR
 #                           FAILURE CASE FOR CELL/DOM0
 #    antamil     07/04/25   Bug 37994044 - Testscript changes to verify
@@ -65,7 +75,7 @@ class Test_clusterless_dom0_class(unittest.TestCase):
     def __init__(self, *initial_data, **kwargs):
         super(Test_clusterless_dom0_class, self).__init__(*initial_data, **kwargs)
         self.__operation = ""
-        self.__operation_style = OP_STYLE_AUTO
+        self.__operation_style = OP_STYLE_ROLLING
         self.__required_nodes_in_node_progress_status = []
         self.__non_required_nodes_in_node_progress_status = []
         self.__patch_node_list = []
@@ -101,7 +111,7 @@ class Test_clusterless_dom0_class(unittest.TestCase):
     @pytest.mark.clusterless_dom0_one_off_v2
     def test_clusterless_dom0_one_off_v2(self):
         self.__operation = TASK_ONEOFFV2
-        self.__operation_style = OP_STYLE_AUTO
+        self.__operation_style = OP_STYLE_ROLLING
         self.__patch_node_list = Test_clusterless_dom0_class.__dom0s
         mUpdateParamInPayload("OneoffScriptAlias", "script_%s_%s" % (PATCH_DOM0, ONEOFF_PLUGIN))
         mUpdateAdditionalOptionsInPayload("OneoffCustomPluginFile", "none")
@@ -113,7 +123,7 @@ class Test_clusterless_dom0_class(unittest.TestCase):
         mExecuteRemoteExasshCmd(
             "/bin/sed  \\'s/ClientAliveInterval.*/ClientAliveInterval 590/\\' -i /etc/ssh/sshd_config",
             Test_clusterless_dom0_class.__dom0s)
-        _result, _status_output = mExecuteInfraPatchCommand(TASK_PREREQ_CHECK, PATCH_DOM0, OP_STYLE_AUTO)
+        _result, _status_output = mExecuteInfraPatchCommand(TASK_PREREQ_CHECK, PATCH_DOM0, OP_STYLE_NON_ROLLING)
         _status_json = json.loads(_status_output)
         _error_code = _status_json["errorCode"]
 
@@ -129,13 +139,14 @@ class Test_clusterless_dom0_class(unittest.TestCase):
         _status, _ = self.__launch_node_handler.mRegisterInfrapatchLaunchNode(_data)
         self.assertFalse(_status, "Launch node registration failed.")
 
-        # delete patches from mgmt host so that it copies during execution. This will increase a coverage a bit
-        _cmd = "ssh %s 'sudo rm -rf /var/odo/InfraPatchBase/*.zip'" % mGetInfraPatchingTestConfigParam('management_host_name')
-        _out, _stat = mExecuteLocal(_cmd)
-        self.assertEqual(_stat, 0, "Removing directory '/var/odo/InfraPatchBase/*.zip' failed.")
+        if not mIsMockEnabled():
+            # delete patches from mgmt host so that it copies during execution. This will increase a coverage a bit
+            _cmd = "ssh %s 'sudo rm -rf /var/odo/InfraPatchBase/*.zip'" % mGetInfraPatchingTestConfigParam('management_host_name')
+            _out, _stat = mExecuteLocal(_cmd)
+            self.assertEqual(_stat, 0, "Removing directory '/var/odo/InfraPatchBase/*.zip' failed.")
 
         _result, _status_output = mExecuteInfraPatchCommandWithDCSAgentChecks(TASK_PREREQ_CHECK, PATCH_DOM0,
-                                                                              OP_STYLE_AUTO)
+                                                                              OP_STYLE_NON_ROLLING)
         mUpdateInfrapatchingConfParam("disable_exacloud_plugin_execution", "False")
         _status, _ = self.__launch_node_handler.mDeregisterInfrapatchLaunchNode(infraType='CABINET',
                                                                                 infraName=_compute_cabinet)
@@ -152,7 +163,7 @@ class Test_clusterless_dom0_class(unittest.TestCase):
         _status, _ = self.__launch_node_handler.mRegisterInfrapatchLaunchNode(_data)
         self.assertFalse(_status, "Launch node registration failed.")
         _result, _status_output = mExecuteInfraPatchCommandWithDCSAgentChecks(TASK_PATCH, PATCH_DOM0,
-                                                                              OP_STYLE_AUTO)
+                                                                              OP_STYLE_NON_ROLLING)
         mUpdateInfrapatchingConfParam("disable_exacloud_plugin_execution", "False")
         _status, _ = self.__launch_node_handler.mDeregisterInfrapatchLaunchNode(infraType='CABINET',
                                                                                 infraName=_compute_cabinet)
@@ -168,7 +179,7 @@ class Test_clusterless_dom0_class(unittest.TestCase):
         _status, _ = self.__launch_node_handler.mRegisterInfrapatchLaunchNode(_data)
         self.assertFalse(_status, "Launch node registration failed.")
         _result, _status_output = mExecuteInfraPatchCommandWithDCSAgentChecks(TASK_ROLLBACK, PATCH_DOM0,
-                                                                              OP_STYLE_AUTO)
+                                                                              OP_STYLE_NON_ROLLING)
         _status, _ = self.__launch_node_handler.mDeregisterInfrapatchLaunchNode(infraType='CABINET',
                                                                                 infraName=_compute_cabinet)
         self.assertFalse(_status, "Launch node deregistration failed.")
@@ -207,6 +218,9 @@ class Test_clusterless_dom0_class(unittest.TestCase):
         self.mValidatePatchOperationWithIncludeNodeList()
         _status, _ = self.__launch_node_handler.mDeregisterInfrapatchLaunchNode(infraType='CABINET', infraName=_compute_cabinet)
         self.assertFalse(_status, "Launch node deregistration failed.")
+        if mIsMockEnabled():
+            _sql = f"update ecs_hw_nodes set node_state='FREE' where oracle_hostname in ('{_hostname}');\ncommit;\n"
+            mExecuteSqlonEcraDb(_sql)
         _sql = f"select node_state from ecs_hw_nodes where oracle_hostname in ('{_hostname}');"
         _sqlout = mExecuteSqlonEcraDb(_sql)
         _match = False
@@ -230,6 +244,9 @@ class Test_clusterless_dom0_class(unittest.TestCase):
         self.mValidatePatchOperationWithIncludeNodeList()
         _status, _ = self.__launch_node_handler.mDeregisterInfrapatchLaunchNode(infraType='CABINET', infraName=_compute_cabinet)
         self.assertFalse(_status, "Launch node deregistration failed.")
+        if mIsMockEnabled():
+            _sql = f"update ecs_hw_nodes set node_state='FREE' where oracle_hostname in ('{_hostname}');\ncommit;\n"
+            mExecuteSqlonEcraDb(_sql)
         _sql = f"select node_state from ecs_hw_nodes where oracle_hostname in ('{_hostname}');"
         _sqlout = mExecuteSqlonEcraDb(_sql)
         _match = False
@@ -318,11 +335,11 @@ class Test_clusterless_dom0_class(unittest.TestCase):
         # send 3 concurrent precheck requests
         with concurrent.futures.ThreadPoolExecutor() as executor:
             f1 = executor.submit(mExecuteInfraPatchCommand, aOperation=TASK_PREREQ_CHECK, aTarget=PATCH_DOM0,
-                                 aOperationStyle=OP_STYLE_AUTO)
+                                 aOperationStyle=OP_STYLE_NON_ROLLING)
             time.sleep(5)
             mUpdateInfraPatchingTestConfigParam("cluster", _cell_cabinet)
             f2 = executor.submit(mExecuteInfraPatchCommand, aOperation=TASK_PREREQ_CHECK, aTarget=PATCH_CELL,
-                                 aOperationStyle=OP_STYLE_AUTO)
+                                 aOperationStyle=OP_STYLE_NON_ROLLING)
 
             _ret1, _status_output1 = f1.result()
             _ret2, _status_output2 = f2.result()
@@ -389,8 +406,8 @@ class Test_clusterless_dom0_class(unittest.TestCase):
         _exassh_cmd = "%s %s -sl -e %s" % (_exassh_bin_path, Test_clusterless_dom0_class.__dom0s[0], _cmd)
         _time_stamp, _stat = mExecuteLocal(_exassh_cmd)
         if _stat != 0:
-            self.assertTrue(_stat, "Problem while getting timestamp from plugin log %s on %s" % (
-                _plugin_log, [Test_clusterless_dom0_class.__dom0s[0]]))
+            self.assertEqual(_stat, 0, "Problem while getting timestamp from plugin log %s on %s. Command: %s" % (
+                _plugin_log, [Test_clusterless_dom0_class.__dom0s[0]], _exassh_cmd))
 
         self.__patch_operation_status_result, self.__patch_operation_status_output = \
             mExecuteInfraPatchCommandWithDCSAgentChecks(self.__operation, Test_clusterless_dom0_class.__target_name,
@@ -470,14 +487,16 @@ class Test_clusterless_dom0_class(unittest.TestCase):
         _plugin_log = "/var/log/exadatatmp/dbnu-plugin.log"
         _exacloud_path = mGetExacloudInstallPath()
         _exassh_bin_path = "%s/bin/exassh" % _exacloud_path
-        # print the content of file by removing all lines from the beginning of a file up to the last occurrence of given timeStamp
-        # Ex: sed '1,$(grep -n "Wed May 22 23:08:15" /var/log/exadatatmp/dbnu-plugin.log | tail -1 | cut -d: -f1)d' /var/log/exadatatmp/dbnu-plugin.log
-        _cmd = "sed '1,$(grep -n \"%s\" %s | tail -1 | cut -d: -f1)d' %s" % (timeStamp, _plugin_log, _plugin_log)
+        # Find the timestamp captured before patching and check only the log lines after it.
+        # If the timestamp marker is missing, fail instead of scanning logs from older runs.
+        _cmd = "'line=$(grep -n \"%s\" %s | tail -1 | cut -d: -f1); " \
+               "if [ -z \"$line\" ]; then exit 1; fi; tail -n +$((line + 1)) %s'" % (
+                   timeStamp, _plugin_log, _plugin_log)
         _exassh_cmd = "%s %s -sl -e %s" % (_exassh_bin_path, Test_clusterless_dom0_class.__dom0s[0], _cmd)
         _logs, _stat = mExecuteLocal(_exassh_cmd)
         if _stat != 0:
-            self.assertTrue(_stat, "Problem while getting plugin log %s from %s" % (
-                _plugin_log, [Test_clusterless_dom0_class.__dom0s[0]]))
+            self.assertEqual(_stat, 0, "Problem while getting plugin log %s from %s. Command: %s" % (
+                _plugin_log, [Test_clusterless_dom0_class.__dom0s[0]], _exassh_cmd))
 
         # Find missing messages
         _missing_messages = [_msg for _msg in _required_messages if _msg not in _logs]

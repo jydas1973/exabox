@@ -12,6 +12,11 @@ NOTE:
 
 History:
     MODIFIED   (MM/DD/YY)
+    kanmanic    06/15/26 - 39560339 - Retry failed AQ response publishes
+    joysjose    06/05/26 - Bug 38385387 : Memory and OHome Reshape retry enhancement
+    aypaul      05/25/26 - SecBug#39392771 Remove proxy implementation from
+                           mysql database
+    kanmanic    03/17/26 - 37764703 AQ Status Tracker Support
     jfsaldan    04/09/26 - Bug 38900114 - EXACLOUD: ISSUES FOUND BY VOXIO CODEV
                            AGENT IN DIR EXABOX/CORE
     jesandov    03/20/26 - 39094088: Add race condition check on creation of
@@ -1332,19 +1337,7 @@ class ebExacloudDB(ebMysqlDB):
         self.mExecuteLog(_sql, _data)
 
     def mSelectAllFromRequestuuidtoExacloud(self, aReqStatus=None):
-        if self.mCheckTableExist('requestuuidtoexacloud'):
-            if aReqStatus:
-                _sql = "SELECT requuid, ecinstanceid, reqstatus, requestcreationtimestamp FROM requestuuidtoexacloud WHERE reqstatus=%(1)s"
-                _list = self.mFetchAll(_sql, [aReqStatus])
-            else:
-                _sql = "SELECT requuid, ecinstanceid, reqstatus, requestcreationtimestamp FROM requestuuidtoexacloud"
-                _list = self.mFetchAll(_sql)
-
-            if len(_list) > 0:
-                return _list
-            return []
-        else:
-            return []
+        return []
 
     #Usage for Proxy heartbeat
     def mUpdateExacloudInstanceInfo(self, aEcinstanceID, aKey, aValue):
@@ -1381,60 +1374,19 @@ class ebExacloudDB(ebMysqlDB):
         """
 
     def mSelectStatusFromUUIDToECInstance(self, aUUID):
-
-        if self.mCheckTableExist('requestuuidtoexacloud'):
-            _sql = """SELECT reqstatus FROM requestuuidtoexacloud WHERE requuid=%(1)s"""
-            _data = [aUUID]
-
-            _list = self.mFetchOne(_sql, _data)
-            if _list is not None:
-                return str(_list[0])
-            return "InitialReqPending"
-        else:
-            return "InitialReqPending"
+        return None
 
     def mInsertUUIDtoECInstanceInfo(self, areqUUID, aECInstanceID, aRequestCreationTimestamp):
-
-        _status = "InitialReqPending"
-
-        _sql1 = """SELECT ecinstanceid FROM requestuuidtoexacloud WHERE requuid=%(1)s"""
-        _data1 = [areqUUID]
-        _handle = self.mFetchOne(_sql1, _data1)
-        if _handle is not None:
-            return
-
-        _sql = """INSERT INTO requestuuidtoexacloud VALUES (%(1)s, %(2)s, %(3)s, %(4)s)"""
-        _data = [str(areqUUID), str(aECInstanceID), _status, str(aRequestCreationTimestamp)]
-        self.mExecuteLog(_sql, _data)
+        pass
 
     def mUpdateStatusForReqUUID(self, aReqUUID, aStatus):
-
-        _sql1 = """SELECT ecinstanceid FROM requestuuidtoexacloud WHERE requuid=%(1)s"""
-        _data1 = [aReqUUID]
-        _handle = self.mFetchOne(_sql1, _data1)
-        if _handle is None:
-            return False
-
-        _sql = """UPDATE requestuuidtoexacloud SET reqstatus=%(1)s WHERE requuid=%(2)s"""
-        _data = [aStatus, aReqUUID]
-        self.mExecuteLog(_sql, _data)
-        return True
+        return False
     
     def mSelectECInstanceIDFromUUIDToECInstance(self, aUUID):
-
-        if self.mCheckTableExist('requestuuidtoexacloud'):
-            _sql = """SELECT ecinstanceid FROM requestuuidtoexacloud WHERE requuid=%(1)s"""
-            _data = [aUUID]
-
-            _list = self.mFetchOne(_sql, _data)
-            if _list is not None:
-                return str(_list[0])
-
         return "None"
 
     def mUpdateUUIDtoexacloudForAgentStart(self):
-        _updaterequestuuidtoexacloudtablequery = "UPDATE requestuuidtoexacloud SET reqstatus='InitialReqDone' WHERE reqstatus='Pending'"
-        self.mExecute(_updaterequestuuidtoexacloudtablequery)
+        pass
 
     def mCreateProxyRequestsTable(self):
 
@@ -1462,77 +1414,19 @@ class ebExacloudDB(ebMysqlDB):
         """
 
     def mInsertNewProxyRequest(self, aRequest):
-
-        _uuid   = aRequest.mGetUUID()
-        _ctype  = aRequest.mGetCmdType()
-        _params = aRequest.mGetParams()
-        if self.mGetMaskParams():
-            _params = maskSensitiveData(aRequest.mGetParams(), full_mask=True)
-
-        _reqbody   = aRequest.mGetReqBody()
-        _urlfullpath = aRequest.mGetUrlFullPath()
-        _urlheaders = aRequest.mGetUrlHeaders()
-        _respbody = aRequest.mGetRespBody()
-        _respcode = aRequest.mGetRespCode()
-        _reqtype = aRequest.mGetReqType()
-
-        _sql = """INSERT INTO proxyrequests(uuid, cmdtype, params, reqbody, urlfullpath, urlheaders, respbody, respcode, reqtype)
-                  VALUES (%(1)s, %(2)s, %(3)s, %(4)s, %(5)s, %(6)s, %(7)s, %(8)s, %(9)s)"""
-        _data = [_uuid, _ctype, _params, _reqbody, _urlfullpath, _urlheaders, _respbody, _respcode, _reqtype]
-        self.mExecuteLog(_sql, _data)
+        pass
 
     def mGetProxyRequest(self, aUUID):
-        _rc = None
-        _sql = """SELECT uuid, cmdtype, params, reqbody, urlfullpath, urlheaders, respbody, respcode, reqtype FROM proxyrequests WHERE uuid=%(1)s"""
-        _data = [aUUID]
-        _rc = self.mFetchOne(_sql, _data)
-        if _rc:
-            try:
-                _params = umaskSensitiveData(_rc[2], full_mask=True)
-            except:
-                _params = ast.literal_eval(_rc[2])
-                _params = umaskSensitiveData(_params, full_mask=False)
-            row = list(_rc)
-            row[2] = str(_params)
-            return tuple(row)
+        return None
 
     def mUpdateProxyRequest(self, aRequest):
-
-        _uuid   = aRequest.mGetUUID()
-        _ctype  = aRequest.mGetCmdType()
-        _params = aRequest.mGetParams()
-        if self.mGetMaskParams():
-            _params = maskSensitiveData(aRequest.mGetParams(), full_mask=True)
-
-        _reqbody   = aRequest.mGetReqBody()
-        _urlfullpath = aRequest.mGetUrlFullPath()
-        _urlheaders = aRequest.mGetUrlHeaders()
-        _respbody = aRequest.mGetRespBody()
-        _respcode = aRequest.mGetRespCode()
-        _reqtype = aRequest.mGetReqType()
-
-        _sql = """UPDATE proxyrequests
-                  SET cmdtype=%(1)s, params=%(2)s, reqbody=%(3)s, urlfullpath=%(4)s,
-                      urlheaders=%(5)s, respbody=%(6)s, respcode=%(7)s, reqtype=%(8)s  WHERE uuid=%(9)s"""
-        _data = [_ctype, _params, _reqbody, _urlfullpath, _urlheaders, _respbody, _respcode, _reqtype, _uuid]
-        self.mExecuteLog(_sql, _data)
+        pass
 
     def mUpdateResponseDetailsInProxyRequest(self, aUUID, aRespCode, aRespBody, aRespUrlHeaders):
-
-        _sql = """UPDATE proxyrequests SET respcode=%(1)s, respbody=%(2)s, urlheaders=%(3)s WHERE uuid=%(4)s"""
-        _data = [aRespCode, aRespBody, aRespUrlHeaders, aUUID]
-        self.mExecuteLog(_sql, _data)
+        pass
 
     def mSelectResponseDetailsFromProxyRequests(self, aUUID):
-
-        if self.mCheckTableExist('proxyrequests'):
-            _sql = """SELECT respcode, respbody, urlheaders FROM proxyrequests WHERE uuid=%(1)s"""
-            _data = [aUUID]
-
-            _list = self.mFetchOne(_sql, _data)
-            return _list
-        else:
-            return ["None", "None", "None"]
+        return ["None", "None", "None"]
 
     def mCreateMockCallTable(self):
 
@@ -2565,6 +2459,15 @@ class ebExacloudDB(ebMysqlDB):
             _params = maskSensitiveData(_params, full_mask=True)
         _sql = """UPDATE requests SET params=%(1)s WHERE uuid=%(2)s"""
         _data = [_params, _uuid]
+        self.mExecuteLog(_sql, _data)
+
+    def mUpdateAqName(self, aUUID, aAqName):
+        if not aUUID:
+            return
+        _sql = """UPDATE requests
+                  SET aq_name=%(1)s
+                  WHERE uuid=%(2)s"""
+        _data = [aAqName, aUUID]
         self.mExecuteLog(_sql, _data)
 
     @mUpdateResponseToEcra
@@ -4000,6 +3903,21 @@ class ebExacloudDB(ebMysqlDB):
         _sql = """UPDATE requests set response_sent=%(1)s where uuid=%(2)s """
         self.mExecute(_sql, [value, uuid])
 
+    def mGetFailedAQResponses(self, limit=50):
+        try:
+            _limit = int(limit)
+        except (TypeError, ValueError):
+            _limit = 50
+        if _limit <= 0:
+            return []
+        _sql = f"""SELECT uuid FROM requests
+                  WHERE response_sent=%(1)s
+                    AND aq_name IS NOT NULL
+                    AND aq_name!=''
+                    AND aq_name!='Undef'
+                  LIMIT {_limit}"""
+        return self.mFetchAll(_sql, ['Error'])
+
     def mCreateErrCodeTable(self):
         if not self.mCheckTableExist('errorresponse'):
             self.mExecute('''CREATE TABLE IF NOT EXISTS errorresponse (
@@ -4010,15 +3928,28 @@ class ebExacloudDB(ebMysqlDB):
                                                   retryCount INTEGER,
                                                   detailErr text,
                                                   nodeData LONGTEXT)''')
+        elif not self.mCheckErrCodeNodeDataColumnExist():
+            self.mExecute('''ALTER TABLE errorresponse ADD COLUMN nodeData LONGTEXT''')
+
+    def mCheckErrCodeNodeDataColumnExist(self):
+        _sql = """SHOW COLUMNS FROM errorresponse LIKE %(1)s"""
+        _data = ['nodeData']
+        _fdata = self.mFetchOne(_sql, _data)
+        return bool(_fdata and len(_fdata) and _fdata[0] == 'nodeData')
 
     def mSetErrCode(self, aData):
-        _sql = """INSERT INTO errorresponse VALUES (%(1)s, %(2)s, %(3)s, %(4)s,
+        self.mCreateErrCodeTable()
+        _sql = """INSERT INTO errorresponse (
+                                              uuid, errorCode, errorMsg, errorType,
+                                              retryCount, detailErr, nodeData)
+                                              VALUES (%(1)s, %(2)s, %(3)s, %(4)s,
                                               %(5)s, %(6)s, %(7)s) ON DUPLICATE KEY UPDATE errorCode=%(2)s, 
                                               errorMsg=%(3)s, errorType=%(4)s, retryCount=%(5)s, detailErr=%(6)s, nodeData=%(7)s"""
         self.mExecute(_sql, aData)
 
     def mGetErrCodeByUUID(self, aUuid):
-        _list = self.mFetchAll("""SELECT * FROM errorresponse where uuid=%(1)s""", [aUuid])
+        self.mCreateErrCodeTable()
+        _list = self.mFetchAll("""SELECT uuid, errorCode, errorMsg, errorType, retryCount, detailErr, nodeData FROM errorresponse where uuid=%(1)s""", [aUuid])
         _errcode = []
         if _list:
             for row in _list:
@@ -4035,11 +3966,28 @@ class ebExacloudDB(ebMysqlDB):
                                                   virtualMachineName VARCHAR(128) PRIMARY KEY,
                                                   dbRunning LONGTEXT)''')
 
-    def mSetDBlist(self, aNodeName, aDBRunningState):
+    def mSplitDBRunningState(self, aDBRunningState):
+        if not aDBRunningState:
+            return '', ''
+        _db_state = str(aDBRunningState)
+        if '|' not in _db_state:
+            return '', _db_state
+        _reshape_type, _db_list = _db_state.split('|', 1)
+        _reshape_type = _reshape_type.strip().upper()
+        if _reshape_type not in ('MEMORY', 'OHOME'):
+            return '', _db_state
+        return _reshape_type, _db_list
+
+    def _mFormatDBRunningState(self, aDBRunningState, aReshapeType=None):
+        if not aReshapeType:
+            return aDBRunningState
+        return '%s|%s' % (str(aReshapeType).upper(), aDBRunningState or '')
+
+    def mSetDBlist(self, aNodeName, aDBRunningState, aReshapeType=None):
         _sql = """INSERT INTO runningdblist VALUES (%(1)s, %(2)s)
                                               ON DUPLICATE KEY UPDATE virtualMachineName=%(1)s,
                                               dbRunning=%(2)s"""
-        aData = [aNodeName, aDBRunningState]
+        aData = [aNodeName, self._mFormatDBRunningState(aDBRunningState, aReshapeType)]
         self.mExecute(_sql, aData)
 
     def mGetDBListByNode(self, aNodeName):
@@ -4047,8 +3995,24 @@ class ebExacloudDB(ebMysqlDB):
         _data = [aNodeName]
         _resp = self.mFetchOne(_sql, _data)
         if _resp:
-            return _resp[0]
+            _, _db_list = self.mSplitDBRunningState(_resp[0])
+            return _db_list
         return ''
+
+    def mGetDBListTypeByNode(self, aNodeName):
+        _sql = """SELECT dbRunning FROM runningdblist where virtualMachineName=%(1)s"""
+        _data = [aNodeName]
+        _resp = self.mFetchOne(_sql, _data)
+        if _resp:
+            _reshape_type, _ = self.mSplitDBRunningState(_resp[0])
+            return _reshape_type
+        return ''
+
+    def mHasDBListByNode(self, aNodeName):
+        _sql = """SELECT 1 FROM runningdblist where virtualMachineName=%(1)s"""
+        _data = [aNodeName]
+        _resp = self.mFetchOne(_sql, _data)
+        return bool(_resp)
 
     def mRemoveDBListByNode(self, aNodeName):
         _sql = """DELETE FROM runningdblist where virtualMachineName=%(1)s"""

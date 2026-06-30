@@ -17,30 +17,49 @@ NOTE:
 History:
 
     MODIFIED   (MM/DD/YY)
+    rajsag   05/29/26 - Bug 39283211 - support X11 no-XRMEM cell types
+    pbellary 05/15/26 - Bug 39238514 - X11M:ADD CELL SUPPORT FOR EXASCALE WITH EF MEDIA TYPE
+    pbellary 05/12/26 - Bug 39120670 - VALIDATE EXISTING OF ESWALLET POST EXASCALE ATTACH CELL
+    oespinos   05/11/26 - 39352433: Attach Cell Fails 'removed_cells' key error 
+    atgandhi 05/01/26 - EXACS:26.1:STORAGE SCALE DOWN RESULTS IN INCORRECT
+                        VOTING FILE METADATA (EXTRA CELL) IN ECS_EXAUNITDETAILS
+    atgandhi   05/01/26 - EXACS:26.1:STORAGE SCALE DOWN RESULTS IN INCORRECT
+                          VOTING FILE METADATA (EXTRA CELL) IN ECS_EXAUNITDETAILS
+    nelango  04/27/26 - Bug 39229861: check cellip.ora permissions
+    nelango    04/27/26 - Bug 39229861: check cellip.ora permissions
     rajsag   04/01/26 - er 38717477 - exacs:25.2.2.2: delete storage with
                         exascale configure infrastructure fails at
                         deleteexascalecelltask: "keyerror: 'operation'
+    rajsag     04/01/26 - er 38717477 - exacs:25.2.2.2: delete storage with
+                          exascale configure infrastructure fails at
+                          deleteexascalecelltask: "keyerror: 'operation'
     rajsag   02/17/26 - 38857796 - exacc:bb:exacloud: progress percentage drops
                         while elastic cell operation is in progress.
+    rajsag     02/17/26 - 38857796 - exacc:bb:exacloud: progress percentage drops
+                          while elastic cell operation is in progress.
     atgandhi 01/21/26 - Enh 38367755 - UPDATE ADD STORAGE WORKFLOW WITH FETCH
                         VOTING DISKS
+    atgandhi   01/21/26 - Enh 38367755 - UPDATE ADD STORAGE WORKFLOW WITH FETCH
+                          VOTING DISKS
     aypaul   01/16/26 - ER#38277264 SELinux fleet exacloud implementation
+    aypaul     01/16/26 - ER#38277264 SELinux fleet exacloud implementation
     oespinos 11/25/25 - Bug 38688728: Try to read rack_num from actual rack_num 
+    oespinos   11/25/25 - Bug 38688728: Try to read rack_num from actual rack_num 
     pbellary   11/24/25 - Enh 38685113 - EXASCALE: POST CONFIGURE EXASCALE EXACLOUD SHOULD FETCH STRE0/STE1 FROM DOM0
-    prsshukl 09/24/25 - Bug 38466258 - ADBS: ADD CELL Phase 1: support multiple
-                        cell addition
+    prsshukl   09/24/25 - Bug 38466258 - ADBS: ADD CELL Phase 1: support multiple
+                          cell addition
     prsshukl   09/24/25 - Bug 38466258 - ADBS: ADD CELL Phase 1: support multiple cell addition
-    nelango  09/09/25 - Bug 38399834: Update original size dict with
-                        post-cellupdate dict instead of reassigning it
     nelango    09/09/25 - Bug 38399834: Update original size dict with
                           post-cellupdate dict instead of reassigning it
-    jfsaldan 09/08/25 - Bug 38402930 - EXACS PROD: DBAAS.ADDSTORAGEEXACSINFRA
-                        IS FAILING AT WAITFORRESIZEDGS - SEEMS TO BE CAUSED BY
-                        THE ENHANCEMENT - 37873380
+    nelango    09/09/25 - Bug 38399834: Update original size dict with
+                          post-cellupdate dict instead of reassigning it
     jfsaldan   09/08/25 - Bug 38402930 - EXACS PROD: DBAAS.ADDSTORAGEEXACSINFRA
                           IS FAILING AT WAITFORRESIZEDGS - SEEMS TO BE CAUSED BY
                           THE ENHANCEMENT - 37873380
-    gparada  08/11/25 - 38253988 Dynamic Storage for data reco sparse - CS flow
+    jfsaldan   09/08/25 - Bug 38402930 - EXACS PROD: DBAAS.ADDSTORAGEEXACSINFRA
+                          IS FAILING AT WAITFORRESIZEDGS - SEEMS TO BE CAUSED BY
+                          THE ENHANCEMENT - 37873380
+    gparada    08/11/25 - 38253988 Dynamic Storage for data reco sparse - CS flow
     gparada    08/11/25 - 38253988 Dynamic Storage for data reco sparse - CS flow
     jfsaldan   07/17/25 - Bug 38205808 - SPARSE GRIDDISKS DOES NOT HAVE THE
                           CORRECT SIZE AFTER ATTACH STORAGE | REGRESSION 2 FROM
@@ -220,7 +239,7 @@ from typing import Optional
 # Ordered exabox imports
 from exabox.core.DBStore import ebGetDefaultDB
 from exabox.core.Context import get_gcontext
-from exabox.core.Error import ebError, gCellUpdateError, gDiskgroupError, ExacloudRuntimeError, gElasticError, gReshapeError
+from exabox.core.Error import ebError, gCellUpdateError, gDiskgroupError, ExacloudRuntimeError, gElasticError, gReshapeError, gExascaleError
 from exabox.core.Node import exaBoxNode
 
 from exabox.config.Config import ebCluCmdCheckOptions
@@ -239,6 +258,7 @@ from exabox.ovm.cluresmgr import ebCluResManager
 from exabox.ovm.csstep.cs_util import csUtil
 from exabox.ovm.csstep.exascale.exascaleutils import ebExascaleUtils
 from exabox.ovm.utils.clu_utils import ebCluUtils
+from exabox.ovm.utils.cellcli_utils import ebCellCliUtils
 from exabox.ovm.vmconfig import exaBoxClusterConfig
 from exabox.ovm.adbs_elastic_service import (mCreateGriddiskADBS,mDeleteGriddiskADBS,mAssignKeyToCell,
                                              mCheckASMScopeSecurity,mSetAvailableToOnGriddisk,mAppendCellipOraForDomU,
@@ -249,9 +269,17 @@ from exabox.tools.oedacli import OedacliCmdMgr
 from exabox.utils.node import connect_to_host
 from exabox.ovm.selinuxcontrols import ebSelinuxControls
 
+
+def _round_two_dec(value):
+    """
+    Normalize numeric inputs to a float with two-decimal precision.
+    """
+    return round(float(value), 2)
+
 SELINUX_UPDATE_SUCCESS = 0
 MAX_RETRY = 3
 RETRY_WAIT_TIME = 10
+CELLIP_PATH = "/etc/oracle/cell/network-config/cellip.ora"
 
 
 class ebCluElasticCellManager(object):
@@ -279,13 +307,14 @@ class ebCluElasticCellManager(object):
         _oedacli_bin = _oeda_path + '/oedacli'
         self.__savexmlpath = _oeda_path + '/exacloud.conf/'
         self.__oedacli_mgr = OedacliCmdMgr( _oedacli_bin, self.__savexmlpath )
+        self.__cellcli = ebCellCliUtils(aExaBoxCluCtrlObj)
 
         if aSkipConf == False:
             # initialize the json to be used for elastic_cell_manage.
             self.initElasticCellConf(aOptions)
         else:
             self.__update_conf['operation'] = 'CELL_INFO'
-        
+
         self.__clu_utils = ebCluUtils(aExaBoxCluCtrlObj)
         self.__selinux_controls = self.__eboxobj.mGetSelinuxController()
 
@@ -293,6 +322,41 @@ class ebCluElasticCellManager(object):
     
     def mGetCluUtils(self):
         return self.__clu_utils
+
+    def mGetCellCliUtils(self):
+        return self.__cellcli
+
+    def mEnsureCellIpPermissions(self, aHosts):
+        """
+        Ensure cellip.ora is readable (mode 644)
+        on all DomU hosts so ASM/grid can access it.
+        """
+        if not aHosts:
+            return
+
+        for _host in aHosts:
+            if not _host:
+                continue
+
+            with connect_to_host(_host, get_gcontext()) as _node:
+                _, _out, _err = _node.mExecuteCmd(f"/bin/stat -c '%a' {CELLIP_PATH}")
+                if _node.mGetCmdExitStatus():
+                    _stderr = _err.read().strip() if _err else "No error output available"
+                    raise ExacloudRuntimeError(aErrorMsg=f"{_host}: failed to stat {CELLIP_PATH}: {_stderr}")
+
+                if not _out:
+                    raise ExacloudRuntimeError(aErrorMsg=f"{_host}: failed to stat {CELLIP_PATH}: No output received")
+
+                _mode = _out.read().strip()
+                if _mode == "644":
+                    ebLogTrace(f"{_host}: {CELLIP_PATH} already 644")
+                    continue
+
+                _, _, _err = _node.mExecuteCmd(f"/bin/chmod 644 {CELLIP_PATH}")
+                if _node.mGetCmdExitStatus():
+                    _stderr = _err.read().strip() if _err else "No error output available"
+                    raise ExacloudRuntimeError(aErrorMsg=f"{_host}: chmod 644 {CELLIP_PATH} failed: {_stderr}")
+                ebLogTrace(f"{_host}: updated {CELLIP_PATH} permissions from {_mode} to 644")
 
     def mUpdateNetworkConfig(self, aNetworks):
         _networks = aNetworks
@@ -336,6 +400,7 @@ class ebCluElasticCellManager(object):
     def initElasticCellConf(self, aOptions):
         ebLogInfo("*** ebCluElasticCellManager:initElasticCellConf >>>")
         _ebox = self.mGetEbox()
+        _cellcli_utils = self.mGetCellCliUtils()
         _rc  = self.mValidateReshapePayload(aOptions)
         if _rc != 0:
             raise ExacloudRuntimeError(0x07004, 0xA, "Input Error ")
@@ -348,6 +413,11 @@ class ebCluElasticCellManager(object):
                 self.__update_conf['operation'] = 'ADD_CELL'
                 self.__update_conf['cell'] = {}
                 self.__update_conf['cell']['hostname'] = _cell['cell_hostname']
+                _rack_info = _cell.get('rack_info', {})
+                self.__update_conf['cell']['type'] = _cellcli_utils.mGetMachineType(
+                    _cell['cell_hostname'],
+                    aRackItemDescription=_rack_info.get('description'),
+                    aCellType=_cell.get('model'))
                 _networks = _cell['network_info']['cellnetworks']
                 self.mUpdateNetworkConfig(_networks)
                 if 'rack_num' in _cell['rack_info'].keys():
@@ -359,13 +429,14 @@ class ebCluElasticCellManager(object):
                 self.__update_conf['cells'].append(self.__update_conf['cell'])
                 del self.__update_conf['cell']
 
-            for _cell in _reshape_config['removed_cells']:
+            if 'removed_cells' in _reshape_config:
+                for _cell in _reshape_config['removed_cells']:
 
-                self.__update_conf['operation'] = 'DELETE_CELL'
-                self.__update_conf['cell'] = {}
-                self.__update_conf['cell']['hostname'] = _cell['cell_node_hostname']
-                self.__update_conf['cells'].append(self.__update_conf['cell'])
-                del self.__update_conf['cell']
+                    self.__update_conf['operation'] = 'DELETE_CELL'
+                    self.__update_conf['cell'] = {}
+                    self.__update_conf['cell']['hostname'] = _cell['cell_node_hostname']
+                    self.__update_conf['cells'].append(self.__update_conf['cell'])
+                    del self.__update_conf['cell']
 
             if self.__update_conf['operation'] == 'ADD_CELL' and not _ebox.mIsXS():
                 self.__update_conf['full_compute_to_virtualcompute_list'] = _reshape_config['full_compute_to_virtualcompute_list']
@@ -629,7 +700,7 @@ class ebCluElasticCellManager(object):
             # Add voting files info in the request data
             if hasattr(_options, 'steplist') and _options.steplist:
                 _step_list = str(_options.steplist).split(",")
-                if 'POST_ADDCELL_CHECK' in _step_list or 'CONFIG_CELL' in _step_list:
+                if 'POST_ADDCELL_CHECK' in _step_list or 'WAIT_FOR_REBALANCING' in _step_list:
                     self._add_voting_files_info(_cellOperationData)
         except Exception as e:
             ebLogError(f"There was an error in adding voting files during post_add_cell_check step: {e}")
@@ -759,7 +830,7 @@ class ebCluElasticCellManager(object):
                     for _cellinfo in _cellConf['cells']:
                         _cells.append(_cellinfo['hostname'])
                     _eBoxCluCtrl.mPostVMCellPatching(aOptions , _cells)
-            
+
             elif _step == "POST_ADDCELL_CHECK" and _do:
                  
                 _message = "Post Add Cell Checks."
@@ -767,12 +838,16 @@ class ebCluElasticCellManager(object):
                 _eBoxCluCtrl.mUpdateStatusOEDA(True, "POST_ADDCELL_CHECK", _step_list, _message)
                 #post validation step to be added
 
+                _new_cell_list = []
+                for _cellinfo in _cellConf['cells']:
+                    _new_cell_list.append(_cellinfo['hostname'])
+
+                #Check Exascale wallet is existing on new storage servers
+                _exascale.mCheckExascaleWallet(_new_cell_list, "cell", _options)
+
                 # Whitelisted the admin network cidr on the Added cell for EXACC fedramp enabled env. for Exascale
                 _csu = csUtil()
                 if _eBoxCluCtrl.mIsFedramp() and _eBoxCluCtrl.mCheckConfigOption ('whitelist_admin_network_cidr', 'True'):
-                    _new_cell_list = []
-                    for _cellinfo in _cellConf['cells']:
-                        _new_cell_list.append(_cellinfo['hostname'])
                     _remote_lock = _eBoxCluCtrl.mGetRemoteLock()
                     with _remote_lock():
                         for _newcell in _new_cell_list:
@@ -919,6 +994,11 @@ class ebCluElasticCellManager(object):
             _undo = False
 
         _do = not _undo
+
+        if _do:
+            _node_pairs = _eBoxCluCtrl.mReturnDom0DomUPair()
+            _domu_hosts = [domu for _, domu in _node_pairs if domu]
+            self.mEnsureCellIpPermissions(_domu_hosts)
         dg_size_dict = {}
         _domUDict = {}
 
@@ -1554,15 +1634,17 @@ class ebCluElasticCellManager(object):
        
             if not _eBoxCluCtrl.IsZdlraProv():
                 #We dont (re)-patch xml for zdlra here.
-                #This usecase is specific to exacs.        
-                _total_dg_size = 0
+                #This usecase is specific to exacs.
+                _total_dg_size = 0.0
+                _data_size = 0.0
+                _reco_size = 0.0
                 _sparse_enabled = False
                 for _dgname, _size in dg_size_dict.items():
-                    _total_dg_size = _total_dg_size + int(_size['totalgb'])
+                    _total_dg_size = _round_two_dec(_total_dg_size + _round_two_dec(_size['totalgb']))
                     if 'DATA' in _dgname:
-                        _data_size = int(_size['totalgb'])
+                        _data_size = _round_two_dec(_size['totalgb'])
                     if 'RECO' in _dgname:
-                        _reco_size = int(_size['totalgb'])
+                        _reco_size = _round_two_dec(_size['totalgb'])
                     if 'SPRC' in _dgname:
                         _sparse_enabled = True
 
@@ -1576,7 +1658,7 @@ class ebCluElasticCellManager(object):
                     aBackupDisk = _backup_disk, 
                     aDRSdistrib = None, 
                     aOptions = self.mGetAoptions(), 
-                    aTotalDGSize = int(_total_dg_size/3))
+                    aTotalDGSize = _round_two_dec(_total_dg_size/3))
 
         _eBoxCluCtrl.mUpdateInMemoryXmlConfig(_eBoxCluCtrl.mGetPatchConfig(), self.mGetAoptions())
         ebLogInfo('ebCluCtrl: Saved patched Cluster Config: ' + _eBoxCluCtrl.mGetPatchConfig())
@@ -1859,9 +1941,9 @@ class ebCluElasticCellManager(object):
     
                 ## Save the totalgb size (GB) of diskgroups in the dictionary for restoration.
                 if _dg_type == _dgConstantsObj._sparse_dg_type_str:
-                    _size_dict['totalgb'] = int(_rc) / (1024 * _cluDgObj.mGetConstantsObj().mGetSparseVsizeFactor())  # Size is returned in MBs
+                    _size_dict['totalgb'] = _round_two_dec(float(_rc) / (1024 * _cluDgObj.mGetConstantsObj().mGetSparseVsizeFactor()))  # Size is returned in MBs
                 else:
-                    _size_dict['totalgb'] = int(_rc) / 1024 # Size is returned in MBs
+                    _size_dict['totalgb'] = _round_two_dec(float(_rc) / 1024) # Size is returned in MBs
                 _rc = 0 
     
                 _rc = _cluDgObj.mUtilGetDiskgroupSize(self.mGetAoptions(), _dg_name, _dgConstantsObj, True)
@@ -1871,7 +1953,11 @@ class ebCluElasticCellManager(object):
                     return self.mRecordError(gDiskgroupError['ErrorFetchingDetails'], "*** " + _detail_error)
     
                 ## Save the usedgb size (GB) of diskgroups in the dictionary for restoration.
-                _size_dict['usedgb'] = int(_rc) / 1024 # Size is returned in MBs
+                _size_dict['usedgb'] = _round_two_dec(float(_rc) / 1024) # Size is returned in MBs
+                if _dg_type == _dgConstantsObj._sparse_dg_type_str:
+                    _size_dict['usedgb'] = int(_rc) / (1024 * _cluDgObj.mGetConstantsObj().mGetSparseVsizeFactor())  # Size is returned in MBs
+                else:
+                    _size_dict['usedgb'] = int(_rc) / 1024 # Size is returned in MBs
                 _rc = 0 
                 _dg_sizes_dict[_dg_name] = _size_dict
                 # Sample Json for _dg_sizes_dict
@@ -1909,14 +1995,15 @@ class ebCluElasticCellManager(object):
                     ebLogWarn("*** ebCluElasticCellManager: Failed to count number of grid disks. Failed to Patch XML")
                     return
 
-            _dg_sliceGB = _dg_sizeGB / (int(_cell_count) * _griddisk_count)
-            _dg_sliceGB = int(16 * (_dg_sliceGB / 16))  ## Round to multiple of 16
+            _dg_sliceGB = _round_two_dec(float(_dg_sizeGB) / (_cell_count * _griddisk_count))
+            if _dg_sliceGB > 0:
+                _dg_sliceGB = _round_two_dec(math.floor(_dg_sliceGB / 16.0) * 16.0)
 
             ebLogInfo("*** Persisting slice size to %s" % (_dg_sliceGB))
             _dgConfig.mSetSliceSize(_dg_sliceGB)
 
             if _dg_name.startswith(_dgConstantsObj._sparse_dg_prefix):
-                _sparse_vsliceGB = int(_dg_sliceGB * _dgConstantsObj._sparse_vsize_factor)
+                _sparse_vsliceGB = _round_two_dec(_dg_sliceGB * _dgConstantsObj._sparse_vsize_factor)
                 _cell_list = _eBoxCluCtrl.mReturnCellNodes()
                 for _cell_name in sorted(_cell_list.keys()):
                     _node = exaBoxNode(get_gcontext())
@@ -1932,13 +2019,13 @@ class ebCluElasticCellManager(object):
                         _slice_size_from_cell = _line.strip()
                         if _slice_size_from_cell.endswith('M'):
                             _slice_size = _slice_size_from_cell[:-1]
-                            _dg_sliceGB = (float(_slice_size) / 1024)
+                            _dg_sliceGB = _round_two_dec(float(_slice_size) / 1024)
                         if _slice_size_from_cell.endswith('G'):
                             _slice_size = _slice_size_from_cell[:-1]
-                            _dg_sliceGB = (float)(_slice_size)
+                            _dg_sliceGB = _round_two_dec(float(_slice_size))
                         if _slice_size_from_cell.endswith('T'):
                             _slice_size = _slice_size_from_cell[:-1]
-                            _dg_sliceGB = (float(_slice_size) * 1024)
+                            _dg_sliceGB = _round_two_dec(float(_slice_size) * 1024)
                         if _slice_size != 0.0:
                             _sparse_vsliceGB = _dg_sliceGB
                             break # We read slice size from this cell; no need to check next cell
@@ -1948,7 +2035,7 @@ class ebCluElasticCellManager(object):
                 _dgConfig.mSetSparseVirtualSize(str(_sparse_vsliceGB) + 'G')
 
             ebLogInfo("*** Persisting total size to %s" % (_dg_sizeGB))
-            _dgConfig.mSetDiskGroupSize(int(_dg_sizeGB))
+            _dgConfig.mSetDiskGroupSize(_round_two_dec(_dg_sizeGB))
 
             # Remove the old config and add new on
             _eBoxCluCtrl.mGetStorage().mRemoveDiskGroupConfig(_dgid)
@@ -1965,7 +2052,7 @@ class ebCluElasticCellManager(object):
         _increment_storage = False
         _size_dict = aDgSizesDict
         _size_dict_afterupdate = aDgSizesDictAfterCellupdate
-        _increment_percent=0
+        _increment_percent=0.0
         _eBoxCluCtrl = self.mGetEbox()
         _cluDgObj = ebCluManageDiskgroup(_eBoxCluCtrl, self.mGetAoptions())
         _dgConstantsObj = _cluDgObj.mGetConstantsObj()
@@ -1997,29 +2084,29 @@ class ebCluElasticCellManager(object):
                 # We should increment the storage by
                 ebLogInfo("Working with diskgroup : " + _dg_name)
                 ebLogInfo(json.dumps(_size_dict[_dg_name], indent=4, sort_keys=True)) 
-                _temp_totalgb=_size_dict[_dg_name]['totalgb']
+                _temp_totalgb=_round_two_dec(_size_dict[_dg_name]['totalgb'])
                 # due to usage of the cell in backgroud during cell update, the used memory might have increased or decreased
                 # make use of latest value incase it has increased else use the old one
                 if _size_dict[_dg_name]['usedgb'] > _size_dict_afterupdate[_dg_name]['usedgb']:
-                    _temp_usedgb=_size_dict[_dg_name]['usedgb']
+                    _temp_usedgb=_round_two_dec(_size_dict[_dg_name]['usedgb'])
                 else:
-                    _temp_usedgb=_size_dict_afterupdate[_dg_name]['usedgb']
-                _temp_new_size=(_temp_usedgb * 100 /_max_used_percent)
+                    _temp_usedgb=_round_two_dec(_size_dict_afterupdate[_dg_name]['usedgb'])
+                _temp_new_size=_round_two_dec((_temp_usedgb * 100.0) / _max_used_percent)
                 if 'SPRC' in _dg_name:
                     _sparse_enabled = True
-                    _percent_usage_sparse =(_size_dict[_dg_name]['totalgb'] - _size_dict[_dg_name]['usedgb'])*100/_size_dict[_dg_name]['totalgb']
+                    _percent_usage_sparse = _round_two_dec((_size_dict[_dg_name]['totalgb'] - _size_dict[_dg_name]['usedgb']) * 100.0 / _size_dict[_dg_name]['totalgb'])
                     if _percent_usage_sparse > 50:
                         _sparse_adjust = True
 
-                if _temp_usedgb > int(_temp_totalgb*_check_percent/100):
+                if _temp_usedgb > _round_two_dec(_temp_totalgb * _check_percent / 100.0):
                     _increment_storage = True
                     ebLogInfo(_dg_name + " diskgroup needs more space: original totalgb -> "+str(_temp_totalgb)+" and current usedgb -> "+ str(_temp_usedgb))
               
-                    _temp_percent = (_temp_new_size - _temp_totalgb)*100/_temp_totalgb
+                    _temp_percent = _round_two_dec((_temp_new_size - _temp_totalgb) * 100.0 / _temp_totalgb)
                     ebLogInfo("Estimated increment percent for "+_dg_name+"  is : "+str(_temp_percent)+" % ")     
                     if _temp_percent > _increment_percent:
-                        _increment_percent = _temp_percent
-                    ebLogInfo("Calculated increment percent for this cluster is : "+str(_increment_percent)+" % ")
+                        _increment_percent = _round_two_dec(_temp_percent)
+                    ebLogInfo("Calculated increment percent for this cluster is : "+str(_round_two_dec(_increment_percent))+" % ")
         
         # Calculate the new sizes
         if _increment_storage:
@@ -2032,15 +2119,15 @@ class ebCluElasticCellManager(object):
                     # Check if the computed resize value is greater than existing size 
                     # due to usage of the cell in backgroud during cell update, the used memory might have increased or decreased
                     # make use of latest value incase it has increased else use the old one
-                    _temp_totalgb=_size_dict[_dg_name]['totalgb']
+                    _temp_totalgb=_round_two_dec(_size_dict[_dg_name]['totalgb'])
                     if _size_dict[_dg_name]['usedgb'] > _size_dict_afterupdate[_dg_name]['usedgb']:
-                        _temp_usedgb=_size_dict[_dg_name]['usedgb']
+                        _temp_usedgb=_round_two_dec(_size_dict[_dg_name]['usedgb'])
                     else:
-                        _temp_usedgb=_size_dict_afterupdate[_dg_name]['usedgb']
-                    _temp_new_size=(_temp_totalgb * _increment_percent/100)+_temp_totalgb
+                        _temp_usedgb=_round_two_dec(_size_dict_afterupdate[_dg_name]['usedgb'])
+                    _temp_new_size=_round_two_dec((_temp_totalgb * _increment_percent/100)+_temp_totalgb)
                     # if calculated new size is greater than _size_dict_afterupdate then no shrink is necessary
 
-                    if int(_temp_new_size) > _size_dict_afterupdate[_dg_name]['totalgb']:
+                    if _round_two_dec(_temp_new_size) > _round_two_dec(_size_dict_afterupdate[_dg_name]['totalgb']):
                         _abort_shrink=True
                         break
         
@@ -2050,23 +2137,22 @@ class ebCluElasticCellManager(object):
                 _dg_type = _dg.mGetDiskGroupType().lower()
                 if _dg_type in [_dgConstantsObj._data_dg_type_str, _dgConstantsObj._reco_dg_type_str, _dgConstantsObj._sparse_dg_type_str]:
                     _dg_name = _dg.mGetDgName()
-                    _temp_totalgb=_size_dict[_dg_name]['totalgb']
+                    _temp_totalgb=_round_two_dec(_size_dict[_dg_name]['totalgb'])
                     if _size_dict[_dg_name]['usedgb'] > _size_dict_afterupdate[_dg_name]['usedgb']:
-                        _temp_usedgb=_size_dict[_dg_name]['usedgb']
+                        _temp_usedgb=_round_two_dec(_size_dict[_dg_name]['usedgb'])
                     else:
-                        _temp_usedgb=_size_dict_afterupdate[_dg_name]['usedgb']
-                    _temp_new_size=(_temp_totalgb * _increment_percent/100)+_temp_totalgb
+                        _temp_usedgb=_round_two_dec(_size_dict_afterupdate[_dg_name]['usedgb'])
+                    _temp_new_size=_round_two_dec((_temp_totalgb * _increment_percent/100)+_temp_totalgb)
                     if _abort_shrink:
                         _size_dict.update(_size_dict_afterupdate)
                         ebLogDebug("Aborting resize as the calculated resize is greater than current size")
                         break
                     else:
                         # We should increment the storage to _increment_percent 
-                        _temp_new_size = (_temp_new_size*1024)/1024
-                        # when multiply and divide by 1024 we round off to gb
-                        if _sparse_adjust and ('SPRC' in _dg_name) and (_temp_new_size < (2 * _temp_usedgb)):
+                        _temp_new_size = _round_two_dec(_temp_new_size)
+                        if _sparse_adjust and ('SPRC' in _dg_name) and (_temp_new_size < _round_two_dec(2 * _temp_usedgb)):
                             ebLogInfo("*** setting new size to 2 times the sparse used size")
-                            _temp_new_size = 2 * _temp_usedgb
+                            _temp_new_size = _round_two_dec(2 * _temp_usedgb)
                         _size_dict[_dg_name]['totalgb'] = _temp_new_size
                         ebLogInfo("Diskgroup "+_dg_name+" will incremented to  "+ str(_temp_new_size))
             ebLogInfo("Diskgroup sizes will be resized to ")
@@ -2149,15 +2235,17 @@ class ebCluElasticCellManager(object):
        
             if not _eBoxCluCtrl.IsZdlraProv():
                 #We dont (re)-patch xml for zdlra here.
-                #This usecase is specific to exacs.        
-                _total_dg_size = 0
+                #This usecase is specific to exacs.
+                _total_dg_size = 0.0
+                _data_size = 0.0
+                _reco_size = 0.0
                 _sparse_enabled = False
                 for _dgname, _size in dg_size_dict.items():
-                    _total_dg_size = _total_dg_size + int(_size['totalgb'])
+                    _total_dg_size = _round_two_dec(_total_dg_size + _round_two_dec(_size['totalgb']))
                     if 'DATA' in _dgname:
-                        _data_size = int(_size['totalgb'])
+                        _data_size = _round_two_dec(_size['totalgb'])
                     if 'RECO' in _dgname:
-                        _reco_size = int(_size['totalgb'])
+                        _reco_size = _round_two_dec(_size['totalgb'])
                     if 'SPRC' in _dgname:
                         _sparse_enabled = True
 
@@ -2171,7 +2259,7 @@ class ebCluElasticCellManager(object):
                     aBackupDisk = _backup_disk, 
                     aDRSdistrib = None, 
                     aOptions = self.mGetAoptions(), 
-                    aTotalDGSize = int(_total_dg_size/3))
+                    aTotalDGSize = _round_two_dec(_total_dg_size/3))
 
         _eBoxCluCtrl.mUpdateInMemoryXmlConfig(_oedaXmlPath, self.mGetAoptions())
         ebLogInfo('ebCluCtrl: Saved patched Cluster Config: ' + _eBoxCluCtrl.mGetPatchConfig())
@@ -2280,7 +2368,7 @@ class ebCluElasticCellManager(object):
             _dg_data = {}
             _dg_data['Command'] = "dg_resize"
             _dg_data['diskgroup'] = _dg_name
-            _dg_data['new_sizeGB'] = _dg_sizes_dict[_dg_name]['totalgb']
+            _dg_data['new_sizeGB'] = _round_two_dec(_dg_sizes_dict[_dg_name]['totalgb'])
             
             dgrpOpOptions = dgAOptions(self)
             dgrpOpOptions.jsonconf['diskgroup'] =_dg_data['diskgroup']
@@ -2362,7 +2450,7 @@ class ebCluElasticCellManager(object):
                 _dg_data = {}
                 _dg_data['Command'] = "dg_resize"
                 _dg_data['diskgroup'] = _dg_name
-                _dg_data['new_sizeGB'] = _dg_sizes_dict[_dg_name]['totalgb']
+                _dg_data['new_sizeGB'] = _round_two_dec(_dg_sizes_dict[_dg_name]['totalgb'])
 
                 dgrpOpOptions = dgAOptions(self)
                 dgrpOpOptions.jsonconf['diskgroup'] =_dg_data['diskgroup']
@@ -2376,7 +2464,7 @@ class ebCluElasticCellManager(object):
                 _dg_fgrp_prop_dict = {}
 
                 # change gb to MB
-                _newsizeMB = int(_dg_data['new_sizeGB']) * 1024
+                _newsizeMB = _round_two_dec(_dg_data['new_sizeGB'] * 1024.0)
                 ebLogInfo(f"New Size for {_dg_name} in MB is {_newsizeMB}")
 
                 # Calculate fail groups
@@ -2426,16 +2514,17 @@ class ebCluElasticCellManager(object):
                                                            fetch info for diskgroup " + _dg_name)
 
                     # Not needed in reshape...?
-                    _dg_slice =  _newsizeMB/(_cell_count * _dg_griddisks_count)
-                    _dg_slice = int(_dg_slice / 16) * 16  ## Round to multiple of 16
-                    _newsizeMB = _dg_slice * (_cell_count * _dg_griddisks_count)
+                    _dg_slice =  _round_two_dec(_newsizeMB/(_cell_count * _dg_griddisks_count))
+                    if _dg_slice > 0:
+                        _dg_slice = _round_two_dec(math.floor(_dg_slice / 16.0) * 16.0)
+                    _newsizeMB = _round_two_dec(_dg_slice * (_cell_count * _dg_griddisks_count))
                     ebLogInfo("*** DG Size : %s, Cell Count : %s, Slice size : %s, Griddisk Count : %s" %(_newsizeMB, _cell_count, _dg_slice, _dg_griddisks_count))
 
                 ### Size has to be validated against this number post rebalance of sparse DG
-                _newExpectedSizeMB = _newsizeMB
+                _newExpectedSizeMB = _round_two_dec(_newsizeMB)
                 if _dg_name.startswith(_dgConstantsObj._sparse_dg_prefix):
                     ebLogInfo(f"Applying SPARSE multiplier {_dgConstantsObj._sparse_vsize_factor}")
-                    _newExpectedSizeMB = _newsizeMB * _dgConstantsObj._sparse_vsize_factor
+                    _newExpectedSizeMB = _round_two_dec(_newsizeMB * _dgConstantsObj._sparse_vsize_factor)
 
 
                 # Call to validate dg sizes
@@ -2443,7 +2532,7 @@ class ebCluElasticCellManager(object):
                 _diskgroupData = _cluDgObj.mGetDiskGroupOperationData()
                 _diskgroupData["Status"] = "Pass"
                 _diskgroupData["ErrorCode"] = "0"
-                _diskgroupData["SizeMB"] = _dg_cursize
+                _diskgroupData["SizeMB"] = _round_two_dec(_dg_cursize)
                 _rc = _cluDgObj.mValidateDgsPostRebalance(dgrpOpOptions, _dg_name, _newExpectedSizeMB, None, _diskgroupData)
                 if _rc != 0:
                     _detail_error = f"Could not validate diskgroup size for {_dg_name}"
@@ -2462,11 +2551,11 @@ class ebCluElasticCellManager(object):
                     _dgConfig = _eBoxCluCtrl.mGetStorage().mGetDiskGroupConfig(_dgid)
                     if _dgConfig.mGetDgName() == _dg_name:
                         ebLogInfo("*** Working on Diskgroup ID %s" %(_dgid))
-                        _dg_slice_size_GB = int(_dg_slice/1024)
+                        _dg_slice_size_GB = _round_two_dec(_dg_slice/1024)
                         ebLogInfo("*** Diskgroup Slice for %s Is %s" %(_dg_name, _dg_slice))
                         if _dg_name.startswith(_dgConstantsObj._sparse_dg_prefix):
-                            _dgConfig.mSetSparseVirtualSize(_dg_slice_size_GB * _dgConstantsObj._sparse_vsize_factor)
-                        _total_size_in_GB = int(_newsizeMB/1024)
+                            _dgConfig.mSetSparseVirtualSize(_round_two_dec(_dg_slice_size_GB * _dgConstantsObj._sparse_vsize_factor))
+                        _total_size_in_GB = _round_two_dec(_newsizeMB/1024)
                         _dgConfig.mSetSliceSize(_dg_slice_size_GB)
                         _dgConfig.mSetDiskGroupSize(_total_size_in_GB)
                         # Remove the old config and add new one
@@ -2535,7 +2624,7 @@ class ebCluElasticCellManager(object):
                 _dg_data = {}
                 _dg_data['Command'] = "dg_resize"
                 _dg_data['diskgroup'] = _dg_name
-                _dg_data['new_sizeGB'] = _dg_sizes_dict[_dg_name]['totalgb']
+                _dg_data['new_sizeGB'] = _round_two_dec(_dg_sizes_dict[_dg_name]['totalgb'])
 
                 dgrpOpOptions = dgAOptions(self)
                 dgrpOpOptions.jsonconf['diskgroup'] =_dg_data['diskgroup']
@@ -2549,7 +2638,7 @@ class ebCluElasticCellManager(object):
                 _dg_fgrp_prop_dict = {}
 
                 # change gb to MB
-                _newsizeMB = math.ceil(_dg_data['new_sizeGB'] * 1024)
+                _newsizeMB = _round_two_dec(math.ceil(_dg_data['new_sizeGB'] * 1024.0))
                 ebLogInfo(f"New Size for {_dg_name} in MB is {_newsizeMB}")
 
                 # Calculate fail groups
@@ -2597,20 +2686,21 @@ class ebCluElasticCellManager(object):
                         _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_FETCHING_GRIDDISK_COUNT'], _detail_error)
                         return self.mRecordError(gDiskgroupError['ErrorFetchingDetails'], "*** Could not\
                                                            fetch info for diskgroup " + _dg_name)
-                    _dg_slice =  _newsizeMB/(_cell_count * _dg_griddisks_count)
-                    _dg_slice = int(_dg_slice / 16) * 16  ## Round to multiple of 16
-                    _newsizeMB = _dg_slice * (_cell_count * _dg_griddisks_count)
+                    _dg_slice =  _round_two_dec(_newsizeMB/(_cell_count * _dg_griddisks_count))
+                    if _dg_slice > 0:
+                        _dg_slice = _round_two_dec(math.floor(_dg_slice / 16.0) * 16.0)
+                    _newsizeMB = _round_two_dec(_dg_slice * (_cell_count * _dg_griddisks_count))
 
                     ebLogInfo("*** DG Size : %s, Cell Count : %s, Slice size : %s, Griddisk Count : %s" %(_newsizeMB, _cell_count, _dg_slice, _dg_griddisks_count))
 
-                _newExpectedSizeMB = _newsizeMB
+                _newExpectedSizeMB = _round_two_dec(_newsizeMB)
 
                 # Call to validate dg sizes
                 _dg_cursize = _cluDgObj.mUtilGetDiskgroupSize(_options, _dg_name, _dgConstantsObj)
                 _diskgroupData = _cluDgObj.mGetDiskGroupOperationData()
                 _diskgroupData["Status"] = "Pass"
                 _diskgroupData["ErrorCode"] = "0"
-                _diskgroupData["SizeMB"] = _dg_cursize
+                _diskgroupData["SizeMB"] = _round_two_dec(_dg_cursize)
                 _rc = _cluDgObj.mResizeGriddisks(dgrpOpOptions, _dg_name, _newExpectedSizeMB, _diskgroupData)
                 if _rc != 0:
                     _detail_error = f"Could not validate diskgroup size for {_dg_name}"
@@ -2855,4 +2945,3 @@ class dgAOptions(object):
         self.configpath = aEbCluElasticCellManager.mGetOedaXmlPath()
             
 # end of ebCluReshapeCell
-

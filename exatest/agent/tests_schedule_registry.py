@@ -2,7 +2,7 @@
 
  $Header: 
 
- Copyright (c) 2021, 2022, Oracle and/or its affiliates.
+ Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 
  NAME:
       tests_schedule_registry.py - Unitest for ScheduleRegistry
@@ -16,6 +16,7 @@
  History:
 
     MODIFIED   (MM/DD/YY)
+    shapatna    05/13/26 - REMOVE EXAWATCHER ENDPOINT FROM EXACLOUD AND ECRA
     pbellary    12/07/21 - Creation of the file
 """
 
@@ -44,41 +45,21 @@ class ebTestScheduleRegistry(ebTestClucontrol):
 
         #registry schedule entries to the DB
         register_schedule_jobs()
-        _rc = db.mGetScheduleByCommand('cleanup_exawatcher_log')
-        self.assertNotEqual(_rc, None)
+        _expected_commands = [
+            'cleanup_oeda_requests',
+            'cleanup_incident_tar_zipfiles',
+            'cleanup_log_files',
+            'cleanup_database_log',
+            'cleanup_sshdiag_log',
+            'cleanup_clusters',
+        ]
 
-        sched_info = get_schedule_info(_rc)
-        db.mDelScheduleEntry(sched_info)
+        for _command in _expected_commands:
+            _rc = db.mGetScheduleByCommand(_command)
+            self.assertNotEqual(_rc, None)
 
-        _rc = db.mGetScheduleByCommand('cleanup_oeda_requests')
-        self.assertNotEqual(_rc, None)
-
-        sched_info = get_schedule_info(_rc)
-        db.mDelScheduleEntry(sched_info)
-
-        _rc = db.mGetScheduleByCommand('cleanup_incident_tar_zipfiles')
-        self.assertNotEqual(_rc, None)
-
-        sched_info = get_schedule_info(_rc)
-        db.mDelScheduleEntry(sched_info)
-
-        _rc = db.mGetScheduleByCommand('cleanup_log_files')
-        self.assertNotEqual(_rc, None)
-
-        sched_info = get_schedule_info(_rc)
-        db.mDelScheduleEntry(sched_info)
-
-        _rc = db.mGetScheduleByCommand('cleanup_database_log')
-        self.assertNotEqual(_rc, None)
-
-        sched_info = get_schedule_info(_rc)
-        db.mDelScheduleEntry(sched_info)
-
-        _rc = db.mGetScheduleByCommand('cleanup_sshdiag_log')
-        self.assertNotEqual(_rc, None)
-
-        sched_info = get_schedule_info(_rc)
-        db.mDelScheduleEntry(sched_info)
+            sched_info = get_schedule_info(_rc)
+            db.mDelScheduleEntry(sched_info)
 
 if __name__ == '__main__':
     unittest.main()

@@ -12,6 +12,24 @@ NOTE:
 
 History:    
     MODIFIED   (MM/DD/YY)
+    dekuckre   06/16/26 - Bug 39562367 skip delete-node SSH precheck target
+    avimonda   06/10/26 - Bug 39301677 use mGetEbox helper in alert precheck
+    bhpati     06/04/26 - Bug 39493771 - EXACC GEN2 – EXADATA DISKGROUP
+                          RESHAPECOMPLETED IGNORED CELLSRV SERVICE DOWN WITH
+                          ERROR AND COMPLETED THE OPERATION IN OTHER CELLS
+    bhpati     06/01/26 - Bug 39404491 - OCIEXACC: EXACLOUD: PREVMCHECKS:
+                          EXACLOUD TRYING TO ALWAYS SET 100GB SPEED, REGARDLESS
+                          OF ACTUAL LINK SPEED
+    joysjose   05/28/26 - Bug 38385387: Memory & OH reshape partial success
+    jfsaldan   05/27/26 - Bug 39448570 - EXACC:CS:NEWR1:CREATE EXACC VMCLUSTER
+                          FAILED AT
+                          ESTP_PREVM_CHECKS:/ETC/SYSCONFIG/NETWORK-SCRIPTS/IFCFG-VMETH0:207:IPADDR=10.106.68.26
+                          BUT IT'S INCORRECT, AS IT CAN PICK UP AN IP THAT IS
+                          ONLY A PARTIAL MATCH
+    joysjose   05/26/26 - Bug 39354509 multigi OEDA selection hardening
+    araghave   05/13/26 - Bug 39281709 - EXACC:DOMU PATCHING:DOMU PATCHING: THE
+                          PATCH FLOW DYNAMICALLY BOOTSTRAPS SSH TRUST AND THEN
+                          SKIPS CLEANUP
     kanmanic   04/14/26 - 39192065 - increase the ping timeout for
                           validate_elastic_shapes operation
     aararora   04/13/26 - 39200237: Issues observed for ca signed certs being
@@ -402,7 +420,7 @@ History:
 from typing import Set, List
 import six
 from exabox.tools.AttributeWrapper import wrapStrBytesFunctions
-from exabox.core.Error import ebError, gSubError, ExacloudRuntimeError, gReshapeError, gNodeElasticError, get_hw_validate_error
+from exabox.core.Error import ebError, gSubError, ExacloudRuntimeError, gReshapeError, gPartialError, gNodeElasticError, get_hw_validate_error
 from exabox.core.Node import exaBoxNode
 from exabox.utils.node import (connect_to_host, node_exec_cmd,
         node_cmd_abs_path_check, node_list_process)
@@ -487,6 +505,43 @@ class ebCluPreChecks(object):
 
     def mGetEbox(self):
         return self.__cluctrl
+
+    def mCheckCellCriticalHardwareAlerts(self):
+        """
+        Detect unresolved critical hardware CELL alerts before creating cell
+        disks or grid disks. This check is read-only and does not attempt cell
+        metadata repair.
+        """
+        _cluctrl = self.mGetEbox()
+        _alert_query = 'list alerthistory where endTime=null AND alertType=stateful AND alertShortName=Hardware AND severity=critical'
+
+        for _cell in sorted(_cluctrl.mReturnCellNodes().keys()):
+            with connect_to_host(_cell, get_gcontext()) as _node:
+
+                _cellcli = node_cmd_abs_path_check(_node, "cellcli")
+                _alert_cmd = f"{_cellcli} -e '{_alert_query}'"
+
+                _cellcli_alerthistory_options = mGetAlertHistoryOptions(_cluctrl, _cell)
+                if _cellcli_alerthistory_options:
+                    _alert_cmd = f"{_cellcli} {_cellcli_alerthistory_options} -e '{_alert_query}'"
+
+                _alert_result = node_exec_cmd(_node, _alert_cmd, timeout=180)
+                if _alert_result.exit_code != 0:
+                    _alert_error = (_alert_result.stderr or '').strip()
+                    _msg = f"Unable to query unresolved critical hardware alerts on CELL {_cell}: {_alert_error}"
+                    ebLogWarn(_msg)
+                    continue
+
+                _alert_text = (_alert_result.stdout or '').strip()
+                if _alert_text:
+                    _msg = (
+                        f"Create Storage cannot continue because CELL {_cell} has unresolved "
+                        "critical hardware alerts. Fix and clear the CELL alerts, then "
+                        "retry create service."
+                    )
+                    ebLogError(_msg)
+                    ebLogError(_alert_text)
+                    raise ExacloudRuntimeError(0x0743, 0xA, _msg, Cluctrl=_cluctrl)
 
     def mCheckOracleLinuxVersion(self, aSrcDomU, aDom0List):
 
@@ -3474,6 +3529,11 @@ class ebCluSshSetup(object):
             # Removes the ssh key based on both host name and key comment if found
             # before adding new key.
             self.mRemoveKeyFromHostsByComment(self.__hostkey, aRemoteHostList)
+
+            # Key details are explicitly removed based on the infra patching tag to ensure
+            # passwordless ssh setup is revoked to maintain security compliance.
+            self.mRemoveKeyFromHostsByComment(EXAPATCHING_KEY_TAG, aRemoteHostList)
+
             self.mAddKeyToHosts(_key, aRemoteHostList)
         else:
             self.mAddKeyToRoceSwitches(_key, aRemoteHostList)
@@ -3634,6 +3694,11 @@ class ebCluSshSetup(object):
         # sufficient in future.
         _hosts = aHost.split('.')
         self.mRemoveKeyFromHosts(_hosts[0], aRemoteHostList, aExcludePatternsRegEx="EXACLOUD KEY|ExaKms")
+
+        # Key details are explicitly removed based on the infra patching tag to ensure
+        # passwordless ssh setup is revoked to maintain security compliance.
+        self.mRemoveKeyFromHostsByComment(EXAPATCHING_KEY_TAG, aRemoteHostList)
+
         self.mRemoveKeyFromHostsByComment(self.__hostkey, aRemoteHostList)
         if not aSkipRestore:
             self.mRestoreSSHKey(aHost, aUser)
@@ -3651,12 +3716,13 @@ class ebCluSshSetup(object):
         self.mRemoveKeyFromHosts(_hosts[0], aRemoteHostList, aExcludePatternsRegEx="EXACLOUD KEY|ExaKms")
         self.mRemoveKeyFromHostsByComment(self.__hostkey, aRemoteHostList)
 
+        # Key details are explicitly removed based on the infra patching tag to ensure
+        # passwordless ssh setup is revoked to maintain security compliance.
+        self.mRemoveKeyFromHostsByComment(EXAPATCHING_KEY_TAG, aRemoteHostList)
 
         # Cleanup examisc key, if old key exists on the launch node
         if self.__hostkey != 'EXACMISC KEY':
             self.mRemoveKeyFromHostsByComment("EXACMISC KEY", aRemoteHostList)
-
-
 
     def mConfigureSshForMgmtHost(self, aLaunchNode, aRemoteHostList, aKeyComment, aInfraPatchBase):
         """
@@ -5556,8 +5622,11 @@ class ebCluDom0SanityTests:
 
             # Search IP in the known list of potential files with stale bridges
             _bin_grep = node_cmd_abs_path_check(_node, "grep", sbin=True)
+            _nat_ip_regex = re.escape(_nat_ip)
+            _ipaddr_pattern = (
+                rf'^[[:space:]]*IPADDR[0-9]*="?{_nat_ip_regex}"?[[:space:]]*$')
             _out_grep_config_files = node_exec_cmd(
-                _node, f"{_bin_grep} -RiI {_nat_ip} {_files_to_search}")
+                _node, f"{_bin_grep} -RiIE {shlex.quote(_ipaddr_pattern)} {_files_to_search}")
             ebLogTrace(_out_grep_config_files)
             if _out_grep_config_files.exit_code == 0:
                 ebLogCritical(
@@ -5572,8 +5641,9 @@ class ebCluDom0SanityTests:
             # If Dom0 has NFT, check if the IP is already used. It shouldn't
             if _check_nft:
                 _bin_nft = node_cmd_abs_path_check(_node, "nft", sbin=True)
+                _nft_ip_pattern = rf"(^|[^0-9.]){_nat_ip_regex}([^0-9.]|$)"
                 _out_grep_nft = node_exec_cmd(
-                    _node, f"{_bin_nft} list table nat | {_bin_grep} -i '{_nat_ip}'")
+                    _node, f"{_bin_nft} list table nat | {_bin_grep} -Ei {shlex.quote(_nft_ip_pattern)}")
                 ebLogTrace(_out_grep_nft)
                 if _out_grep_nft.exit_code == 0:
                     ebLogCritical(
@@ -6418,6 +6488,13 @@ class ebCluStorageReshapePrecheck(object):
     def mStorageReshapePrecheck(self, aOptions,aReshapeProgress=False):
         ebLogInfo('*** Running Exadata storage reshape precheck ***')
 
+        if not self.__ebox.mCheckCellsServicesUp(aRestart=False):
+            _detail_error = "ASM reshape precheck failed: One or more cell services are not running"
+            ebLogError('*** mStorageReshapePrecheck: The error is: %s' % (_detail_error))
+            self.mUpdateRequestData(1, [], _detail_error, aOptions)
+            self.__ebox.mUpdateErrorObject(gReshapeError['ERROR_RESHAPE_PRECHECK'], _detail_error)
+            raise ExacloudRuntimeError(0x0808, 0xA, _detail_error)
+
         # Bug 37315192: We need to retry the griddisk precheck
         # to avoid failling for transcient issues (same as in
         # asm reshape)
@@ -6487,6 +6564,10 @@ class ebCluStorageReshapePrecheck(object):
                             _rc = True
                         else:
                             _rc = False
+                elif cellnode.mGetCmdExitStatus():
+                    _griddisk_status_check_error = f"Failed to check grid disk states on cell {_cell}"
+                    ebLogError(f"*** {_griddisk_status_check_error}")
+                    _rc = True
             rc_status[_cell] = _rc
                
         _plist = ProcessManager()
@@ -6605,11 +6686,22 @@ class ebCluNodeSubsetPrecheck(object):
         _rc = 0
         if _optype == "ADD_NODE":
             _rc = self.mAddNodePrecheck(_options)
+        elif _optype == "DELETE_NODE":
+            _rc = self.mDeleteNodePrecheck(_options)
         else:
             _detail_error = "Operation " + _optype + " is not supported. Please input a valid operation"
             self.__ebox.mUpdateErrorObject(gReshapeError['INVALID_INPUT_PARAMETER'], _detail_error)
             _rc = 1
 
+        return _rc
+
+    def mDeleteNodePrecheck(self, aOptions):
+        ebLogInfo('*** Running Delete Node precheck ***')
+        _rc = 0
+        _data = []
+        _error = ""
+        self.mUpdateRequestData(_rc, _data, _error, aOptions)
+        ebLogInfo('*** mDeleteNodePrecheck: Success - Delete Node precheck passed')
         return _rc
 
     def mAddNodePrecheck(self, aOptions):
@@ -6685,10 +6777,33 @@ class ebCluServerSshConnectionCheck(object):
 
         ebLogJson(json.dumps(_response, indent=4, sort_keys = True))
 
+    def mGetDeleteNodeSshSkipList(self, aOptions):
+        _skip_nodes = set()
+        _inputjson = getattr(aOptions, "jsonconf", None)
+        if not _inputjson or _inputjson.get("opType") != "DELETE_NODE":
+            return _skip_nodes
+
+        _node_name = _inputjson.get("node_name")
+        if not _node_name:
+            return _skip_nodes
+
+        if isinstance(_node_name, list):
+            _node_names = _node_name
+        else:
+            _node_names = [_node_name]
+
+        for _node in _node_names:
+            _node = str(_node).strip()
+            if _node:
+                _skip_nodes.add(_node)
+                _skip_nodes.add(_node.split(".")[0])
+        return _skip_nodes
+
     def mServerSshConnectionCheck(self, aOptions, aDomUs=[], aDom0s=[], aCells=[]):
         ebLogInfo('*** mServerSshConnectionCheck >>> ***')
         _servers = aDomUs + aDom0s + aCells
         _rc = 0
+        _skip_nodes = self.mGetDeleteNodeSshSkipList(aOptions)
 
         if self.__ebox.mIsOciEXACC():
             _key_only = False
@@ -6696,6 +6811,10 @@ class ebCluServerSshConnectionCheck(object):
             _key_only = True
 
         for _server in _servers:
+            if _server in _skip_nodes or _server.split(".")[0] in _skip_nodes:
+                ebLogInfo('*** Skipping ssh test for delete node: %s ***' % (_server))
+                continue
+
             ebLogInfo('*** Running ssh test for server: %s ***' % (_server))
             if self.__node.mIsConnectable(aHost=_server, aKeyOnly=_key_only):
                 ebLogInfo('*** Success: server %s is connectable ***' % (_server))
@@ -6724,6 +6843,7 @@ class ebCluServerSshConnectionCheck(object):
         ebLogInfo('*** mNodeSubsetSshConnectionCheck >>> ***')
         _domUs = aDomUs
         _rc = 1
+        _skip_nodes = self.mGetDeleteNodeSshSkipList(aOptions)
         
         if self.__ebox.mIsOciEXACC():
             _key_only = False
@@ -6731,6 +6851,10 @@ class ebCluServerSshConnectionCheck(object):
             _key_only = True
 
         for _domu in _domUs:
+            if _domu in _skip_nodes or _domu.split(".")[0] in _skip_nodes:
+                ebLogInfo('*** Skipping ssh test for delete node: %s ***' % (_domu))
+                continue
+
             ebLogInfo('*** Running ssh test for server: %s ***' % (_domu))
             if self.__node.mIsConnectable(aHost=_domu, aKeyOnly=_key_only):
                 ebLogInfo('*** Success: VM %s is connectable ***' % (_domu))
@@ -6918,6 +7042,68 @@ def mGetDom0sImagesListSorted(aExaBoxCluCtrlObj) -> List[str]:
         key=cmp_to_key(version_compare))
     ebLogDebug(f'mGetDom0sImagesListSorted returns {_minV}')
     return _minV
+
+def mHasRunningDBListState(aDomU, aReshapeType=None):
+    _db = ebGetDefaultDB()
+    _dbs_up = _db.mGetDBListByNode(aDomU)
+    if not (_dbs_up and _dbs_up.strip()):
+        return False
+    if not aReshapeType:
+        return True
+    return _db.mGetDBListTypeByNode(aDomU) == str(aReshapeType).upper()
+
+def mGetReshapeRetryTypeFromRackState(aOptions, aExpectedType=None):
+    _rack_state_to_reshape_type = {
+        'NEEDS_ATTENTION_MEM': 'MEMORY',
+        'NEEDS_ATTENTION_OHOME': 'OHOME',
+    }
+
+    _jsonconf = getattr(aOptions, 'jsonconf', aOptions)
+    if not isinstance(_jsonconf, dict):
+        return None
+
+    _reshape_type = _rack_state_to_reshape_type.get(_jsonconf.get('rack_state'))
+    if not _reshape_type:
+        return None
+
+    if aExpectedType and _reshape_type != str(aExpectedType).upper():
+        return None
+
+    return _reshape_type
+
+def mGetAppliedReshapePartialError(aReshapeType, aCrsDown=False, aDbDown=False):
+    if not aReshapeType:
+        return None
+
+    _reshape_type = str(aReshapeType).upper()
+    if _reshape_type == 'MEMORY':
+        if aCrsDown and aDbDown:
+            return gPartialError['MEMORY_RESHAPE_APPLIED_CRS_DB_DOWN']
+        if aDbDown:
+            return gPartialError['MEMORY_RESHAPE_APPLIED_DB_DOWN']
+        if aCrsDown:
+            return gPartialError['MEMORY_RESHAPE_APPLIED_CRS_DOWN']
+    elif _reshape_type == 'OHOME':
+        if aCrsDown and aDbDown:
+            return gPartialError['OHOME_RESHAPE_APPLIED_CRS_DB_DOWN']
+        if aDbDown:
+            return gPartialError['OHOME_RESHAPE_APPLIED_DB_DOWN']
+        if aCrsDown:
+            return gPartialError['OHOME_RESHAPE_APPLIED_CRS_DOWN']
+
+    return None
+
+def mUpdateAppliedReshapeErrorObject(aExaBoxCluCtrlObj, aReshapeType,
+                                     aDetailError, aCrsDown=False,
+                                     aDbDown=False, aNodeData=''):
+    _partial_error = mGetAppliedReshapePartialError(
+        aReshapeType, aCrsDown=aCrsDown, aDbDown=aDbDown
+    )
+    if _partial_error is None:
+        return False
+
+    aExaBoxCluCtrlObj.mUpdateErrorObject(_partial_error, aDetailError, aNodeData)
+    return True
 
 def mWaitForSystemBoot(aNode: exaBoxNode) -> None:
     """
@@ -7123,6 +7309,11 @@ class ebCluEthernetConfig:
         _opt_speed = aOptSpeed
         _exadata_model = aExadataModel
 
+        _curr_speed = self.mGetCurrentSpeed(_node, _ethx)
+        if _curr_speed == _opt_speed:
+            ebLogInfo(f"{_dom0}: {_ethx} already has custom link speed {_opt_speed}")
+            return _rc
+
         ebLogInfo(f"{_dom0}: Setting Custom link speed {_opt_speed} in interface {_ethx} ")
         if mCompareModel(_exadata_model, "X9") >= 0:
             _cmd_str = f"/usr/sbin/ethtool -s {_ethx} speed {_opt_speed} autoneg on"
@@ -7231,6 +7422,8 @@ class ebCluEthernetConfig:
 
         #Check advertise mode present in supported modes, if present set the value
         _rc = -1
+        _supported_speeds = []
+        _valid_speeds = []
         if _link_modes and _supported_modes:
             _link = list(set(self.mSplitLinkMode(_link_modes)))
             _link_speeds = sorted(_link, reverse=True)
@@ -7239,6 +7432,7 @@ class ebCluEthernetConfig:
             _supported = list(set(self.mSplitLinkMode(_supported_modes)))
             _supported_speeds = sorted(_supported, reverse=True)
             ebLogInfo(f"Supported link speeds {_supported_speeds}")
+            _valid_speeds = [speed for speed in _link_speeds if speed in _supported_speeds]
 
             for _speed in _link_speeds:
                 if _speed in _supported_speeds:
@@ -7246,7 +7440,7 @@ class ebCluEthernetConfig:
                     _rc = self.mSetCustomSpeed(_node, _ethx, _current_speed, _optimum_speed, _exadata_model)
                     if _rc == 0:
                         break
-        #Set default custom speed
+        #Set default supported custom speed
         if _rc == -1:
             if self.__cluctrl.mCompareExadataModel(_exadata_model, 'X10') >= 0:
                 _optimum_speed = 100000
@@ -7254,7 +7448,20 @@ class ebCluEthernetConfig:
                 _optimum_speed = 50000
             else:
                 _optimum_speed = 25000
-            _rc = self.mSetCustomSpeed(_node, _ethx, _current_speed, _optimum_speed, _exadata_model)
+            
+            if _valid_speeds:
+                if _optimum_speed not in _valid_speeds:
+                    _optimum_speed = _valid_speeds[0]
+                    ebLogInfo(f"{_dom0}: {_ethx} using supported link speed {_optimum_speed}")
+
+                if _current_speed == _optimum_speed:
+                    ebLogInfo(f"{_dom0}: {_ethx} already has supported link speed {_current_speed}")
+                    _rc = 0
+                else:
+                    _rc = self.mSetCustomSpeed(_node, _ethx, _current_speed, _optimum_speed, _exadata_model)
+            else:
+                ebLogInfo(f"{_dom0}: {_ethx} does not support default custom link speed {_optimum_speed}; skipping speed update")
+            
         _, _o, _ = _node.mExecuteCmd(f"cat /sys/class/net/{_ethx}/speed")
         _out = _o.readlines()
         ebLogTrace("cat /sys/class/net/%s/speed output is %s"%(_ethx,str(_out)))
@@ -8129,9 +8336,140 @@ def mGetGridListSupportedByOeda(aExaBoxCluCtrlObj, aGridVersion, aGrid26aiSuppor
         
         ebLogWarn(f'Grid version {aGridVersion} NOT supported by OEDA !')
         return False, _supported_major_minor_versions
-    
+
     except Exception as e:
         ebLogError(f'Exception during checking Grid list support in OEDA : {str(e)}')
         return False, set()
-        
+
+
+def mGetMultiGIOedaRequiredFile(aExaBoxCluCtrlObj, aGridVersion):
+    """
+    Return the grid klone basename OEDA expects for the given GI version.
+    """
+    _ebox = aExaBoxCluCtrlObj
+    if _ebox is None:
+        _msg = "Invalid clucontrol object for OEDA requiredfiles lookup"
+        ebLogError(_msg)
+        raise ExacloudRuntimeError(0x0828, 0xA, _msg, aStackTrace=True)
+    _oedacli_bin = os.path.join(_ebox.mGetOedaPath(), 'oedacli')
+    if not isinstance(aGridVersion, str) or re.match(r'^[0-9]+(\.[0-9]+)*$', aGridVersion) is None:
+        _msg = f"Invalid GI version for OEDA requiredfiles lookup: {aGridVersion}"
+        ebLogError(_msg)
+        raise ExacloudRuntimeError(0x0828, 0xA, _msg, aStackTrace=True)
+    _expr = f'list requiredfiles giversion={aGridVersion}'
+    _cmd = f'{shlex.quote(_oedacli_bin)} -e {shlex.quote(_expr)}'
+    _rc, _, _stdout, _ = _ebox.mExecuteLocal(_cmd)
+    if _rc != 0:
+        _msg = f"OEDA requiredfiles lookup failed for GI version {aGridVersion}"
+        ebLogError(_msg)
+        raise ExacloudRuntimeError(0x0828, 0xA, _msg, aStackTrace=True)
+    if not _stdout:
+        _msg = f"OEDA requiredfiles lookup returned no output for GI version {aGridVersion}"
+        ebLogError(_msg)
+        raise ExacloudRuntimeError(0x0828, 0xA, _msg, aStackTrace=True)
+    _output = _stdout.strip()
+    _matches = re.findall(r'[^,\s"]*grid-klone-Linux-x86-64-[^,\s"]+\.zip', _output)
+
+    for _match in _matches:
+        _basename = os.path.basename(_match)
+        if _basename:
+            ebLogInfo(f"Using OEDA required GI file {_basename} for GI version {aGridVersion}")
+            return _basename
+
+    _msg = f"Could not determine OEDA required GI file for version {aGridVersion}"
+    ebLogError(_msg)
+    raise ExacloudRuntimeError(0x0828, 0xA, _msg, aStackTrace=True)
+
+
+def mGetMultiGIOedaSelection(aExaBoxCluCtrlObj, aGiVersion=None, aOedaGridVersion=None):
+    """
+    Resolve the staged repo GI image basename and exact OEDA-required alias
+    for multigi versions that use the 23.26+ naming.
+    aOedaGridVersion is the OEDA-target grid/GI version used for the
+    requiredfiles lookup when the caller already derived it.
+    """
+    _ebox = aExaBoxCluCtrlObj
+    _selection = {}
+
+    if _ebox is None:
+        ebLogWarn("Could not derive multigi OEDA selection without clucontrol object")
+        return _selection
+
+    if not _ebox.mGetGiMultiImageSupport():
+        ebLogWarn("GI multi-image support disabled; skipping multigi OEDA selection")
+        return _selection
+
+    _giversion = aGiVersion or _ebox.mGetVersionGiMultiImages()
+    if not _giversion:
+        ebLogWarn("GI version is empty; skipping multigi OEDA selection")
+        return _selection
+
+    _giversion_parts = _giversion.split('.')
+    if len(_giversion_parts) < 4 or not all(_part.isdigit() for _part in _giversion_parts[:4]):
+        ebLogWarn(f"Unable to derive multigi OEDA selection for GI version {_giversion}")
+        return _selection
+    _version = int(''.join(_giversion_parts[:4]))
+
+    if _version < 232600:
+        ebLogTrace(f"GI version {_giversion} is below 23.26; skipping multigi OEDA selection")
+        return _selection
+
+    _repo_image = None
+    for _imgnode in _ebox.mGetRepoInventory().get('grid-klones', []):
+        if _imgnode.get('version') != _giversion:
+            continue
+        if ('service' in _imgnode.keys()) and (_ebox.mGetServiceType() not in _imgnode['service']):
+            continue
+        if _imgnode.get('files'):
+            _repo_image = os.path.basename(_imgnode['files'][0]['path'])
+            break
+
+    if not _repo_image:
+        _msg = f"Could not find repository GI image for multigi version {_giversion}"
+        ebLogError(_msg)
+        raise ExacloudRuntimeError(0x0828, 0xA, _msg, aStackTrace=True)
+
+    _oeda_grid_version = aOedaGridVersion
+    if not _oeda_grid_version:
+        _found_grid_version = False
+        supported_by_oeda, oeda_supported_gi_list = mGetGridListSupportedByOeda(
+            _ebox, _giversion, aGrid26aiSupport=True)
+        if supported_by_oeda:
+            _found_grid_version = True
+            _oeda_grid_version = '.'.join(_giversion_parts[:4] + ['0'])
+        else:
+            ebLogInfo(f"Given GI ver not supported by OEDA: {_giversion}")
+            _filtered_list = [v for v in oeda_supported_gi_list if v.startswith("23")]
+            _sorted_list = sorted(
+                _filtered_list,
+                key=lambda _version_str: tuple(map(int, _version_str.split('.'))),
+                reverse=True
+            )
+            ebLogTrace(f"Sorted OEDA-supported multigi versions: {_sorted_list}")
+            if _sorted_list:
+                _oeda_grid_version = _sorted_list[0]
+                if _oeda_grid_version.startswith("23.26"):
+                    _found_grid_version = True
+                else:
+                    ebLogInfo("Could not find GI version starts with 23.26,trying to find lesser version")
+                    _oeda_prefix = ".".join(_oeda_grid_version.split(".")[:3])
+                    for _imgnode in _ebox.mGetRepoInventory().get("grid-klones", []):
+                        _imgversion = _imgnode.get("version", "")
+                        if _imgversion.startswith(_oeda_prefix + "."):
+                            _oeda_grid_version = _imgversion
+                            _found_grid_version = True
+                            break
+        if not _found_grid_version:
+            _msg = "Given GI ver not supported by OEDA and Could not get supportedGI list from OEDA"
+            ebLogError(_msg)
+            raise ExacloudRuntimeError(0x0828, 0xA, _msg, aStackTrace=True)
+
+    _required_gi_file = mGetMultiGIOedaRequiredFile(_ebox, _oeda_grid_version)
+    _selection = {
+        "staged_basename": _repo_image,
+        "required_basename": _required_gi_file,
+    }
+    ebLogInfo(f"Resolved multigi OEDA selection: {_selection}")
+    return _selection
+
 # end of file

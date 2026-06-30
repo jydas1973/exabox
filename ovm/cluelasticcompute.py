@@ -15,6 +15,14 @@ NOTE:
 History:
 
     MODIFIED   (MM/DD/YY)
+    jesandov    06/18/26 - Bug#39540098 Carry over cert for R1 to ADBD DomUs
+    scoral      05/27/26 - Bug 39443833 - Configure bondmonitor before
+                           creating the new VMs.
+    prsshukl    05/22/26 - Bug 39416987 - EXACC: SSL INSPECTION: PHASE1:
+                           EXACLOUD ISN'T COPYING CUSTOMER ROOT CA AS UNABLE TO
+                           LOGIN TO THE CPS WALLET Bug 39416987 - EXACC: SSL
+                           INSPECTION: PHASE1: EXACLOUD ISN'T COPYING CUSTOMER
+                           ROOT CA AS UNABLE TO LOGIN TO THE CPS WALLET
     pbellary    04/15/26 - Enh 39213619 - EXACLOUD SHOULD UPDATE STORAGE INTERCONNECTS IN ASM ADD NODE FOR A EXASCALE INFRA 
     aararora    04/13/26 - 39200237: Issues observed for ca signed certs being
                            copied to domus for exacc
@@ -1867,7 +1875,7 @@ class ebCluReshapeCompute(object):
                     _obj = ebCopyDBCSAgentpfxFile(_ebox)
                     _obj.mCopyDbcsAgentpfxFiletoDomUsForFedramp()
 
-                    self.mGetCluUtils().mSetupCustomerRootCACertificates(aOptions)
+                    self.mGetCluUtils().mSetupCustomerRootCACertificates()
 
                 # Executes the steps required post GI NID installation.
                 # Post GI NID also makes sure ACFS is loaded.
@@ -1934,6 +1942,9 @@ class ebCluReshapeCompute(object):
                             _node.mExecuteCmd(f"/usr/bin/chmod -R 775 /u01/app/grid/diag/crs/{_host}/crs/*")
 
                 self.mGetCluUtils().mInstallFalconAgentOnDomus(_newdomUList, "Elastic Add Compute")
+
+                # Carryover certificate
+                self.mGetCluUtils().mCarryoverCertR1()
 
                 ebLogInfo("OSTP_POSTGI_NID")
                 
@@ -2146,9 +2157,13 @@ class ebCluReshapeCompute(object):
         # Validation
         self.mPostReshapeValidation(aOptions,None, _newdomUList)
 
-        if not _ebox.mIsExaScale() and "delete_domu_keys" in aOptions.jsonconf and aOptions.jsonconf['delete_domu_keys'].lower() == "true":
-            # Remove access to the domUs.
-            _ebox.mRemoveSshKeys(['opc', 'grid', 'oracle'])
+        # Remove deprecated SSH algorithms on newly added DomUs
+        _algorithms = _ebox.mCheckConfigOption('deprecated_ssh_algorithms')
+        csUtil().mRemoveDeprecatedSshAlgorithms(_newdomUList, _algorithms)
+
+        # Remove the condition until the support of the secure_vm from CP is avalible in add node
+        #if not _ebox.mIsExaScale() and "delete_domu_keys" in aOptions.jsonconf and aOptions.jsonconf['delete_domu_keys'].lower() == "true":
+        _ebox.mRemoveSshKeys(['opc', 'grid', 'oracle'])
 
 
     def mConfigureVMBackup(self, aOptions, aSrcDom0, aNewDom0List):
@@ -2720,6 +2735,11 @@ class ebCluReshapeCompute(object):
             if _utils.mIsEDVImageSupported(aOptions):
                 _utils.mPatchEDVVolumes(aOptions)
 
+            # Configure bondmonitor.
+            clubonding.configure_bonding_if_enabled(
+                _ebox, payload=aOptions.jsonconf,
+                configure_bridge=False, configure_monitor=True)
+
         try:
             _patchconfig = _ebox.mGetPatchConfig()
             _addnodexml = _oeda_path + '/exacloud.conf/' + _step + '_' + _uuid + '.xml'
@@ -2806,7 +2826,7 @@ class ebCluReshapeCompute(object):
                 for _dom0, _domU in _ebox.mReturnDom0DomUPair():
                     _ebox.mConfigureDefaultGateway(_dom0, _domU, aOptions)
 
-            # Configure bonding.
+            # Configure bonding bridge.
             # 
             # Configure bridge only if static monitoring bridge is not supported.
             conf_bridge = \
@@ -3963,6 +3983,9 @@ class ebCluReshapeCompute(object):
                     raise ExacloudRuntimeError(0x0801, 0xA, _detail_error)
 
         for _, _domU in _ebox.mGetOrigDom0sDomUs():
+            _ping_node = exaBoxNode(get_gcontext())
+            if not _ping_node.mIsConnectable(_domU):
+                continue
             with connect_to_host(_domU, get_gcontext()) as _node:
                 _node.mExecuteCmdLog(f'{_path}/bin/olsnodes -s -t | grep {_delnode}')
                 if _node.mGetCmdExitStatus() == 0:
@@ -4554,10 +4577,10 @@ class ebCluReshapeCompute(object):
 
             #remove only reshaped domu
             if not _ebox.mIsKVM():
-                _cmd_str  = '/opt/exadata_ovm/exadata.img.domu_maker remove-domain '+_reshape_domu+' -force'
+                _cmd_str2  = '/opt/exadata_ovm/exadata.img.domu_maker remove-domain '+_reshape_domu+' -force'
                 if _ebox.mIsExabm():
-                    _cmd_str += ' ; /opt/exadata_ovm/exadata.img.domu_maker remove-bridge-dom0 vmeth100 -force'
-                _cmd_str2 = 'xm destroy '+_reshape_domu
+                    _cmd_str2 += ' ; /opt/exadata_ovm/exadata.img.domu_maker remove-bridge-dom0 vmeth100 -force'
+                _cmd_str = 'xm destroy '+_reshape_domu
                 _cmd_str3 = ''
                 _chkvm_cmd = 'xm list | grep '+ _reshape_domu
             else:
@@ -4582,6 +4605,7 @@ class ebCluReshapeCompute(object):
                 ebLogDebug("** [Debug] The command '{0}' returned with the code '{1}'".format(_cmd_str , str(_rc)) )
 
             if _ebox.mIsKVM():
+                #31799929: Added as per OEDA team to cleanup stale VM which is still cached.
                 ebLogInfo('*** Running virsh undefine using : '+_cmd_str3)
                 _node.mExecuteCmdLog(_cmd_str3)
                 _rc = _node.mGetCmdExitStatus()

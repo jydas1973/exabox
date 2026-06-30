@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    joysjose    05/08/26 - Bug 38385387 Memory & OH reshape partial success
 #    dekuckre    04/10/26 - Fix encrypted lvresize failure unit test
 #                           expectations
 #    dekuckre    04/02/26 - Fix Python 3.6 mock call argument assertion in
@@ -95,7 +96,7 @@ class _FakeNode:
             raise AssertionError('Unexpected command: %s' % cmd)
         return self.responses[cmd].pop(0)
 
-    def mExecuteCmd(self, cmd, **kwargs):
+    def mExecuteCmd(self, cmd, *args, **kwargs):
         self.executed.append(cmd)
         status, out_lines, err_lines = self._get_response(cmd)
         self._last_status = status
@@ -125,6 +126,13 @@ class TestExaBoxKvmDiskMgr(unittest.TestCase):
         self.fake_edp = mock.Mock()
         self.fake_edp.mGetEbox.return_value = self.fake_ebox
         self.fake_edp.mRecordError.return_value = 0
+        self.fake_db = mock.Mock()
+        self.mock_get_default_db = mock.patch(
+            'ecs.exacloud.exabox.ovm.kvmdiskmgr.ebGetDefaultDB',
+            return_value=self.fake_db
+        )
+        self.mock_get_default_db.start()
+        self.addCleanup(self.mock_get_default_db.stop)
 
     def _create_encrypted_node(self, fs_type='xfs', overrides=None):
         overrides = overrides or {}
@@ -482,12 +490,279 @@ class TestExaBoxKvmDiskMgr(unittest.TestCase):
             result = manager.mClusterPartitionResize({'partition': 'u02'})
 
         self.assertEqual(result, 0)
+        self.fake_db.mSetDBlist.assert_not_called()
+        self.fake_db.mRemoveDBListByNode.assert_not_called()
         self.fake_edp.mExecuteDomUUmountPartition.assert_called_once_with('domu', 'u02')
         manager.mExecuteDomUDownsizeStepsEncrypted.assert_called_once_with('domu', '/dev/mapper/app', '40')
         manager.mExecuteDom0ResizeSteps.assert_called_once_with('dom0', 'domu', '40', '/dev/exc/u02_disk')
         self.fake_edp.mRecordError.assert_not_called()
         self.assertIn('Status', partition_data)
         self.assertEqual(node_domU.executed[0], fdisk_cmd)
+
+    @mock.patch('ecs.exacloud.exabox.ovm.kvmdiskmgr.time.sleep', return_value=None)
+    @mock.patch('ecs.exacloud.exabox.ovm.kvmdiskmgr.getMountPointInfo')
+    @mock.patch('ecs.exacloud.exabox.ovm.kvmdiskmgr.get_gcontext', return_value='ctx')
+    @mock.patch('ecs.exacloud.exabox.ovm.kvmdiskmgr.node_exec_cmd_check')
+    @mock.patch('ecs.exacloud.exabox.ovm.kvmdiskmgr.connect_to_host')
+    def test_cluster_partition_resize_records_ohome_partial_crs_db_down(
+        self, mock_connect, mock_node_exec, _mock_ctx, mock_mount_info, _mock_sleep
+    ):
+        self.fake_ebox.mIsExaScale.return_value = True
+        self.fake_ebox.mCheckIfCrsDbsUp.return_value = False
+        self.fake_ebox.mGetOracleBaseDirectories.return_value = ('/u02/app/19.0.0', None, None)
+        self.fake_ebox.mGetActiveDbInstances.return_value = ['DB1']
+        self.fake_ebox.mCheckCrsUp.return_value = False
+        self.fake_ebox.mCheckDBIsUp.return_value = True
+        self.fake_ebox.mCheckConfigOption.return_value = '1'
+        partition_data = {}
+        self.fake_edp.mGetPartitionOperationData.return_value = partition_data
+        self.fake_edp.mGetDom0DomUpairs.return_value = [('dom0', 'domu')]
+        self.fake_edp.mClusterPartitionTargetDiff.return_value = True
+        self.fake_edp.mClusterPartitionInfo2.return_value = (0, {
+            'fs': '/dev/mapper/app',
+            'used': '30',
+            'total': '50',
+        })
+
+        constants = type('Const', (), {
+            '_partitionname_key': 'partition',
+            '_newsizeGB_key': 'newsize',
+            '_usedsizeGB_key': 'used',
+            '_totalsizeGB_key': 'total',
+            '_filesystem_key': 'fs',
+        })()
+        self.fake_edp.mGetConstantsObj.return_value = constants
+
+        def _parse_input(options, out_params):
+            out_params['partition'] = 'u02'
+            out_params['newsize'] = '40'
+            return 0
+
+        fdisk_cmd = "/sbin/fdisk -l '/dev/mapper/app' | /usr/bin/grep Disk"
+        node_domU = _FakeNode({
+            fdisk_cmd: [
+                (0, ["Disk /dev/mapper/app: 42.9 GB, 42949672960 bytes\n"], []),
+                (0, ["Disk /dev/mapper/app: 42.9 GB, 42949672960 bytes\n"], []),
+            ],
+            '/usr/sbin/e2fsck -f /dev/mapper/app': [
+                (0, ['fs clean\n'], []),
+            ],
+        }, default_response=(0, ['ok\n'], []))
+        node_dom0 = _FakeNode({
+            '/usr/bin/ls -l /dev/exc/u02_disk': [(0, ['-rw 1 root root 123 /dev/exc/u02_disk\n'], [])]
+        }, default_response=(0, ['ok\n'], []))
+
+        def _connect(host, _ctx):
+            node = node_domU if host == 'domu' else node_dom0
+
+            @contextlib.contextmanager
+            def _mgr():
+                try:
+                    yield node
+                finally:
+                    if hasattr(node, 'mDisconnect'):
+                        node.mDisconnect()
+
+            return _mgr()
+
+        mock_connect.side_effect = _connect
+        self.fake_edp.mClusterParseInput.side_effect = _parse_input
+        self.fake_edp.mRecordError.return_value = 'crs-db-partial'
+        mock_mount_info.return_value = mock.Mock(is_luks=True)
+        mock_node_exec.return_value = mock.Mock(stdout='target /dev/exc/u02_disk')
+
+        self.fake_edp.mExecuteDomUUmountPartition.return_value = 0
+
+        with mock.patch('ecs.exacloud.exabox.ovm.kvmdiskmgr.mUpdateAppliedReshapeErrorObject') as mock_update:
+            with mock.patch('ecs.exacloud.exabox.ovm.kvmdiskmgr.ebCluUtils', new=_FakeCluUtils):
+                manager = exaBoxKvmDiskMgr(self.fake_edp)
+                manager.mExecuteDomUDownsizeStepsEncrypted = mock.Mock(return_value=0)
+                manager.mExecuteDom0ResizeSteps = mock.Mock(return_value=0)
+                result = manager.mClusterPartitionResize({'partition': 'u02'})
+
+        self.assertEqual(result, 'crs-db-partial')
+        self.fake_db.mSetDBlist.assert_called_once_with('domu', 'DB1', aReshapeType='OHOME')
+        self.fake_db.mRemoveDBListByNode.assert_not_called()
+        mock_update.assert_called_once_with(
+            self.fake_ebox, 'OHOME', 'Could not start cluster services on domu',
+            aCrsDown=True,
+            aDbDown=True, aNodeData=[{'hostname': 'domu'}]
+        )
+        self.fake_edp.mRecordError.assert_called_once_with(
+            gPartitionError['ErrorFetchingDetails'], '*** Could not start cluster services on domu'
+        )
+
+    @mock.patch('ecs.exacloud.exabox.ovm.kvmdiskmgr.time.sleep', return_value=None)
+    @mock.patch('ecs.exacloud.exabox.ovm.kvmdiskmgr.getMountPointInfo')
+    @mock.patch('ecs.exacloud.exabox.ovm.kvmdiskmgr.get_gcontext', return_value='ctx')
+    @mock.patch('ecs.exacloud.exabox.ovm.kvmdiskmgr.node_exec_cmd_check')
+    @mock.patch('ecs.exacloud.exabox.ovm.kvmdiskmgr.connect_to_host')
+    def test_cluster_partition_resize_records_ohome_partial_crs_only(
+        self, mock_connect, mock_node_exec, _mock_ctx, mock_mount_info, _mock_sleep
+    ):
+        self.fake_ebox.mIsExaScale.return_value = True
+        self.fake_ebox.mCheckIfCrsDbsUp.return_value = False
+        self.fake_ebox.mGetOracleBaseDirectories.return_value = ('/u02/app/19.0.0', None, None)
+        self.fake_ebox.mGetActiveDbInstances.return_value = []
+        self.fake_ebox.mCheckCrsUp.return_value = False
+        self.fake_ebox.mCheckDBIsUp.return_value = True
+        self.fake_ebox.mCheckConfigOption.return_value = '1'
+        self.fake_edp.mGetPartitionOperationData.return_value = {}
+        self.fake_edp.mGetDom0DomUpairs.return_value = [('dom0', 'domu')]
+        self.fake_edp.mClusterPartitionTargetDiff.return_value = True
+        self.fake_edp.mClusterPartitionInfo2.return_value = (0, {
+            'fs': '/dev/mapper/app',
+            'used': '30',
+            'total': '50',
+        })
+
+        constants = type('Const', (), {
+            '_partitionname_key': 'partition',
+            '_newsizeGB_key': 'newsize',
+            '_usedsizeGB_key': 'used',
+            '_totalsizeGB_key': 'total',
+            '_filesystem_key': 'fs',
+        })()
+        self.fake_edp.mGetConstantsObj.return_value = constants
+
+        def _parse_input(options, out_params):
+            out_params['partition'] = 'u02'
+            out_params['newsize'] = '40'
+            return 0
+
+        fdisk_cmd = "/sbin/fdisk -l '/dev/mapper/app' | /usr/bin/grep Disk"
+        node_domU = _FakeNode({
+            fdisk_cmd: [
+                (0, ["Disk /dev/mapper/app: 42.9 GB, 42949672960 bytes\n"], []),
+                (0, ["Disk /dev/mapper/app: 42.9 GB, 42949672960 bytes\n"], []),
+            ],
+            '/usr/sbin/e2fsck -f /dev/mapper/app': [(0, ['fs clean\n'], [])],
+        }, default_response=(0, ['ok\n'], []))
+        node_dom0 = _FakeNode({
+            '/usr/bin/ls -l /dev/exc/u02_disk': [(0, ['-rw 1 root root 123 /dev/exc/u02_disk\n'], [])]
+        }, default_response=(0, ['ok\n'], []))
+
+        def _connect(host, _ctx):
+            node = node_domU if host == 'domu' else node_dom0
+
+            @contextlib.contextmanager
+            def _mgr():
+                try:
+                    yield node
+                finally:
+                    if hasattr(node, 'mDisconnect'):
+                        node.mDisconnect()
+
+            return _mgr()
+
+        mock_connect.side_effect = _connect
+        self.fake_edp.mClusterParseInput.side_effect = _parse_input
+        self.fake_edp.mRecordError.return_value = 'crs-only-partial'
+        mock_mount_info.return_value = mock.Mock(is_luks=True)
+        mock_node_exec.return_value = mock.Mock(stdout='target /dev/exc/u02_disk')
+        self.fake_edp.mExecuteDomUUmountPartition.return_value = 0
+
+        with mock.patch('ecs.exacloud.exabox.ovm.kvmdiskmgr.mUpdateAppliedReshapeErrorObject') as mock_update:
+            with mock.patch('ecs.exacloud.exabox.ovm.kvmdiskmgr.ebCluUtils', new=_FakeCluUtils):
+                manager = exaBoxKvmDiskMgr(self.fake_edp)
+                manager.mExecuteDomUDownsizeStepsEncrypted = mock.Mock(return_value=0)
+                manager.mExecuteDom0ResizeSteps = mock.Mock(return_value=0)
+                result = manager.mClusterPartitionResize({'partition': 'u02'})
+
+        self.assertEqual(result, 'crs-only-partial')
+        self.fake_db.mSetDBlist.assert_called_once_with('domu', '', aReshapeType='OHOME')
+        self.fake_db.mRemoveDBListByNode.assert_not_called()
+        mock_update.assert_called_once_with(
+            self.fake_ebox, 'OHOME', 'Could not start cluster services on domu',
+            aCrsDown=True,
+            aDbDown=False, aNodeData=[{'hostname': 'domu'}]
+        )
+
+    @mock.patch('ecs.exacloud.exabox.ovm.kvmdiskmgr.time.sleep', return_value=None)
+    @mock.patch('ecs.exacloud.exabox.ovm.kvmdiskmgr.getMountPointInfo')
+    @mock.patch('ecs.exacloud.exabox.ovm.kvmdiskmgr.get_gcontext', return_value='ctx')
+    @mock.patch('ecs.exacloud.exabox.ovm.kvmdiskmgr.node_exec_cmd_check')
+    @mock.patch('ecs.exacloud.exabox.ovm.kvmdiskmgr.connect_to_host')
+    def test_cluster_partition_resize_records_ohome_partial_db_down(
+        self, mock_connect, mock_node_exec, _mock_ctx, mock_mount_info, _mock_sleep
+    ):
+        self.fake_ebox.mIsExaScale.return_value = True
+        self.fake_ebox.mCheckIfCrsDbsUp.return_value = False
+        self.fake_ebox.mGetOracleBaseDirectories.return_value = ('/u02/app/19.0.0', None, None)
+        self.fake_ebox.mGetActiveDbInstances.side_effect = [['DB1', 'DB2'], ['DB1']]
+        self.fake_ebox.mCheckCrsUp.return_value = True
+        self.fake_ebox.mCheckDBIsUp.return_value = False
+        self.fake_ebox.mCheckConfigOption.return_value = '1'
+        self.fake_edp.mGetPartitionOperationData.return_value = {}
+        self.fake_edp.mGetDom0DomUpairs.return_value = [('dom0', 'domu')]
+        self.fake_edp.mClusterPartitionTargetDiff.return_value = True
+        self.fake_edp.mClusterPartitionInfo2.return_value = (0, {
+            'fs': '/dev/mapper/app',
+            'used': '30',
+            'total': '50',
+        })
+
+        constants = type('Const', (), {
+            '_partitionname_key': 'partition',
+            '_newsizeGB_key': 'newsize',
+            '_usedsizeGB_key': 'used',
+            '_totalsizeGB_key': 'total',
+            '_filesystem_key': 'fs',
+        })()
+        self.fake_edp.mGetConstantsObj.return_value = constants
+
+        def _parse_input(options, out_params):
+            out_params['partition'] = 'u02'
+            out_params['newsize'] = '40'
+            return 0
+
+        fdisk_cmd = "/sbin/fdisk -l '/dev/mapper/app' | /usr/bin/grep Disk"
+        node_domU = _FakeNode({
+            fdisk_cmd: [
+                (0, ["Disk /dev/mapper/app: 42.9 GB, 42949672960 bytes\n"], []),
+                (0, ["Disk /dev/mapper/app: 42.9 GB, 42949672960 bytes\n"], []),
+            ],
+            '/usr/sbin/e2fsck -f /dev/mapper/app': [(0, ['fs clean\n'], [])],
+        }, default_response=(0, ['ok\n'], []))
+        node_dom0 = _FakeNode({
+            '/usr/bin/ls -l /dev/exc/u02_disk': [(0, ['-rw 1 root root 123 /dev/exc/u02_disk\n'], [])]
+        }, default_response=(0, ['ok\n'], []))
+
+        def _connect(host, _ctx):
+            node = node_domU if host == 'domu' else node_dom0
+
+            @contextlib.contextmanager
+            def _mgr():
+                try:
+                    yield node
+                finally:
+                    if hasattr(node, 'mDisconnect'):
+                        node.mDisconnect()
+
+            return _mgr()
+
+        mock_connect.side_effect = _connect
+        self.fake_edp.mClusterParseInput.side_effect = _parse_input
+        self.fake_edp.mRecordError.return_value = 'db-partial'
+        mock_mount_info.return_value = mock.Mock(is_luks=True)
+        mock_node_exec.return_value = mock.Mock(stdout='target /dev/exc/u02_disk')
+        self.fake_edp.mExecuteDomUUmountPartition.return_value = 0
+
+        with mock.patch('ecs.exacloud.exabox.ovm.kvmdiskmgr.mUpdateAppliedReshapeErrorObject') as mock_update:
+            with mock.patch('ecs.exacloud.exabox.ovm.kvmdiskmgr.ebCluUtils', new=_FakeCluUtils):
+                manager = exaBoxKvmDiskMgr(self.fake_edp)
+                manager.mExecuteDomUDownsizeStepsEncrypted = mock.Mock(return_value=0)
+                manager.mExecuteDom0ResizeSteps = mock.Mock(return_value=0)
+                result = manager.mClusterPartitionResize({'partition': 'u02'})
+
+        self.assertEqual(result, 'db-partial')
+        self.fake_db.mSetDBlist.assert_called_once_with('domu', 'DB1 DB2', aReshapeType='OHOME')
+        self.fake_db.mRemoveDBListByNode.assert_not_called()
+        mock_update.assert_called_once_with(
+            self.fake_ebox, 'OHOME', "Could not start DB ['DB2'] on domu",
+            aDbDown=True,
+            aNodeData=[{'hostname': 'domu'}]
+        )
 
     # Auto-generated test for mExecuteDomUUpsizeStepsEncrypted
     @mock.patch('ecs.exacloud.exabox.ovm.kvmdiskmgr.get_gcontext', return_value='ctx')

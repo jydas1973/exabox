@@ -4,7 +4,7 @@
 #
 # add_test_params_to_config.py
 #
-# Copyright (c) 2023, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2023, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      add_test_params_to_config.py - This module checks and adds infra patching test config params to config file
@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    jyotdas     06/16/26 - Enh 39523473 - Track Plugin Progress Status in
+#                           Infrapatching Tooling
 #    apotluri    07/21/25 - Enhancement Request 37982406 - COMBINE COVERAGE
 #                           REPORTS FROM CLUSTERLESS SETUP AND REGULAR COVERAGE
 #                           RUN SETUP
@@ -46,6 +48,7 @@ INFRA_PATCHING_TEST_CONFIG_PARAMS  = """{
     "last_completed_test_execution_step_for_code_coverage": 0,
     "disable_exacloud_plugin_execution": "False",
     "disable_time_profile_data_validation": "False",
+    "validate_plugin_progress_status": "True",
     "enable_time_diff_analysis": "True",
     "is_r1_env": "False",
     "is_exacompute": "False",

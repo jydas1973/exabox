@@ -12,6 +12,8 @@ NOTE:
 History:
 
     MODIFIED   (MM/DD/YY)
+       joysjose 05/22/26 - Use request-local staged oedacli for OCI ExaCC ATP
+                           XML patching and add regression coverage.
        dekuckre 03/24/26 - Fix ATP simulation command tuple membership
        diyanez  10/19/20 - 32042031 - OCIEXACC: ADB: MAIN: PYTHON 3
                            COMPATIBILITY ISSUE IN CLUEXACCATP.PY
@@ -225,11 +227,12 @@ class ebExaCCAtpPatchXML(object):
         B) Clone the Nat network as a top level admin network
     """
     
-    def __init__(self, aXML, aDomUList, aDebug):
+    def __init__(self, aXML, aDomUList, aDebug, aOedaPath=None):
         self.__oedaXML  = aXML
         # Store short hostname to match OEDA
         self.__domUList = list(map(lambda x: x.split('.')[0], aDomUList))
         self.__debug    = aDebug
+        self.__oedaPath = aOedaPath or get_gcontext().mGetOEDAPath()
 
     def mExecuteOEDACLI(self, aCMDs):
         """
@@ -251,7 +254,7 @@ class ebExaCCAtpPatchXML(object):
             _xmlV1Reinjector = V1OedaXMLRebuilder()
             _xmlV1Reinjector.SavePropertiesFromTemplate(self.__oedaXML)
 
-        _oedacli_path = os.path.join(get_gcontext().mGetOEDAPath(),'oedacli')
+        _oedacli_path = os.path.join(self.__oedaPath, 'oedacli')
         _cmd = [_oedacli_path,'-j','-c',os.path.abspath(self.__oedaXML),'-f', _tmpfile.name]
 
         _oedaArgs = get_gcontext().mGetConfigOptions()['oedacli_extra_args'].split(" ")

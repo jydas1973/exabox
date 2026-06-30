@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     Mask - mask/umask functions
@@ -13,6 +13,7 @@ NOTE:
 History:
 
     MODIFIED   (MM/DD/YY)
+    jfsaldan    05/07/26 - Log mkstore stderr
     aypaul      04/29/25 - Bug#37535214 Check if input string is Salted or not.
     ririgoye    02/04/25 - Bug 37391243 - ECSREQ list function not working when
                            dealing with empty entries
@@ -97,6 +98,12 @@ def mExecuteLocal(aCmd, aCurrDir=None, aStdIn=sp.PIPE, aStdOut=sp.PIPE, aStdErr=
         _stderrP = _stderrP.decode("UTF-8").strip()
     else:
         _stderrP = ""
+
+    if _stderrP:
+        if _rc != 0:
+            ebLogError(_stderrP)
+        else:
+            ebLogWarn(_stderrP)
 
     return _rc, _stdoutP, _stderrP
 

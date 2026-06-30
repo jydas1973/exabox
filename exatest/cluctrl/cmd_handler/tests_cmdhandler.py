@@ -1091,6 +1091,34 @@ class ebTestCmdHandler(ebTestClucontrol):
         _obj = CommandHandler(self.mGetClubox())
         _obj.mHandlerEnableQinQ(_options)
 
+    def test_mHandlerXsRemoveVMUserPrivilege(self):
+        fname = "mHandlerXsRemoveVMUserPrivilege"
+        ebLogInfo(f"Running unit test on clucommandhandler.py: {fname}")
+        _ebox = self.mGetClubox()
+        _utils = MagicMock()
+
+        with patch.object(_ebox, 'mGetExascaleUtils', return_value=_utils):
+            _obj = CommandHandler(_ebox)
+            _rc = _obj.mHandlerXsRemoveVMUserPrivilege()
+
+        self.assertEqual(_rc, 0)
+        _utils.mRemoveClusterUserPrivilege.assert_called_once_with(_ebox.mGetArgsOptions())
+
+    def test_mHandlerXsDisableNormalRedundancy(self):
+        fname = "mHandlerXsDisableNormalRedundancy"
+        ebLogInfo(f"Running unit test on clucommandhandler.py: {fname}")
+        _ebox = self.mGetClubox()
+        _utils = MagicMock()
+        _options = copy.deepcopy(_ebox.mGetArgsOptions())
+        _options.custom_attr = "marker"
+
+        with patch.object(_ebox, 'mGetExascaleUtils', return_value=_utils):
+            _obj = CommandHandler(_ebox)
+            _rc = _obj.mHandlerXsDisableNormalRedundancy(_options)
+
+        self.assertEqual(_rc, 0)
+        _utils.mDisableNormalRedundancy.assert_called_once_with(_options)
+
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mSetupNatNfTablesOnDom0v2')
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mRebootNode')
     def test_mHandlerEnableQinQ02(self, mock_mRebootNode, mock_mSetupNatNfTablesOnDom0v2):
@@ -1123,8 +1151,6 @@ class ebTestCmdHandler(ebTestClucontrol):
         }
         self.mPrepareMockCommands(_cmds)
 
-        _obj = CommandHandler(self.mGetClubox())
-        _obj.mHandlerEnableQinQ(_options)
 
 #if __name__ == "__main__":
 #    unittest.main()
@@ -1149,6 +1175,8 @@ def suite():
     suite.addTest(ebTestCmdHandler('test_mHandlerCheckConnection_ping_fail'))
     suite.addTest(ebTestCmdHandler('test_mHandlerCheckConfig'))
     suite.addTest(ebTestCmdHandler('test_mHandlerHealthCheckPostProv'))
+    suite.addTest(ebTestCmdHandler('test_mHandlerXsRemoveVMUserPrivilege'))
+    suite.addTest(ebTestCmdHandler('test_mHandlerXsDisableNormalRedundancy'))
     suite.addTest(ebTestCmdHandler('test_mHandlerFetchKeys'))
     suite.addTest(ebTestCmdHandler('test_mHandlerElasticInfo'))
     suite.addTest(ebTestCmdHandler('test_mHandlerMountVolume'))
@@ -1193,5 +1221,3 @@ def suite():
 if __name__ == '__main__':
     runner = unittest.TextTestRunner(failfast=True)
     runner.run(suite())
-
-

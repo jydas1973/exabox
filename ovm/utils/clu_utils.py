@@ -17,6 +17,11 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    jesandov    06/18/26 - Bug#39540098 Carry over cert for R1 to ADBD DomUs
+#    rajsag      05/29/26 - Bug 39283211 - support X11 no-XRMEM cell types
+#    prsshukl    05/21/26 - Bug 39416987 - EXACC: SSL INSPECTION: PHASE1:
+#                           EXACLOUD ISN'T COPYING CUSTOMER ROOT CA AS UNABLE
+#                           TO LOGIN TO THE CPS WALLET
 #    aararora    03/20/26 - 39106054: Add Falcon agent install helper
 #    aararora    01/27/26 - Bug 38723384: Add retry/force logic for crs restart
 #    prsshukl    03/04/25 - Bug 38828221: Copy customer Root CA for SSL Inspection enabled infra
@@ -58,8 +63,12 @@ from exabox.utils.common import mCompareModel
 from exabox.utils.node import connect_to_host, node_exec_cmd_check, node_cmd_abs_path_check, node_exec_cmd
 from exabox.core.Context import get_gcontext
 from exabox.core.Error import ebError, ExacloudRuntimeError, gReshapeError, gPartialError, gProvError, gNodeElasticError
+from exabox.ovm.utils.cellcli_utils import (ebCellCliUtils,
+                                            X11_EF_NOXRMEM_MACHINE_TYPE,
+                                            X11_HC_NOXRMEM_MACHINE_TYPE)
 
 from exabox.log.LogMgr import ebLogError, ebLogInfo, ebLogWarn, ebLogTrace
+from exabox.utils.ExaRegion import is_r1_region, get_r1_certificate_path
 
 DEFAULT_CRS_RETRY_ATTEMPTS = 3
 DEFAULT_CRS_RETRY_DELAY = 10
@@ -268,6 +277,80 @@ class ebCluUtils(object):
 
         ebLogInfo(f'{aValue} is successfully appended to {aProperty} in {_oeda_properties_path}.')
 
+    def mGetAddedCellPayloads(self):
+        if not hasattr(self.__cluctrl, 'mGetArgsOptions'):
+            return []
+
+        try:
+            _options = self.__cluctrl.mGetArgsOptions()
+        except Exception as ex:
+            ebLogWarn(f"*** Unable to retrieve args options for X11 no-XRMEM detection: {ex}")
+            return []
+
+        _jsonconf = getattr(_options, 'jsonconf', None)
+        if not isinstance(_jsonconf, dict):
+            return []
+
+        _reshape_config = _jsonconf.get('reshaped_node_subset', {})
+        if not isinstance(_reshape_config, dict):
+            return []
+
+        _added_cells = _reshape_config.get('added_cells', [])
+        if isinstance(_added_cells, list):
+            return _added_cells
+        if isinstance(_added_cells, tuple):
+            return list(_added_cells)
+        return []
+
+    def mGetCurrentCellNames(self):
+        if not hasattr(self.__cluctrl, 'mReturnCellNodes'):
+            return []
+
+        try:
+            _cell_nodes = self.__cluctrl.mReturnCellNodes()
+        except Exception as ex:
+            ebLogWarn(f"*** Unable to retrieve current cells for X11 no-XRMEM detection: {ex}")
+            return []
+
+        if isinstance(_cell_nodes, dict):
+            return list(_cell_nodes.keys())
+        if isinstance(_cell_nodes, (list, tuple, set)):
+            return list(_cell_nodes)
+        return []
+
+    def mGetX11NoXrmemMachineTypes(self):
+        _cellcli_utils = ebCellCliUtils(self.__cluctrl)
+        _machine_types = set()
+        _added_cells = self.mGetAddedCellPayloads()
+        for _cell in _added_cells:
+            if not isinstance(_cell, dict):
+                continue
+
+            _cell_name = _cell.get('cell_hostname') or _cell.get('hostname')
+            if not _cell_name:
+                continue
+
+            _rack_info = _cell.get('rack_info', {})
+            if not isinstance(_rack_info, dict):
+                _rack_info = {}
+
+            _machine_type = _cellcli_utils.mGetX11NoXrmemMachineType(
+                _cell_name,
+                aRackItemDescription=_rack_info.get('description'),
+                aCellType=_cell.get('model') or _cell.get('type'))
+            if _machine_type:
+                _machine_types.add(_machine_type)
+
+        if _added_cells:
+            return _machine_types
+
+        for _cell_name in self.mGetCurrentCellNames():
+            _machine_type = _cellcli_utils.mGetX11NoXrmemMachineType(_cell_name)
+            if _machine_type:
+                _machine_types.add(_machine_type)
+
+        return _machine_types
+
     def mUpdateGlobalEsProperties(self):
         # Update global es.properties under exacloud/oeda/properties folder
         _global_es_properties_path = os.path.join(self.__cluctrl.mGetBasePath(),
@@ -277,15 +360,27 @@ class ebCluUtils(object):
                                                                             "new": "true",
                                                                             "action": "replace"}}
         _append_celltypes_x11_xrmem = self.__cluctrl.mCheckConfigOption('append_celltypes_x11_xrmem')
+        _x11_noxrmem_machine_types = self.mGetX11NoXrmemMachineTypes()
+        _celltype_values = []
+        _hc_celltype_values = []
         if _append_celltypes_x11_xrmem and _append_celltypes_x11_xrmem == 'True':
+            _celltype_values.append("X11MHCXRMEM:X11_XRMEM_ROCE_CELL_XC")
+            _hc_celltype_values.append("X11MHCXRMEM:X11_XRMEM_ROCE_CELL_XC")
+        if X11_HC_NOXRMEM_MACHINE_TYPE in _x11_noxrmem_machine_types:
+            _celltype_values.append("X11MHCNOXRMEM:X11_NOXRMEM_ROCE_CELL_XC")
+            _hc_celltype_values.append("X11MHCNOXRMEM:X11_NOXRMEM_ROCE_CELL_XC")
+        if X11_EF_NOXRMEM_MACHINE_TYPE in _x11_noxrmem_machine_types:
+            _celltype_values.append("X11MEFNOXRMEM:X11_NOXRMEM_ROCE_CELL_EF")
+        if _celltype_values:
             _dict_global_es_properties["CELLTYPES"] = {
                 "action": "append",
-                "value": "X11MHCXRMEM:X11_XRMEM_ROCE_CELL_XC",
+                "value": ",".join(_celltype_values),
                 "delimiter": ","
             }
+        if _hc_celltype_values:
             _dict_global_es_properties["HC_CELL_TYPES"] = {
                 "action": "append",
-                "value": "X11MHCXRMEM:X11_XRMEM_ROCE_CELL_XC",
+                "value": ",".join(_hc_celltype_values),
                 "delimiter": ","
             }
         for _property, _values in _dict_global_es_properties.items():
@@ -533,55 +628,39 @@ class ebCluUtils(object):
 
     # Copying Domu certificates and key during Create Service flow and Add compute flow
     # if copy fails, then fail CS and Add compute flow respectively.
-    def mSetupCustomerRootCACertificates(self, aOptions=None):
-
-        def mGetCustomerRootCA(aOptions):
-            _customer_root_ca_base64 = None
-            _customer_root_ca_str = None
-            if aOptions is not None and aOptions.jsonconf is not None and 'customer_root_ca' in list(aOptions.jsonconf.keys()) and aOptions.jsonconf['customer_root_ca']:
-                _customer_root_ca_base64 = aOptions.jsonconf['customer_root_ca']
-                _customer_root_ca_str = b64decode(_customer_root_ca_base64).decode('utf8')
-
-            return _customer_root_ca_str
-
-        if not aOptions:
-            aOptions = self.__cluctrl.mGetArgsOptions()
-        
+    def mSetupCustomerRootCACertificates(self):
         try:
             _cert_source_destination_mapping = {}
-            if self.__cluctrl.mIsSslInspectionEnabled(aOptions):
-                _customer_root_ca_str = mGetCustomerRootCA(aOptions)
-                if _customer_root_ca_str is None:
-                    ebLogError(f"*** Fatal Error *** : Customer root ca in payload is emtpy")
-                    raise ExacloudRuntimeError(0x0820, 0xA, 'Root CA Certificate Str addition failed!')
-                _timestamp = str(time.time()).replace(".", "")
-                if _customer_root_ca_str is not None:
-                    _cert_source_destination_mapping = {
-                        f'{_customer_root_ca_str}' : '/etc/pki/ca-trust/source/anchors/rootca_{_timestamp}.crt',
-                    }
+            _customer_root_ca_cert_path = "/etc/pki/ca-trust/source/anchors/customer-root-ca.crt"
+            if self.__cluctrl.mIsSslInspectionEnabled():
+                if os.path.exists(_customer_root_ca_cert_path) is False:
+                    ebLogError(f"*** Fatal Error *** : customer-root-ca.crt does not exist in cps")
+                    raise ExacloudRuntimeError(0x0820, 0xA, 'customer-root-ca.crt addition failed!')
+                
+                _cert_source_destination_mapping = {
+                    f'{_customer_root_ca_cert_path}' : f'{_customer_root_ca_cert_path}',
+                }
 
             if _cert_source_destination_mapping:
                 for _, _domU in self.__cluctrl.mReturnDom0DomUPair():
                     with connect_to_host(_domU, get_gcontext(), username='root') as _nodeU:
-                        for source_str , dest_file in _cert_source_destination_mapping.items():
+                        for source_file , dest_file in _cert_source_destination_mapping.items():
                             dest_directory_path = os.path.dirname(dest_file)
                             if _nodeU.mFileExists(dest_directory_path) is False:
                                 ebLogTrace(f"Directory path : {dest_directory_path} does not exist , creating the path")
                                 _nodeU.mExecuteCmd(f'mkdir -p {dest_directory_path}')
-                            # Copy certificate str to domU
-                            ebLogInfo(f"*** Adding customer root ca certificate to {dest_file} on {_domU}")
-                            _echo_cmd = node_cmd_abs_path_check(_nodeU, "echo")
-                            _cmd_write = f"{_echo_cmd} '{source_str}' > {dest_file}"
-                            _nodeU.mExecuteCmdLog(_cmd_write)
+                            # Copy customer-root-ca.crt from cps to DomU
+                            ebLogInfo(f"*** Copying customer-root-ca.crt to {dest_file} on {_domU}")
+                            _nodeU.mCopyFile(source_file, dest_file)
                             if not _nodeU.mFileExists(dest_file):
-                                ebLogError(f"*** Fatal Error *** : Error while Adding the customer root ca certificate str to domU {_domU}")
-                                raise ExacloudRuntimeError(0x0820, 0xA, 'Root CA Certificate Str addition failed!')
+                                ebLogError(f"*** Fatal Error *** : Error while copying the customer-root-ca.crt to domU {_domU}")
+                                raise ExacloudRuntimeError(0x0820, 0xA, 'customer-root-ca.crt addition failed!')
 
                             node_exec_cmd_check(_nodeU, "update-ca-trust")
                             ebLogInfo(f"*** Completed CA trust refresh on {_domU}")
                         
         except Exception as e:
-            ebLogError(f' Error while Adding customer root CA certificate to domU: {e}')
+            ebLogError(f'Error while copying customer-root-ca.crt to domU: {e}')
             raise ExacloudRuntimeError(0x0820, 0xA, e)
 
     def mInstallFalconAgentOnDomus(self, aDomus, aOperationLabel=None):
@@ -841,3 +920,13 @@ class ebCluUtils(object):
         """Extract file name from the provided url"""
         _parsed = urllib.parse.urlparse(aUrl)
         return os.path.basename(_parsed.path)
+
+    def mCarryoverCertR1(self):
+        if self.__cluctrl.isATP():
+            if is_r1_region():
+                for _, _domU in self.__cluctrl.mReturnDom0DomUPair():
+                    with connect_to_host(_domU, get_gcontext()) as _node:
+                        node_exec_cmd_check(_node, "/bin/mkdir -p /opt/exacloud")
+                        _node.mCopyFile(get_r1_certificate_path(), "/opt/exacloud/combined_r1.crt")
+    
+# end of file

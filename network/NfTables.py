@@ -14,6 +14,10 @@ NOTE:
 History:
 
         MODIFIED   (MM/DD/YY)
+        jfsaldan   05/04/26 - Document nftables include helper return codes
+        jfsaldan   04/29/26 - Bug 39220733 - EXACC:BB:VMS:R1:VMS KEEP STOPPING
+                              AUTOMATICALLY EVEN THEY ARE UP & RUNNING |
+                              REIMAGED DOM0 MISSING INCLUDE OF NFT CONFIG FILE
         jesandov   11/21/25 - 38677852: Remove comment message
         scoral     09/22/25 - Bug 38446950 - Implement mDeleteNFTRules as a
                               generalization of mDeleteDuplicateNFTRules.
@@ -34,6 +38,7 @@ from exabox.log.LogMgr import ebLogInfo
 from exabox.utils.node import node_exec_cmd_check, node_exec_cmd
 from exabox.log.LogMgr import ebLogInfo, ebLogTrace, ebLogError
 from exabox.core.Error import ExacloudRuntimeError
+from exabox.core.Context import get_gcontext
 
 
 
@@ -419,5 +424,51 @@ class NfTables:
     def mDeleteDuplicateNFTRules(self, aNode):
         ebLogInfo("Removing duplicated NFTables rules")
         self.mDeleteNFTRules(aNode, aOnlyDuplicates=True)
+
+    def mEnsureExadataIncludeConfig(self, aNode):
+        """
+        :returns int:
+            0 = include already present
+            1 = include added
+            2 = skip flag enabled.
+        """
+        _nftables_conf = "/etc/sysconfig/nftables.conf"
+        _include_stmt = 'include "/etc/nftables/exadata.nft"'
+        _skip_flag = "skip_nft_exadata_include_check"
+        _gcontext = get_gcontext()
+        _config_options = _gcontext.mGetConfigOptions() if _gcontext else {}
+
+        if str(_config_options.get(_skip_flag, "False")).lower() == "true":
+            ebLogInfo(f"{_skip_flag} is True. Skipping exadata nftables include check.")
+            return 2
+
+        ebLogInfo(f"Checking {_nftables_conf} for {_include_stmt}")
+        _ret = node_exec_cmd(
+            aNode,
+            f"/bin/cat {_nftables_conf}",
+            log_error=True,
+            log_stdout_on_error=True)
+        if _ret.exit_code != 0:
+            _err = f"Failed to read {_nftables_conf} while checking exadata nftables include"
+            ebLogError(_err)
+            raise ExacloudRuntimeError(0x0838, 0xA, _err)
+
+        ebLogTrace(f"{_nftables_conf} from Dom0 {aNode.mGetHostname()}:\n{_ret.stdout}")
+
+        for _line in (_ret.stdout or "").splitlines():
+            _line = _line.strip()
+            if not _line or _line.startswith("#"):
+                continue
+            if _line == _include_stmt:
+                ebLogInfo(f"{_nftables_conf} already contains the statement '' {_include_stmt} ''")
+                return 0
+
+        ebLogInfo(f"Adding {_include_stmt} to {_nftables_conf}")
+        node_exec_cmd_check(
+            aNode,
+            f"/bin/echo '{_include_stmt}' >> {_nftables_conf}",
+            log_error=True,
+            log_stdout_on_error=True)
+        return 1
 
 # end of file

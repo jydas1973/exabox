@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2024, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     XenVmMgr - Implement HVMgr interface
@@ -11,6 +11,7 @@ NOTE:
     None
 
 History:
+    gvalderr    05/08/26   - Bug 39166742 - Add VM resume support
     bhpati      09/09/24 - EXACS: PROVISIONING FAILED WITH EXACLOUD ERROR CODE:
                            16 HYPERVISOR STOPPED ON DOM0.
     ritikhan    11/03/23   - ENH 35405135 - VMCLUSTER PAYLOAD CREATION: HANDLE ALL VMS IN SHUT DOWN STATE SCENARIO
@@ -482,6 +483,24 @@ class ebXenVmMgr(HVMgr):
                         ebLogInfo("Calling destroy on vmid: {0}".format(_tmpVmId))
                         hostcmd = 'xm destroy {0}'.format(_tmpVmId)
                         self.mDestroyVM(_tmpVmId)
+
+        return _rc
+
+    # TODO: For the moment this change is fine, but in the future once
+    # vm_maker has support for VM resume, we should migrate to it.
+    def mResumeVM(self, aVMId):
+        _vmid = aVMId
+        _host_cmd = 'xm unpause ' + _vmid
+        _i, _o, _e = self.mExecuteCmd(_host_cmd)
+        _rc = self.mGetCmdExitStatus()
+        if _rc:
+            ebLogError(f'*** XM UNPAUSE failed for : {_rc} / {_vmid}')
+
+            for _line in _o.readlines():
+                ebLogError(f'*** XM UNPAUSE O_LOG: {_line}')
+
+            for _line in _e.readlines():
+                ebLogError(f'*** XM UNPAUSE E_LOG: {_line}')
 
         return _rc
 

@@ -11,6 +11,7 @@ NOTE:
     None
 
 History:
+    joysjose  05/08/26 - Bug 38385387 Memory & OH reshape partial success
     aararora  27/02/26 - Bug 38902170: Correct resource leak issues
     nelango   02/06/26 - Bug 38700324: lvresize changes for bind mounts
     bhpati    02/05/26 - Bug 38820127 - OCI: LOCAL STORAGE RESHAPE OPERATION HUNG FOR 2 WEEKS
@@ -38,6 +39,7 @@ import time
 from exabox.log.LogMgr import ebLogDiag, ebLogWarn, ebLogInfo,  ebLogError, ebLogVerbose, ebLogTrace
 from exabox.core.Node import exaBoxNode
 from exabox.core.Context import get_gcontext
+from exabox.core.DBStore import ebGetDefaultDB
 from exabox.core.Error import ebError, ExacloudRuntimeError, gPartitionError, gReshapeError
 from exabox.infrapatching.core.clupatchhealthcheck import ebCluPatchHealthCheck
 from exabox.utils.node import (
@@ -49,6 +51,7 @@ from exabox.utils.node import (
 )
 from exabox.ovm.cluencryption import getMountPointInfo, getDiskLabel
 from exabox.ovm.utils.clu_utils import ebCluUtils, mRunCrsCommandsWithRetry
+from exabox.ovm.clumisc import mGetReshapeRetryTypeFromRackState, mUpdateAppliedReshapeErrorObject
 import json, re
 import math
 import os
@@ -1032,7 +1035,8 @@ class exaBoxKvmDiskMgr(object):
                 percentage_increase = _percentage_increase + _percentageStepSize
                 _lastNode.append(_domU)
                 if _domU not in _node_toUpdate_list:
-                    if _eBoxCluCtrl.mCheckIfCrsDbsUp(_domU):
+                    _reshape_type = mGetReshapeRetryTypeFromRackState(aOptions, 'OHOME')
+                    if _eBoxCluCtrl.mCheckIfCrsDbsUp(_domU, aReshapeType=_reshape_type):
                         ebLogInfo("*** node already at the resize Value. Continuing with next node")
                         continue
                 _this_node_infoobj = existing_partition_info[_domU]
@@ -1055,6 +1059,8 @@ class exaBoxKvmDiskMgr(object):
 
                 ## We dont have to stop cluster services if disk is going to be expanded.. live expansion is possible !
                 if shrink == 1 and _inparams[_partition_name_key] == 'u02' and _gi_home is not None:
+                    _dbList_str = ' '.join([str(_dbs) for _dbs in _db_List])
+                    ebGetDefaultDB().mSetDBlist(_domU, _dbList_str, aReshapeType='OHOME')
                     ebLogInfo("*** Resize(Shrink) triggered for u02; will stop cluster services if running")
                     ebLogInfo("*** Checking cluster services on " + _domU)
                     with connect_to_host(_domU, get_gcontext()) as _node:
@@ -1332,7 +1338,11 @@ class exaBoxKvmDiskMgr(object):
                         if _out is None and _exitstatus != 1:
                             self.logDebugInfo(_o, _e)
                             _detail_error = 'Could not start cluster services on ' + _domU
-                            _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_CRS_START'], _detail_error)
+                            mUpdateAppliedReshapeErrorObject(
+                                _eBoxCluCtrl, 'OHOME', _detail_error, aCrsDown=True,
+                                aDbDown=_isDatabaseInstanceRunning,
+                                aNodeData=[{'hostname': _domU}]
+                            )
                             return self.__edp.mRecordError(gPartitionError['ErrorFetchingDetails'], "*** " + _detail_error)
 
                         _tvl = _eBoxCluCtrl.mCheckConfigOption('crs_timeout')
@@ -1358,7 +1368,11 @@ class exaBoxKvmDiskMgr(object):
                         else:
                             ebLogError("*** CRS has failed to come up")
                             _detail_error = 'Could not start cluster services on ' + _domU
-                            _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_CRS_START'], _detail_error)
+                            mUpdateAppliedReshapeErrorObject(
+                                _eBoxCluCtrl, 'OHOME', _detail_error, aCrsDown=True,
+                                aDbDown=_isDatabaseInstanceRunning,
+                                aNodeData=[{'hostname': _domU}]
+                            )
                             return self.__edp.mRecordError(gPartitionError['ErrorFetchingDetails'], "*** " + _detail_error)
                         
 
@@ -1373,18 +1387,24 @@ class exaBoxKvmDiskMgr(object):
 
                             if _db_started:
                                 ebLogInfo("*** DB has come up")
+                                ebGetDefaultDB().mRemoveDBListByNode(_domU)
                             else:
                                 _post_crs_db_list = _eBoxCluCtrl.mGetActiveDbInstances(_domU) or []
                                 if sorted(_db_List) == sorted(_post_crs_db_list):
                                     ebLogInfo(f'*** pre/post CRS restart DB instances on {_domU} are same. Pre CRS DB list:{_db_List}, Post CRS DB List: {_post_crs_db_list}')
+                                    ebGetDefaultDB().mRemoveDBListByNode(_domU)
                                 else:
                                     _startup_failed_dbs = sorted(set(_db_List) - set(_post_crs_db_list))
                                     ebLogError(f"*** DB's {_startup_failed_dbs} has failed to come up on {_domU}")
                                     _detail_error = f'Could not start DB {_startup_failed_dbs} on {_domU}'
-                                    _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_DB_START'], _detail_error)
+                                    mUpdateAppliedReshapeErrorObject(
+                                        _eBoxCluCtrl, 'OHOME', _detail_error, aDbDown=True,
+                                        aNodeData=[{'hostname': _domU}]
+                                    )
                                     return self.__edp.mRecordError(gPartitionError['ErrorFetchingDetails'], "*** " + _detail_error)
                         else:
                             ebLogWarn(f'*** Skipping the DB check as NO active database instances were found on {_domU} prior to the reshape.')
+                            ebGetDefaultDB().mRemoveDBListByNode(_domU)
 
 
                         if _tfa_status != 0:

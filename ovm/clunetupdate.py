@@ -3,7 +3,7 @@
 #
 # clunetupdate.py
 #
-# Copyright (c) 2021, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      clunetupdate.py - logic for ReST CluCtrl command "network_update"
@@ -17,6 +17,7 @@
 #        with all the default checks enabled.
 #
 #    MODIFIED   (MM/DD/YY)
+#    joysjose    05/07/26 - Bug 39263018 - voxio clunetupdate command injection fix
 #    ririgoye    11/26/25 - Bug 38636333 - EXACLOUD PYTHON:ADD INSTANTCLIENT TO
 #                           LD_LIBRARY_PATH
 #    scoral      10/07/25 - Enh 38452359: Support up to 199 VMs.
@@ -47,6 +48,7 @@ __all__ = ['handle_network_update', 'handle_rollback_bonding_migration']
 from itertools import count, dropwhile, takewhile
 import os
 import re
+import shlex
 import tempfile
 from typing import (
     Any, Callable, Dict, Iterator, List, Mapping, NamedTuple, Optional,
@@ -772,11 +774,45 @@ def cluctrl_change_net_from_payload(
 #        being used here under consent of the owners.  Please don't replicate
 #        anywhere else without explicit consent of the owners of those
 #        components.
-CHANGE_VLAN_CMD_FMT = \
-    '/opt/exacloud/bondmonitor/bond_utils.py change_vlan {} {} {} {}'
-CHANGE_MAC_CMD_FMT = \
-    '/opt/exacloud/bondmonitor/bond_utils.py change_mac {} {} {} {} {}'
+BOND_UTILS = '/opt/exacloud/bondmonitor/bond_utils.py'
 REMOTE_ROLLBACK_VLANID = '/opt/exacloud/bondmonitor/rollback_vlanid.sh'
+VALID_VM_NAME_RE = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_.-]*$')
+VALID_NET_TYPE_RE = re.compile(r'^[A-Za-z][A-Za-z0-9_-]*$')
+VALID_MAC_ADDR_RE = re.compile(
+    r'^[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}$')
+
+
+def shell_join(args: Sequence[object]) -> str:
+    """Build a shell-safe command string from trusted argv elements."""
+    return ' '.join(shlex.quote(str(arg)) for arg in args)
+
+
+def validate_vm_name(vm_name: str) -> str:
+    """Validate DomU VM names before they reach the shell."""
+    if not VALID_VM_NAME_RE.fullmatch(vm_name):
+        raise ValueError(f'Invalid VM name: {vm_name}')
+    return vm_name
+
+
+def validate_net_type(net_type: str) -> str:
+    """Validate network type before it reaches the shell."""
+    if not VALID_NET_TYPE_RE.fullmatch(net_type):
+        raise ValueError(f'Invalid network type: {net_type}')
+    return net_type
+
+
+def validate_mac_addr(mac_addr: str) -> str:
+    """Validate MAC address before it reaches the shell."""
+    if not VALID_MAC_ADDR_RE.fullmatch(mac_addr):
+        raise ValueError(f'Invalid MAC address: {mac_addr}')
+    return mac_addr
+
+
+def validate_vlan_id(vlan_id: int) -> int:
+    """Validate VLAN IDs before they reach the shell."""
+    if not isinstance(vlan_id, int) or not 0 <= vlan_id <= 4094:
+        raise ValueError(f'Invalid VLAN ID: {vlan_id}')
+    return vlan_id
 
 
 def update_networks(
@@ -805,7 +841,7 @@ def update_networks(
 
     def __update_net(node_conf: NodeVMNetUpdates,
                      rollback: bool) -> None:
-        vm_name = node_conf.domu_vm_name
+        vm_name = validate_vm_name(node_conf.domu_vm_name)
         with connect_to_host(node_conf.dom0, ctx) as node:
             # Shutdown VM if rollback
             if rollback:
@@ -818,12 +854,19 @@ def update_networks(
             clubonding.install_bond_monitor_rpm(node, rpm_path)
 
             for net_type, conf in node_conf.net_updates.items():
-                # NOTE: we need to change the MAC before VLAN because we pass
-                #       the current VLAN to CHANGE_MAC_CMD_FMT.
+                net_type = validate_net_type(net_type)
+                # NOTE: we need to change the MAC before VLAN because the
+                #       change-mac helper expects the current VLAN.
                 if conf.macs:
                     curr_vlan, old_mac, new_mac = conf.macs
-                    cmd = CHANGE_MAC_CMD_FMT.format(
-                        vm_name, curr_vlan, net_type, new_mac, old_mac)
+                    curr_vlan = validate_vlan_id(
+                        0 if curr_vlan is None else curr_vlan)
+                    old_mac = validate_mac_addr(old_mac)
+                    new_mac = validate_mac_addr(new_mac)
+                    cmd = shell_join([
+                        BOND_UTILS, 'change_mac', vm_name, curr_vlan,
+                        net_type, new_mac, old_mac
+                    ])
                     node_exec_cmd_check(node, cmd)
 
                 if conf.vlans:
@@ -832,26 +875,32 @@ def update_networks(
                     # NOTE: the command to change VLANs in Dom0 expects vlan 0
                     #       to mean "no vlan" (which we represent with None).
                     #       We have to adjust the values.
-                    old_vlan = 0 if old_vlan is None else old_vlan
-                    new_vlan = 0 if new_vlan is None else new_vlan
+                    old_vlan = validate_vlan_id(
+                        0 if old_vlan is None else old_vlan)
+                    new_vlan = validate_vlan_id(
+                        0 if new_vlan is None else new_vlan)
 
                     if not rollback:
-                        cmd = CHANGE_VLAN_CMD_FMT.format(
-                            vm_name, net_type, new_vlan, old_vlan)
+                        cmd = shell_join([
+                            BOND_UTILS, 'change_vlan', vm_name, net_type,
+                            new_vlan, old_vlan
+                        ])
                         node_exec_cmd_check(node, cmd)
 
                     # update the nftables rules for this cluster if needed
                     if update_nft_rules:
                         old_bond = f'"{bond_for_vlan(old_vlan)}"'
                         new_bond = f'"{bond_for_vlan(new_vlan)}"'
-                        cmd = (f"/bin/sed -i 's/{old_bond}/{new_bond}/g' "
-                               f"{nft_rules}")
+                        cmd = shell_join([
+                            '/bin/sed', '-i',
+                            f's/{old_bond}/{new_bond}/g', nft_rules
+                        ])
                         node_exec_cmd_check(node, cmd)
 
             if rollback:
                 # call the rollback vlan script
                 if node.mFileExists(REMOTE_ROLLBACK_VLANID):
-                    cmd = f"{REMOTE_ROLLBACK_VLANID} {vm_name}"
+                    cmd = shell_join([REMOTE_ROLLBACK_VLANID, vm_name])
                     node_exec_cmd_check(node, cmd)
                 else:
                     msg = f'{REMOTE_ROLLBACK_VLANID} script does not'\

@@ -3,7 +3,7 @@
 #
 # constants.py
 #
-# Copyright (c) 2020, 2024, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      constants.py - Contains all the constants used in test code.
@@ -15,6 +15,8 @@
 #      This contains all the constants used in util and testcases code.
 #
 #    MODIFIED   (MM/DD/YY)
+#    jyotdas     05/27/26 - Bug 39431447 - EXACC - smr workflow is blocking cpu
+#                           reshape operation
 #    emekala     12/12/24 - ENH 37374442 - SUPPORT INFRA PATCH MOCK FWK TO
 #                           ACCEPT MOCK RESPONSE IN JSON FORMAT VIA REST API
 #    araghave    12/10/24 - Enh 37241595 - TEST CHANGES TO REPLACE ALL IBSWITCH
@@ -122,3 +124,6 @@ ECRADB_DEPLOYMENT_FILE = "deployment/deployment.readme"
 
 # Infrapatching custom mock patch json file capturing mock rack and response details. Its placed under exacloud/config/
 CUSTOM_MOCK_PATCH_FILE_NAME = "custom_mock_patch.json"
+
+# Compatibility matrix test constants (Bug 39005054)
+ECRA_ONGOING_OPERATION_ERROR = "0x01000007"

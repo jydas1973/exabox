@@ -16,6 +16,10 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    aypaul      05/11/26 - Bug#39276269 Fix security issue for base image
+#                           attach
+#    joysjose    04/10/26 - fix imagebase copy volume lock handling for unit
+#                           tests
 #    jesandov    03/30/26 - 39139207: Fix collision on parallel imagebase copy
 #    jesandov    03/26/26 - 39060375: Add correct R1 certificate path
 #    jesandov    03/13/26 - 38875952: Change approach to copy to domU
@@ -36,7 +40,7 @@ import copy
 from exabox.core.Context import get_gcontext
 from exabox.core.Node import exaBoxNode
 from exabox.log.LogMgr import ebLogError, ebLogInfo, ebLogWarn, ebLogTrace
-from exabox.utils.common import mCompareModel
+from exabox.utils.common import is_valid_fqdn
 from exabox.utils.node import (connect_to_host, node_cmd_abs_path_check, node_exec_cmd_check,
                                node_exec_cmd, node_read_text_file, node_write_text_file)
 from exabox.jsondispatch.jsonhandler import JDHandler
@@ -161,9 +165,11 @@ class ImagebaseCopyVolume(JDHandler):
                 raise ValueError(f"Missing {aKey} in bom file")
 
             _lock = RemoteLock(None, force_host_list=[aHostInfo["domU"]])
+            _lockAcquired = False
 
             try:
                 _lock.acquire()
+                _lockAcquired = True
 
                 # Calculate udev device
                 with connect_to_host(aHostInfo["domU"], get_gcontext()) as _node:
@@ -222,7 +228,8 @@ class ImagebaseCopyVolume(JDHandler):
                     _attachDone = True
 
             finally:
-                _lock.release()
+                if _lockAcquired:
+                    _lock.release()
 
             with connect_to_host(aHostInfo["domU"], get_gcontext()) as _node:
 
@@ -289,13 +296,19 @@ class ImagebaseCopyVolume(JDHandler):
 
                         if "domU" not in _hostNode:
                             if "domU" in _volume and _volume["domU"]:
+                                if not is_valid_fqdn(_volume["domU"]):
+                                    raise ExacloudRuntimeError(0x0825, 0xA, f"FQDN {_volume['domU']} is an invalid hostname")
                                 _hostNode["domU"] = _volume["domU"]
 
                         if "dom0" not in _hostNode:
                             if "attach_host" in _volume and "dom0" in _volume:
                                 if _volume["dom0"] in _volume["attach_host"]:
+                                    if not is_valid_fqdn(_volume["attach_host"]):
+                                        raise ExacloudRuntimeError(0x0825, 0xA, f"FQDN {_volume['attach_host']} is an invalid hostname")
                                     _hostNode["dom0"] = _volume["attach_host"]
                                 else:
+                                    if not is_valid_fqdn(_volume["dom0"]):
+                                        raise ExacloudRuntimeError(0x0825, 0xA, f"FQDN {_volume['dom0']} is an invalid hostname")
                                     _hostNode["dom0"] = _volume["dom0"]
 
                         if "gold_system" not in _hostNode:

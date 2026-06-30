@@ -64,6 +64,12 @@ NOTES:
 History:
 
     MODIFIED   (MM/DD/YY)
+    scoral      05/29/26 - Bug 39443833 - Enhanced logging and validations of
+                           configure_bond_monitor.
+    avimonda    04/25/26 - Clarify bridge restart logging for bonding restart
+                           path
+    avimonda    04/22/26 - Bug 39168993: Restart vmbondeth0 when bond restart
+                           is required
     mpedapro    02/03/26 - Enh::38914367 update MTU of PF interfaces to 9000
     aararora    01/16/26 - Bug 38842120: Fix monitor_admin json - regression
                            from 38452359
@@ -618,7 +624,9 @@ def patch_bond_bridge_ifcfg(
     bond_exists = node.mFileExists(bond_ifcfg_path)
 
     restart_bond = True
+    update_bond = True
     restart_bridge = True
+    update_bridge = True
     _force_network_interfaces_reboot  = get_gcontext().mGetConfigOptions().get(
             "force_network_interfaces_reboot", "false")
 
@@ -626,17 +634,27 @@ def patch_bond_bridge_ifcfg(
         if bond_exists and validate_bonding_config(node, bond_interface, bond_vals):
             ebLogInfo(f'Actual bond interface config is already matching with desire config, skipping bond interface {bond_interface} restart.')
             restart_bond = False
+            update_bond = False
 
         if bridge_exists and validate_bridge_config(node, bridge_interface, bridge_key_vals):
             ebLogInfo(f'Actual bridge interface config is already matching with desire config, skipping bridge interface {bridge_interface} restart.')
             restart_bridge = False
+            update_bridge = False
+
+        if bond_exists and bridge_exists and restart_bond and not restart_bridge:
+            ebLogInfo(
+                f'Bridge interface {bridge_interface} config matches desired config, '
+                f'but {bridge_interface} will be restarted because dependent bond interface '
+                f'{bond_interface} will be restarted.'
+            )
+            restart_bridge = True
 
 
     # Patch interfaces.  Skip cleanup if ifcfg files are missing.
     if is_cleanup and not bridge_exists:
         ebLogWarn(f"BONDING: {node.mGetHostname()}: "
                   f"{bridge_ifcfg_path} missing, skipping cleanup.")
-    elif not restart_bridge:
+    elif not update_bridge:
         ebLogInfo("Current bridge config is matching desired config, skiping config file update")
     else:
         node_update_key_val_file(node, bridge_ifcfg_path, bridge_key_vals)
@@ -644,7 +662,7 @@ def patch_bond_bridge_ifcfg(
     if is_cleanup and not bond_exists:
         ebLogWarn(f"BONDING: {node.mGetHostname()}: "
                   f"{bond_ifcfg_path} missing, skipping cleanup.")
-    elif not restart_bond:
+    elif not update_bond:
         ebLogInfo("Current bond conig is matching desired config, skiping config file update")
     else:
         node_update_key_val_file(node, bond_ifcfg_path, bond_key_vals)
@@ -1377,10 +1395,12 @@ def configure_bond_monitor(
     node_write_text_file(
         node, REMOTE_MONITOR_CONFIG_BK_FILE_FMT.format(bond_conf.domu),
         bond_conf.monitor_conf)
-    if bond_conf.domu_client:
-        conf_file_vm = (f'/EXAVMIMAGES/GuestImages/{bond_conf.domu_client}/'
-                        f'monitor_{bond_conf.domu}.json')
+
+    vm_files = f'/EXAVMIMAGES/GuestImages/{bond_conf.domu_client}'
+    if bond_conf.domu_client and node.mFileExists(vm_files):
+        conf_file_vm = f'{vm_files}/monitor_{bond_conf.domu}.json'
         node_write_text_file(node, conf_file_vm, bond_conf.monitor_conf)
+        ebLogInfo(f'BONDING: Saved monitor config file: {conf_file_vm}')
 
 
 def cleanup_bond_bridges(

@@ -16,12 +16,26 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    jyotdas     06/20/26 - Enh 39523473 - Track Plugin Progress Status in
+#                           Infrapatching Tooling
+#    araghave    06/08/26 - Bug 39483306 - QMR PATCHING FAILING DUE TO "BAD
+#                           AUTHENTICATION TYPE; ALLOWED TYPES: [PUBLICKEY] ON
+#                           DOMU TARGET
+#    sdevasek    06/03/26 - Bug 39483306 - QMR PATCHING FAILING FOR
+#                           DOM0DOMU PLUGIN FAILURE
+#    araghave    05/22/26 - Bug 39424884 - EXACS:26.1.1:BB:DOMU:LIVE
+#                           UPDATE:ALLCVSS ROLLBACK FAILING
+#    avimonda    05/15/26 - Bug 39189788 use plugin-specific console timeout
+#    araghave    04/20/26 - Enh 39152619 - MODIFY ALL SMR/ELU OPERATIONS TO
+#                           ROLLING OPERATIONS STYLE IN INFRA PATCHING CODE
 #    jyotdas     04/08/26 - Codex scan issue fixes
 #    sdevasek    04/01/26 - Bug 39149959 - OCI: SMR PATCHING IS
 #                           LOOKING FOR PATCHES IN ECRA WHICH ARE NOT
 #                           REGISTERED VIA IMAGESERIES AND FAILING
 #    sdevasek    04/08/26 - Enh 39181872 - REMOVE
 #                           MFIXINVALIDELUVERSIONENTRIES FROM ECS_MAIN
+#    araghave    03/25/26 - Enh 39082322 - INFRAPATCHING ARTIFACTS - SPACE
+#                           MANAGEMENT ON MANAGEMENT HOST AS LAUNCH NODE
 #    sdevasek    03/18/26 - Bug 39051493 - SMR PATCHING FAILED WITH ERROR :
 #                           "PATCH FILES MISSING ON TH EXACLOUD HOST AND ELU
 #                           PATCHING CANNOT CONTINUE FOR THE CURRENT PATCH
@@ -1174,7 +1188,7 @@ class GenericHandler(LogHandler):
                     return _ret, _current_qmr_image_version, _elu_info, _is_elu_outstanding_work_applicable
 
             elif _current_live_update_version_msg:
-                if ELU_APPLIED_REBOOT_MESSAGE in _current_live_update_version_msg:
+                if ELU_APPLIED_REBOOT_MESSAGE_RESET in _current_live_update_version_msg or ELU_OUTSTANDING_ITEMS_EXIST_MESSAGE_NEVER in _current_live_update_version_msg:
                     '''
                       Cases where ELU outstanding items will be applied.
                       Domu will reboot after the outstanding work items are applied.
@@ -1712,12 +1726,21 @@ class GenericHandler(LogHandler):
         """
         _accessible_user = None
         _user_node_accessible_dict = self.mGetUserToNodeMappingToRunPlugins()
+
+        if (_user_node_accessible_dict is None) or (aDomUHostname not in _user_node_accessible_dict):
+            self.mPatchLogInfo(f"Host {aDomUHostname} not in initial mapping _user_node_accessible_dict or mapping is empty. Calling mGetUsertoConnectWith(host)")
+            _user_to_connect_with = self.mGetUsertoConnectWith(aDomUHostname,exaBoxNode(get_gcontext()))
+            # mGetUsertoConnectWith sets the user-to-node mapping using
+            # mSetUserToNodeMappingToRunPlugins, so fetch the updated mapping.
+            _user_node_accessible_dict = self.mGetUserToNodeMappingToRunPlugins()
+
         if aDomUHostname in _user_node_accessible_dict:
             _users = _user_node_accessible_dict[aDomUHostname]
             if "root" in _users:
                 _accessible_user = "root"
             elif "opc" in _users:
                 _accessible_user = "opc"
+        self.mPatchLogInfo(f"Resolved accessible user for host {aDomUHostname}: {_accessible_user} in mGetUserDetailsBasedOnDomUhostnameToRunPlugins")
         return _accessible_user
 
     def mGetCurrentLaunchNodeList(self):
@@ -1868,6 +1891,9 @@ class GenericHandler(LogHandler):
     def mGetSleepbetweenComputeTimeInSec(self):
         return int(mGetInfraPatchingConfigParam('exadata_sleep_between_computes_time_in_sec'))
 
+    def mGetExacloudPluginConsoleExecutionTimeoutInSeconds(self):
+        return int(mGetInfraPatchingConfigParam('exacloud_plugin_console_execution_timeout_in_seconds'))
+
     def mGetPluginConsoleReadCustomTimeoutSec(self):
         return int(mGetInfraPatchingConfigParam('plugin_console_read_custom_timeout_sec'))
 
@@ -1948,6 +1974,12 @@ class GenericHandler(LogHandler):
 
     def mGetMaxNumberofSshRetries(self):
         return int(mGetInfraPatchingConfigParam('max_number_of_ssh_retries'))
+
+    def mGetPatchSpaceMultiplierRemoteLaunchNode(self):
+        return int(mGetInfraPatchingConfigParam('patch_space_multiplier_exadata_launch_node'))
+
+    def mGetPatchSpaceMultiplierLocalLaunchNode(self):
+        return int(mGetInfraPatchingConfigParam('patch_space_multiplier_external_launch_node'))
 
     def mGetRpmExcludeList(self):
         try:
@@ -2913,45 +2945,18 @@ class GenericHandler(LogHandler):
 
     def mSetPatchOperationStyle(self):
         """
-        Decides which type of operation style will be used: rolling/non-rolling
+         - Decides which type of operation style will be used: rolling/non-rolling
+         - CP always passes rolling in case of Exasplice/ELU irrespective of the 
+           Patch/Target type, In case of OperationsStyle passed as non-rolling
+           during SMR/ELU through ecracli, we should explicitly set ops style to 
+           'rolling' to mimick the CP behaviour.
+         - Operations Style is 'rolling' by default.
         """
-
-        # Patchmgr support only non-rolling style in case of exasplice on dom0 
-        # nodes. So, change to non-rolling if auto or rolling specified by user
-        # depending on the infra patching operation. Exasplice rollback must
-        # always be performed in rolling style.
-
-        # Cells should be patched in rolling always in case of monthly patching
-        # because customer might try VM start/stop operations and those
-        # operations would fail if cell goes in non-rolling (because VMs
-        # are brought down).
-        # TODO :This can be relaxed to use non-rolling once we get the rebootless cell monthly patching
-
         if self.mIsExaSplice():
-            if PATCH_DOM0 in self.__target_type:
-                if self.__task == TASK_ROLLBACK:
-                    '''
-                     Perform ELU/Exasplice rollback in rolling to
-                     avoid outage scenarios as all Dom0s will get
-                     rebooted together in case of non-rolling is 
-                     set.
-                    '''
-                    self.__op_style = OP_STYLE_ROLLING
-                else:
-                    self.__op_style = OP_STYLE_NON_ROLLING
-            elif  PATCH_CELL in self.__target_type:
-                self.__op_style = OP_STYLE_ROLLING
-            self.mPatchLogInfo(
-                f"Monthly Patching operation style set to {self.__op_style} for target {self.__target_type} ")
+            self.__op_style = OP_STYLE_ROLLING
             return
 
-        # Change style to auto in case of prechecks and let it evaluate based on the VMs availabality, later.
-        if self.__task in [TASK_PREREQ_CHECK, TASK_ROLLBACK_PREREQ_CHECK] and self.__op_style == OP_STYLE_NON_ROLLING:
-            self.mPatchLogWarn("Changing operation style to auto for precheck operation.")
-            self.__op_style = OP_STYLE_AUTO
-
         if (self.__op_style == OP_STYLE_AUTO and self.__target_env == ENV_PRODUCTION):
-
             if self.mGetDomUListFromXml(aFromXmList=True):
                 self.__mListOfStatementsToPrint.append(("INFO", "VMs up found in cluster. Operation style will be set to Rolling."))
                 self.__op_style = OP_STYLE_ROLLING
@@ -3382,6 +3387,22 @@ class GenericHandler(LogHandler):
 
             return _patch_report_json
 
+    def mGetPersistedPluginProgressStatus(self):
+        """
+        Read the currently persisted plugin_progressing_status block from the patch
+        report so that report rebuilders which reconstruct the data block from scratch
+        can carry it forward instead of clobbering it (mirrors how node_progressing_status
+        is preserved). Best-effort: returns None on any failure.
+        """
+        try:
+            _, _, _, _json_patch_report = self.mGetAllPatchListDetails()
+            if _json_patch_report:
+                _data = json.loads(_json_patch_report).get("data") or {}
+                return _data.get(PLUGIN_PROGRESSING_STATUS)
+        except Exception as e:
+            self.mPatchLogWarn(f"mGetPersistedPluginProgressStatus best-effort read failed: {str(e)}")
+        return None
+
     def mGetAllPatchListDetails(self):
         _master_request_uuid = None
         _child_request_uuid = None
@@ -3558,6 +3579,13 @@ class GenericHandler(LogHandler):
            if _master_request_uuid:
                self.mPatchLogInfo(f"Master request uuid for error status {_master_request_uuid}")
                self.__json_status["data"]["master_request_uuid"] = _master_request_uuid
+
+           # Preserve any plugin_progressing_status already persisted
+           # this report is rebuilt from a fresh mAddPatchreport() template and would
+           # otherwise clobber the plugin progress block, like node_progressing_status.
+           _persisted_plugin_progress = self.mGetPersistedPluginProgressStatus()
+           if _persisted_plugin_progress and PLUGIN_PROGRESSING_STATUS not in self.__json_status["data"]:
+               self.__json_status["data"][PLUGIN_PROGRESSING_STATUS] = _persisted_plugin_progress
 
            self.mPatchLogInfo('Updating patch status JSON report to Exacloud DB.')
            _db = ebGetDefaultDB()

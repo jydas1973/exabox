@@ -16,6 +16,12 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    ririgoye    05/21/26 - EXACS-170979 SOP dependency support
+#    ririgoye    05/13/26 - EXACS-170977 localhost exacloud python review fix
+#    ririgoye    05/12/26 - EXACS-170977 use Exacloud Python from SOP metadata
+#    ririgoye    03/23/26 - Bug 39041362 - EXACLOUD SOP REMOTE EXECUTION
+#                           METADATA SHOULD PROVIDE AN EASY WAY TO USE EXACLOUD
+#                           PYTHON+MODULES
 #    aararora    02/27/26 - Bug 38902170: Correct resource leak issues
 #    aypaul      06/17/25 - Bug#37990012 Improve error logging for non
 #                           reachable iloms.
@@ -54,10 +60,11 @@ import json
 import uuid
 import copy
 import re
+import shlex
 from exabox.utils.node import connect_to_host, node_exec_cmd, node_cmd_abs_path_check
 from exabox.core.Context import get_gcontext
 from exabox.core.Node import exaBoxNode
-from exabox.sop.sopscripts import SOPScriptsRepo, SCRIPT_PATH, SCRIPT_RETURN_JSON_SUPPORT, SCRIPT_EXEC, SCRIPT_PARALLEL_EXEC, SCRIPT_VERSION, SCRIPT_COMMENTS
+from exabox.sop.sopscripts import SOPScriptsRepo, SCRIPT_PATH, SCRIPT_RETURN_JSON_SUPPORT, SCRIPT_EXEC, SCRIPT_USE_EXACLOUD_PYTHON, SCRIPT_PARALLEL_EXEC, SCRIPT_VERSION, SCRIPT_COMMENTS, mGetValidatedScriptDependencies
 from exabox.core.Error import ExacloudRuntimeError
 from exabox.log.LogMgr import ebLogInfo, ebLogError, ebLogTrace, ebLogWarn
 from exabox.BaseServer.AsyncProcessing import ProcessManager, ProcessStructure, TimeoutBehavior, ExitCodeBehavior
@@ -125,6 +132,7 @@ class SOPExecution():
         self.__output = dict()
         self.__script_version_required = aScriptVersion
         self.__targetnode_type = aNodeType
+        self.__script_dependencies = []
         if self.__targetnode_type is not None and "switch" in self.__targetnode_type:
             self.__requests_dir = os.path.join("/tmp/oadt/requests", self.__uuid)
         else:
@@ -143,6 +151,56 @@ class SOPExecution():
 
     def mGetResult(self) -> dict:
         return self.__output
+
+    def __mGetScriptExecutable(self, aNode: str) -> str:
+        _script_metadata = self.__scripts_metadata.get(self.__script_name, {})
+        if aNode == "localhost" and _script_metadata.get(SCRIPT_USE_EXACLOUD_PYTHON, False):
+            _exacloud_base = get_gcontext().mGetBasePath()
+            if _exacloud_base is None or _exacloud_base == "":
+                raise ExacloudRuntimeError(0x815, 0xA, "Exacloud base path is not available for SOP script execution.")
+            return os.path.join(_exacloud_base, "bin", "python")
+        return _script_metadata.get(SCRIPT_EXEC, "/bin/sh")
+
+    def __mBuildScriptExecutionCommand(self, aRequestDirectory: str, aScriptExecutable: str, aScriptParams: str) -> str:
+        _script_path = os.path.join(aRequestDirectory, self.__script_name)
+        if not self.__script_dependencies:
+            return f"{aScriptExecutable} {_script_path} {aScriptParams}"
+
+        _shell_cmd = f"cd {shlex.quote(aRequestDirectory)} && exec {aScriptExecutable} {shlex.quote(_script_path)}"
+        if aScriptParams is not None and aScriptParams != "":
+            _shell_cmd = f"{_shell_cmd} {aScriptParams}"
+        return f"/bin/sh -c {shlex.quote(_shell_cmd)}"
+
+    def __mCleanupRequestDirectory(self, aConnectedNode, aRequestDirectory: str, aNode: str) -> None:
+        try:
+            _cmd_to_execute = f"/bin/rm -rf {aRequestDirectory}"
+            ebLogTrace(f"Cleaning up SOP request directory after precheck failure: {_cmd_to_execute} on host: {aNode}")
+            _cmd_structure = node_exec_cmd(aConnectedNode, _cmd_to_execute)
+            if _cmd_structure.exit_code != SUCCESSEXITCODE:
+                ebLogWarn(f"Failed to clean up SOP request directory {aRequestDirectory} on {aNode}")
+        except Exception as e:
+            ebLogWarn(f"Exception while cleaning up SOP request directory {aRequestDirectory} on {aNode}: {e}")
+
+    def __mCopyScriptDependencies(self, aConnectedNode, aRequestDirectory: str, aNode: str) -> None:
+        if not self.__script_dependencies:
+            return
+
+        ebLogInfo(f"SOP script {self.__script_name} declares dependencies: {[dep[0] for dep in self.__script_dependencies]}")
+        for _relative_dependency_path, _local_dependency_path in self.__script_dependencies:
+            _dest_dependency_path = os.path.join(aRequestDirectory, _relative_dependency_path)
+            _dest_dependency_dir = os.path.dirname(_dest_dependency_path)
+            if _dest_dependency_dir != aRequestDirectory:
+                _cmd_create_dependency_dir = f"/bin/mkdir -p {_dest_dependency_dir}"
+                ebLogTrace(f"Creating SOP dependency directory on {aNode}: {_cmd_create_dependency_dir}")
+                _cmd_structure = node_exec_cmd(aConnectedNode, _cmd_create_dependency_dir)
+                if _cmd_structure.exit_code != SUCCESSEXITCODE:
+                    raise Exception(f"Failed to create dependency directory {_dest_dependency_dir} on host {aNode}")
+
+            try:
+                ebLogTrace(f"Copying SOP dependency {_relative_dependency_path} to {_dest_dependency_path} on remote host: {aNode}")
+                aConnectedNode.mCopyFile(_local_dependency_path, _dest_dependency_path)
+            except Exception as e:
+                raise Exception(f"Failed to copy dependency {_relative_dependency_path} for script {self.__script_name} to host {aNode}: {e}")
 
     """
     This function performs cleanup or post execution operations for a SOP execution at a node level.
@@ -182,6 +240,12 @@ class SOPExecution():
         elif self.__script_version_required != self.__scripts_metadata.get(self.__script_name).get(SCRIPT_VERSION):
             raise ExacloudRuntimeError(0x815, 0xA, f"Script: {self.__script_name} Version: {self.__script_version_required} is not present in the script repository.")
 
+        _script_metadata = self.__scripts_metadata.get(self.__script_name)
+        _metadata_file = f"{_script_metadata.get(SCRIPT_PATH)}.metadata"
+        self.__script_dependencies = mGetValidatedScriptDependencies(_script_metadata, _metadata_file)
+        if self.__script_dependencies:
+            ebLogInfo(f"Validated SOP dependencies for {self.__script_name}: {[dep[0] for dep in self.__script_dependencies]}")
+
         _dest_json_file = None
         for _node in self.__nodes_list:
             _request_directory = self.__requests_dir
@@ -207,30 +271,36 @@ class SOPExecution():
                 else:
                     ebLogTrace("Payload as a parameter is not configured for this request.")
                 with connect_to_host(hostname = _node, ctx = get_gcontext(), local = isLocal) as _connected_node:
-                    ebLogTrace("Creating/verifying OADT requests directory.")
-                    _cmd_create_oadt_dir = f"/bin/mkdir -p {_request_directory}"
-                    _cmd_structure = node_exec_cmd(_connected_node, _cmd_create_oadt_dir)
-                    _create_oadt_dir_exitcode = _cmd_structure.exit_code
-                    if _create_oadt_dir_exitcode != 0:
-                        _error_message = f"Failed to create {_request_directory} directory."
-                        ebLogError(_error_message)
-                        raise Exception(_error_message)
-                    _local_script_path = self.__scripts_metadata.get(self.__script_name).get(SCRIPT_PATH)
-                    _dest_script_path = os.path.join(_request_directory, self.__script_name)
-                    _connected_node.mCopyFile(_local_script_path, _dest_script_path)
-                    ebLogTrace(f"SOP script {self.__script_name} copied to {_dest_script_path} on remote host: {_node}")
+                    try:
+                        ebLogTrace("Creating/verifying OADT requests directory.")
+                        _cmd_create_oadt_dir = f"/bin/mkdir -p {_request_directory}"
+                        _cmd_structure = node_exec_cmd(_connected_node, _cmd_create_oadt_dir)
+                        _create_oadt_dir_exitcode = _cmd_structure.exit_code
+                        if _create_oadt_dir_exitcode != 0:
+                            _error_message = f"Failed to create {_request_directory} directory."
+                            ebLogError(_error_message)
+                            raise Exception(_error_message)
+                        _local_script_path = self.__scripts_metadata.get(self.__script_name).get(SCRIPT_PATH)
+                        _dest_script_path = os.path.join(_request_directory, self.__script_name)
+                        _connected_node.mCopyFile(_local_script_path, _dest_script_path)
+                        ebLogTrace(f"SOP script {self.__script_name} copied to {_dest_script_path} on remote host: {_node}")
 
-                    if _dest_json_file is not None:
-                        _connected_node.mCopyFile(_local_json_file, _dest_json_file)
-                        ebLogTrace(f"SOP script payload for {self.__script_name} copied to {_dest_json_file} on remote host: {_node}")
+                        self.__mCopyScriptDependencies(_connected_node, _request_directory, _node)
 
-                    #Check if script executable has an absolute path or not
-                    _script_executable = self.__scripts_metadata.get(self.__script_name).get(SCRIPT_EXEC)
-                    if not _script_executable.startswith("/"):
-                        ebLogTrace("Absolute path for executable not configured for this script, will attempt to check on remote node.")
-                        _temp_exec = node_cmd_abs_path_check(_connected_node, _script_executable)
-                        self.__scripts_metadata.get(self.__script_name)[SCRIPT_EXEC] = _temp_exec
-                        ebLogTrace(f"Script: {self.__script_name} is configured to use the executable {_temp_exec}")
+                        if _dest_json_file is not None:
+                            _connected_node.mCopyFile(_local_json_file, _dest_json_file)
+                            ebLogTrace(f"SOP script payload for {self.__script_name} copied to {_dest_json_file} on remote host: {_node}")
+
+                        #Check if script executable has an absolute path or not
+                        _script_executable = self.__mGetScriptExecutable(_node)
+                        if not _script_executable.startswith("/"):
+                            ebLogTrace("Absolute path for executable not configured for this script, will attempt to check on remote node.")
+                            _temp_exec = node_cmd_abs_path_check(_connected_node, _script_executable)
+                            self.__scripts_metadata.get(self.__script_name)[SCRIPT_EXEC] = _temp_exec
+                            ebLogTrace(f"Script: {self.__script_name} is configured to use the executable {_temp_exec}")
+                    except Exception:
+                        self.__mCleanupRequestDirectory(_connected_node, _request_directory, _node)
+                        raise
             except Exception as e:
                 _error_msg = f"Error while running prechecks on {_node} for script {self.__script_name}. Detail error: {e}"
                 ebLogError(_error_msg)
@@ -405,7 +475,6 @@ class SOPExecution():
     def mProcessRequest(self) -> None:
 
         ebLogInfo(f"Executing script {self.__script_name}")
-        _script_executable = self.__scripts_metadata.get(self.__script_name).get(SCRIPT_EXEC)
         _script_params = self.__script_params
         
 
@@ -423,8 +492,8 @@ class SOPExecution():
                     if _node == "localhost":
                         isLocal = True
                         _request_directory = self.__local_requests_dir
-                    _script_path = os.path.join(_request_directory, self.__script_name)
-                    _cmd_to_execute = f"{_script_executable} {_script_path} {_script_params}"
+                    _script_executable = self.__mGetScriptExecutable(_node)
+                    _cmd_to_execute = self.__mBuildScriptExecutionCommand(_request_directory, _script_executable, _script_params)
                     with connect_to_host(hostname = _node, ctx = get_gcontext(), local = isLocal) as _connected_node:
                         ebLogTrace(f"Executing command: {_cmd_to_execute} on host: {_node}")
                         _cmd_structure = node_exec_cmd(_connected_node, _cmd_to_execute)
@@ -456,7 +525,6 @@ class SOPExecution():
 
     def mProcessRequestInAynscMode(self) -> None:
 
-        _script_executable = self.__scripts_metadata.get(self.__script_name).get(SCRIPT_EXEC)
         _script_params = self.__script_params
         _plist = ProcessManager()
 
@@ -469,8 +537,8 @@ class SOPExecution():
                 if _node == "localhost":
                     isLocal = True
                     _request_directory = self.__local_requests_dir
-                _script_path = os.path.join(_request_directory, self.__script_name)
-                _cmd_to_execute = f"{_script_executable} {_script_path} {_script_params}"
+                _script_executable = self.__mGetScriptExecutable(_node)
+                _cmd_to_execute = self.__mBuildScriptExecutionCommand(_request_directory, _script_executable, _script_params)
                 with connect_to_host(hostname = _node, ctx = get_gcontext(), local = isLocal) as _connected_node:
                     _cmd_structure = node_exec_cmd(_connected_node, _cmd_to_execute)
                     ebLogTrace(f"Executing command: {_cmd_to_execute} on host: {_node}")

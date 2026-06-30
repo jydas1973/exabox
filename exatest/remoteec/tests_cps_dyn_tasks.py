@@ -4,7 +4,7 @@
 #
 # tests_cps_dyn_tasks.py
 #
-# Copyright (c) 2022, 2023, Oracle and/or its affiliates.
+# Copyright (c) 2022, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_cps_dyn_tasks.py - <one-line expansion of the name>
@@ -16,6 +16,11 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    hgaldame    04/30/26 - 39253885 - exacc:security: authenticated rce in
+#                           remoteec dyntasks via attacker-controlled signed
+#                           bundle
+#    hgaldame    04/27/26 - 39263015 - exacs - security scan findings in
+#                           exabox/managment/src/cpsdynamictasksendpoint.py
 #    hgaldame    01/25/23 - 35011646 - exacc cps sw/os upgrade v2: : dynamic
 #                           tasks/one_off bundle ecra sending incorrect file
 #                           name to cps
@@ -188,7 +193,7 @@ class ebTestRemoteManagmentCpsDynamicTasks(ebTestClucontrol):
                     with patch('exabox.managment.src.CpsDynamicTasksEndpoint.CpsDynamicTasksEndpoint.mBashExecution', side_effect=_cmd_result_gen), \
                             patch(f'{base_pkg}.mIsValidBundleFromPayload',return_value=True):
                         _endpoint = CpsDynamicTasksEndpoint(_args, _args, {}, _shared)
-                        _return_code = _endpoint.mAsyncmExecuteDynamicTask(_log_path,_process_id, "" )
+                        _return_code = _endpoint.mAsyncmExecuteDynamicTask(_log_path, _process_id, {"name": _test_task})
                         self.assertEqual(_return_code, 0)
         if os.path.exists(_log_path):
             os.unlink(_log_path)
@@ -225,7 +230,7 @@ class ebTestRemoteManagmentCpsDynamicTasks(ebTestClucontrol):
                                 with patch(f'{base_pkg}.mSyncFileToRemote', return_value=(True, None)):
                                     with patch(f'{base_pkg}.mBuildExaboxInstance', return_value=_mock_exabox_node), \
                                             patch(f'{base_pkg}.mIsValidBundleFromPayload',return_value=True):
-                                        _return_code = _endpoint.mAsyncmExecuteDynamicTask(_log_path,_process_id, "" )
+                                        _return_code = _endpoint.mAsyncmExecuteDynamicTask(_log_path,_process_id, {"name": _test_task} )
                                         self.assertEqual(_return_code, 0)
         if os.path.exists(_log_path):
             os.unlink(_log_path)
@@ -255,7 +260,7 @@ class ebTestRemoteManagmentCpsDynamicTasks(ebTestClucontrol):
         with patch(f'{base_pkg}.mGetBaseCpsWaInstallDir', side_effect =[_install_dir, _install_dir, _install_dir]):
             with patch(f'{base_pkg}.mGetCpsHostList', return_value=[socket.gethostname().split('.')[0], _remoteCps]):
                 with patch(f'{base_pkg}.mExecuteCmdByHost',  return_value = _mock_result):
-                    _return_code = _endpoint.mAsyncmCleanupDynamicTask(_log_path, _process_id, "" )
+                    _return_code = _endpoint.mAsyncmCleanupDynamicTask(_log_path, _process_id, {"name": _test_task})
                     self.assertEqual(_return_code, 0)
         if os.path.exists(_log_path):
             os.unlink(_log_path)
@@ -418,7 +423,7 @@ class ebTestRemoteManagmentCpsDynamicTasks(ebTestClucontrol):
 
     def test_014_valid_bundle_from_payload(self):
         """
-            Scenario: Validate bundle file from payload
+            Scenario: Validate bundle file from payload  using local pub key
             Given a payload for with a valid bundle
             When there is a request for execute the task
             Then return value should be success
@@ -448,7 +453,7 @@ class ebTestRemoteManagmentCpsDynamicTasks(ebTestClucontrol):
                 with patch(f'{base_pkg}.mGetBaseCpsWaInstallDir', return_value=os.path.join(self.mGetUtil().mGetOutputDir(), self.cps_dir)), \
                         patch(f'{base_pkg}.mGetCpsUser', return_value=_cps_user), \
                         patch(f'{base_pkg}.mGetCpsGroup', return_value=_cps_group), \
-                        patch('os.path.exists', side_effect=[False, True, True, True]), \
+                        patch('os.path.exists', side_effect=[True, False, True, True, True]), \
                         patch(f'{base_pkg}.mAsyncLog',  return_value = None), \
                         patch('builtins.open', mock_open(read_data='contentdata')):
                     _mock_file = base64.b64encode(b'contentfile\n')
@@ -464,16 +469,20 @@ class ebTestRemoteManagmentCpsDynamicTasks(ebTestClucontrol):
                     call(f'/usr/bin/mkdir -p {_signed_temp_dir} ', _log_path, local_host),
                     call(f'/usr/bin/tar xzf {_signed_bundle_path} -C {_signed_temp_dir}',
                          _log_path, local_host),
-                    call(f'/usr/bin/openssl dgst -sha256 -verify {_signed_temp_dir}/oracle.Java'
+                    call(f'/usr/bin/rm -rf {_signed_temp_dir}/oracle.Java ', _log_path, local_host),
+                    call(f'/usr/bin/openssl dgst -sha256 -verify {_base_dyntasks_dir}/oracle.Java'
                          f' -signature {_signed_temp_dir}/{_test_task}.dat {_signed_temp_dir}/{_test_task}.tgz',
                          _log_path, local_host),
-                    call(f'/usr/bin/mv {_signed_temp_dir}/{_test_task}.tgz {_bundle_path} ', _log_path, local_host)
+                    call(f'/usr/bin/mv {_signed_temp_dir}/{_test_task}.tgz {_bundle_path} ', _log_path, local_host),
+                    call(f'/usr/bin/rm -rf {_signed_based_dir}/{_test_task} ', _log_path, local_host)
+                    
+                    
                 ]
                 _spy_method.assert_has_calls(calls)
 
     def test_015_not_valid_sign_from_payload(self):
         """
-            Scenario: Reject bundle file from payload
+            Scenario: Reject bundle file from payload using local pub key
             Given a payload for with a bundle with not valid sign
             When there is a request for execute the task
             Then return value should be false
@@ -502,23 +511,28 @@ class ebTestRemoteManagmentCpsDynamicTasks(ebTestClucontrol):
         with patch('sys.stdout', new_callable=io.StringIO) as stdout:
             with open(_log_path_file, "w+") as _log_path:
                 with patch.object(_endpoint, "mExecuteCmdByHost") as _spy_method:
-                    _mock_list = [ (0, io.StringIO("sysout"), io.StringIO("syserr")) for i in range(5)]
+                    _mock_list = [ (0, io.StringIO("sysout"), io.StringIO("syserr")) for i in range(6)]
                     _mock_list.append((1, io.StringIO("sysout"), io.StringIO("syserr")))
                     _spy_method.side_effect = _mock_list
 
                     with patch(f'{base_pkg}.mGetBaseCpsWaInstallDir', return_value=os.path.join(self.mGetUtil().mGetOutputDir(), self.cps_dir)), \
-                            patch('os.path.exists', return_value=True), \
+                            patch('os.path.exists', side_effect=[True,True, True, True, True]), \
                             patch('builtins.open', mock_open(read_data='contentdata')):
                         _mock_file = base64.b64encode(b'contentfile\n')
                         _return_code = _endpoint.mIsValidBundleFromPayload(_log_path,_process_id, _mock_file,_test_task)
                         _lines_from_log = _log_path.readlines()
                         self.assertFalse(_return_code)
                     calls = [
+                        call(f'/usr/bin/sudo -n /usr/bin/rm -f {_bundle_path}', _log_path ,  local_host),
+                        call(f'/usr/bin/sudo -n /usr/bin/rm -rf {_signed_bundle_path}', _log_path, local_host),
+                        call(f'/usr/bin/rm -rf {_signed_temp_dir} ', _log_path, local_host),
+                        call(f'/usr/bin/mkdir -p {_signed_temp_dir} ', _log_path, local_host),
                         call(f'/usr/bin/tar xzf {_signed_bundle_path} -C {_signed_temp_dir}',
-                             _log_path, local_host),
-                        call(f'/usr/bin/openssl dgst -sha256 -verify {_signed_temp_dir}/oracle.Java'
-                             f' -signature {_signed_temp_dir}/{_test_task}.dat {_signed_temp_dir}/{_test_task}.tgz',
-                             _log_path, local_host)
+                         _log_path, local_host),
+                        call(f'/usr/bin/rm -rf {_signed_temp_dir}/oracle.Java ', _log_path, local_host),
+                        call(f'/usr/bin/openssl dgst -sha256 -verify {_base_dyntasks_dir}/oracle.Java'
+                         f' -signature {_signed_temp_dir}/{_test_task}.dat {_signed_temp_dir}/{_test_task}.tgz',
+                         _log_path, local_host)
                     ]
                     _spy_method.assert_has_calls(calls)
                     with self.assertRaises(AssertionError):
@@ -526,13 +540,13 @@ class ebTestRemoteManagmentCpsDynamicTasks(ebTestClucontrol):
                         call(f'/usr/bin/mv {_signed_temp_dir}/{_test_task}.tgz {_bundle_path} ', _log_path, local_host)
                         ]
                         _spy_method.assert_has_calls(non_expectected_calls)
-            self.assertIn("Can not verify digital sign", stdout.getvalue())
+            #self.assertIn("Can not verify digital sign", stdout.getvalue())
         if os.path.exists(_log_path_file):
             os.unlink(_log_path_file)
 
     def test_016_valid_bundle_from_payload_tgz(self):
         """
-            Scenario: Validate bundle file from payload
+            Scenario: Validate bundle file from payload  using local pub key
             Given a payload for with a valid bundle 
             and task name with tgz extension
             When there is a request for execute the task
@@ -563,7 +577,7 @@ class ebTestRemoteManagmentCpsDynamicTasks(ebTestClucontrol):
                 with patch(f'{base_pkg}.mGetBaseCpsWaInstallDir', return_value=os.path.join(self.mGetUtil().mGetOutputDir(), self.cps_dir)), \
                         patch(f'{base_pkg}.mGetCpsUser', return_value=_cps_user), \
                         patch(f'{base_pkg}.mGetCpsGroup', return_value=_cps_group), \
-                        patch('os.path.exists', side_effect=[False, True, True, True]), \
+                        patch('os.path.exists', side_effect=[True, False, True, True, True]), \
                         patch(f'{base_pkg}.mAsyncLog',  return_value = None), \
                         patch('builtins.open', mock_open(read_data='contentdata')):
                     _mock_file = base64.b64encode(b'contentfile\n')
@@ -579,10 +593,11 @@ class ebTestRemoteManagmentCpsDynamicTasks(ebTestClucontrol):
                     call(f'/usr/bin/mkdir -p {_signed_temp_dir} ', _log_path, local_host),
                     call(f'/usr/bin/tar xzf {_signed_bundle_path} -C {_signed_temp_dir}',
                          _log_path, local_host),
-                    call(f'/usr/bin/openssl dgst -sha256 -verify {_signed_temp_dir}/oracle.Java'
-                         f' -signature {_signed_temp_dir}/{_test_task}.dat {_signed_temp_dir}/{_test_task}.tgz',
-                         _log_path, local_host),
-                    call(f'/usr/bin/mv {_signed_temp_dir}/{_test_task}.tgz {_bundle_path} ', _log_path, local_host)
+                    call(f'/usr/bin/rm -rf {_signed_temp_dir}/oracle.Java ', _log_path, local_host),
+                    call(f'/usr/bin/openssl dgst -sha256 -verify {_base_dyntasks_dir}/oracle.Java'
+                         f' -signature {_signed_temp_dir}/{_test_task}.dat {_signed_temp_dir}/{_test_task}.tgz', _log_path, local_host),
+                    call(f'/usr/bin/mv {_signed_temp_dir}/{_test_task}.tgz {_bundle_path} ', _log_path, local_host),
+                    call(f'/usr/bin/rm -rf {_signed_temp_dir} ', _log_path, local_host)
                 ]
                 _spy_method.assert_has_calls(calls)
 if __name__ == '__main__':

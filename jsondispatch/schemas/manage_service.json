@@ -4,14 +4,18 @@
             "type": "string"
         },
         "service": {
-            "type": "string"
+            "type": "string",
+            "enum": ["syslens"]
         },
         "task": {
             "type": "string",
             "enum": ["start", "stop", "status"]
         },
         "host_nodes": {
-            "type": "array"
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
         }
     },
     "required": [
@@ -20,5 +24,6 @@
         "task",
         "host_nodes"
     ],
+    "additionalProperties": false,
     "type": "object"
 }

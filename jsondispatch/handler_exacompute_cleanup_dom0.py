@@ -46,9 +46,9 @@ class ExaComputeCleanupDom0(JDHandler):
             _srcVMs = node_exec_cmd_check(_node, _cmd).stdout.strip().split()
             for _vmName in _srcVMs:
                 _vmBridges = get_kvm_guest_bridges(_node, _vmName)
-                _cmd = f"/bin/virsh destroy {_vmName}"
+                _cmd = f"{VM_MAKER} --stop-domain {_vmName} --destroy"
                 node_exec_cmd(_node, _cmd)
-                _cmd = f"/bin/virsh undefine {_vmName}"
+                _cmd = f"{VM_MAKER} --remove-domain {_vmName}"
                 node_exec_cmd(_node, _cmd)
                 _cmd = f"umount /EXAVMIMAGES/GuestImages/{_vmName}"
                 node_exec_cmd(_node, _cmd)

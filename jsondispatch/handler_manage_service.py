@@ -4,7 +4,7 @@
 #
 # handler_manage_service.py
 #
-# Copyright (c) 2025, Oracle and/or its affiliates.
+# Copyright (c) 2025, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      handler_manage_service.py - <one-line expansion of the name>
@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    jepalomi    04/28/26 - Bug 39263021 - Fix security findings
 #    jepalomi    11/12/25 - Bug 38529119 - EXACLOUD API TO SUPPORT START/STOP
 #                           SYSLENS ON DOM0S
 #    jepalomi    11/12/25 - Creation
@@ -25,18 +26,65 @@ import os
 import time
 
 from exabox.core.Context import get_gcontext
+from exabox.core.Error import ExacloudRuntimeError
 from exabox.log.LogMgr import ebLogError, ebLogInfo
 from exabox.utils.node import (connect_to_host, node_exec_cmd_check, node_exec_cmd)
 
 from exabox.jsondispatch.jsonhandler import JDHandler
 
 class ManageServiceHandler(JDHandler):
+    TRUSTED_SERVICES = {
+        "syslens": {
+            "unit": "syslens",
+            "package": "syslens",
+        },
+    }
 
     def __init__(self, aOptions, aRequestObj = None, aDb=None):
 
         super().__init__(aOptions, aRequestObj, aDb)
         self.mSetSchemaFile(os.path.abspath(
             "exabox/jsondispatch/schemas/manage_service.json"))
+
+    @classmethod
+    def mGetTrustedServiceMeta(cls, aRequestedService: str) -> dict:
+        """
+        Resolve the request-facing service name to trusted internal metadata.
+
+        Only explicitly supported services are allowed to flow into command
+        construction.
+        """
+        _service_meta = cls.TRUSTED_SERVICES.get(aRequestedService)
+        if _service_meta is None:
+            raise ExacloudRuntimeError(
+                0x00, 0x0,
+                f"Unsupported service '{aRequestedService}' for manage_service endpoint"
+            )
+
+        return _service_meta
+
+    @staticmethod
+    def mBuildTaskCmds(aServiceMeta: dict) -> dict:
+        """
+        Build command strings from trusted service metadata only.
+        """
+        _systemctl = "/usr/bin/systemctl"
+        _rpm = "/usr/bin/rpm"
+        _service_unit = aServiceMeta["unit"]
+        _service_pkg = aServiceMeta["package"]
+
+        return {
+            "exists": f"{_systemctl} cat {_service_unit}",
+            "start": f"{_systemctl} start {_service_unit}",
+            "stop": f"{_systemctl} stop {_service_unit}",
+            "status": f"{_systemctl} is-active {_service_unit}",
+            "full_status": f"{_systemctl} status {_service_unit}",
+            "version": f"{_rpm} -q {_service_pkg}",
+            "recent_logs": (
+                f'''/usr/bin/journalctl -u {_service_unit} --since "5 min ago" '''
+                f'''--no-pager -l --full -n 20'''
+            ),
+        }
         
     def mExecute(self) -> tuple:
         """
@@ -48,29 +96,28 @@ class ManageServiceHandler(JDHandler):
         _rc = 0
         _response = {}
 
-        systemctl = "/usr/bin/systemctl"
-        rpm = "/usr/bin/rpm"
-
-        task_cmds = {
-            'start': f'{systemctl} start {{service}}',
-            'stop': f'{systemctl} stop {{service}}',
-            'status': f'{systemctl} is-active {{service}}',
-            'version': f'{rpm} -q {{service}}',
-        }
-        
         _jconf = self.mGetOptions().jsonconf
+        # "operation" is part of the public request contract and is kept for
+        # API compatibility. It is currently unused by the handler logic but
+        # reserved for future behavior.
+        _operation = _jconf["operation"]
         task = _jconf["task"]
-        service = _jconf["service"]
+        requested_service = _jconf["service"]
+        service_meta = self.mGetTrustedServiceMeta(requested_service)
+        task_cmds = self.mBuildTaskCmds(service_meta)
         node_results = []
 
-        ebLogInfo(f"Executing {task} task on service {service} for hosts: {_jconf['host_nodes']}")
+        ebLogInfo(
+            f"Executing {task} task on service {requested_service} for hosts: "
+            f"{_jconf['host_nodes']}"
+        )
 
         for host in _jconf["host_nodes"]:
-            node_result = self.mExecServiceCmd(host, service, task, task_cmds)
+            node_result = self.mExecServiceCmd(host, requested_service, task, task_cmds)
             node_results.append(node_result)
 
         _response = {
-            "service": service,
+            "service": requested_service,
             "task": task,
             "node_task_status": node_results
         }
@@ -78,13 +125,13 @@ class ManageServiceHandler(JDHandler):
         return (_rc, _response)
 
     @staticmethod
-    def mExecServiceCmd(aHostname: str, aService: str, aTask: str, aTaskCmds: dict) -> dict:
+    def mExecServiceCmd(aHostname: str, aServiceLabel: str, aTask: str, aTaskCmds: dict) -> dict:
         """
         Execute a service management task on a remote host.
 
         Args:
             aHostname (str): Target host.
-            aService   (str): Systemd service name.
+            aServiceLabel (str): Request-facing service name.
             aTask      (str): Task to perform ("start", "stop", "status").
             aTaskCmds  (dict): Mapping of task names to command templates.
 
@@ -104,27 +151,27 @@ class ManageServiceHandler(JDHandler):
             with connect_to_host(aHostname, get_gcontext()) as _node:
 
                 # Validate service exists
-                node_exec_cmd_check(_node, f"/usr/bin/systemctl cat {aService}")
+                node_exec_cmd_check(_node, aTaskCmds["exists"])
 
                 # Call handler for task
                 if aTask in ("start", "stop"):
                     res = ManageServiceHandler._handle_start_stop_task(
-                        _node, aHostname, aService, aTask, aTaskCmds
+                        _node, aHostname, aServiceLabel, aTask, aTaskCmds
                     )
                 elif aTask == "status":
                     res = ManageServiceHandler._handle_status_task(
-                        _node, aHostname, aService, aTaskCmds
+                        _node, aHostname, aServiceLabel, aTaskCmds
                     )
                 else:
                     raise ValueError(
-                        f"Invalid task '{aTask}' for service {aService} on host {aHostname}"
+                        f"Invalid task '{aTask}' for service {aServiceLabel} on host {aHostname}"
                     )
 
         except Exception as e:
             # Use default res since handler result was never assigned
             res["error"] = str(e)
             res["message"] = (
-                f"Exception while executing {aTask} task on service {aService} "
+                f"Exception while executing {aTask} task on service {aServiceLabel} "
                 f"for host {aHostname}"
             )
 
@@ -140,14 +187,14 @@ class ManageServiceHandler(JDHandler):
 
 
     @staticmethod
-    def _handle_start_stop_task(aNode, aHostname: str, aService: str, aTask: str, aTaskCmds: dict) -> dict:
+    def _handle_start_stop_task(aNode, aHostname: str, aServiceLabel: str, aTask: str, aTaskCmds: dict) -> dict:
         """
         Handle a start or stop operation for a systemd service.
 
         Args:
             aNode: Remote execution context.
             aHostname (str): Target host.
-            aService (str): Systemd service name.
+            aServiceLabel (str): Request-facing service name.
             aTask (str): Operation ("start" or "stop").
             aTaskCmds (dict): Command templates for each operation.
 
@@ -163,8 +210,7 @@ class ManageServiceHandler(JDHandler):
         }
 
         # Execute the start/stop command
-        base_cmd = aTaskCmds[aTask].format(service=aService)
-        node_exec_cmd(aNode, base_cmd)
+        node_exec_cmd(aNode, aTaskCmds[aTask])
 
         # Wait for service to reach expected state
         max_timeout = 300      # 5 minutes
@@ -174,31 +220,26 @@ class ManageServiceHandler(JDHandler):
         time.sleep(interval)   # let service settle
 
         while elapsed_time < max_timeout:
-            _, status_val, _ = node_exec_cmd(
-                aNode, aTaskCmds["status"].format(service=aService)
-            )
+            _, status_val, _ = node_exec_cmd(aNode, aTaskCmds["status"])
             status_val = status_val.strip()
+
+            # Immediate failure states
+            if status_val in ("failed", "unknown"):
+                break
 
             # success conditions
             if (aTask == "start" and status_val == "active") or \
                (aTask == "stop" and status_val != "active"):
 
                 res["task_status"] = "success"
-                res["message"] = f"{aService} {aTask} successful for host {aHostname}"
+                res["message"] = f"{aServiceLabel} {aTask} successful for host {aHostname}"
                 return res
-
-            # Immediate failure states
-            if status_val in ("failed", "unknown"):
-                break
 
             time.sleep(interval)
             elapsed_time += interval
 
-        _, full_status, _ = node_exec_cmd(aNode, f"/usr/bin/systemctl status {aService}")
-        _, journal_out, _ = node_exec_cmd(
-            aNode,
-            f'''/usr/bin/journalctl -u {aService} --since "5 min ago" --no-pager -l --full | tail -20'''
-        )
+        _, full_status, _ = node_exec_cmd(aNode, aTaskCmds["full_status"])
+        _, journal_out, _ = node_exec_cmd(aNode, aTaskCmds["recent_logs"])
 
         combined_error = (
             full_status +
@@ -206,7 +247,7 @@ class ManageServiceHandler(JDHandler):
             journal_out
         )
 
-        res["message"] = f"{aService} {aTask} failed for host {aHostname}"
+        res["message"] = f"{aServiceLabel} {aTask} failed for host {aHostname}"
         res["error"] = (
             combined_error.strip()
             if combined_error.strip()
@@ -220,14 +261,14 @@ class ManageServiceHandler(JDHandler):
 
 
     @staticmethod
-    def _handle_status_task(aNode, aHostname: str, aService: str, aTaskCmds: dict) -> dict:
+    def _handle_status_task(aNode, aHostname: str, aServiceLabel: str, aTaskCmds: dict) -> dict:
         """
         Retrieve the current status and version of a systemd service.
 
         Args:
             aNode: Remote execution context.
             aHostname (str): Target host.
-            aService (str): Systemd service name.
+            aServiceLabel (str): Request-facing service name.
             aTaskCmds (dict): Command templates for "status" and "version".
 
         Returns:
@@ -244,13 +285,9 @@ class ManageServiceHandler(JDHandler):
         }
 
         # Get service status
-        _, status_val, status_err = node_exec_cmd(
-            aNode, aTaskCmds["status"].format(service=aService)
-        )
+        _, status_val, status_err = node_exec_cmd(aNode, aTaskCmds["status"])
         # Get version
-        _, ver_val, ver_err = node_exec_cmd(
-            aNode, aTaskCmds["version"].format(service=aService)
-        )
+        _, ver_val, ver_err = node_exec_cmd(aNode, aTaskCmds["version"])
 
         res["status"] = status_val.strip()
         res["version"] = ver_val.strip()
@@ -258,7 +295,7 @@ class ManageServiceHandler(JDHandler):
         if not status_val or not ver_val:
             res["error"] = status_err or ver_err
             res["message"] = (
-                f"Failed to obtain status and version for service {aService} "
+                f"Failed to obtain status and version for service {aServiceLabel} "
                 f"on host {aHostname}"
             )
             ebLogError(res["message"])
@@ -268,7 +305,7 @@ class ManageServiceHandler(JDHandler):
         # SUCCESS
         res["task_status"] = "success"
         res["message"] = (
-            f"Status and version retrieved successfully for service {aService} "
+            f"Status and version retrieved successfully for service {aServiceLabel} "
             f"on host {aHostname}"
         )
 

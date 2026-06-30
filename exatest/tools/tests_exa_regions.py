@@ -4,7 +4,7 @@
 #
 # tests_exa_regions.py
 #
-# Copyright (c) 2023, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2023, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_exa_regions.py - <one-line expansion of the name>
@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    jfsaldan    06/22/26 - Migrate Exacloud IMDSv1 references to IMDSv2
 #    ririgoye    10/25/23 - Bug 35919782 - Unit tests for instance principals
 #                           retried
 #    gparada     03/14/23 - Creation (test_exa_regions)
@@ -58,7 +59,7 @@ class TestExaRegions(ebTestClucontrol):
 
     def test_get_region_info_URLError(self):    
         get_gcontext().mSetRegEntry("exaregion_information", {})    
-        _str_URLError = "http://badurl.com/opc/v1/instance"        
+        _str_URLError = "http://badurl.com/opc/v2/instance"        
         _region_info = get_region_info(_str_URLError)
         self.assertIsNone(_region_info)
 
@@ -77,7 +78,7 @@ class TestExaRegions(ebTestClucontrol):
         self.assertEqual(self._realmDomainComponent, _region_info["realmDomainComponent"])
         self.assertEqual(self._regionKey, _region_info["regionKey"])
         self.assertEqual(self._regionIdentifier, _region_info["regionIdentifier"])
-        # curl --noproxy '*' http://169.254.169.254/opc/v1/instance
+        # curl --noproxy '*' -H "Authorization: Bearer Oracle" http://169.254.169.254/opc/v2/instance
 
 
     @patch("exabox.utils.ExaRegion.json.loads", return_value={

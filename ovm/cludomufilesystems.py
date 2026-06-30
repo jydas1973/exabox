@@ -4,7 +4,7 @@
 #
 # cludomufilesystems.py
 #
-# Copyright (c) 2021, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      cludomufilesystems.py - Utilities to resize DomU filesystems.
@@ -18,6 +18,10 @@
 #      None.
 #
 #    MODIFIED   (MM/DD/YY)
+#    bhpati      05/07/26 - Bug 39284048 - Use VM_MAKER instead of virsh for
+#                           forcefully shutting down the VM.
+#    remamid     04/30/26 - Bug 39239033 - cleanup snapshots before DomU LV resize
+#    dekuckre    04/27/26 - fix xen domu_maker handling in domufilesystems
 #    pbellary    12/10/25 - Bug 38745809 - RESIZE DOMU FILESYSTEM IS FAILING WITH EDV ENABLED CLUSTERS 
 #    scoral      11/13/25 - Bug 38648866 - Added support of EDV volumes for
 #                           Exascale clusters.
@@ -1241,9 +1245,13 @@ def shutdown_domu(
 
     # Get the hypervisor binary (virsh for KVM or xm for XEN).
     hypervisor: Optional[str] = node_cmd_abs_path(dom0_node, 'virsh')
+    stop_vm_cmd: str = f"{VM_MAKER} --stop-domain {domu_name}"
+    stop_force_vm_cmd: str = f"{VM_MAKER} --stop-domain {domu_name} --force"
+
     if not hypervisor:
         hypervisor = node_cmd_abs_path_check(dom0_node, 'xm', sbin=True)
-
+        stop_vm_cmd = f"{hypervisor} shutdown {domu_name}"
+        stop_force_vm_cmd = f"{hypervisor} destroy {domu_name}"
 
     # Check if DomU is already shut off.
     out = vm_active_list(dom0_node, hypervisor)
@@ -1255,10 +1263,10 @@ def shutdown_domu(
     ebLogInfo(f"*** Performing shutdown of DomU {domu_name} ...")
     t0: float = time.time()
     try:
-        node_exec_cmd_check(dom0_node, f"{hypervisor} shutdown {domu_name}")
+        node_exec_cmd_check(dom0_node, stop_vm_cmd)
     except ExacloudRuntimeError as ex:
         if force_on_timeout:
-            node_exec_cmd_check(dom0_node, f"{hypervisor} destroy {domu_name}")
+            node_exec_cmd_check(dom0_node, stop_force_vm_cmd)
         else:
             msg: str = f"Could not shutdown DomU {domu_name} "
             raise ExacloudRuntimeError(0x10, 0xA, msg) from ex
@@ -1273,7 +1281,7 @@ def shutdown_domu(
             break
     else:
         if force_on_timeout:
-            node_exec_cmd_check(dom0_node, f"{hypervisor} destroy {domu_name}")
+            node_exec_cmd_check(dom0_node, stop_force_vm_cmd)
         else:
             msg: str = (
                 f"Could not shutdown DomU {domu_name} "
@@ -1311,7 +1319,7 @@ def start_domu(
 
     # Get the hypervisor binary (virsh for KVM or xm for XEN).
     hypervisor: Optional[str] = node_cmd_abs_path(dom0_node, 'virsh')
-    start_vm_cmd: str = f"{hypervisor} start {domu_name}"
+    start_vm_cmd: str = f"{VM_MAKER} --start-domain {domu_name}"
     if not hypervisor:
         hypervisor = node_cmd_abs_path_check(dom0_node, 'xm', sbin=True)
         start_vm_cmd: str = \
@@ -1520,6 +1528,106 @@ def expand_domu_fs_using_mountpoint(
 
 
 
+
+
+def cleanup_lv_snapshots(
+    node: exaBoxNode,
+    lv_names: Sequence[str],
+    host_label: str
+) -> None:
+    """Remove snapshots for the given logical volumes on the supplied node.
+
+    lvresize refuses to grow an origin LV while snapshots exist (rc 5 /
+    "Snapshot origin volumes can be resized only while inactive").
+    This helper proactively drops those snapshots so DomU resizes succeed.
+    """
+    if not lv_names:
+        return
+
+    LVREMOVE: str = node_cmd_abs_path_check(node, 'lvremove', sbin=True)
+    LVS: str = node_cmd_abs_path_check(node, 'lvs', sbin=True)
+
+    cleanup_cmd = f"{LVS} --reportformat json --noheadings -o lv_name,origin,vg_name"
+    result = node_exec_cmd(node, cleanup_cmd, check_error=True)
+    payload = json.loads(result.stdout or '{}')
+    report = payload.get('report', [])
+    entries = report[0].get('lv', []) if report else []
+
+    snapshots = [
+        (lv.get('lv_name'), lv.get('vg_name'))
+        for lv in entries
+        if lv.get('origin') in lv_names and lv.get('lv_name')
+    ]
+
+    if not snapshots:
+        return
+
+    ebLogInfo(
+        f"*** Removing snapshots {snapshots} for origins {lv_names} on {host_label}"
+    )
+    for snap_name, snap_vg in snapshots:
+        snap_mount: str = ''
+        mountpoint_query = (
+            f"{LVS} --noheadings -o lv_path,mountpoint "
+            f"--select lv_name={snap_name}"
+        )
+        try:
+            mountpoint_result = node_exec_cmd(
+                node,
+                mountpoint_query,
+                check_error=True
+            )
+            mountpoint_output = mountpoint_result.stdout.strip()
+            if mountpoint_output:
+                parts = mountpoint_output.split()
+                if len(parts) >= 2:
+                    snap_mount = parts[1]
+        except ExacloudRuntimeError as err:
+            if 'Unrecognised field: mountpoint' not in str(err):
+                raise
+
+            lv_path_result = node_exec_cmd(
+                node,
+                f"{LVS} --noheadings -o lv_path --select lv_name={snap_name}",
+                check_error=True
+            )
+            lv_path = lv_path_result.stdout.strip()
+            try:
+                FINDMNT: str = node_cmd_abs_path_check(node, 'findmnt')
+                findmnt_result = node_exec_cmd(
+                    node,
+                    f"{FINDMNT} -n -o TARGET --source {lv_path}"
+                )
+                snap_mount = findmnt_result.stdout.strip()
+            except ExacloudRuntimeError:
+                snap_mount = ''
+
+        if snap_mount and snap_mount != '-':
+            ebLogInfo(
+                f"*** Unmounting snapshot {snap_vg}/{snap_name} "
+                f"from {snap_mount} on {host_label}"
+            )
+            node_exec_cmd_check(
+                node,
+                f"/bin/umount {snap_mount}"
+            )
+
+        node_exec_cmd_check(node, f"{LVREMOVE} -f {snap_vg}/{snap_name}")
+
+    verify = node_exec_cmd(node, cleanup_cmd, check_error=True)
+    verify_payload = json.loads(verify.stdout or '{}')
+    verify_report = verify_payload.get('report', [])
+    remaining = [
+        lv.get('lv_name')
+        for lv in (verify_report[0].get('lv', []) if verify_report else [])
+        if lv.get('origin') in lv_names
+    ]
+    if remaining:
+        msg = (
+            f"Snapshots {remaining} still present for origins {lv_names} on {host_label}"
+        )
+        ebLogError(msg)
+        return
 def expand_domu_fs_using_free_vg(
     domu_node: exaBoxNode,
     domu_fs_tree: ebNodeFSTree,
@@ -1539,6 +1647,15 @@ def expand_domu_fs_using_free_vg(
     :param resize_mode: Resize mode, see ebDomUFSResizeMode to get more info.
     :returns: ebNodeFSLayout after the resize.
     """
+
+    lv_names: List[str] = []
+    if domu_fs_tree.lv:
+        lv_names.append(domu_fs_tree.lv.name)
+    if filesystem in FS_WITH_DUPLICATED_VOLUME and domu_fs_tree.inactive_lv:
+        lv_names.append(domu_fs_tree.inactive_lv.name)
+
+    if lv_names:
+        cleanup_lv_snapshots(domu_node, lv_names, domu_node.mGetHostname())
 
     LVRESIZE: str = node_cmd_abs_path_check(domu_node, 'lvresize', sbin=True)
 

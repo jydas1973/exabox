@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    sdevasek    06/19/26 - Bug 39562371 - Support full-version dbserver
+#                           patch selection
 #    sdevasek    04/08/26 - Enh 39143069 - ADDRESS VOXIO CODEV AGENT SCAN
 #                           ISSUES OBSERVED IN EXACOMPUTE PATCHING
 #    araghave    03/12/26 - Enh 38932829 - PROVIDE A PLUGIN SUPPORT DURING DOM0
@@ -95,7 +97,7 @@ from exabox.infrapatching.exacompute.core.exacomputepatch import ebCluExaCompute
 from exabox.infrapatching.handlers.loghandler import LogHandler
 from exabox.BaseServer.AsyncProcessing import ProcessManager, ProcessStructure
 from exabox.infrapatching.utils.constants import *
-from exabox.infrapatching.utils.utility import mGetFirstDirInZip, mGetInfraPatchingKnownAlert, mFormatOut, mGetSshTimeout
+from exabox.infrapatching.utils.utility import mGetFirstDirInZip, mGetInfraPatchingKnownAlert, mFormatOut, mGetSshTimeout, mQuarterlyVersionPatternMatch, mExaspliceVersionPatternMatch
 from exabox.ovm.hypervisorutils import *
 from exabox.infrapatching.core.infrapatcherror import *
 from exabox.core.Node import exaBoxNode
@@ -1635,52 +1637,135 @@ class ExaGenericHandler(TargetHandler):
 
         return _ret
 
-    def mCompareDbserverPatchFiles(self, aDbPatchFile1, aDbPatchFile2):
+    def mGetDbserverPatchVersionDetails(self, aDbPatchFileDir):
+        """
+         This method returns the db patch version directory suffix based
+         on the input DB patch file path provided.
+
+         -bash-4.4$ /bin/unzip -l /scratch/araghave/ecra_installs/abhi/mw_home/user_projects/
+         domains/exacloud/PatchPayloads/DBPatchFile/dbserver.patch.zip | /bin/grep dbserver_patch_ |
+         /bin/head -1 | /bin/awk '{print $4}' | /bin/tr -d "/" | /bin/cut -d_ -f3-
+         250119
+         -bash-4.4$
+        """
+        _version = None
+        _db_patch_file = None
+        try:
+            _cmd_list = []
+            _db_patch_file = os.path.join(aDbPatchFileDir)
+            _cmd_list.append(["/bin/unzip", "-l", _db_patch_file])
+            _cmd_list.append(["/bin/grep", "dbserver_patch_"])
+            _cmd_list.append(["/bin/head", "-1"])
+            _cmd_list.append(["/bin/awk", '{print $4}'])
+            _cmd_list.append(["/bin/tr", "-d", '/'])
+            _cmd_list.append(["/bin/cut", "-d_", "-f3-"])
+            _rc, _o = runInfraPatchCommandsLocally(_cmd_list)
+            if _o:
+                _version = ((_o.split("\n"))[0]).strip()
+        except Exception as e:
+            self.mPatchLogWarn("Error in generating dbserver patch version. Error: %s" % str(e))
+            self.mPatchLogTrace(traceback.format_exc())
+        return _version
+
+    def mParseDbserverPatchVersionDetails(self, aDbPatchVersion):
+        if not aDbPatchVersion:
+            return None
+
+        _db_patch_version = aDbPatchVersion.strip().strip("/")
+        if mQuarterlyVersionPatternMatch(_db_patch_version):
+            return {
+                "format": "fullPatchVersion",
+                "db_patch_version": _db_patch_version,
+            }
+
+        if mExaspliceVersionPatternMatch(_db_patch_version):
+            return {
+                "format": "legacyExapsliceSixDigitVersion",
+                "db_patch_version": _db_patch_version,
+            }
+
+        return None
+
+    def mCompareDbserverPatchVersionDetails(self, aVersionedLocDbPatchInfo,
+                                            aCommonLocDbPatchInfo):
+        """
+         Return 1 if first patch version is newer, -1 if second patch version
+         is newer, and 0 if both versions compare the same or cannot be compared.
+
+         Full vs legacy:
+           26.1.0.0.0.260531 > 260515.1 because full-version format has
+           precedence over legacy date-code format.
+
+         Full vs full, higher Exadata release:
+           26.2.0.0.0.260520 > 26.1.0.0.0.260531 because OracleVersion compares
+           26.2 higher than 26.1 before considering the build date.
+
+         Full vs full, same Exadata release:
+           26.1.0.0.0.260615 > 26.1.0.0.0.260531 because the later build date
+           is higher when release components are the same.
+
+         Full vs full, same build date with suffix:
+           26.1.0.0.0.260615.2 > 26.1.0.0.0.260615.1 because the optional
+           trailing suffix participates in OracleVersion comparison.
+
+         Legacy vs legacy:
+           260615.2 > 260615.1, and 260615.1 > 260531.2, using the same
+           OracleVersion comparison for date-code versions.
+
+         Equal or uncomparable versions:
+           26.1.0.0.0.260615.1 == 26.1.0.0.0.260615.1 returns 0. If
+           OracleVersion cannot compare parsed versions, this helper also
+           returns 0 and lets the caller use its tie handling.
+        """
+        if aVersionedLocDbPatchInfo["format"] == "fullPatchVersion" and aCommonLocDbPatchInfo["format"] != "fullPatchVersion":
+            return 1
+        if aVersionedLocDbPatchInfo["format"] != "fullPatchVersion" and aCommonLocDbPatchInfo["format"] == "fullPatchVersion":
+            return -1
+
+        _verobj = OracleVersion()
+        _comparison_result = _verobj.mCompareVersions(aVersionedLocDbPatchInfo["db_patch_version"],
+                                                     aCommonLocDbPatchInfo["db_patch_version"])
+        if _comparison_result is None:
+            return 0
+        return _comparison_result
+
+    def mCompareDbserverPatchFiles(self, aVersionedLocDbPatchFile, aCommonLocDbPatchFile):
         """
          This method checks for the dbserver patch files staged at common
          and the exadata version stage locations and return the LATEST
-         based on the date format details in the file naming convention.
+         based on the dbserver_patch directory version naming convention.
 
-         In the below example, 2 dbserver patch zip locations are provided
-         as input for comparison to return the LATEST patch.
-
-          [ araghave_dbserver ] bash-4.2$  unzip -l
-          PatchPayloads/DBPatchFile/dbserver.patch.zip | grep 'dbserver_patch_' | head -1
-            0  10-18-2023 00:09   dbserver_patch_231017/
-          [ araghave_dbserver ] bash-4.2$
-
-          [ araghave_dbserver ] bash-4.2$ unzip -l
-          PatchPayloads/23.1.24.0.0.250306.1/DBPatchFile/dbserver.patch.zip | grep
-          'dbserver_patch_' | head -1
-            0  03-14-2025 00:00   dbserver_patch_250313/
-          [ araghave_dbserver ] bash-4.2$
-
-          -bash-4.2$ unzip -l PatchPayloads/DBPatchFile/dbserver.patch.zip | head -4
-          Archive:  PatchPayloads/DBPatchFile/dbserver.patch.zip
-           Length      Date    Time    Name
-          ---------  ---------- -----   ----
-                0  09-18-2024 23:46   dbserver_patch_240915.1/
-          -bash-4.2$
-
-          Here dbserver_patch_250313 is LATEST compared to dbserver_patch_231017 and
-          will be consumed for patching.
+         Full-version naming such as dbserver_patch_26.1.0.0.0.260531
+         takes precedence over legacy date-code naming such as
+         dbserver_patch_260515.1. When both entries have the same format,
+         Oracle version comparison is used, including optional trailing suffixes.
         """
-        _db_patch_file_date_format_1 = None
-        _db_patch_file_date_format_2 = None
+        _versioned_loc_dbserver_version = None
+        _common_loc_dbserver_version = None
         try:
-            _db_patch_file_date_format_1 = self.mGetDbserverPatchVersionDetails(aDbPatchFile1)
-            _db_patch_file_date_format_2 = self.mGetDbserverPatchVersionDetails(aDbPatchFile2)
+            _versioned_loc_dbserver_version = self.mGetDbserverPatchVersionDetails(aVersionedLocDbPatchFile)
+            _common_loc_dbserver_version = self.mGetDbserverPatchVersionDetails(aCommonLocDbPatchFile)
+            _versioned_loc_dbserver_info = self.mParseDbserverPatchVersionDetails(_versioned_loc_dbserver_version)
+            _common_loc_dbserver_info = self.mParseDbserverPatchVersionDetails(_common_loc_dbserver_version)
 
-            if _db_patch_file_date_format_1 and _db_patch_file_date_format_2:
-                if int(_db_patch_file_date_format_1) > int(_db_patch_file_date_format_2):
-                    self.mPatchLogInfo(f"{aDbPatchFile1} is the LATEST dbserver patch file available based on the date.")
-                    return aDbPatchFile1
-                elif int(_db_patch_file_date_format_1) < int(_db_patch_file_date_format_2):
-                    self.mPatchLogInfo(f"{aDbPatchFile2} is the LATEST dbserver patch file available based on the date.")
-                    return aDbPatchFile2
+            if _versioned_loc_dbserver_info and _common_loc_dbserver_info:
+                _comparison_result = self.mCompareDbserverPatchVersionDetails(_versioned_loc_dbserver_info, _common_loc_dbserver_info)
+                if _comparison_result > 0:
+                    self.mPatchLogInfo(f"{aVersionedLocDbPatchFile} is the LATEST dbserver patch file available based on version {_versioned_loc_dbserver_version}.")
+                    return aVersionedLocDbPatchFile
+                elif _comparison_result < 0:
+                    self.mPatchLogInfo(f"{aCommonLocDbPatchFile} is the LATEST dbserver patch file available based on version {_common_loc_dbserver_version}.")
+                    return aCommonLocDbPatchFile
                 else:
-                    self.mPatchLogInfo(f"Both the dbserver patch files have the same date: {_db_patch_file_date_format_2} and either of them can be used for patching.")
-                    return aDbPatchFile2
+                    self.mPatchLogInfo(f"Both the dbserver patch files have the same version details: {_common_loc_dbserver_version} and either of them can be used for patching.")
+                    return aCommonLocDbPatchFile
+
+            if _versioned_loc_dbserver_info is not None:
+                self.mPatchLogInfo(f"DBPatch file details not found for {aCommonLocDbPatchFile}. Returning {aVersionedLocDbPatchFile}")
+                return aVersionedLocDbPatchFile
+            elif _common_loc_dbserver_info is not None:
+                self.mPatchLogInfo(f"DBPatch file details not found for {aVersionedLocDbPatchFile}. Returning {aCommonLocDbPatchFile}")
+                return aCommonLocDbPatchFile
             else:
                 self.mPatchLogInfo("DBPatch file not found in either of the Patch Stage locations.")
                 return None
@@ -1688,38 +1773,6 @@ class ExaGenericHandler(TargetHandler):
             self.mPatchLogWarn("Error in generating dbserver patch version file for patching. Error: %s" % str(e))
             self.mPatchLogTrace(traceback.format_exc())
             return None
-
-    def mGetDbserverPatchVersionDetails(self, aDbPatchFileDir):
-        """
-         This method returns the db patch file along with version based
-         on the input DB patch file path provided.
-
-         -bash-4.4$ /bin/unzip -l /scratch/araghave/ecra_installs/abhi/mw_home/user_projects/
-         domains/exacloud/PatchPayloads/DBPatchFile/dbserver.patch.zip | /bin/grep dbserver_ |
-         /bin/head -1 | /bin/awk '{print $4}' | /bin/tr -d "/"
-         dbserver_patch_250119
-         -bash-4.4$
-        """
-        _version = None
-        _db_patch_file = None
-        try:
-            _cmd_list = []
-            _out = []
-            # Get Dbserver patch version details.
-            _db_patch_file = os.path.join(aDbPatchFileDir)
-            _cmd_list.append(["/bin/unzip", "-l", _db_patch_file])
-            _cmd_list.append(["/bin/grep", "dbserver_"])
-            _cmd_list.append(["/bin/head", "-1"])
-            _cmd_list.append(["/bin/awk", '{print $4}'])
-            _cmd_list.append(["/bin/tr", "-d", '/'])
-            _cmd_list.append(["/bin/cut", "-d.", "-f1"])
-            _rc, _o = runInfraPatchCommandsLocally(_cmd_list)
-            if _o:
-                _version = ((_o.split("\n"))[0]).split("_")[2]
-        except Exception as e:
-            self.mPatchLogWarn("Error in generating dbserver patch version. Error: %s" % str(e))
-            self.mPatchLogTrace(traceback.format_exc())
-        return _version
 
     def mGetPatchFileDetails(self, aPatchFileTag):
         """

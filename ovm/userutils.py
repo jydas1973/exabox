@@ -4,7 +4,7 @@
 #
 # userutils.py
 #
-# Copyright (c) 2024, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2024, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      userutils.py - <one-line expansion of the name>
@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED (MM/DD/YY)
+#    remamid   04/29/26 - Adjust switch SSH handling
+#    remamid   03/31/26 - Bug 38973298 Refactor SSH config handling
 #    gparada   04/15/25 - 37828983 ssh CPS' as ecra usr, exec cmds with sudo
 #    gparada   02/28/25 - 37746597 force userdel for secscan with diff owner
 #    gparada   02/28/25 - 37652127 remove secscan home folder
@@ -34,8 +36,9 @@ from exabox.core.Node import exaBoxNode
 from exabox.log.LogMgr import ebLogError, ebLogInfo, ebLogWarn, ebLogTrace
 from exabox.utils.node import (
     node_cmd_abs_path_check,
-    node_exec_cmd_check,    
+    node_exec_cmd_check,
 )
+from exabox.ovm.csstep.cs_util import csUtil, _SSH_DEFAULT_FILE
 
 # We need to import exaBoxCluCtrl for type annotations, but it will cause a
 # cyclic-import at runtime.  Thus we import it only when type-checking.  We
@@ -77,21 +80,34 @@ class ebUserUtils:
             return
 
         _node = exaBoxNode(get_gcontext())
+        _cs_util = csUtil()
+
+        _is_dom0 = aHostname in _dom0s
+        _is_cell = aHostname in _cells
 
         try:
             _node.mConnect(aHost=aHostname)
             _svc_cmd = node_cmd_abs_path_check(_node, "service", sbin=True)
 
-            _cmd = "/bin/cat /etc/ssh/sshd_config | /bin/grep 'TrustedUserCAKey.*ca.pub'"
-            _node.mExecuteCmd(_cmd)
+            if _is_dom0 or _is_cell:
+                _, changed = _cs_util.mUpdateExacloudSshd(
+                    _node,
+                    {'TrustedUserCAKeys': '/etc/ssh/ca.pub'},
+                    ebox=aEbox,
+                    aHosts=[aHostname],
+                )
+            else:
+                _, changed = _cs_util.mUpdateExacloudSshd(
+                    _node,
+                    {'TrustedUserCAKeys': '/etc/ssh/ca.pub'},
+                    conf_file=_SSH_DEFAULT_FILE,
+                )
 
-            if _node.mGetCmdExitStatus() != 0:
-
-                _cmd = "/bin/echo 'TrustedUserCAKeys /etc/ssh/ca.pub' >> /etc/ssh/sshd_config"
-                node_exec_cmd_check(_node, _cmd)
-
+            if changed:
                 _cmd = f"{_svc_cmd} sshd restart"
                 node_exec_cmd_check(_node, _cmd)
+            else:
+                ebLogInfo(f"*** TrustedUserCAKeys already present on {aHostname}; skipping sshd restart")
 
         finally:
             _node.mDisconnect()
@@ -219,4 +235,3 @@ class ebUserUtils:
         _dummyEntry = _exakms.mBuildExaKmsEntry("dummy", 
             aUserName, _exakms.mGetEntryClass().mGeneratePrivateKey())
         return _dummyEntry
-

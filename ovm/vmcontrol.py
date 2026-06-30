@@ -11,6 +11,7 @@ NOTE:
     None
 
 History:
+    gvalderr    05/08/26   - Bug 39166742 - Add VM resume support
     jesandov    10/30/2025 - 38554948: Add force shutdown and force bounce
     remamid     09/24/2025 - Add OS command as part of mRebootVMCheck as part of VM validation bug 38347575
     avimonda    09/06/2015 - Bug 38205634 - OCI: EXACC: SOFTRESETEXACCVMNODE FAILS ON EXACLOUD WITH "ERROR WHILE MULTIPROCESSING(PROCESS TIMEOUT)"
@@ -338,6 +339,9 @@ class exaBoxOVMCtrl(object):
             ebLogInfo('*** Successfully Started VM: {0}, time: {1}'.format(_vmid, _elapsed))
             return 0
 
+    def mResumeVM(self, aVMId):
+        return self.__vmhandle.mResumeVM(aVMId)
+
     def mUptime(self):
         self.__vmhandle.mUptime()
 
@@ -494,7 +498,7 @@ class ebVgLifeCycle(ebVgBase):
 
         _rc = (-1 << 16 ) | 0x0000
 
-        if aCmd in ['list', 'status', 'start', 'shutdown', 'bounce', 'create', 'destroy', 'vcpuset']:
+        if aCmd in ['list', 'status', 'start', 'shutdown', 'bounce', 'create', 'destroy', 'vcpuset', 'resume']:
             if self.__vmctrl.dom0 == False:
                 ebLogWarn('Node type Dom0 expected to run command: ' + aCmd)
                 self.__vmctrl.mDumpInfo()
@@ -627,8 +631,15 @@ class ebVgLifeCycle(ebVgBase):
                 return _rc
             _mAutostartSettingErr = None 
 
+            _dom0_lock = None
             try:
-                _dom0_lock = RemoteLock(aCluCtrlObj, force_host_list=[self.__vmctrl.mGetDom0()])
+                _request_lock_active = (
+                    aCluCtrlObj is not None and
+                    aCluCtrlObj.mGetRemoteLock().get_request_state() == 1
+                )
+                if not _request_lock_active:
+                    _dom0_lock = RemoteLock(aCluCtrlObj, force_host_list=[self.__vmctrl.mGetDom0()])
+
                 if _dom0_lock:
                     _dom0_lock.acquire()
 
@@ -751,6 +762,18 @@ class ebVgLifeCycle(ebVgBase):
             if _rc == 0 and _mAutostartSettingErr == 0x0454:
                 return _mAutostartSettingErr 
             return _rc
+
+        if aCmd == 'resume':
+            if aVMId:
+                _vmid = aVMId
+            else:
+                _vmid = aOptions.vmid
+            if not _vmid:
+                return 0x0412       # ERROR_412 : VMID INVALID OR VM NOT CONFIGURED
+            self.__vmctrl.mRefreshDomUsCfg()
+            if not _vmid in self.__vmctrl.mGetDomUsCfg():
+                return 0x0412       # ERROR_412 : VMID INVALID OR VM NOT CONFIGURED
+            return self.__vmctrl.mResumeVM(_vmid)
 
         if aCmd == 'uptime':
             self.__vmctrl.mUptime()

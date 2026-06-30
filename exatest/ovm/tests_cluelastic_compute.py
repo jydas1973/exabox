@@ -4,7 +4,7 @@
 #
 # tests_cluelastic.py
 #
-# Copyright (c) 2021, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_cluelastic.py - <one-line expansion of the name>
@@ -111,7 +111,9 @@ class ebTestCluElasticCompute(ebTestClucontrol):
 
         ebLogInfo("Unit test on Cluelastic.getImageVersion successful.")
 
-    def test_patchOedaXmlForElastic(self):
+
+    @patch('exabox.ovm.utils.cellcli_utils.ebCellCliUtils.mIsEFRack', return_value=True)
+    def test_patchOedaXmlForElastic(self, mock_ebEscliUtils):
         ebLogInfo("")
         ebLogInfo("Running unit test on Cluelastic.patchOedaXmlForElastic")
         fullOptions = testOptions()
@@ -123,6 +125,13 @@ class ebTestCluElasticCompute(ebTestClucontrol):
                                 exaMockCommand("/usr/local/bin/imageinfo -version", aRc=0, aStdout= "20.1.8.0.0.210317", aPersist=True)
                             ]
                         ],
+            self.mGetRegexCell():
+                        [
+                            [
+                                exaMockCommand("/opt/oracle.cellos/exadata.img.hw --get model", aRc=0, aStdout="E6-2L", aPersist=True)
+                            ]
+                        ],
+
             self.mGetRegexLocal():
                         [
                             [

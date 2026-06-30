@@ -16,6 +16,7 @@ EXTERNAL INTERFACES:
 INTERNAL CLASSES:
 
 History:
+    avimonda  05/12/26 - Add CELL-04633 PD-CD mapping diagnostics
     pbellary  04/20/2023 - 35109538: DISKGROUP CREATION FAILED DUE TO MISSING GRID DISKS 
     siyarlag  01/31/2022 - 31540575: create adbs cloud user
     dekuckre  15/06/2021 - 32982101: Update nonroot password in ZDLRA env
@@ -79,6 +80,9 @@ class csCreateStorage(CSBase):
         csu.mExecuteOEDAStep(ebox, self.step, steplist, aOedaStep=_csConstants.OSTP_SETUP_CELL, dom0Lock=False)
 
         ebox.mReleaseRemoteLock()
+
+        _prechecks = ebCluPreChecks(ebox)
+        _prechecks.mCheckCellCriticalHardwareAlerts()
 
         #
         # Execute OEDA CREATE_CELL 
@@ -181,5 +185,3 @@ class csCreateStorage(CSBase):
         ebLogInfo('csCreateStorage: Completed undoExecute Successfully')
         _stepSpecificDetails = _clu_utils.mStepSpecificDetails("deleteServiceDetails", 'DONE', "Undo Create Storage completed", 'ESTP_CREATE_STORAGE')
         _clu_utils.mUpdateTaskProgressStatus([], 100, "Undo Create Storage", "Done", _stepSpecificDetails)
-
-

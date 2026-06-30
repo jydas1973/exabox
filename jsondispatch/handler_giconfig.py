@@ -4,7 +4,7 @@
 #
 # handler_giconfig.py
 #
-# Copyright (c) 2023, 2024, Oracle and/or its affiliates.
+# Copyright (c) 2023, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      handler_giconfig.py - <one-line expansion of the name>
@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    joysjose    04/16/26 - 38900232 Voxio code fix - Dir exabox/jsondispatch
 #    ivang       08/20/24 - bug-36953200: use factory pattern instead of
 #                           nesting instances
 #    akkar       02/14/24 - Bug-36250866:Change validation for new paylaod
@@ -73,6 +74,7 @@ class GIConfigHandler(JDHandler):
 
         _rc = GIConfigHandler.SUCCESS
         _response = {}
+        _gi_config_mgr = None
 
         # Create Gi config and clucontrol object
         #TODO : Add check for old repo format
@@ -91,7 +93,8 @@ class GIConfigHandler(JDHandler):
         # Regardless of error or success, we'll try to log the contents of
         # the _gi_config_mgr object
         finally:
-            ebLogTrace(f"Gi config opeartion output:'{json.dumps(_gi_config_mgr.mGetGIResponseData(), indent=4)}'")
+            if _gi_config_mgr is not None and hasattr(_gi_config_mgr, "mGetGIResponseData"):
+                ebLogTrace(f"Gi config operation output:'{json.dumps(_gi_config_mgr.mGetGIResponseData(), indent=4)}'")
 
         return _rc, _response
 

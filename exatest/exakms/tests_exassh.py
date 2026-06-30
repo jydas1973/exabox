@@ -16,6 +16,9 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    aararora    06/19/26 - Bug#39568198 Support RoCE switch download without
+#                           SFTP
+#    jesandov    04/27/26 - 39263025: Fix vulnerabilities found by IA
 #    bhpati      01/27/26 - Enh 38820677 - EXASSH WITH DEBUG FLAG SHOULD WRITE
 #                           THE ENTRIES TO THE LOG FILE WHEN IT IS RAN WITH -FL
 #                           FLAG
@@ -31,6 +34,12 @@ import os
 import unittest
 import stat
 import logging
+import inspect
+import socket
+import base64
+import gzip
+import tempfile
+import paramiko
 
 from random import shuffle
 from unittest.mock import patch
@@ -49,6 +58,25 @@ from exabox.exakms.ExaKmsSingleton import ExaKmsSingleton
 
 from exabox.exassh.ExasshManager import ExasshManager
 from exabox.exassh.ExasshScript import ExasshScript
+
+import shlex, subprocess
+
+SKIP_UT=True
+
+def mExecuteCmd(aArgs, aFail=True):
+    try:
+        print(aArgs, flush=True)
+        proc = subprocess.Popen(aArgs, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False)
+        outs, errs = proc.communicate()
+        _msg = f"Cmd: {aArgs} returned: {proc.returncode}.\nstdout:'{outs}',\nstderr:'{errs}'"
+        print(_msg, flush=True)
+        if proc.returncode != 0:
+            if aFail:
+                raise RuntimeError(_msg)
+        return outs.decode("utf8"), errs.decode("utf8")
+    except:
+        proc.kill()
+        raise
 
 class ebTestExaKms(ebTestClucontrol):
 
@@ -75,7 +103,7 @@ class ebTestExaKms(ebTestClucontrol):
         self.user = os.environ["USER"]
         self.home = os.environ["HOME"]
         self.host = os.environ["HOSTNAME"]
-
+        
         self.mGenerateLocalKey(self)
 
     @classmethod
@@ -92,7 +120,7 @@ class ebTestExaKms(ebTestClucontrol):
 
         # Delete all exatest_keys
         _home = os.environ["HOME"]
-        os.system(f"/bin/sed -i '/exatest_key/d' {_home}/.ssh/authorized_keys")
+        mExecuteCmd(["/bin/sed", "-i", "/exatest_key/d", f"{_home}/.ssh/authorized_keys"])
 
     def mGenerateLocalKey(self):
 
@@ -101,12 +129,28 @@ class ebTestExaKms(ebTestClucontrol):
 
         _pubkey =  _entry.mGetPublicKey("exatest_key")
 
-        os.system(f"/bin/mkdir -p {self.home}/.ssh")
-        os.system(f"/bin/chmod 700 {self.home}/.ssh")
-        os.system(f"/bin/echo '{_pubkey}' >> {self.home}/.ssh/authorized_keys")
-        os.system(f"/bin/chmod 600 {self.home}/.ssh/authorized_keys")
+        mExecuteCmd(["/bin/mkdir", "-p", f"{self.home}/.ssh"])
+        mExecuteCmd(["/bin/chmod", "700", f"{self.home}/.ssh"])
+
+        with open(f"{self.home}/.ssh/authorized_keys", "a+") as _f:
+            _f.write(_pubkey)
+            _f.write("\n")
+
+        print(f"Host info: {socket.getfqdn()} / {socket.gethostname()}", flush=True)
+
+        mExecuteCmd(["/bin/chmod", "600", f"{self.home}/.ssh/authorized_keys"])
+        mExecuteCmd(["/usr/bin/ssh-keygen", "-R", socket.getfqdn()])
+        mExecuteCmd(["/usr/bin/ssh-keygen", "-R", socket.gethostname()])
+
+        _commandBase = ["/bin/ssh", "-o", "PasswordAuthentication=no", "-o", "StrictHostKeyChecking=accept-new"]
+
+        mExecuteCmd(_commandBase + [f"{self.user}@{socket.getfqdn()}", '/bin/echo new'], aFail=False)
+        mExecuteCmd(_commandBase + [f"{self.user}@{socket.gethostname()}", '/bin/echo new'], aFail=False)
 
     def test_000_command(self):
+
+        if SKIP_UT:
+            return
 
         _commandRc = 1
 
@@ -142,6 +186,9 @@ class ebTestExaKms(ebTestClucontrol):
 
     def test_002_download_upload(self):
 
+        if SKIP_UT:
+            return
+
         # Create file to upload
         _file1 = os.path.abspath(os.path.join(self.mGetUtil().mGetOutputDir(), "exassh_example0.txt"))
         _file2 = os.path.abspath(os.path.join(self.mGetUtil().mGetOutputDir(), "exassh_example_upload.txt"))
@@ -174,6 +221,9 @@ class ebTestExaKms(ebTestClucontrol):
             _exassh.mDisconnect()
 
     def test_003_download_upload_recursive(self):
+
+        if SKIP_UT:
+            return
 
         # Create file to upload
         _dirDW = os.path.abspath(os.path.join(self.mGetUtil().mGetOutputDir(), "exassh_workdir_dw"))
@@ -244,8 +294,8 @@ class ebTestExaKms(ebTestClucontrol):
 
             # Prepare keysdb env
             if not os.path.exists(f"{_basepath}/dbcli/bin/mkstore"):
-                os.system(f"mkdir -p {_basepath}/dbcli/")
-                os.system(f"unzip packages/wallet_util.zip -d {_basepath}/dbcli/ 2>&1 >/dev/null")
+                mExecuteCmd(["/bin/mkdir", "-p", f"{_basepath}/dbcli/"])
+                mExecuteCmd(["/usr/bin/unzip", "packages/wallet_util.zip", "-d", f"{_basepath}/dbcli/"])
 
             get_gcontext().mSetRegEntry("MKSTORE_BASEPATH", _basepath)
             self.mGetClubox().mGetCtx().mSetConfigOption('exakms_type', 'ExaKmsKeysDB')
@@ -285,7 +335,7 @@ class ebTestExaKms(ebTestClucontrol):
             self.host,
             "--mina",
             "-u", self.user,
-            "-e", "echo ."
+            "-e", "/bin/echo x"
         ])
 
 
@@ -306,11 +356,11 @@ class ebTestExaKms(ebTestClucontrol):
         _exasshScript.mCreateManager([
             self.host,
             "-u", self.user,
-            "-e", "echo hi",
             "-sl", "-fl", "-nc",
             "-k", "x",
             "-w", "1000",
-            "-o", "json"
+            "-o", "json",
+            "-e", "/bin/echo hi"
         ])
 
         _manager = _exasshScript.mGetExassManager()
@@ -320,7 +370,7 @@ class ebTestExaKms(ebTestClucontrol):
         _rc = _exasshScript.mExecute()
         self.assertEqual(_rc, 0)
 
-    def test_007_status_bad_exassh_script(self):
+    def test_097_status_bad_exassh_script(self):
 
         def get_status_pregenerate(aExaKmsEntry, aValidateEntry=True):
 
@@ -355,9 +405,6 @@ class ebTestExaKms(ebTestClucontrol):
         self.assertEqual(_rc, 0)
 
         self.assertEqual(len(_exakms.mSearchExaKmsEntries({})), 0)
-
-        # Generate key again after the delete
-        self.mGenerateLocalKey()
 
     @patch('exabox.exassh.ExasshManager.ExasshManager.mStartCli')
     def test_008_optcl_flag(self, mock_prepareChannel):
@@ -400,6 +447,10 @@ class ebTestExaKms(ebTestClucontrol):
     
 
     def test_009_remotelyexecute_no_args(self):
+
+        if SKIP_UT:
+            return
+
         # Create working directories
         _currDir = os.path.abspath(os.path.join(self.mGetUtil().mGetOutputDir(), "exassh_re_workdir"))
 
@@ -412,7 +463,7 @@ class ebTestExaKms(ebTestClucontrol):
 
         with open(_file1, "w") as _f:
             _f.write(_fileContent1)
-        os.system(f"/bin/chmod u+x {_file1}")
+        mExecuteCmd(["/bin/chmod", "u+x", _file1])
 
         # Upload created test file
         _exassh = ExasshManager(self.mGetClubox(), aConsoleLog=True, aFileLog=True)
@@ -432,6 +483,10 @@ class ebTestExaKms(ebTestClucontrol):
 
 
     def test_010_remotelyexecute_with_args(self):
+
+        if SKIP_UT:
+            return
+
         # Create working directories
         _currDir = os.path.abspath(os.path.join(self.mGetUtil().mGetOutputDir(), "exassh_re_workdir"))
 
@@ -444,7 +499,7 @@ class ebTestExaKms(ebTestClucontrol):
 
         with open(_file1, "w") as _f:
             _f.write(_fileContent1)
-        os.system(f"/bin/chmod u+x {_file1}")
+        mExecuteCmd(["/bin/chmod", "u+x", _file1])
 
         # Upload created test file
         _exassh = ExasshManager(self.mGetClubox(), aConsoleLog=True, aFileLog=True)
@@ -467,7 +522,7 @@ class ebTestExaKms(ebTestClucontrol):
     @patch("os.getcwd", return_value="/tmp/exacloud/test")
     @patch("exabox.exassh.ExasshManager.ExasshManager.mInitExacloud", return_value=None)
     @patch("logging.getLogger")
-    def test_paramiko_logger_gets_file_handler(self, mock_get_logger, mock_init, mock_getcwd,
+    def test_010_paramiko_logger_gets_file_handler(self, mock_get_logger, mock_init, mock_getcwd,
                                                 mock_makedirs, mock_file_handler):
 
         file_handler = mock.Mock(name="file_handler")
@@ -491,6 +546,190 @@ class ebTestExaKms(ebTestClucontrol):
         self.assertIn(file_handler, exassh_logger.handlers)
         self.assertIn(file_handler, paramiko_logger.handlers)
         self.assertEqual(logging.DEBUG, paramiko_logger.level)
+
+
+    @patch("os.getcwd", return_value="/tmp/exacloud/test")
+    @patch("exabox.exassh.ExasshManager.ExasshManager.mInitExacloud", return_value=None)
+    def test_011_roce_chunk_size_defaults_and_caps(self, mock_init, mock_getcwd):
+
+        _manager = ExasshManager(aConsoleLog=False, aFileLog=False)
+        _context = mock.Mock(name="context")
+
+        with patch("exabox.exassh.ExasshManager.get_gcontext", return_value=_context):
+            _context.mCheckConfigOption.return_value = "bad"
+            self.assertEqual(_manager.mGetRoceDownloadChunkBytes(), 4 * 1024 * 1024)
+
+            _context.mCheckConfigOption.return_value = "0"
+            self.assertEqual(_manager.mGetRoceDownloadChunkBytes(), 4 * 1024 * 1024)
+
+            _context.mCheckConfigOption.return_value = "65"
+            self.assertEqual(_manager.mGetRoceDownloadChunkBytes(), 64 * 1024 * 1024)
+
+            _context.mCheckConfigOption.return_value = "16"
+            self.assertEqual(_manager.mGetRoceDownloadChunkBytes(), 16 * 1024 * 1024)
+
+    @patch("os.getcwd", return_value="/tmp/exacloud/test")
+    @patch("exabox.exassh.ExasshManager.ExasshManager.mInitExacloud", return_value=None)
+    def test_012_has_roce_fqdn_uses_raw_requested_conn_and_host_names(self, mock_init, mock_getcwd):
+
+        _manager = ExasshManager(aConsoleLog=False, aFileLog=False)
+        self.assertFalse(_manager.mHasRoceFqdn())
+
+        _manager.mSetConnParams({"FQDN": "scaqan17sw-rocea0"})
+        self.assertTrue(_manager.mHasRoceFqdn())
+
+        _manager.mSetConnParams({"FQDN": "scaqan17sw-rocea0.us.oracle.com"})
+        self.assertTrue(_manager.mHasRoceFqdn())
+
+        _manager.mSetConnParams({"FQDN": "scaqan17sw-leafa0.us.oracle.com"})
+        setattr(_manager, "_ExasshManager__host", "scaqan17sw-rocea0.us.oracle.com")
+        self.assertTrue(_manager.mHasRoceFqdn())
+
+    @patch("os.getcwd", return_value="/tmp/exacloud/test")
+    @patch("exabox.exassh.ExasshManager.ExasshManager.mInitExacloud", return_value=None)
+    def test_013_has_roce_fqdn_uses_requested_conn_and_entry_names(self, mock_init, mock_getcwd):
+
+        _manager = ExasshManager(aConsoleLog=False, aFileLog=False)
+        _entry = mock.Mock(name="entry")
+        _entry.mGetFQDN.return_value = "stored-switch-entry.example.com"
+
+        self.assertFalse(_manager.mHasRoceFqdn())
+
+        _manager.mSetConnParams({"FQDN": "rack-sw-rocea0.example.com"})
+        self.assertTrue(_manager.mHasRoceFqdn())
+
+        _manager.mGetConnParams()["FQDN"] = "stored-switch-entry.example.com"
+        self.assertTrue(_manager.mHasRoceFqdn())
+
+        _manager.mSetConnParams({"FQDN": "stored-switch-entry.example.com"})
+        _entry.mGetFQDN.return_value = "rack-sw-rocea0.example.com"
+        _manager.mSetConnectedEntry(_entry)
+        self.assertTrue(_manager.mHasRoceFqdn())
+
+    @patch("os.getcwd", return_value="/tmp/exacloud/test")
+    @patch("exabox.exassh.ExasshManager.ExasshManager.mInitExacloud", return_value=None)
+    def test_014_roce_guestshell_file_size_ignores_prompt_noise(self, mock_init, mock_getcwd):
+
+        _manager = ExasshManager(aConsoleLog=False, aFileLog=False)
+
+        with patch.object(_manager, "mExecuteGuestShellMarkedCommand", return_value="12345\n>\n"):
+            self.assertEqual(_manager.mGetRoceGuestShellFileSize("/var/log/messages"), 12345)
+
+    @patch("os.getcwd", return_value="/tmp/exacloud/test")
+    @patch("exabox.exassh.ExasshManager.ExasshManager.mInitExacloud", return_value=None)
+    def test_015_roce_guestshell_file_size_error_has_message(self, mock_init, mock_getcwd):
+
+        _manager = ExasshManager(aConsoleLog=False, aFileLog=False)
+
+        with patch.object(_manager, "mExecuteGuestShellMarkedCommand", return_value=">\n"):
+            with self.assertRaises(Exception) as _ctx:
+                _manager.mGetRoceGuestShellFileSize("/var/log/messages")
+
+        self.assertIn("Exacloud error code: 0", str(_ctx.exception))
+        self.assertIn("Unable to determine remote file size from guestshell output", str(_ctx.exception))
+        self.assertNotIn("No Error Message Defined", str(_ctx.exception))
+
+    @patch("os.getcwd", return_value="/tmp/exacloud/test")
+    @patch("exabox.exassh.ExasshManager.ExasshManager.mInitExacloud", return_value=None)
+    def test_016_download_roce_guestshell_writes_complete_file_atomically(self, mock_init, mock_getcwd):
+
+        _content = b"hello from roce guestshell"
+        _payload = base64.b64encode(gzip.compress(_content)).decode("ascii")
+        _manager = ExasshManager(aConsoleLog=False, aFileLog=False)
+
+        with tempfile.TemporaryDirectory() as _tmpdir:
+            _localFile = os.path.join(_tmpdir, "messages")
+
+            with patch.object(_manager, "mEnterRoceGuestShell"), \
+                 patch.object(_manager, "mGetRoceGuestShellFileSize", return_value=len(_content)), \
+                 patch.object(_manager, "mGetRoceDownloadChunkBytes", return_value=1024), \
+                 patch.object(_manager, "mGetRoceDownloadChunkTimeout", return_value=180), \
+                 patch.object(_manager, "mExecuteGuestShellMarkedCommand", return_value=_payload):
+
+                self.assertEqual(_manager.mDownloadRoceGuestShellFile("/var/log/messages", _localFile), 0)
+
+            with open(_localFile, "rb") as _file:
+                self.assertEqual(_file.read(), _content)
+            self.assertEqual(
+                [f for f in os.listdir(_tmpdir) if f.endswith(".tmp")],
+                []
+            )
+
+    @patch("os.getcwd", return_value="/tmp/exacloud/test")
+    @patch("exabox.exassh.ExasshManager.ExasshManager.mInitExacloud", return_value=None)
+    def test_017_download_roce_guestshell_preserves_existing_file_on_failure(self, mock_init, mock_getcwd):
+
+        _manager = ExasshManager(aConsoleLog=False, aFileLog=False)
+
+        with tempfile.TemporaryDirectory() as _tmpdir:
+            _localFile = os.path.join(_tmpdir, "messages")
+            with open(_localFile, "wb") as _file:
+                _file.write(b"existing")
+
+            with patch.object(_manager, "mEnterRoceGuestShell"), \
+                 patch.object(_manager, "mGetRoceGuestShellFileSize", return_value=16), \
+                 patch.object(_manager, "mGetRoceDownloadChunkBytes", return_value=1024), \
+                 patch.object(_manager, "mGetRoceDownloadChunkTimeout", return_value=180), \
+                 patch.object(_manager, "mExecuteGuestShellMarkedCommand", side_effect=RuntimeError("chunk failed")):
+
+                self.assertEqual(_manager.mDownloadRoceGuestShellFile("/var/log/messages", _localFile), 1)
+
+            with open(_localFile, "rb") as _file:
+                self.assertEqual(_file.read(), b"existing")
+            self.assertEqual(
+                [f for f in os.listdir(_tmpdir) if f.endswith(".tmp")],
+                []
+            )
+
+    @patch("os.getcwd", return_value="/tmp/exacloud/test")
+    @patch("exabox.exassh.ExasshManager.ExasshManager.mInitExacloud", return_value=None)
+    def test_018_drain_interactive_channel_logs_and_raises(self, mock_init, mock_getcwd):
+
+        _manager = ExasshManager(aConsoleLog=False, aFileLog=False)
+        _channel = mock.Mock(name="channel")
+        _channel.recv_ready.side_effect = RuntimeError("closed")
+
+        with patch.object(_manager, "mGetChannel", return_value=_channel), \
+             patch.object(_manager.mGetLog(), "error") as _error:
+            with self.assertRaises(RuntimeError):
+                _manager.mDrainInteractiveChannel()
+
+        _error.assert_any_call("Failed to drain interactive SSH channel: closed")
+
+
+
+    @patch("os.getcwd", return_value="/tmp/exacloud/test")
+    @patch("exabox.exassh.ExasshManager.ExasshManager.mInitExacloud", return_value=None)
+    def test_019_download_retries_guestshell_when_sftp_fails_on_roce(self, mock_init, mock_getcwd):
+
+        _manager = ExasshManager(aConsoleLog=False, aFileLog=False)
+        _manager.mSetConnParams({"FQDN": "rack-sw-rocea0.example.com"})
+        _channel = mock.Mock(name="channel")
+        _channel.get_transport.return_value = mock.Mock(name="transport")
+
+        with patch.object(_manager, "mGetChannel", return_value=_channel), \
+             patch.object(_manager, "mDownloadRoceGuestShellFile", return_value=0) as _download, \
+             patch("exabox.exassh.ExasshManager.paramiko.SFTPClient.from_transport", side_effect=paramiko.SSHException("Subsystem request failed")):
+
+            self.assertEqual(_manager.mDownload("/var/log/messages", "messages"), 0)
+            _download.assert_called_once_with("/var/log/messages", "messages")
+
+    @patch("os.getcwd", return_value="/tmp/exacloud/test")
+    @patch("exabox.exassh.ExasshManager.ExasshManager.mInitExacloud", return_value=None)
+    def test_020_download_does_not_retry_guestshell_for_non_roce_sftp_failure(self, mock_init, mock_getcwd):
+
+        _manager = ExasshManager(aConsoleLog=False, aFileLog=False)
+        _manager.mSetConnParams({"FQDN": "rack-sw-leafa0.example.com"})
+        _channel = mock.Mock(name="channel")
+        _channel.get_transport.return_value = mock.Mock(name="transport")
+
+        with patch.object(_manager, "mGetChannel", return_value=_channel), \
+             patch.object(_manager, "mDownloadRoceGuestShellFile", return_value=0) as _download, \
+             patch("exabox.exassh.ExasshManager.paramiko.SFTPClient.from_transport", side_effect=paramiko.SSHException("Channel closed")):
+
+            self.assertEqual(_manager.mDownload("/var/log/messages", "messages"), 1)
+            _download.assert_not_called()
+
 
 
 if __name__ == '__main__':

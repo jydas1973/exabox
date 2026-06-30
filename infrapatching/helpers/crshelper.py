@@ -20,6 +20,8 @@
 #                           RESILIENCY OF CRS RESTART FOR INFRAPATCHING FLOW
 #    bhpati      12/12/25 - Bug 38671457 - Errormessage Improvement if CRS is
 #                           disabled on Domu
+#    mirrodri    10/12/25 - Enh 38521465 PROVIDE OPTIONS TO MOCK PATCHMGR
+#                           COMMAND ON AUTOMATION ENVIRONMENTS
 #    araghave    09/27/25 - Enhancement Request 38457501 - EXACC GEN2
 #                           | INFRA PATCHING |ERFORM HEARTBEAT CHECKS AND
 #                           CRS AUTOSTARTUP IN PARALLEL FOR NON-ROLLING
@@ -267,6 +269,10 @@ class CrsHelper(LogHandler):
         _is_hb_issue_present_in_cell_with_gd_unknown_state = False
         _heartbeat_timeout_in_seconds = self.mGetHandlerInstance().mGetExadataPatchGridHeartBeatTimeoutSec()
         _heartbeat_in_cell_alert_log_execution_timeout_in_seconds = self.mGetHandlerInstance().mGetHeartBeatDetailsInCellAlertLogExecutionTimeoutSec()
+
+        if self.mGetHandlerInstance().mIsMockEnabledByEcra():
+            self.mPatchLogInfo("Mock mode enabled by ECRA: forcing heartbeat timeout to 1 second.")
+            _heartbeat_timeout_in_seconds = 1 
 
         '''
          This validation is performed based on checkValidateHeartbeatRequired 

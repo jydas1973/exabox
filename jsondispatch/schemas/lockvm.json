@@ -1,15 +1,24 @@
 {
+    "additionalProperties": false,
     "properties": {
         "dom0domUPairs": {
             "items": {
+                "additionalProperties": false,
                 "properties": {
                     "dom0": {
+                        "maxLength": 253,
+                        "minLength": 1,
+                        "pattern": "^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$",
                         "type": "string"
                     },
                     "domus": {
                         "items": {
+                            "maxLength": 253,
+                            "minLength": 1,
+                            "pattern": "^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$",
                             "type": "string"
                         },
+                        "minItems": 1,
                         "type": "array"
                     }
                 },
@@ -19,10 +28,14 @@
                 ],
                 "type": "object"
             },
+            "minItems": 1,
             "type": "array"
         },
         "clientIPs": {
             "items": {
+                "maxLength": 15,
+                "minLength": 7,
+                "pattern": "^(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])(?:\\.(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])){3}$",
                 "type": "string"
             },
             "type": "array"

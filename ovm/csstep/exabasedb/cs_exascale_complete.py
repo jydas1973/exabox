@@ -273,6 +273,11 @@ class csExaScaleComplete(CSBase):
             """
         ebox.mDisablePasswordExpiration()
 
+        # Ensure deprecated SSH algorithms are removed on the provisioned DomUs
+        _domus = [domu for _, domu in ebox.mReturnDom0DomUPair()]
+        _algorithms = ebox.mCheckConfigOption('deprecated_ssh_algorithms')
+        _csu.mRemoveDeprecatedSshAlgorithms(_domus, _algorithms)
+
         # Remove DomU Access
         if ebox.mGetCmd() == "createservice" and aOptions and aOptions.jsonconf and \
            "delete_domu_keys" in aOptions.jsonconf and \

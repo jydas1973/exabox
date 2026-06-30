@@ -16,6 +16,7 @@
 #      None.
 #
 #    MODIFIED   (MM/DD/YY)
+#    ririgoye    05/04/26 - Fix lockvm input validation
 #    scoral      12/14/25 - Creation
 #
 
@@ -36,7 +37,17 @@ class LockVM(JDHandler):
 
     def mExecute(self) -> tuple:
         _payload = self.mGetOptions().jsonconf
-        _clientIPs = _payload.get('clientIPs') if _payload.get('clientIPs') else []
+        _clientIPs = ebIpTablesRoCE.mNormalizeLockVMClientIPs(
+            _payload.get('clientIPs') if _payload.get('clientIPs') else []
+        )
+        _dom0_domus_list = []
+        for _dom0_domus in _payload['dom0domUPairs']:
+            _dom0 = ebIpTablesRoCE.mNormalizeLockVMHostname(_dom0_domus['dom0'], 'dom0')
+            _domus = [
+                ebIpTablesRoCE.mNormalizeLockVMDomUHostname(_domu)
+                for _domu in _dom0_domus['domus']
+            ]
+            _dom0_domus_list.append((_dom0, _domus))
 
         _callback = None
         if self.mGetOptions().lockvm_operation == 'lockvm':
@@ -46,9 +57,9 @@ class LockVM(JDHandler):
         else:
             raise ValueError(f'Bad lockvm_operation "{self.mGetOptions().lockvm_operation}"')
 
-        for _dom0_domus in _payload['dom0domUPairs']:
-            with connect_to_host(_dom0_domus['dom0'], get_gcontext()) as _node:
-                for _domu in _dom0_domus['domus']:
-                    _callback(_node, _domu.split('.')[0])
+        for _dom0, _domus in _dom0_domus_list:
+            with connect_to_host(_dom0, get_gcontext()) as _node:
+                for _domu_nat_hostname in _domus:
+                    _callback(_node, _domu_nat_hostname)
 
         return (0, {})

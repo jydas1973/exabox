@@ -1,3 +1,4 @@
+import inspect
 import os
 import tempfile
 import unittest
@@ -5,6 +6,7 @@ import unittest
 from unittest.mock import ANY, Mock, call, patch, mock_open
 
 from exabox.core.Context import get_gcontext
+from exabox.core.Error import ebError
 from exabox.core.MockCommand import exaMockCommand
 from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
 from exabox.ovm.kvmcpumgr import exaBoxKvmCpuMgr
@@ -2166,7 +2168,7 @@ class TestKVMCpuManagerV2Extra(ebTestClucontrol):
 
         options = self.mGetPayload()
         options.jsonconf = {
-            "vms": [{"hostname": "guestvm1", "cores": "2"}],
+            "vms": [{"hostname": "guestvm1", "cores": "1"}],
             "subfactor": 1,
         }
 
@@ -2208,9 +2210,21 @@ class TestKVMCpuManagerV2Extra(ebTestClucontrol):
                             }):
                                 rc = mgr.mManageVMCpusCountKvm("resizecpus", "guestvm1", aOptions=options)
 
-        self.assertIsInstance(rc, int)
-        self.assertGreaterEqual(rc, 0)
-        self.assertGreaterEqual(vm_handle.mDispatchEvent.call_count, 0)
+        self.assertEqual(rc, ebError(0x0452))
+        self.assertEqual(
+            vm_handle.mDispatchEvent.call_args_list,
+            [
+                call('shutdown', aOptions=None, aVMId='guestvm1', aCluCtrlObj=cluctrl),
+                call('start', aOptions=None, aVMId='guestvm1', aCluCtrlObj=cluctrl),
+            ],
+        )
+
+    def test_mManageVMCpusCountKvm_non_cos_restart_passes_cluctrl(self):
+        source = inspect.getsource(exaBoxKvmCpuMgr.mManageVMCpusCountKvm)
+        self.assertEqual(source.count("aCluCtrlObj=self.__ecc"), 2)
+        self.assertIn("_rc = _vmhandle.mDispatchEvent(", source)
+        self.assertIn("'shutdown',", source)
+        self.assertIn("'start',", source)
 
     # Auto-generated test for mClusterCPUInfoKvm
     def test_mClusterCPUInfoKvm_collects_vcpu_and_pinning(self):

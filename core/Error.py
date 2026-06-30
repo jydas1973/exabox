@@ -11,6 +11,8 @@ NOTE:
     None
 
 History:
+    joysjose    05/08/26 - Bug 38385387 Memory & OH reshape partial success
+    pbellary    12/05/2026 - Bug 39120670 - VALIDATE EXISTING OF ESWALLET POST EXASCALE ATTACH CELL
     jesandov    18/03/2026 - 39036804: Add GIP error
     ajayasin    02/27/2026 - 39018800:n-3,26ai:default gi support from UI
     scoral      02/04/2026 - Bug 38906210 - Update STALE_VM_FILES error message.
@@ -757,7 +759,13 @@ gReshapeError = {
 }
 
 gPartialError = {
-    'ERROR_VM_CPU_RESIZE_PARTIAL'     : ('0x02FF0000', 'Failed to resize CPU on all VMs. VM CPU core count will be partially updated', 'RETRYABLE_ERR', 3)
+    'ERROR_VM_CPU_RESIZE_PARTIAL'     : ('0x02FF0000', 'Failed to resize CPU on all VMs. VM CPU core count will be partially updated', 'RETRYABLE_ERR', 3),
+    'MEMORY_RESHAPE_APPLIED_CRS_DB_DOWN' : ('0x02FF0100', 'Memory reshape was applied, but CRS and database instances did not come up on the VM', 'NEED_CUSTOMER_ATTENTION', 3),
+    'MEMORY_RESHAPE_APPLIED_DB_DOWN'  : ('0x02FF0101', 'Memory reshape was applied, but database instances did not come up on the VM', 'NEED_CUSTOMER_ATTENTION', 3),
+    'MEMORY_RESHAPE_APPLIED_CRS_DOWN' : ('0x02FF0102', 'Memory reshape was applied, but CRS did not come up on the VM', 'NEED_CUSTOMER_ATTENTION', 3),
+    'OHOME_RESHAPE_APPLIED_CRS_DB_DOWN' : ('0x02FF0200', 'Oracle Home reshape was applied, but CRS and database instances did not come up on the VM', 'NEED_CUSTOMER_ATTENTION', 3),
+    'OHOME_RESHAPE_APPLIED_DB_DOWN'   : ('0x02FF0201', 'Oracle Home reshape was applied, but database instances did not come up on the VM', 'NEED_CUSTOMER_ATTENTION', 3),
+    'OHOME_RESHAPE_APPLIED_CRS_DOWN'  : ('0x02FF0202', 'Oracle Home reshape was applied, but CRS did not recover on the VM', 'NEED_CUSTOMER_ATTENTION', 3)
 }
 #
 #Exacloud Elastic Error Codes.
@@ -870,7 +878,12 @@ gExascaleError = {
     'UPDATE_EDV_VOLUME_OWNERS'              : ('0x02060017', 'Failed to update edv volume owners list', 'CRITICAL_NORETRY_ERR', 0),
     'UPDATE_ACL'                            : ('0x02060018', 'Failed to update acl permissions', 'CRITICAL_NORETRY_ERR', 0),
     'CELLCLI_CMD_FAILED'                    : ('0x02060019', 'Failed to execute cellcli command', 'CRITICAL_NORETRY_ERR', 0),
-    'VAULT_GET_ACL_FAILED'                  : ('0x0206001A', 'Failed to retrieve Exascale Vault ACLs', 'CRITICAL_NORETRY_ERR', 0)
+    'VAULT_GET_ACL_FAILED'                  : ('0x0206001A', 'Failed to retrieve Exascale Vault ACLs', 'CRITICAL_NORETRY_ERR', 0),
+    'DISALBLE_NORMAL_REDUNDANCY_FAILED'     : ('0x0206001B', 'Failed to disable normal redundancy', 'CRITICAL_NORETRY_ERR', 0),
+    'GET_EXASCALE_SERVICE_FAILED'           : ('0x0206001C', 'Failed to retrieve exascale service details', 'CRITICAL_NORETRY_ERR', 0),
+    'WALLET_NOT_FOUND'                      : ('0x0206001D', 'WALLET path does not exist', 'CRITICAL_NORETRY_ERR', 0),
+    'EXASCALE_DEPLOY_ERROR'                 : ('0x0206001E', 'Exascale Services were offline', 'CRITICAL_NORETRY_ERR', 0),
+    'CELL_MEMORY_CHECK_FAILED'              : ('0x0206001F', 'Failed to validate storage cell memory', 'CRITICAL_NORETRY_ERR', 0)
 }
 
 #
@@ -1473,4 +1486,3 @@ def retryOnException(max_times: int = 5, sleep_interval: int = 5):
             raise ExacloudRuntimeError(aErrorMsg=_msg)
         return helper_function
     return decorator
-

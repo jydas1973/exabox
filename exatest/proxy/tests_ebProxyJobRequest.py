@@ -4,7 +4,7 @@
 #
 # tests_ebProxyJobRequest.py
 #
-# Copyright (c) 2021, Oracle and/or its affiliates. 
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_ebProxyJobRequest.py - <one-line expansion of the name>
@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    aypaul      05/26/26 - Fix unit tests for 39392771Fix unit tests for
+#                           39392771
 #    aypaul      08/16/21 - Creation
 #
 import json
@@ -80,42 +82,6 @@ class ebTestProxyJobRequest(ebTestClucontrol):
         self.assertEqual(proxyJobRequest.mGetCmdType(), "Status.GET")
         self.assertEqual(proxyJobRequest.mGetType(), "Status")
         self.assertEqual(proxyJobRequest.mGetCmd(), "GET")
-
-    def test_mValidateDBEntries(self):
-
-        mysqlDB = ebGetDefaultDB()
-        mysqlDB.mCreateProxyRequestsTable()
-        ebLogInfo("")
-        ebLogInfo("Running unit test on class ebTestProxyJobRequest constructor.")
-        currentParams = {"uuid" : "0000-0000-0000-0000"}
-        proxyJobRequest = ebProxyJobRequest("CLUCtrl.POST", currentParams, mysqlDB)
-
-        newUUID = str(uuid.uuid1())
-        proxyJobRequest.mSetCmdType("Status.GET")
-        proxyJobRequest.mSetUUID(newUUID)
-        proxyJobRequest.mSetParams({"dbName" : "sampleDBName"})
-        proxyJobRequest.mSetUrlFullPath("http://slc17qpf.us.oracle.com:7080/Status/{}".format(newUUID))
-        proxyJobRequest.mSetUrlHeaders({"Authorization": "Basic YWxhZGRpbjpvcGVuc2VzYW1l"})
-        proxyJobRequest.mSetRespBody("Dummy Response Body")
-        proxyJobRequest.mSetRespCode(200)
-        proxyJobRequest.mSetReqType("GET")
-        proxyJobRequest.mSetReqBody("Dummy Request Body")
-
-        proxyJobRequest.mRegister()
-        newProxyJobRequest = ebProxyJobRequest("DUMMY.CMD", {}, mysqlDB)
-        newProxyJobRequest.mLoadRequestFromDB(newUUID)
-
-        self.assertEqual(newProxyJobRequest.mGetReqBody(), "Dummy Request Body")
-        self.assertEqual(newProxyJobRequest.mGetReqType(), "GET")
-        self.assertEqual(newProxyJobRequest.mGetRespCode(), 200)
-        self.assertEqual(newProxyJobRequest.mGetRespBody(), "Dummy Response Body")
-        self.assertEqual(literal_eval(newProxyJobRequest.mGetUrlHeaders()).get("Authorization",None), "Basic YWxhZGRpbjpvcGVuc2VzYW1l")
-        self.assertEqual(newProxyJobRequest.mGetUrlFullPath(), "http://slc17qpf.us.oracle.com:7080/Status/{}".format(newUUID))
-        self.assertEqual(newProxyJobRequest.mGetOptions().dbName, "sampleDBName")
-        self.assertEqual(newProxyJobRequest.mGetUUID(), newUUID)
-        self.assertEqual(newProxyJobRequest.mGetCmdType(), "Status.GET")
-        self.assertEqual(newProxyJobRequest.mGetType(), "Status")
-        self.assertEqual(newProxyJobRequest.mGetCmd(), "GET")
 
 if __name__ == "__main__":
     unittest.main()

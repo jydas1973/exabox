@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    ririgoye    05/04/26 - Add lockvm validation tests
 #    scoral      03/27/26 - Add tests for RemoveSecurityRulesExaBM
 #    jesandov    10/16/23 - 35729701: Support of OL7 + OL8
 #    jesandov    01/27/23 - Creation
@@ -29,6 +30,8 @@ from exabox.core.MockCommand import exaMockCommand
 from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
 from exabox.ovm.cluiptablesroce import ebIpTablesRoCE
 from unittest import mock
+from exabox.core.Error import ExacloudRuntimeError
+from exabox.network.NfTables import NfTables
 
 class ebTestIpTablesRoCEwithNFT(ebTestClucontrol):
 
@@ -36,6 +39,83 @@ class ebTestIpTablesRoCEwithNFT(ebTestClucontrol):
     def setUpClass(self):
         super().setUpClass()
         self.mGetClubox(self).mGetCtx().mSetConfigOption('iptables_backend', "iptables_nft")
+
+    def test_LockVMValidation_accepts_expected_values(self):
+
+        self.assertEqual(
+            ebIpTablesRoCE.mNormalizeLockVMHostname("dom0-1.example.com", "dom0"),
+            "dom0-1.example.com"
+        )
+        self.assertEqual(
+            ebIpTablesRoCE.mNormalizeLockVMDomUHostname("vm-01.example.com"),
+            "vm-01"
+        )
+        self.assertEqual(
+            ebIpTablesRoCE.mNormalizeLockVMClientIPs(["10.0.0.1", "192.168.1.20"]),
+            ["10.0.0.1", "192.168.1.20"]
+        )
+
+    def test_LockVMValidation_rejects_command_injection_values(self):
+
+        _bad_hostnames = [
+            "vm01;touch /tmp/pwned",
+            "vm01`id`",
+            "vm01$(id)",
+            "vm01\nwhoami",
+            "vm01|whoami",
+            "vm01 example",
+            "-vm01",
+            "vm01-",
+        ]
+
+        for _hostname in _bad_hostnames:
+            with self.subTest(hostname=_hostname):
+                with self.assertRaises(ValueError):
+                    ebIpTablesRoCE.mNormalizeLockVMDomUHostname(_hostname)
+
+        _bad_client_ips = [
+            "10.0.0.1;touch /tmp/pwned",
+            "10.0.0.1$(id)",
+            "10.0.0.1/24",
+            "999.0.0.1",
+            "2001:db8::1",
+        ]
+
+        for _client_ip in _bad_client_ips:
+            with self.subTest(client_ip=_client_ip):
+                with self.assertRaises(ValueError):
+                    ebIpTablesRoCE.mNormalizeLockVMClientIPs([_client_ip])
+
+    def test_LockGuestSSHTraffic_rejects_invalid_input_before_remote_exec(self):
+
+        _node = mock.Mock()
+
+        with mock.patch("exabox.ovm.cluiptablesroce.node_exec_cmd_check") as _mock_exec:
+            with self.assertRaises(ValueError):
+                ebIpTablesRoCE.mLockGuestSSHTraffic(
+                    _node,
+                    "vm01;touch /tmp/pwned",
+                    ["10.0.0.1"]
+                )
+            _mock_exec.assert_not_called()
+
+        with mock.patch("exabox.ovm.cluiptablesroce.node_exec_cmd_check") as _mock_exec:
+            with self.assertRaises(ValueError):
+                ebIpTablesRoCE.mLockGuestSSHTraffic(
+                    _node,
+                    "vm01.example.com",
+                    ["10.0.0.1;touch /tmp/pwned"]
+                )
+            _mock_exec.assert_not_called()
+
+    def test_UnlockGuestSSHTraffic_rejects_invalid_input_before_remote_exec(self):
+
+        _node = mock.Mock()
+
+        with mock.patch("exabox.ovm.cluiptablesroce.node_exec_cmd_check") as _mock_exec:
+            with self.assertRaises(ValueError):
+                ebIpTablesRoCE.mUnlockGuestSSHTraffic(_node, "vm01;touch /tmp/pwned")
+            _mock_exec.assert_not_called()
 
     def test_PrevmSetupNFTablesDelete(self):
 
@@ -305,6 +385,92 @@ class ebTestIpTablesRoCEwithNFT(ebTestClucontrol):
         self.mGetClubox().mSetOciExacc(True)
 
         self.mGetClubox().mSetupNatNfTablesOnDom0v2()
+
+    def test_mEnsureExadataIncludeConfig_include_present(self):
+
+
+        _echo_cmd = (
+            '/bin/echo \'include "/etc/nftables/exadata.nft"\' >> '
+            '/etc/sysconfig/nftables.conf')
+        _cmds = {
+            self.mGetRegexDom0(): [
+                [
+                    exaMockCommand("/bin/cat /etc/sysconfig/nftables.conf",
+                        aStdout=(
+                            '# Uncomment the include statement here to load the default config sample\n'
+                            '# in /etc/nftables for nftables service.\n'
+                            '#include "/etc/nftables/main.nft"\n'
+                            '# To customize, either edit the samples in /etc/nftables, append further\n'
+                            '# commands to the end of this file or overwrite it after first service\n'
+                            'include "/etc/nftables/exadata.nft"\n'))
+                    #exaMockCommand(_echo_cmd),
+                ],
+            ],
+        }
+
+        self.mPrepareMockCommands(_cmds)
+
+        _node = exaBoxNode(self.mGetContext())
+        try:
+            _node.mConnect(aHost="scaqab10adm01")
+            self.assertEqual(0, NfTables().mEnsureExadataIncludeConfig(_node))
+        finally:
+            _node.mDisconnect()
+
+    def test_mEnsureExadataIncludeConfig_adds_uncommented_include(self):
+
+
+        _echo_cmd = (
+            '/bin/echo \'include "/etc/nftables/exadata.nft"\' >> '
+            '/etc/sysconfig/nftables.conf')
+        _cmds = {
+            self.mGetRegexDom0(): [
+                [
+                    exaMockCommand("/bin/cat /etc/sysconfig/nftables.conf",
+                        aStdout=(
+                            '# Uncomment the include statement here to load the default config sample\n'
+                            '# in /etc/nftables for nftables service.\n'
+                            '#include "/etc/nftables/main.nft"\n'
+                            '# To customize, either edit the samples in /etc/nftables, append further\n'
+                            '# commands to the end of this file or overwrite it after first service\n'
+                            '#include "/etc/nftables/exadata.nft"\n')),
+                    exaMockCommand(_echo_cmd),
+                ],
+            ],
+        }
+
+        self.mPrepareMockCommands(_cmds)
+
+        _node = exaBoxNode(self.mGetContext())
+        try:
+            _node.mConnect(aHost="scaqab10adm01")
+            self.assertEqual(1, NfTables().mEnsureExadataIncludeConfig(_node))
+        finally:
+            _node.mDisconnect()
+
+    def test_mEnsureExadataIncludeConfig_skip_flag(self):
+
+        _ctx = self.mGetContext()
+        _config_options = dict(_ctx.mGetConfigOptions())
+        _ctx.mSetConfigOption('skip_nft_exadata_include_check', 'True', aAddPersist=False)
+
+        _cmds = {
+            self.mGetRegexDom0(): [
+                [
+                    # No commands should be executed when the skip flag is enabled.
+                ],
+            ],
+        }
+
+        self.mPrepareMockCommands(_cmds)
+
+        _node = exaBoxNode(self.mGetContext())
+        try:
+            _node.mConnect(aHost="scaqab10adm01")
+            self.assertEqual(2, NfTables().mEnsureExadataIncludeConfig(_node))
+        finally:
+            _node.mDisconnect()
+            _ctx.mSetConfigOptions(_config_options)
 
 
 

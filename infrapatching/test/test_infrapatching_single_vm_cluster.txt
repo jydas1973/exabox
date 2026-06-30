@@ -15,6 +15,8 @@
 #      Unit test case script for all DomU operations.
 #
 #    MODIFIED   (MM/DD/YY)
+#    araghave    04/23/26 - Enh 39152619 - MODIFY ALL SMR/ELU OPERATIONS TO
+#                           ROLLING OPERATIONS STYLE IN INFRA PATCHING CODE
 #    sdevasek    02/26/26 - Bug 39008110 - REMOVE ELUOPTIONS FROM ADDITIONAL
 #                           OPTIONS IN DOM0 TEST SETUP
 #    sdevasek    02/12/25 - Enh 38959949 - UPDATE EXISTING SINGLE VM TEST TO
@@ -45,7 +47,7 @@ class Test_single_vm_cluster_class(unittest.TestCase):
     def __init__(self, *initial_data, **kwargs):
         super(Test_single_vm_cluster_class, self).__init__(*initial_data, **kwargs)
         self.__operation = ""
-        self.__operation_style = OP_STYLE_AUTO
+        self.__operation_style = OP_STYLE_ROLLING
 
     # This method is to run something similar before every test execution.
     def setUp(self):

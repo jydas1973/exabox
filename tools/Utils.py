@@ -4,7 +4,7 @@
 #
 # Utils.py
 #
-# Copyright (c) 2024, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2024, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      Utils.py - <one-line expansion of the name>
@@ -27,9 +27,18 @@ import os
 import psutil
 import shutil
 import uuid
+from datetime import datetime
+from typing import List
 
 from exabox.core.Error import ExacloudRuntimeError
+from exabox.core.Node import exaBoxNode
 from exabox.log.LogMgr import ebLogInit, ebLogInfo, ebLogError, ebLogVerbose, ebLogWarn, ebLogTrace
+from exabox.utils.common import remove_algorithms
+from exabox.utils.node import (
+    node_cmd_abs_path_check,
+    node_exec_cmd_check,
+    node_read_text_file,
+    node_write_text_file)
 
 # Get current exacloud root using this file's location as reference
 def mGetExacloudRoot():
@@ -102,3 +111,65 @@ def mBackupFile(aSourcefilepath: str=None, aRaiseException: bool=False) -> bool:
                 return False
 
     return True
+
+
+def mRemoveSshAlgorithmsFromNode(
+        aNode: exaBoxNode,
+        aAlgorithmsToRemove: List[str]) -> None:
+    """
+    Remove SSH algorithms from sshd_config on a remote node.
+
+    The routine backs up the current sshd_config, applies the pruning using
+    remove_algorithms(), and restarts sshd so the update is effective
+    immediately.
+
+    :param aNode: already connected exaBoxNode instance.
+    :param aAlgorithmsToRemove: list of algorithms to remove.
+    :raises ExacloudRuntimeError: on connection or command failures.
+    """
+    if not aNode or not aNode.mIsConnected():
+        raise ExacloudRuntimeError(
+            0x10,
+            0xA,
+            "Node must be a connected exaBoxNode instance")
+
+    if not aAlgorithmsToRemove:
+        ebLogInfo("No algorithms provided to remove from sshd_config.")
+        return
+
+    sshd_config_path = "/etc/ssh/sshd_config"
+    ebLogInfo(
+        f"Removing algorithms {aAlgorithmsToRemove} from {sshd_config_path} "
+        f"on {aNode.mGetHostname()}")
+
+    current_config = node_read_text_file(aNode, sshd_config_path)
+    updated_config = remove_algorithms(current_config, aAlgorithmsToRemove)
+
+    if current_config == updated_config:
+        ebLogInfo("sshd_config already excludes the requested algorithms.")
+        return
+
+    now_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    backup_path = f"{sshd_config_path}_{now_str}"
+
+    cp_cmd = node_cmd_abs_path_check(aNode, "cp")
+    node_exec_cmd_check(
+        aNode,
+        f"{cp_cmd} {sshd_config_path} {backup_path}",
+        log_error=True,
+        log_stdout_on_error=True)
+    ebLogInfo(f"Created sshd_config backup at {backup_path}.")
+
+    if not updated_config.endswith("\n"):
+        updated_config = f"{updated_config}\n"
+
+    node_write_text_file(aNode, sshd_config_path, updated_config)
+    ebLogInfo("Updated sshd_config with filtered algorithms.")
+
+    systemctl_cmd = node_cmd_abs_path_check(aNode, "systemctl", sbin=True)
+    node_exec_cmd_check(
+        aNode,
+        f"{systemctl_cmd} restart sshd",
+        log_error=True,
+        log_stdout_on_error=True)
+    ebLogInfo("Restarted sshd service to apply the configuration changes.")

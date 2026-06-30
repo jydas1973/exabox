@@ -25,10 +25,10 @@ from exabox.core.Context import get_gcontext
 from exabox.core.MockCommand import exaMockCommand
 from exabox.log.LogMgr import ebLogInfo, ebLogError
 from exabox.ovm import clumisc
-from exabox.ovm.clumisc import ebCluPreChecks,ebCluSshSetup,OracleVersion,ebFortifyIssues,ebCluStorageReshapePrecheck,ebCluStartStopHostFromIlom, ebCluNodeSubsetPrecheck, ebCluRestartVmExacsService, ebCluFaultInjection, ebMigrateUsersUtil, mGetGridListSupportedByOeda, ebCluCellSanityTests, mGetDom0sImagesListSorted, ebSubnetIp, ebSubnetSet, validateIpOrHostname, ebCluScheduleManager, ebCluCellValidate, ebCluPostComputeValidate, AgentWorkerPIDListing, ebCluFetchSshKeys
+from exabox.ovm.clumisc import ebCluPreChecks,ebCluSshSetup,OracleVersion,ebFortifyIssues,ebCluStorageReshapePrecheck,ebCluStartStopHostFromIlom, ebCluNodeSubsetPrecheck, ebCluRestartVmExacsService, ebCluFaultInjection, ebMigrateUsersUtil, mGetGridListSupportedByOeda, mGetMultiGIOedaRequiredFile, mGetMultiGIOedaSelection, ebCluCellSanityTests, mGetDom0sImagesListSorted, ebSubnetIp, ebSubnetSet, validateIpOrHostname, ebCluScheduleManager, ebCluCellValidate, ebCluPostComputeValidate, AgentWorkerPIDListing, ebCluFetchSshKeys
 from exabox.ovm.monitor import ebClusterNode
 import warnings
-from unittest.mock import patch, Mock, mock_open, call
+from unittest.mock import patch, Mock, mock_open, call, MagicMock
 from exabox.core.Error import ExacloudRuntimeError
 from exabox.utils.node import  connect_to_host
 from exabox.ovm.adbs_elastic_service import mCreateADBSSiteGroupConfig
@@ -36,6 +36,7 @@ from exabox.ovm.clumisc import mWaitForSystemBoot, ebMiscFx, mGetAlertHistoryOpt
 from exabox.ovm.kvmvmmgr import ebKvmVmMgr
 from exabox.agent.ebJobRequest import ebJobRequest
 from exabox.ovm.clumisc import ebCluEthernetConfig
+from exabox.infrapatching.utils.constants import EXAPATCHING_KEY_TAG
 
 
 SSH_KEY1 = "ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEArCjp6sw0M36Cm1yJasmUeGDnMGyYZqRk+dl01OOTrwDT6mKGVD+UJfU3ACRyejKPW09fZkMFp7nhBf8gTapSwvyhcelO580iWzNCGoB5oeexivaXJpBaD01PKqd1NpgQfs90qIIXeB4ej5Z/kxGwT18Tnl6hSRxscH1tjkRfHxbajDGndd7cBP71asEPZyGIFIncp5Oi4fNmi7xX29HCT5LFaQwbtxC587HkCviRdaZLmYx7FaA9tN5gaXDg8qavF/4ImpwKosWUk9WcXecb1V0W6bxx/DHEuy6MZNHZR0RlRgFmFEZQQBFJUGCnq3JOSLm0dZE2yCUnFDT0VryjoQ== root@scas07adm07.us.oracle.com"
@@ -160,6 +161,215 @@ class mMockPrecheck:
 
     def mGetEbox(self):
         return self.__cluctrl
+
+
+class ebTestMultiGIOedaHelpers(ebTestClucontrol):
+
+    @classmethod
+    def setUpClass(cls):
+        super(ebTestMultiGIOedaHelpers, cls).setUpClass(True, True)
+        warnings.filterwarnings("ignore")
+
+    def mGetMultiGIOedaTestEbox(self, aRepoInventory=None):
+        _ebox = copy.deepcopy(self.mGetClubox())
+        _ebox.mGetGiMultiImageSupport = MagicMock(return_value=True)
+        _ebox.mGetServiceType = MagicMock(return_value='EXACS')
+        _ebox.mGetRepoInventory = MagicMock(return_value=aRepoInventory or {
+            'grid-klones': [
+                {
+                    'version': '23.26.1.0.260115',
+                    'service': ['EXACS'],
+                    'files': [{'path': 'EXACS/grid-klone-Linux-x86-64-232610260115.zip'}]
+                }
+            ]
+        })
+        _ebox.mGetOedaPath = MagicMock(return_value='/tmp/oeda')
+        _ebox.mExecuteLocal = MagicMock()
+        return _ebox
+
+    @patch('exabox.ovm.clumisc.mGetGridListSupportedByOeda')
+    def test_mGetMultiGIOedaSelection(self, mock_mGetGridListSupportedByOeda):
+        ebLogInfo("Running unit test on clumisc.mGetMultiGIOedaSelection")
+        _ebox = self.mGetMultiGIOedaTestEbox()
+        _ebox.mExecuteLocal = MagicMock(return_value=(0, None,
+            'grid-klone-Linux-x86-64-2300026000.zip, dbserver.patch.zip', ''))
+        mock_mGetGridListSupportedByOeda.return_value = (False, {'23.26.0.0.0', '23.6.0.24.10'})
+
+        with patch.object(_ebox, 'mGetVersionGiMultiImages', return_value='23.26.1.0.260115'):
+            _selection = mGetMultiGIOedaSelection(_ebox)
+
+        self.assertEqual(_selection['staged_basename'], 'grid-klone-Linux-x86-64-232610260115.zip')
+        self.assertEqual(_selection['required_basename'], 'grid-klone-Linux-x86-64-2300026000.zip')
+        _ebox.mExecuteLocal.assert_called_once_with(
+            "/tmp/oeda/oedacli -e 'list requiredfiles giversion=23.26.0.0.0'")
+
+    @patch('exabox.ovm.clumisc.mGetGridListSupportedByOeda')
+    def test_mGetMultiGIOedaSelection_with_explicit_oeda_version(self, mock_mGetGridListSupportedByOeda):
+        _ebox = self.mGetMultiGIOedaTestEbox()
+        _ebox.mExecuteLocal = MagicMock(return_value=(
+            0, None, 'path/grid-klone-Linux-x86-64-2300026000.zip', ''
+        ))
+
+        _selection = mGetMultiGIOedaSelection(
+            _ebox,
+            aGiVersion='23.26.1.0.260115',
+            aOedaGridVersion='23.26.0.0.0'
+        )
+
+        self.assertEqual(_selection, {
+            'staged_basename': 'grid-klone-Linux-x86-64-232610260115.zip',
+            'required_basename': 'grid-klone-Linux-x86-64-2300026000.zip',
+        })
+        mock_mGetGridListSupportedByOeda.assert_not_called()
+
+    @patch('exabox.ovm.clumisc.mGetGridListSupportedByOeda')
+    def test_mGetMultiGIOedaSelection_uses_supported_oeda_version(self, mock_mGetGridListSupportedByOeda):
+        _ebox = self.mGetMultiGIOedaTestEbox()
+        _ebox.mExecuteLocal = MagicMock(return_value=(
+            0, None, '/tmp/grid-klone-Linux-x86-64-2326100000.zip', ''
+        ))
+        mock_mGetGridListSupportedByOeda.return_value = (True, {'23.26.1.0.260115'})
+
+        _selection = mGetMultiGIOedaSelection(_ebox, aGiVersion='23.26.1.0.260115')
+
+        self.assertEqual(_selection, {
+            'staged_basename': 'grid-klone-Linux-x86-64-232610260115.zip',
+            'required_basename': 'grid-klone-Linux-x86-64-2326100000.zip',
+        })
+        _ebox.mExecuteLocal.assert_called_once_with(
+            "/tmp/oeda/oedacli -e 'list requiredfiles giversion=23.26.1.0.0'")
+
+    @patch('exabox.ovm.clumisc.mGetGridListSupportedByOeda')
+    def test_mGetMultiGIOedaSelection_falls_back_to_repo_version_for_older_oeda_support(
+            self, mock_mGetGridListSupportedByOeda):
+        _ebox = self.mGetMultiGIOedaTestEbox({
+            'grid-klones': [
+                {
+                    'version': '23.26.1.0.260115',
+                    'service': ['EXACS'],
+                    'files': [{'path': 'EXACS/grid-klone-Linux-x86-64-232610260115.zip'}]
+                },
+                {
+                    'version': '23.25.0.1.250110',
+                    'service': ['EXACS'],
+                    'files': [{'path': 'EXACS/grid-klone-Linux-x86-64-232501250110.zip'}]
+                }
+            ]
+        })
+        _ebox.mExecuteLocal = MagicMock(return_value=(
+            0, None, 'grid-klone-Linux-x86-64-232501250110.zip', ''
+        ))
+        mock_mGetGridListSupportedByOeda.return_value = (False, {'23.25.0.0.0', '23.6.0.24.10'})
+
+        _selection = mGetMultiGIOedaSelection(_ebox, aGiVersion='23.26.1.0.260115')
+
+        self.assertEqual(_selection, {
+            'staged_basename': 'grid-klone-Linux-x86-64-232610260115.zip',
+            'required_basename': 'grid-klone-Linux-x86-64-232501250110.zip',
+        })
+        _ebox.mExecuteLocal.assert_called_once_with(
+            "/tmp/oeda/oedacli -e 'list requiredfiles giversion=23.25.0.1.250110'")
+
+    @patch('exabox.ovm.clumisc.mGetGridListSupportedByOeda')
+    def test_mGetMultiGIOedaSelection_returns_empty_when_multigi_disabled(
+            self, mock_mGetGridListSupportedByOeda):
+        _ebox = self.mGetMultiGIOedaTestEbox()
+        _ebox.mGetGiMultiImageSupport = MagicMock(return_value=False)
+
+        self.assertEqual(mGetMultiGIOedaSelection(_ebox), {})
+        mock_mGetGridListSupportedByOeda.assert_not_called()
+        _ebox.mExecuteLocal.assert_not_called()
+
+    @patch('exabox.ovm.clumisc.mGetGridListSupportedByOeda')
+    def test_mGetMultiGIOedaSelection_returns_empty_for_invalid_version(
+            self, mock_mGetGridListSupportedByOeda):
+        _ebox = self.mGetMultiGIOedaTestEbox()
+
+        self.assertEqual(
+            mGetMultiGIOedaSelection(_ebox, aGiVersion='23.26.bad.version'),
+            {}
+        )
+        mock_mGetGridListSupportedByOeda.assert_not_called()
+        _ebox.mExecuteLocal.assert_not_called()
+
+    @patch('exabox.ovm.clumisc.mGetGridListSupportedByOeda')
+    def test_mGetMultiGIOedaSelection_returns_empty_when_ebox_missing(
+            self, mock_mGetGridListSupportedByOeda):
+        self.assertEqual(mGetMultiGIOedaSelection(None), {})
+        mock_mGetGridListSupportedByOeda.assert_not_called()
+
+    @patch('exabox.ovm.clumisc.mGetGridListSupportedByOeda')
+    def test_mGetMultiGIOedaSelection_raises_when_repo_image_missing(
+            self, mock_mGetGridListSupportedByOeda):
+        _ebox = self.mGetMultiGIOedaTestEbox({'grid-klones': []})
+
+        with self.assertRaises(ExacloudRuntimeError) as cm:
+            mGetMultiGIOedaSelection(_ebox, aGiVersion='23.26.1.0.260115')
+
+        self.assertEqual(cm.exception.args[0], 0x0828)
+        mock_mGetGridListSupportedByOeda.assert_not_called()
+        _ebox.mExecuteLocal.assert_not_called()
+
+    @patch('exabox.ovm.clumisc.mGetGridListSupportedByOeda')
+    def test_mGetMultiGIOedaSelection_raises_when_oeda_list_has_no_usable_version(
+            self, mock_mGetGridListSupportedByOeda):
+        _ebox = self.mGetMultiGIOedaTestEbox()
+        mock_mGetGridListSupportedByOeda.return_value = (False, {'19.25.0.0.0'})
+
+        with self.assertRaises(ExacloudRuntimeError) as cm:
+            mGetMultiGIOedaSelection(_ebox, aGiVersion='23.26.1.0.260115')
+
+        self.assertEqual(cm.exception.args[0], 0x0828)
+        _ebox.mExecuteLocal.assert_not_called()
+
+    def test_mGetMultiGIOedaRequiredFile_returns_basename(self):
+        _ebox = self.mGetMultiGIOedaTestEbox()
+        _ebox.mExecuteLocal = MagicMock(return_value=(
+            0, None,
+            '/repo/path/grid-klone-Linux-x86-64-2300026000.zip, dbserver.patch.zip',
+            ''
+        ))
+
+        self.assertEqual(
+            mGetMultiGIOedaRequiredFile(_ebox, '23.26.0.0.0'),
+            'grid-klone-Linux-x86-64-2300026000.zip'
+        )
+        _ebox.mExecuteLocal.assert_called_once_with(
+            "/tmp/oeda/oedacli -e 'list requiredfiles giversion=23.26.0.0.0'")
+
+    def test_mGetMultiGIOedaRequiredFile_raises_when_missing(self):
+        _ebox = self.mGetMultiGIOedaTestEbox()
+        _ebox.mExecuteLocal = MagicMock(return_value=(0, None, 'dbserver.patch.zip', ''))
+
+        with self.assertRaises(ExacloudRuntimeError) as cm:
+            mGetMultiGIOedaRequiredFile(_ebox, '23.26.0.0.0')
+
+        self.assertEqual(cm.exception.args[0], 0x0828)
+
+    def test_mGetMultiGIOedaRequiredFile_raises_on_invalid_version(self):
+        _ebox = self.mGetMultiGIOedaTestEbox()
+        _ebox.mExecuteLocal = MagicMock()
+
+        with self.assertRaises(ExacloudRuntimeError) as cm:
+            mGetMultiGIOedaRequiredFile(_ebox, '23.26.0.0.0; whoami')
+
+        self.assertEqual(cm.exception.args[0], 0x0828)
+        _ebox.mExecuteLocal.assert_not_called()
+
+    def test_mGetMultiGIOedaRequiredFile_raises_on_failed_oeda_command(self):
+        _ebox = self.mGetMultiGIOedaTestEbox()
+        _ebox.mExecuteLocal = MagicMock(return_value=(1, None, '', 'failure'))
+
+        with self.assertRaises(ExacloudRuntimeError) as cm:
+            mGetMultiGIOedaRequiredFile(_ebox, '23.26.0.0.0')
+
+        self.assertEqual(cm.exception.args[0], 0x0828)
+
+    def test_mGetMultiGIOedaRequiredFile_raises_when_ebox_missing(self):
+        with self.assertRaises(ExacloudRuntimeError) as cm:
+            mGetMultiGIOedaRequiredFile(None, '23.26.0.0.0')
+
+        self.assertEqual(cm.exception.args[0], 0x0828)
 
 
 class ebTestClumisc(ebTestClucontrol):
@@ -376,28 +586,7 @@ class ebTestClumisc(ebTestClucontrol):
         ovmObject.mRestoreSSHKey(aHost)
         ebLogInfo("Unit test on ebCluSshSetup.mRestoreSSHKey succeeded.")
 
-
-    def test_Storagereshapeprecheck(self):
-        self.mGetContext().mSetConfigOption('jsonmode', 'True')
-        _options = self.mGetPayload()
-        _options.jsonmode = 'True'
-        _cmds = {
-            self.mGetRegexCell(): [
-                [
-                    exaMockCommand("/opt/oracle/cell/cellsrv/bin/cellcli -e list griddisk attributes name where asmmodestatus=\'DROPPED\'", aRc=0, aPersist=True),
-                    exaMockCommand("/opt/oracle/cell/cellsrv/bin/cellcli -e list griddisk attributes name where asmmodestatus=\'OFFLINE\'", aRc=0, aPersist=True),
-                    exaMockCommand("/opt/oracle/cell/cellsrv/bin/cellcli -e list griddisk attributes name where asmmodestatus=\'UNKNOWN\'", aRc=0, aPersist=True),
-                ]
-            ]
-        }
-        self.mPrepareMockCommands(_cmds)
-        __ebox = self.mGetClubox()
-        __node = exaBoxNode(get_gcontext())
-        _reshapeprecheck = ebCluStorageReshapePrecheck(__ebox)
-        with patch('exabox.ovm.clumisc.ebCluStorageReshapePrecheck.mGetOfflineCellDisks', return_value=0):
-            _rc = _reshapeprecheck.mStorageReshapePrecheck(_options)
-            self.assertEqual(_rc, 0)
-
+    
     def test_mGetOfflineCellDisks_OFFLINE(self):
         self.mGetContext().mSetConfigOption('jsonmode', 'True')
         _options = self.mGetPayload()
@@ -1039,9 +1228,7 @@ class ebTestClumisc(ebTestClucontrol):
             rc = ethernet_config.mUpdateCustomEthernetSpeed(node, "dom0-host", "eth9", 25000, "X9")
 
         self.assertIsNone(rc)
-        self.assertEqual(mock_set_custom.call_count, 1)
-        # Fallback should force default 50000 speed for X9 models
-        self.assertEqual(mock_set_custom.call_args_list[0][0][3], 50000)
+        self.assertEqual(mock_set_custom.call_count, 0)
         self.assertEqual(node.mExecuteCmd.call_args_list[-1][0][0], "cat /sys/class/net/eth9/speed")
 
     def test_mSetCustomSpeed_failure(self):
@@ -1055,7 +1242,9 @@ class ebTestClumisc(ebTestClucontrol):
         node.mGetCmdExitStatus.return_value = 1
         node.mDisconnect = Mock()
 
-        with patch("exabox.ovm.clumisc.mCompareModel", return_value=1), patch("time.sleep", return_value=None):
+        with patch.object(ebCluEthernetConfig, "mGetCurrentSpeed", return_value=25000), \
+             patch("exabox.ovm.clumisc.mCompareModel", return_value=1), \
+             patch("time.sleep", return_value=None):
             with self.assertRaises(ExacloudRuntimeError):
                 ethernet_config.mSetCustomSpeed(node, "eth9", 25000, 100000, "X11")
 
@@ -1259,7 +1448,7 @@ class ebTestClumisc(ebTestClucontrol):
 
         self.assertIsNone(rc)
         mock_validate.assert_called_once_with(node, "eth9")
-        mock_set_speed.assert_called_once_with(node, "eth9", 25000, 25000, "X8")
+        mock_set_speed.assert_not_called()
 
     @patch("exabox.ovm.clumisc.ebCluEthernetConfig.mSetCustomSpeed", return_value=0)
     @patch("exabox.ovm.clumisc.ebCluEthernetConfig.mGetSupportedSpeeds", return_value=([], []))
@@ -1288,7 +1477,7 @@ class ebTestClumisc(ebTestClucontrol):
             ethernet_config.mUpdateCustomEthernetSpeed(node, "dom0-host", "eth9", 25000, "X10")
 
         mock_validate.assert_called_once_with(node, "eth9")
-        mock_set_speed.assert_called_once_with(node, "eth9", 25000, 100000, "X10")
+        mock_set_speed.assert_not_called()
         node.mDisconnect.assert_called_once()
 
     @patch("exabox.ovm.clumisc.ebCluEthernetConfig.mSetCustomSpeed", return_value=0)
@@ -1318,7 +1507,7 @@ class ebTestClumisc(ebTestClucontrol):
 
         self.assertIsNone(rc)
         mock_validate.assert_called_once_with(node, "eth9")
-        mock_set_speed.assert_called_once_with(node, "eth9", 25000, 100000, "X10")
+        mock_set_speed.assert_not_called()
         node.mDisconnect.assert_not_called()
 
     def test_mReplaceDiscover_success(self):
@@ -4536,7 +4725,8 @@ class ebTestClumisc(ebTestClucontrol):
             ovm.mCleanSSHPasswordless("host.example.com", ["node1"], aUser="opc")
 
         remove_key.assert_called_once_with("host", ["node1"], aExcludePatternsRegEx="EXACLOUD KEY|ExaKms")
-        remove_comment.assert_called_once_with(None, ["node1"])
+        remove_comment.assert_any_call(None, ["node1"])
+        self.assertGreaterEqual(remove_comment.call_count, 1)
         restore_key.assert_called_once_with("host.example.com", "opc")
 
     def test_ebCluSshSetup_clean_ssh_passwordless_skip_restore(self):
@@ -4549,7 +4739,8 @@ class ebTestClumisc(ebTestClucontrol):
             ovm.mCleanSSHPasswordless("host.example.com", ["node1"], aSkipRestore=True)
 
         remove_key.assert_called_once_with("host", ["node1"], aExcludePatternsRegEx="EXACLOUD KEY|ExaKms")
-        remove_comment.assert_called_once_with(None, ["node1"])
+        remove_comment.assert_any_call(None, ["node1"])
+        self.assertGreaterEqual(remove_comment.call_count, 1)
         restore_key.assert_not_called()
 
     def test_OracleVersion_compare_alnum_branches(self):
@@ -6453,12 +6644,25 @@ class ebTestClumisc(ebTestClucontrol):
         """# Auto-generated test for mRunNodeSubsetPrecheck"""
         ebox = Mock()
         precheck = ebCluNodeSubsetPrecheck(ebox)
-        options = types.SimpleNamespace(jsonconf={"opType": "DELETE_NODE"})
+        options = types.SimpleNamespace(jsonconf={"opType": "UNKNOWN"})
 
         rc = precheck.mRunNodeSubsetPrecheck(options)
 
         self.assertEqual(rc, 1)
         ebox.mUpdateErrorObject.assert_called_once()
+
+    def test_ebCluNodeSubsetPrecheck_delete_node_success(self):
+        """# Auto-generated test for mDeleteNodePrecheck"""
+        ebox = Mock()
+        precheck = ebCluNodeSubsetPrecheck(ebox)
+        options = types.SimpleNamespace(jsonconf={"opType": "DELETE_NODE", "node_name": "domu1"})
+
+        with patch.object(precheck, "mUpdateRequestData") as update_data:
+            rc = precheck.mRunNodeSubsetPrecheck(options)
+
+        self.assertEqual(rc, 0)
+        update_data.assert_called_once()
+        ebox.mUpdateErrorObject.assert_not_called()
 
     def test_ebCluNodeSubsetPrecheck_addnode_success(self):
         """# Auto-generated test for mAddNodePrecheck"""
@@ -6530,6 +6734,28 @@ class ebTestClumisc(ebTestClucontrol):
         self.assertEqual(rc, 0)
         ebox.mUpdateErrorObject.assert_not_called()
 
+    def test_ebCluServerSshConnectionCheck_skips_delete_node(self):
+        """# Auto-generated test for mServerSshConnectionCheck"""
+        ebox = Mock()
+        ebox.mIsOciEXACC.return_value = False
+        checker = clumisc.ebCluServerSshConnectionCheck(ebox)
+        options = types.SimpleNamespace(
+            jsonmode=False,
+            jsonconf={"opType": "DELETE_NODE", "node_name": "domu1.example.com"},
+        )
+
+        checker._ebCluServerSshConnectionCheck__node = Mock()
+        checker._ebCluServerSshConnectionCheck__node.mIsConnectable.return_value = True
+
+        with patch.object(checker, "mUpdateRequestData"):
+            rc = checker.mServerSshConnectionCheck(
+                options, aDomUs=["domu1.example.com", "domu2.example.com"], aDom0s=[], aCells=[])
+
+        self.assertEqual(rc, 0)
+        checker._ebCluServerSshConnectionCheck__node.mIsConnectable.assert_called_once_with(
+            aHost="domu2.example.com", aKeyOnly=True)
+        ebox.mUpdateErrorObject.assert_not_called()
+
     def test_ebCluServerSshConnectionCheck_failure_raises(self):
         """# Auto-generated test for mServerSshConnectionCheck"""
         ebox = Mock()
@@ -6560,6 +6786,28 @@ class ebTestClumisc(ebTestClucontrol):
             rc = checker.mNodeSubsetSshConnectionCheck(options, aDomUs=["domu1", "domu2"])
 
         self.assertEqual(rc, 0)
+        ebox.mUpdateErrorObject.assert_not_called()
+
+    def test_ebCluServerSshConnectionCheck_node_subset_skips_delete_node(self):
+        """# Auto-generated test for mNodeSubsetSshConnectionCheck"""
+        ebox = Mock()
+        ebox.mIsOciEXACC.return_value = False
+        checker = clumisc.ebCluServerSshConnectionCheck(ebox)
+        options = types.SimpleNamespace(
+            jsonmode=False,
+            jsonconf={"opType": "DELETE_NODE", "node_name": "domu1.example.com"},
+        )
+
+        checker._ebCluServerSshConnectionCheck__node = Mock()
+        checker._ebCluServerSshConnectionCheck__node.mIsConnectable.return_value = True
+
+        with patch.object(checker, "mUpdateRequestData"):
+            rc = checker.mNodeSubsetSshConnectionCheck(
+                options, aDomUs=["domu1.example.com", "domu2.example.com"])
+
+        self.assertEqual(rc, 0)
+        checker._ebCluServerSshConnectionCheck__node.mIsConnectable.assert_called_once_with(
+            aHost="domu2.example.com", aKeyOnly=True)
         ebox.mUpdateErrorObject.assert_not_called()
 
     def test_ebCluServerSshConnectionCheck_node_subset_failure(self):

@@ -18,6 +18,10 @@
 #      None.
 #
 #    MODIFIED   (MM/DD/YY)
+#    avimonda    04/25/26 - Add bonding regression tests for arp interval
+#                           restart handling
+#    avimonda    04/22/26 - Bug 39168993: Restart vmbondeth0 when bond restart
+#                           is required
 #    mpedapro    02/18/26 - Enh::38914367 Update bonding test cases to reflect
 #                           the removed method get_slave_name in clubonding.py
 #    aararora    01/16/26 - Bug 38842120: Fix monitor_admin json - regression
@@ -1889,6 +1893,7 @@ class ebTestBonding(ebTestClucontrol):
 
         _commands = [
             exaMockCommand("/bin/test -e /sbin/initctl", aRc=1),
+            exaMockCommand("/bin/test -e /EXAVMIMAGES/GuestImages/test_domu_client"),
         ]
 
         _cmds = {
@@ -3188,8 +3193,8 @@ class ebTestBonding(ebTestClucontrol):
             mock_if_down.assert_called_once_with(node, 'bondeth0')
             mock_if_up.assert_called_once_with(node, 'bondeth0')
 
-    def test_patch_bond_bridge_ifcfg_skip_bridge_restart_when_matching(self):
-        """Ensure bridge config is not updated when already matching"""
+    def test_patch_bond_bridge_ifcfg_restarts_bridge_when_bond_changes(self):
+        """Ensure bridge restart follows bond restart even when bridge config matches"""
         node = MagicMock()
         node.mGetHostname.return_value = "dom0"
         node.mFileExists.side_effect = lambda path: True
@@ -3217,9 +3222,30 @@ class ebTestBonding(ebTestClucontrol):
 
             clubonding.patch_bond_bridge_ifcfg(node, bond_iface_conf, is_cleanup=False)
 
-            mock_update_file.assert_called_once()  # only bond updates executed
-            mock_if_down.assert_called_once_with(node, 'bondeth0')
-            mock_if_up.assert_has_calls([call(node, 'bondeth0'), call(node, 'eth1'), call(node, 'eth2')])
+            mock_update_file.assert_called_once_with(
+                node,
+                clubonding.BOND_IFCFG_PATH_FMT.format(0),
+                {
+                    'MTU': '9000',
+                    'BONDING_OPTS': '"mode=active-backup fail_over_mac=1 '
+                                    'num_grat_arp=8 arp_interval=1000 '
+                                    'primary_reselect=failure arp_allslaves=1 '
+                                    'arp_ip_target=192.168.1.1 primary=eth1"'
+                }
+            )
+            self.assertEqual(
+                mock_if_down.call_args_list,
+                [call(node, 'vmbondeth0'), call(node, 'bondeth0')]
+            )
+            self.assertEqual(
+                mock_if_up.call_args_list,
+                [
+                    call(node, 'vmbondeth0'),
+                    call(node, 'bondeth0'),
+                    call(node, 'eth1'),
+                    call(node, 'eth2')
+                ]
+            )
 
     def test_update_bonded_bridges_skips_when_eth0_removed(self):
         # Auto-generated test for update_bonded_bridges
@@ -3559,6 +3585,49 @@ class BondingEdgeCaseTests(unittest.TestCase):
                 node,
                 'bondeth0',
                 {'fail_over_mac': '1'}
+            )
+
+        self.assertFalse(result)
+
+    def test_validate_bonding_config_detects_arp_interval_mismatch(self):
+        node = MagicMock()
+        node.mGetHostname.return_value = 'iad201625exdd005'
+
+        expected = {
+            'MTU': '9000',
+            'mode': 'active-backup',
+            'fail_over_mac': '1',
+            'num_grat_arp': '8',
+            'arp_interval': '1000',
+            'primary_reselect': 'failure',
+            'arp_allslaves': '1',
+            'arp_ip_target': '192.168.1.1',
+            'primary': 'eth1'
+        }
+
+        def fake_read(_node, _iface, attr):
+            values = {
+                'MTU': '9000',
+                'mode': 'active-backup',
+                'fail_over_mac': '1',
+                'num_grat_arp': '8',
+                'arp_interval': '100',
+                'primary_reselect': 'failure',
+                'arp_allslaves': '1',
+                'arp_ip_target': '192.168.1.1',
+                'primary': 'eth1'
+            }
+            value = values[attr]
+            if attr in {'fail_over_mac', 'arp_allslaves'}:
+                return f'{attr} {value}'
+            return value
+
+        with patch('exabox.ovm.clubonding.read_bond_interface_atr',
+                   side_effect=fake_read):
+            result = clubonding.validate_bonding_config(
+                node,
+                'bondeth0',
+                expected
             )
 
         self.assertFalse(result)

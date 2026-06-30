@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    atgandhi    04/27/26 - Bug 39263024 - EXACS - SECURITY SCAN FINDINGS IN
+#                           EXABOX/JSONDISPATCH/HANDLER_SLA_VMCLUSTER.PY
 #    atgandhi    02/01/26 - Bug 38910261 - EXACS:SLA NOT SET TO 0 AFTER
 #                           SLA_SERVER_MAX_TIMEOUT EXPIRY WHEN ADMIN NETWORK
 #                           (ETH0) IS DOWN
@@ -45,11 +47,24 @@ from exabox.utils.node import (connect_to_host, node_cmd_abs_path_check,
                                node_exec_cmd, node_read_text_file)
 from exabox.jsondispatch.jsonhandler import JDHandler
 
+_SLA_TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
+_SAFE_HOSTNAME_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
+
 def _to_epoch(time_str):
     try:
-        return int(time.mktime(time.strptime(time_str, '%Y-%m-%d %H:%M:%S')))
+        return int(time.mktime(time.strptime(time_str, _SLA_TIME_FORMAT)))
     except Exception:
         return 0
+
+def _validate_sla_time(time_str, allow_empty=False):
+    if allow_empty and not time_str:
+        return None
+    if not isinstance(time_str, str):
+        raise ValueError("SLA time must be a string")
+    dt = datetime.datetime.strptime(time_str, _SLA_TIME_FORMAT)
+    if dt.strftime(_SLA_TIME_FORMAT) != time_str:
+        raise ValueError("SLA time must match YYYY-MM-DD HH:MM:SS")
+    return time_str
 
 def _year_aware_strptime(value, fmt):
     now_year = datetime.datetime.utcnow().year
@@ -73,7 +88,7 @@ def _find_intervals(down_list, up_list):
 
     for di, down in enumerate(down_list):
         up = None
-        while up_idx < n_up and up_list[up_idx] <= down:
+        while up_idx < n_up and up_list[up_idx] < down:
             up_idx += 1
         if up_idx < n_up:
             up = up_list[up_idx]
@@ -93,16 +108,21 @@ def mExtractDowntimePeriods_with_node(node, host, server_type, start_time, end_t
     since_epoch = _to_epoch(start_time)
     until_epoch = _to_epoch(end_time) if end_time else float("inf")
     try:
+        safe_start_time = _validate_sla_time(start_time)
+        safe_end_time = _validate_sla_time(end_time, allow_empty=True)
         if server_type == 'compute':
             # One single call for all "Stopped" and "Started" entries for libvirtd
-            combined_cmd = (
-                f'sudo journalctl -u libvirtd --since "{start_time}" --until "{end_time}" | grep -E "Stopped Virtualization daemon|Started Virtualization daemon"'
-            )
+            combined_cmd = ["sudo", "journalctl", "-u", "libvirtd", "--since", safe_start_time]
+            if safe_end_time:
+                combined_cmd.extend(["--until", safe_end_time])
             _, combined_out, _ = node_exec_cmd(node, combined_cmd, timeout=12)
             down_list = []
             up_list = []
             if combined_out:
                 for line in combined_out.splitlines():
+                    if ("Stopped Virtualization daemon" not in line and
+                            "Started Virtualization daemon" not in line):
+                        continue
                     m = re.match(r'^(\w+\s+\d+\s+\d+:\d+:\d+)', line)
                     if m:
                         try:
@@ -119,21 +139,27 @@ def mExtractDowntimePeriods_with_node(node, host, server_type, start_time, end_t
             results['compute'] = _find_intervals(down_list, up_list)
 
             # NETWORK: unify interface events in a single grep
-            combined_net_cmd = (
-                f'journalctl -k --since "{start_time}" --until "{end_time}" | grep -i "bondeth0" | grep -Ei "now running without any active interface!|active interface up"'
-            )
+            combined_net_cmd = ["journalctl", "-k", "--since", safe_start_time]
+            if safe_end_time:
+                combined_net_cmd.extend(["--until", safe_end_time])
             _, combined_net_out, _ = node_exec_cmd(node, combined_net_cmd, timeout=10)
             nd_list, nu_list = [], []
             if combined_net_out:
                 for line in combined_net_out.splitlines():
+                    lower_line = line.lower()
+                    if "bondeth0" not in lower_line:
+                        continue
+                    if ("now running without any active interface!" not in lower_line and
+                            "active interface up" not in lower_line):
+                        continue
                     m = re.match(r'^(\w+\s+\d+\s+\d+:\d+:\d+)', line)
                     if m:
                         try:
                             dt = _year_aware_strptime(m.group(1), "%b %d %H:%M:%S")
                             if since_epoch < dt.timestamp() < until_epoch:
-                                if "now running without any active interface!" in line:
+                                if "now running without any active interface!" in lower_line:
                                     nd_list.append(dt)
-                                elif "active interface up" in line:
+                                elif "active interface up" in lower_line:
                                     nu_list.append(dt)
                         except Exception:
                             pass
@@ -144,6 +170,8 @@ def mExtractDowntimePeriods_with_node(node, host, server_type, start_time, end_t
             log_dir_cmd = "hostname -s"
             _, short_hostname, _ = node_exec_cmd(node, log_dir_cmd, timeout=3)
             short_hostname = short_hostname.strip()
+            if not _SAFE_HOSTNAME_RE.match(short_hostname):
+                raise ValueError("Unexpected storage hostname format")
             alert_log_path = f"/opt/oracle/cell/log/diag/asm/cell/{short_hostname}/alert/"
             grep_cmd = (
                 f'grep -B 4 -E "Stopped Service CELLSRV|Started Service CELLSRV" {alert_log_path}*log*xml | grep -E "msg time|Stopped Service CELLSRV|Started Service CELLSRV"'
@@ -414,3 +442,4 @@ class SLAVmClusterHandler(JDHandler):
                 return 0
             return 1
         return 0
+

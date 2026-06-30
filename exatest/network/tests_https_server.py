@@ -4,7 +4,7 @@
 #
 # tests_https_server.py
 #
-# Copyright (c) 2025, Oracle and/or its affiliates.
+# Copyright (c) 2025, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_https_server.py - <one-line expansion of the name>
@@ -38,6 +38,7 @@ class TestExaHTTPSServer(unittest.TestCase):
     @patch('exabox.network.ExaHTTPSServer.ebCertificateConfig', return_value={'client_certificate_file': 'client_certificate_file',
                                                                               'local_certificate_file': 'local_certificate_file',
                                                                               'local_certificate_key_file': 'local_certificate_key_file',
+                                                                              'client_certificate_key_file': 'client_certificate_key_file',
                                                                               'protocol': 'PROTOCOL_TLS'})
     
     def test_init_calls_super(self, mock_eb_certificate_config, mock_get_tls_config_path, mock_ssl_context):
@@ -63,6 +64,7 @@ class TestExaHTTPSServer(unittest.TestCase):
     @patch('exabox.network.ExaHTTPSServer.ebCertificateConfig', return_value={'client_certificate_file': 'client_certificate_file',
                                                                               'local_certificate_file': 'local_certificate_file',
                                                                               'local_certificate_key_file': 'local_certificate_key_file',
+                                                                              'client_certificate_key_file': 'client_certificate_key_file',
                                                                               'protocol': 'PROTOCOL_TLS'})
     @patch('exabox.network.ExaHTTPSServer.ssl.SSLContext')
     @patch('exabox.network.ExaHTTPSServer.BaseHTTPServer.HTTPServer.__init__', new=mock_super_init)
@@ -116,6 +118,7 @@ class TestExaHTTPRequestHandler(unittest.TestCase):
     @patch('exabox.network.ExaHTTPSServer.ebCertificateConfig', return_value={'client_certificate_file': 'client_certificate_file',
                                                                               'local_certificate_file': 'local_certificate_file',
                                                                               'local_certificate_key_file': 'local_certificate_key_file',
+                                                                              'client_certificate_key_file': 'client_certificate_key_file',
                                                                               'protocol': 'PROTOCOL_TLS'})
     
     def test_init_calls_super(self, mock_eb_certificate_config, mock_get_tls_config_path, mock_ssl_context):
@@ -141,6 +144,7 @@ class TestExaHTTPRequestHandler(unittest.TestCase):
     @patch('exabox.network.ExaHTTPSServer.ebCertificateConfig', return_value={'client_certificate_file': 'client_certificate_file',
                                                                               'local_certificate_file': 'local_certificate_file',
                                                                               'local_certificate_key_file': 'local_certificate_key_file',
+                                                                              'client_certificate_key_file': 'client_certificate_key_file',
                                                                               'protocol': 'PROTOCOL_TLS'})
     @patch('exabox.network.ExaHTTPSServer.ssl.SSLContext')
     @patch('exabox.network.ExaHTTPSServer.BaseHTTPServer.BaseHTTPRequestHandler.__init__', new=mock_super_init_handler)
@@ -174,6 +178,7 @@ class TestExaHTTPRequestHandler(unittest.TestCase):
     @patch('exabox.network.ExaHTTPSServer.ebCertificateConfig', return_value={'client_certificate_file': 'client_certificate_file',
                                                                               'local_certificate_file': 'local_certificate_file',
                                                                               'local_certificate_key_file': 'local_certificate_key_file',
+                                                                              'client_certificate_key_file': 'client_certificate_key_file',
                                                                               'protocol': 'PROTOCOL_TLS'})
     @patch('exabox.network.ExaHTTPSServer.ssl.SSLContext')
     @patch('exabox.network.ExaHTTPSServer.BaseHTTPServer.BaseHTTPRequestHandler.__init__', new=mock_super_init_handler)
@@ -192,6 +197,7 @@ class TestManagmentServerCreateSocket(unittest.TestCase):
     @patch('exabox.managment.src.ManagmentServer.ebCertificateConfig', return_value={'client_certificate_file': 'client_certificate_file',
                                                                               'local_certificate_file_remoteec': 'local_certificate_file_remoteec',
                                                                               'local_certificate_key_file_remoteec': 'local_certificate_key_file_remoteec',
+                                                                              'client_certificate_key_file': 'client_certificate_key_file',
                                                                               'protocol': 'PROTOCOL_TLS'})
     
     def test_init_calls_super(self, mock_eb_certificate_config, mock_get_tls_config_path, mock_ssl_context):
@@ -218,6 +224,7 @@ class TestManagmentServerCreateSocket(unittest.TestCase):
     @patch('exabox.managment.src.ManagmentServer.ebCertificateConfig', return_value={'client_certificate_file': 'client_certificate_file',
                                                                               'local_certificate_file_remoteec': 'local_certificate_file_remoteec',
                                                                               'local_certificate_key_file_remoteec': 'local_certificate_key_file_remoteec',
+                                                                              'client_certificate_key_file': 'client_certificate_key_file',
                                                                               'protocol': 'PROTOCOL_TLS'})
     @patch('exabox.managment.src.ManagmentServer.ssl.SSLContext')
     def test_init_https_enabled_non_oci(self, mock_ssl_context, mock_eb_certificate_config, mock_use_oci_certificates, mock_is_https_enabled,
@@ -253,6 +260,7 @@ class TestManagmentServerCreateSocket(unittest.TestCase):
     @patch('exabox.managment.src.ManagmentServer.ebCertificateConfig', return_value={'client_certificate_file': 'client_certificate_file',
                                                                               'local_certificate_file_remoteec': 'local_certificate_file_remoteec',
                                                                               'local_certificate_key_file_remoteec': 'local_certificate_key_file_remoteec',
+                                                                              'client_certificate_key_file': 'client_certificate_key_file',
                                                                               'protocol': 'PROTOCOL_TLS'})
     @patch('exabox.managment.src.ManagmentServer.ssl.SSLContext')
     def test_init_https_enabled_non_oci(self, mock_ssl_context, mock_eb_certificate_config, mock_use_oci_certificates, mock_is_https_enabled,

@@ -12,6 +12,9 @@ NOTE:
         https://confluence.oraclecorp.com/confluence/display/~jonathan.sandoval@oracle.com/Exacloud+Exatest+Framework
 
 History:
+    aararora    06/19/2026 - Bug#39568198 Support RoCE switch download without SFTP
+    jesandov    06/10/2026 - Bug#39462050: Add secure client
+    jesandov    04/27/2026 - Bug#39263025 Fix security issues found using IA
     aypaul      07/15/2025 - Bug#38126347 Update ssh channel implementation for reading data.
     abflores    03/14/2025 - Bug 37704409: Fix MINA FAILS IN R1 BECAUSE OEDA IS UNDEFINED
     jesandov    01/06/2024 - Add PKCS8 and TraditionalOpenSSL Format export
@@ -27,6 +30,9 @@ History:
 
 from __future__ import print_function
 
+import base64
+import gzip
+import math
 import six
 import sys
 import pprint
@@ -34,21 +40,10 @@ import json
 import os
 import re
 import time
+import tempfile
 import subprocess as sp
 import shlex
 import time
-import warnings
-
-try:
-    from cryptography.utils import CryptographyDeprecationWarning
-    warnings.filterwarnings(
-        "ignore",
-        category=CryptographyDeprecationWarning,
-        module=r"paramiko\..*",
-    )
-except Exception:
-    pass
-
 import paramiko
 import termios
 import select
@@ -69,6 +64,14 @@ from exabox.tools.AttributeWrapper import wrapStrBytesFunctions
 from exabox.exatest.common.ebExacloudUtil import ebExacloudUtil
 from exabox.exakms.ExaKmsSingleton import ExaKmsSingleton
 from exabox.exakms.ExaKmsEntry import ExaKmsEntry, ExaKmsHostType, ExaKmsOperationType, ExaKmsKeyFormat
+from exabox.network.osds.sshclient import SshClient, mExecuteLocal
+
+_ROCE_DOWNLOAD_DEFAULT_MB = 4
+_ROCE_DOWNLOAD_MAX_MB = 64
+_ROCE_DOWNLOAD_READY_TIMEOUT = 60
+_ROCE_DOWNLOAD_MIN_CHUNK_TIMEOUT = 180
+_ROCE_DOWNLOAD_TIMEOUT_OVERHEAD_SECONDS = 30
+_ROCE_DOWNLOAD_MIN_MB_PER_SECOND = 0.03
 
 class MaxLevelFilter(logging.Filter):
     def __init__(self, level):
@@ -151,6 +154,7 @@ class ebExasshLogger:
         if _paramiko_logger.level > logging.DEBUG:
             _paramiko_logger.setLevel(logging.DEBUG)
 
+
 class ExasshManager:
 
     def __init__(self, aClubox=None, aConsoleLog=True, aFileLog=False, aSilent=True, aDebug=False):
@@ -167,16 +171,19 @@ class ExasshManager:
 
         self.__exakmsType = "auto"
         self.__connParams = {}
+        self.__requestedFqdn = None
         self.__sessionSsh = None
         self.__channel = None
         self.__silent = aSilent
+        self.__connectedEntry = None
         self.__debug = aDebug
         self.__logger = ebExasshLogger(os.path.join(self.__exacloudPath, "log"), aConsoleLog, aFileLog)
+        self.__sshclient = None
         self.mInitExacloud(aClubox)
 
         if not self.__silent and self.__debug:
             logging.getLogger("paramiko").setLevel(logging.DEBUG)
-        
+
         if self.__debug and aFileLog:
             self.__logger.mAttachToParamiko()
 
@@ -206,6 +213,10 @@ class ExasshManager:
 
     def mSetConnParams(self, aDict):
         self.__connParams = aDict
+        self.__requestedFqdn = aDict.get("FQDN") if aDict else None
+
+    def mGetRequestedFqdn(self):
+        return self.__requestedFqdn
 
     def mGetExaKmsSingleton(self):
 
@@ -246,6 +257,12 @@ class ExasshManager:
     def mSetClubox(self, aClubox):
         self.__clubox = aClubox
 
+    def mGetSshClient(self):
+        return self.__sshclient
+
+    def mSetSshClient(self, aClient):
+        self.__sshclient = aClient
+
     def mGetSessionSsh(self):
         return self.__sessionSsh
 
@@ -257,6 +274,12 @@ class ExasshManager:
 
     def mSetChannel(self, aChannel):
         self.__channel = aChannel
+
+    def mGetConnectedEntry(self):
+        return self.__connectedEntry
+
+    def mSetConnectedEntry(self, aEntry):
+        self.__connectedEntry = aEntry
 
     def mGetOutput(self):
         return self.__output
@@ -289,6 +312,8 @@ class ExasshManager:
         with open(f"{self.__exacloudPath}/exabox/exatest/resources/debug_mina.sh", "r") as _f:
             _mina_content = _f.read()
 
+        _java = shlex.quote(os.path.join(get_gcontext().mGetJavaHome(), "bin", "java"))
+
         _entry.mSaveToFile("/tmp", _tmpfile)
 
         if self.__debug:
@@ -296,6 +321,7 @@ class ExasshManager:
         else:
             _mina_content = _mina_content.replace("{_debug}", "")
 
+        _mina_content = _mina_content.replace("{_java}", _java)
         _mina_content = _mina_content.replace("{_keyfile}", _tmpfile)
         _mina_content = _mina_content.replace("{_user}", _entry.mGetUser())
         _mina_content = _mina_content.replace("{_host}", _entry.mGetFQDN())
@@ -310,7 +336,8 @@ class ExasshManager:
             _f.write("\n")
 
         # Execute OEDA Mina
-        _rc = os.system(f"(cd {_oedaPath}; bash {_minafile})")
+        os.chmod(_minafile, 0o700)
+        _rc = sp.run(["/bin/bash", _minafile], cwd=_oedaPath, check=False).returncode
 
         if _rc == 0:
             self.mGetLog().info(f"Mina Connection to: {_entry.mGetFQDN()} closed.")
@@ -470,6 +497,9 @@ class ExasshManager:
 
         return _data
 
+    def mShellQuote(self, aValue):
+        return shlex.quote(str(aValue))
+
     def mAddPreferredPubkeys(self, aExaKmsEntry):
 
         if aExaKmsEntry.mGetHostType() == ExaKmsHostType.SWITCH:
@@ -499,16 +529,78 @@ class ExasshManager:
             )
 
 
+    def mHasRoceFqdn(self):
+        _entry = self.mGetConnectedEntry()
+        _candidateFqdns = [
+            self.mGetRequestedFqdn(),
+            self.mGetConnParams().get("FQDN"),
+            getattr(self, "_ExasshManager__host", None)
+        ]
+
+        if _entry:
+            try:
+                _candidateFqdns.append(_entry.mGetFQDN())
+            except Exception:
+                pass
+
+        for _fqdn in _candidateFqdns:
+            if not _fqdn:
+                continue
+
+            # RoCE switch detection is used only as an SFTP failure fallback.
+            # Keep it tied to the user-visible hostname instead of requiring
+            # strict FQDN validation, since short names like scaqan17sw-rocea0
+            # are valid exassh input and still identify RoCE switches.
+            if "roce" in str(_fqdn).lower():
+                return True
+
+        return False
+
+    def mGetRoceDownloadChunkBytes(self):
+        _mb = _ROCE_DOWNLOAD_DEFAULT_MB
+        try:
+            _configured = get_gcontext().mCheckConfigOption(
+                "exassh_roce_default_mbrate",
+                str(_ROCE_DOWNLOAD_DEFAULT_MB)
+            )
+            _mb = int(str(_configured).strip())
+        except Exception:
+            _mb = _ROCE_DOWNLOAD_DEFAULT_MB
+
+        if _mb <= 0:
+            _mb = _ROCE_DOWNLOAD_DEFAULT_MB
+
+        if _mb > _ROCE_DOWNLOAD_MAX_MB:
+            self.mGetLog().info(
+                f"Configured exassh_roce_default_mbrate={_mb} MB exceeds "
+                f"maximum; using {_ROCE_DOWNLOAD_MAX_MB} MB"
+            )
+            _mb = _ROCE_DOWNLOAD_MAX_MB
+
+        return _mb * 1024 * 1024
+
+    def mGetRoceDownloadChunkTimeout(self):
+        # Scale timeout with the configured chunk size while preserving the
+        # 4 MB behavior as the minimum. The rate is intentionally
+        # conservative because RoCE downloads run through an interactive shell.
+        _chunkMb = float(self.mGetRoceDownloadChunkBytes()) / (1024 * 1024)
+        _timeout = (
+            _ROCE_DOWNLOAD_TIMEOUT_OVERHEAD_SECONDS +
+            int(math.ceil(_chunkMb / _ROCE_DOWNLOAD_MIN_MB_PER_SECOND))
+        )
+
+        return max(_ROCE_DOWNLOAD_MIN_CHUNK_TIMEOUT, _timeout)
+
     def mPrepareChannel(self, aExaKmsEntry):
 
-        self.mSetSessionSsh(paramiko.SSHClient())
-        self.mGetSessionSsh().set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        self.mAddPreferredPubkeys(aExaKmsEntry)
+        self.__host = aExaKmsEntry.mGetFQDN()
+        self.mSetConnectedEntry(aExaKmsEntry)
 
         if self.__debug:
             self.mGetLog().info(f"Using public key: {aExaKmsEntry.mGetPublicKey().strip()}")
 
         _keydat = aExaKmsEntry.mGetPrivateKey()
+        self.mAddPreferredPubkeys(aExaKmsEntry)
 
         if "ECDSA" in aExaKmsEntry.mGetVersion():
             _key = paramiko.ECDSAKey.from_private_key(StringIO(_keydat))
@@ -517,8 +609,24 @@ class ExasshManager:
             _keydat = self.mAddRSAToKeys(_keydat)
             _key = paramiko.RSAKey.from_private_key(StringIO(_keydat))
 
-        self.__host = aExaKmsEntry.mGetFQDN()
-        self.mGetSessionSsh().connect(self.__host, 22, aExaKmsEntry.mGetUser(), pkey=_key)
+        _retries = 3
+        while _retries > 0:
+            try:
+                self.mSetSshClient(SshClient(self.__host))
+                self.mSetSessionSsh(self.mGetSshClient().mCreateSshClient())
+                self.mGetSessionSsh().connect(self.__host, 22, aExaKmsEntry.mGetUser(), pkey=_key)
+                break
+            except paramiko.ssh_exception.SSHException as exp:
+                if "not found in known_hosts" in str(exp):
+                    SshClient(self.__host).mAddToKnownHost()
+                else:
+                    _retries -= 1
+                    if _retries <= 0:
+                        raise
+            except Exception as e:
+                _retries -= 1
+                if _retries <= 0:
+                    raise
 
         _banner = self.mGetSessionSsh()._transport.get_banner()
         if _banner is not None and not self.__silent:
@@ -538,10 +646,15 @@ class ExasshManager:
 
         if self.mGetChannel() is not None:
             self.mGetChannel().close()
+            self.mSetChannel(None)
 
         if self.mGetSessionSsh() is not None:
             self.mGetSessionSsh().close()
+            self.mSetSessionSsh(None)
 
+        if self.mGetSshClient() is not None:
+            self.mGetSshClient().mCleanUp()
+            self.mSetSshClient(None)
 
     def mExecuteSshCommand(self, aCommand):
 
@@ -560,17 +673,19 @@ class ExasshManager:
             outchannelfile = channel.makefile("r")
             errchannelfile = channel.makefile_stderr("r")
             while not channel.exit_status_ready():
+                select.select([channel], [], [])
                 if channel.recv_stderr_ready():
                     err += errchannelfile.read().decode("utf-8")
                 if channel.recv_ready():
                     out += outchannelfile.read().decode("utf-8", errors='ignore')
-            if channel.exit_status_ready():
-                rc = channel.recv_exit_status()
+
             #Weird behavior of paramiko channel. The channel exit status is set even if the consumer has not read any data from the stdout/stderr streams.
             if channel.recv_stderr_ready():
                 err += errchannelfile.read().decode("utf-8")
             if channel.recv_ready():
                 out += outchannelfile.read().decode("utf-8", errors='ignore')
+            if channel.exit_status_ready():
+                rc = channel.recv_exit_status()
 
         except Exception as e:
             self.mGetLog().error(e)
@@ -589,9 +704,198 @@ class ExasshManager:
             self.mGetLog().error(traceback.format_exc())
             return 1
 
+    def mDrainInteractiveChannel(self):
+        # Clear prompts, command echoes, and banners left on the interactive
+        # channel before sending a marker-delimited command.
+        try:
+            while self.mGetChannel().recv_ready():
+                self.mGetChannel().recv(4096)
+                time.sleep(0.05)
+        except Exception as e:
+            self.mGetLog().error(f"Failed to drain interactive SSH channel: {e}")
+            self.mGetLog().error(traceback.format_exc())
+            raise
+
+    def mReadInteractiveUntil(self, aEndMarker, aTimeout=60):
+        _end = time.time() + aTimeout
+        _data = ""
+
+        while time.time() < _end:
+            if self.mGetChannel().recv_ready():
+                _data += self.mGetChannel().recv(4096).decode("utf-8", errors="ignore")
+                if aEndMarker in _data:
+                    return _data
+            else:
+                time.sleep(0.2)
+
+        raise ExacloudRuntimeError(aErrorMsg=f"Timed out waiting for marker: {aEndMarker}")
+
+    def mExecuteGuestShellMarkedCommand(self, aCommand, aTimeout):
+        # Keep the interactive transfer protocol simple: write unique begin/end
+        # markers around the command output and parse the bytes between them.
+        _token = uuid.uuid4().hex
+        _beginPrefix = "__EXASSH_ROCE_BEGIN_"
+        _endPrefix = "__EXASSH_ROCE_END_"
+        _markerSuffix = f"{_token}__"
+        _begin = f"{_beginPrefix}{_markerSuffix}"
+        _end = f"{_endPrefix}{_markerSuffix}"
+
+        # Split the marker into shell variables so the echoed command does not
+        # contain the complete marker.  Then simple substring parsing only sees
+        # markers that were printed by command execution.
+        _cmd = (
+            f"_exassh_b={self.mShellQuote(_beginPrefix)}; "
+            f"_exassh_e={self.mShellQuote(_endPrefix)}; "
+            f"_exassh_s={self.mShellQuote(_markerSuffix)}; "
+            f"printf '\n%s%s\n' \"$_exassh_b\" \"$_exassh_s\"; "
+            f"{aCommand}; "
+            f"_rc=$?; "
+            f"printf '\n%s%s:%s\n' \"$_exassh_e\" \"$_exassh_s\" \"$_rc\""
+        )
+
+        self.mDrainInteractiveChannel()
+        self.mGetChannel().sendall(_cmd + "\n")
+        _output = self.mReadInteractiveUntil(_end, aTimeout)
+
+        try:
+            _payload = _output.split(_begin, 1)[1].split(_end, 1)[0]
+            _rcText = _output.split(_end, 1)[1].splitlines()[0].lstrip(":").strip()
+        except Exception:
+            raise ExacloudRuntimeError(
+                aErrorMsg=f"Unable to parse guestshell command output: {_output[-200:]}"
+            )
+
+        if _rcText != "0":
+            raise ExacloudRuntimeError(
+                aErrorMsg=f"Guestshell command failed with rc={_rcText}: {aCommand}"
+            )
+
+        return _payload
+
+    def mEnterRoceGuestShell(self):
+        # RoCE switches land in a restricted shell; guestshell is required
+        # before Linux log paths and tools such as tail/head/gzip are available.
+        self.mDrainInteractiveChannel()
+        self.mGetLog().info("Entering guestshell")
+        self.mGetChannel().sendall("run guestshell\n")
+        time.sleep(5)
+        self.mDrainInteractiveChannel()
+
+    def mGetRoceGuestShellFileSize(self, aRemoteFile):
+        # Snapshot the readable regular-file size once so downloads are bounded
+        # even if a live log grows while the transfer is in progress.
+        _remote = self.mShellQuote(aRemoteFile)
+        _cmd = (
+            f"if test -r {_remote} && test -f {_remote}; then "
+            f"wc -c < {_remote}; "
+            f"elif test -d {_remote}; then echo DIRECTORY; "
+            f"else echo UNREADABLE; fi"
+        )
+        _output = self.mExecuteGuestShellMarkedCommand(_cmd, _ROCE_DOWNLOAD_READY_TIMEOUT)
+        _value = ""
+
+        # Restricted-shell prompts can arrive in the same PTY read as command
+        # output.  Use the first meaningful status or numeric line and ignore
+        # prompt-only noise such as ">" after the marker payload.
+        for _line in _output.strip().splitlines():
+            _line = _line.strip()
+            if not _line or _line in [">", "$", "#"]:
+                continue
+            if _line in ["DIRECTORY", "UNREADABLE"] or _line.isdigit():
+                _value = _line
+                break
+
+        if _value == "DIRECTORY":
+            raise ExacloudRuntimeError(aErrorMsg="RoCE guestshell download supports files only")
+        if _value == "UNREADABLE":
+            raise ExacloudRuntimeError(aErrorMsg=f"Remote file is missing or unreadable: {aRemoteFile}")
+
+        try:
+            return int(_value)
+        except ValueError:
+            raise ExacloudRuntimeError(aErrorMsg=f"Unable to determine remote file size from guestshell output: {_output.strip()}")
+
+    def mDownloadRoceGuestShellFile(self, aRemoteFile, aLocalFile):
+        _rc = 0
+        _tempLocal = None
+
+        try:
+            _baseLocal = os.path.abspath(os.path.expanduser(aLocalFile))
+            _parentDir = os.path.dirname(_baseLocal)
+            if _parentDir:
+                os.makedirs(_parentDir, exist_ok=True)
+
+            self.mEnterRoceGuestShell()
+
+            _remoteSize = self.mGetRoceGuestShellFileSize(aRemoteFile)
+            _chunkSize = self.mGetRoceDownloadChunkBytes()
+            _chunkTimeout = self.mGetRoceDownloadChunkTimeout()
+            _remote = self.mShellQuote(aRemoteFile)
+            self.mGetLog().info(
+                f"RoCE guestshell download size={_remoteSize} bytes, chunk_size={_chunkSize} bytes, chunk_timeout={_chunkTimeout} seconds"
+            )
+            _offset = 1
+
+            self.mGetLog().info(
+                f"Downloading RoCE switch file through guestshell in {_chunkSize} byte chunks\n"
+            )
+
+            # Write to a sibling temporary file first so a failed chunk does not
+            # leave a truncated file at the user-requested destination.
+            with tempfile.NamedTemporaryFile(
+                "wb",
+                dir=_parentDir if _parentDir else ".",
+                prefix=os.path.basename(_baseLocal) + ".",
+                suffix=".tmp",
+                delete=False
+            ) as _localFile:
+                _tempLocal = _localFile.name
+                while _offset <= _remoteSize:
+                    _size = min(_chunkSize, _remoteSize - _offset + 1)
+                    self.mGetLog().info(
+                        f"Downloading RoCE chunk offset={_offset} size={_size}"
+                    )
+                    # Stream a precise byte range, compress it to keep terminal
+                    # traffic smaller, and base64 encode it to survive the PTY.
+                    _cmd = (
+                        f"tail {_remote} -c +{_offset} | "
+                        f"head -c {_size} | "
+                        f"gzip - -cf | base64"
+                    )
+                    _payload = self.mExecuteGuestShellMarkedCommand(
+                        _cmd,
+                        _chunkTimeout
+                    )
+                    _payload = "".join(_payload.strip().splitlines())
+                    _localFile.write(gzip.decompress(base64.b64decode(_payload, validate=True)))
+                    _offset += _size
+
+            os.replace(_tempLocal, _baseLocal)
+            _tempLocal = None
+
+            self.mGetLog().info(f"{aRemoteFile}  -> {_baseLocal}")
+            self.mGetLog().info("")
+            self.mGetLog().info("File Transfer complete")
+
+        except Exception as e:
+            if _tempLocal and os.path.exists(_tempLocal):
+                try:
+                    os.remove(_tempLocal)
+                except Exception as cleanupError:
+                    self.mGetLog().error(
+                        f"Failed to remove temporary download file {_tempLocal}: {cleanupError}"
+                    )
+            self.mGetLog().error(e)
+            self.mGetLog().error(traceback.format_exc())
+            _rc = 1
+
+        return _rc
+
     def mDownload(self, aRemoteFile, aLocalFolder):
 
         _rc = 0
+        _sftp = None
+        _roceFallback = False
 
         try:
 
@@ -632,12 +936,29 @@ class ExasshManager:
             self.mGetLog().info("")
             self.mGetLog().info("File Transfer complete")
 
-            _sftp.close()
-
         except Exception as e:
-            self.mGetLog().error(e)
-            self.mGetLog().error(traceback.format_exc())
-            _rc = 1
+            if self.mHasRoceFqdn():
+                self.mGetLog().info(
+                    "SFTP download failed; assuming RoCE switch from FQDN "
+                    "and retrying through guestshell"
+                )
+                self.mGetLog().info(f"SFTP failure before RoCE guestshell retry: {e}")
+                _roceFallback = True
+
+            else:
+                self.mGetLog().error(e)
+                self.mGetLog().error(traceback.format_exc())
+                _rc = 1
+
+        finally:
+            if _sftp:
+                try:
+                    _sftp.close()
+                except Exception as closeError:
+                    self.mGetLog().error(f"Failed to close SFTP download session: {closeError}")
+
+        if _roceFallback:
+            return self.mDownloadRoceGuestShellFile(aRemoteFile, aLocalFolder)
 
         return _rc
 

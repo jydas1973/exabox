@@ -16,6 +16,11 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    sdevasek    06/23/26 - Bug 39562371 - Add dbserver patch version compare
+#                           tests
+#    bhpati      06/17/26 - Bug 39298929 - AIM4ECS:0X03010000 - PATCH OPERATION
+#                           STATUS FAILED
+#    nelango     05/13/26 - Bug 39333475: Add unittest for df check
 #    avimonda    04/07/26 - Bug 39128684 - OCI: QMR IS FAILED DUE TO AN UNKNOWN ISSUE.
 #    remamid     02/19/26 - Add mgmt launch async test
 #    araghave    01/19/26 - Bug 38861325 - ECS_MAIN ->
@@ -136,7 +141,8 @@ from exabox.infrapatching.handlers.targetHandler.targethandler import TargetHand
 from exabox.infrapatching.core.infrapatcherror import (
     PATCH_COPY_ASYNC_TIMEOUT,
     UNABLE_TO_SSH_PATCHNODE_POSTPATCH,
-    PASSWDLESS_SSH_CLEANUP_FAILED
+    PASSWDLESS_SSH_CLEANUP_FAILED,
+    PATCH_COPY_ERROR, PATCH_UNZIP_ERROR
 )
 from exabox.core.MockCommand import exaMockCommand
 from exabox.core.Error import ExacloudRuntimeError
@@ -805,6 +811,111 @@ class ebTestTargetHandler(ebTestClucontrol):
         _rc, _errmsg = _targetHandler.mValidateImageCheckSum(_PatchFile, _local_patch_path, aRemotePatchBase, aNodeList, aRemoteNecessarySpaceMb, aSingleVmHandler)
         self.assertEqual(_rc, _SUCCESS_ERROR_CODE)
 
+    @patch("exabox.infrapatching.utils.infrapatchexecutionvalidator.InfrapatchExecutionValidator.mIsManagementHostLaunchNodeForDomU", return_value=False)
+    @patch("exabox.infrapatching.utils.infrapatchexecutionvalidator.InfrapatchExecutionValidator.mCheckCondition", return_value=False)
+    @patch('exabox.core.Node.exaBoxNode.mFileExists', return_value=False)
+    def test_mValidateImageCheckSum_2(self, mock_mFileExists, mock_mCheckCondition, mock_mIsManagementHostLaunchNodeForDomU):
+        ebLogInfo("Running unit test on TargetHandler.mValidateImageCheckSum when df output is empty")
+
+        _PatchFile = "dbserver.patch.zip"
+        _local_patch_path = "PatchPayloads/24.1.7.0.0.241204/DBPatchFile"
+        aRemotePatchBase = "/u02/dbserver.patch.zip_exadata_ol8_23.1.21.0.0.241204_Linux-x86-64.zip/"
+        aRemoteNecessarySpaceMb = 400
+        aNodeList = [self.mGetClubox().mReturnDom0DomUPair()[1][1]]
+
+        _cmds = {
+            self.mGetRegexLocal(): [
+                [
+                    exaMockCommand("/bin/sha256sum*", aRc=0, aStdout="abcdef PatchPayloads/DBPatchFile/dbserver.patch.zip", aPersist=True),
+                    exaMockCommand("/bin/awk*", aRc=0, aStdout="abcdef"),
+                    exaMockCommand("/bin/du*", aRc=0, aStdout="327M PatchPayloads/DBPatchFile/dbserver.patch.zip", aPersist=True),
+                    exaMockCommand("/bin/awk*", aRc=0, aStdout="327M"),
+                ]
+            ],
+            self.mGetRegexDomU(): [
+                [
+                    exaMockCommand("/usr/bin/sha256sum /u02/dbserver.patch.zip_exadata_ol8_23.1.21.0.0.241204_Linux-x86-64.zip/dbserver.patch.zip | /bin/awk '{print $1}'", aRc=0, aStdout="abcdef", aPersist=True),
+                    exaMockCommand("mkdir -p*", aRc=0, aPersist=True),
+                    exaMockCommand("df -mP*", aRc=0, aStdout="", aStderr="df: cannot access", aPersist=True),
+                ]
+            ]
+        }
+
+        self.__patch_args_dict['TargetType'] = ["domu"]
+        _targetHandler = TargetHandler(self.__patch_args_dict)
+        self.mPrepareMockCommands(_cmds)
+
+        mock_add_error = MagicMock()
+        _targetHandler.mAddError = mock_add_error
+
+        _rc, _errmsg = _targetHandler.mValidateImageCheckSum(_PatchFile,_local_patch_path,aRemotePatchBase,aNodeList,aRemoteNecessarySpaceMb,None,)
+
+        expected_msg = (
+            "Could not determine free space on "
+            + f"{aNodeList[0]} at {aRemotePatchBase}. Reason: df command returned empty output for {aRemotePatchBase}. stderr: df: cannot access. Trying a different node"
+        )
+
+        self.assertEqual(_rc, PATCH_COPY_ERROR)
+        self.assertEqual(_errmsg, f"Patch copy method encountered error. {expected_msg}")
+    
+    @patch("exabox.infrapatching.utils.infrapatchexecutionvalidator.InfrapatchExecutionValidator.mIsManagementHostLaunchNodeForDomU", return_value=False)
+    @patch("exabox.infrapatching.utils.infrapatchexecutionvalidator.InfrapatchExecutionValidator.mCheckCondition", return_value=False)
+    @patch("exabox.core.Node.exaBoxNode.mExecuteCmdLog")
+    @patch("exabox.core.Node.exaBoxNode.mFileExists", return_value=False)
+    def test_mValidateImageCheckSum_checksum_failure_removes_corrupted_patch_file(
+        self,
+        mock_mFileExists,
+        mock_mExecuteCmdLog,
+        mock_mCheckCondition,
+        mock_mIsManagementHostLaunchNodeForDomU,
+        ):
+        ebLogInfo("Running unit test on TargetHandler.mValidateImageCheckSum for checksum failure cleanup")
+
+        _PatchFile = "dbserver.patch.zip"
+        _local_patch_path = "PatchPayloads/24.1.7.0.0.241204/DBPatchFile"
+        aRemotePatchBase = "/u02/dbserver.patch.zip_exadata_ol8_23.1.21.0.0.241204_Linux-x86-64.zip/"
+        aNodeList = [self.mGetClubox().mReturnDom0DomUPair()[1][1]]
+        aRemoteNecessarySpaceMb = 400
+        _remote_patch_file = f"{aRemotePatchBase}{_PatchFile}"
+
+        _cmds = {
+            self.mGetRegexLocal(): [
+                [
+                    exaMockCommand("/bin/sha256sum*", aRc=0, aStdout="d509ecc7c0736b488ba7adc79ffd56d31b9674af89e0f7d835c741bd05867e0f  PatchPayloads/DBPatchFile/dbserver.patch.zip", aPersist=True),
+                    exaMockCommand("/bin/awk*", aRc=0, aStdout="d509ecc7c0736b488ba7adc79ffd56d31b9674af89e0f7d835c741bd05867e0f"),
+                    exaMockCommand("/bin/du*", aRc=0, aStdout="327M\tPatchPayloads/DBPatchFile/dbserver.patch.zip", aPersist=True),
+                    exaMockCommand("/bin/awk*", aRc=0, aStdout="327M"),
+                ]
+            ],
+            self.mGetRegexDomU(): [
+                [
+                    exaMockCommand("/usr/bin/sha256sum /u02/dbserver.patch.zip_exadata_ol8_23.1.21.0.0.241204_Linux-x86-64.zip/dbserver.patch.zip | /bin/awk '{print $1}'",aRc=0, aStdout="badchecksum", aPersist=True),
+                    exaMockCommand("mkdir -p*", aRc=0, aPersist=True),
+                    exaMockCommand("df -mP*", aRc=0, aStdout="8142", aPersist=True),
+                ],
+                [
+                    exaMockCommand("/usr/bin/sha256sum /u02/dbserver.patch.zip_exadata_ol8_23.1.21.0.0.241204_Linux-x86-64.zip/dbserver.patch.zip | /bin/awk '{print $1}'",aRc=0, aStdout="badchecksum", aPersist=True),
+                ],
+            ],
+        }
+
+        self.__patch_args_dict["TargetType"] = ["domu"]
+        _targetHandler = TargetHandler(self.__patch_args_dict)
+        self.mPrepareMockCommands(_cmds)
+        _targetHandler.mAddError = MagicMock()
+
+        _rc, _errmsg = _targetHandler.mValidateImageCheckSum(
+            _PatchFile,
+            _local_patch_path,
+            aRemotePatchBase,
+            aNodeList,
+            aRemoteNecessarySpaceMb,
+            None,
+        )
+
+        self.assertEqual(_rc, PATCH_COPY_ERROR)
+        self.assertIn(f"Patch file : {_remote_patch_file} corrupted on node", _errmsg)
+
     @patch("exabox.infrapatching.utils.infrapatchexecutionvalidator.InfrapatchExecutionValidator.mCheckCondition", return_value=False)
     @patch("exabox.infrapatching.handlers.targetHandler.targethandler.TargetHandler.mValidateImageCheckSum", side_effect=Exception("Timeout while async execute (id: node-1, start_time: 2025-06-09 18:22:34+0000, end_time: 2025-06-09 19:22:34+0000, max_time: 3600, callback: <function TargetHandler.mValidateImageCheckSum.<locals>._mExecute_FileCopy at 0x145729b66d90>, args: ['node-1'], pid: 2804658, is_running: True). Error while multiprocessing(Process timeout)"))
     def test_mValidateImageCheckSumWithRetry_timeout(self, mock_validate_checksum, mock_check_condition):
@@ -828,8 +939,7 @@ class ebTestTargetHandler(ebTestClucontrol):
         self.assertEqual(_errmsg, _expected_suffix)
         self.assertTrue(any(PATCH_COPY_ASYNC_TIMEOUT in _entry for _entry in _log_output.output))
         self.assertTrue(any(_expected_suffix in _entry for _entry in _log_output.output))
-
-
+    
     def test_mCheckKnownAlertHistory(self):
         ebLogInfo("")
         ebLogInfo("Running unit test on TargetHandler.mCheckKnownAlertHistory")
@@ -853,7 +963,100 @@ class ebTestTargetHandler(ebTestClucontrol):
         self.mPrepareMockCommands(_cmds)
         _targetHandler = TargetHandler(self.__patch_args_dict)
         self.assertEqual(_targetHandler.mGetKnownAlertHistoryCmd(_target_type, "23.1.21.0.0.241204"), "")
-        
+
+    def test_mCompareDbserverPatchVersionDetails(self):
+        ebLogInfo("")
+        ebLogInfo("Running unit test on TargetHandler.mCompareDbserverPatchVersionDetails")
+
+        _full_format = "fullPatchVersion"
+        _legacy_format = "legacyExapsliceSixDigitVersion"
+        _targetHandler = TargetHandler.__new__(TargetHandler)
+
+        def _mDbPatchInfo(aFormat, aVersion):
+            return {
+                "format": aFormat,
+                "db_patch_version": aVersion,
+            }
+
+        _test_cases = [
+            (
+                "full version takes precedence over legacy version",
+                _mDbPatchInfo(_full_format, "26.1.0.0.0.260531"),
+                _mDbPatchInfo(_legacy_format, "260615.1"),
+                1,
+            ),
+            (
+                "legacy version loses precedence to full version",
+                _mDbPatchInfo(_legacy_format, "260615.1"),
+                _mDbPatchInfo(_full_format, "26.1.0.0.0.260531"),
+                -1,
+            ),
+            (
+                "higher full-version exadata release wins",
+                _mDbPatchInfo(_full_format, "26.2.0.0.0.260520"),
+                _mDbPatchInfo(_full_format, "26.1.0.0.0.260531"),
+                1,
+            ),
+            (
+                "lower full-version exadata release loses",
+                _mDbPatchInfo(_full_format, "26.1.0.0.0.260531"),
+                _mDbPatchInfo(_full_format, "26.2.0.0.0.260520"),
+                -1,
+            ),
+            (
+                "same full-version release uses newer build date",
+                _mDbPatchInfo(_full_format, "26.1.0.0.0.260615"),
+                _mDbPatchInfo(_full_format, "26.1.0.0.0.260531"),
+                1,
+            ),
+            (
+                "same full-version build date uses trailing suffix",
+                _mDbPatchInfo(_full_format, "26.1.0.0.0.260615.2"),
+                _mDbPatchInfo(_full_format, "26.1.0.0.0.260615.1"),
+                1,
+            ),
+            (
+                "legacy version uses trailing suffix",
+                _mDbPatchInfo(_legacy_format, "260615.2"),
+                _mDbPatchInfo(_legacy_format, "260615.1"),
+                1,
+            ),
+            (
+                "legacy version uses newer date before suffix",
+                _mDbPatchInfo(_legacy_format, "260531.2"),
+                _mDbPatchInfo(_legacy_format, "260615.1"),
+                -1,
+            ),
+            (
+                "equal full versions compare the same",
+                _mDbPatchInfo(_full_format, "26.1.0.0.0.260615.1"),
+                _mDbPatchInfo(_full_format, "26.1.0.0.0.260615.1"),
+                0,
+            ),
+        ]
+
+        for _message, _versioned_loc_info, _common_loc_info, _expected in _test_cases:
+            with self.subTest(_message):
+                self.assertEqual(
+                    _targetHandler.mCompareDbserverPatchVersionDetails(
+                        _versioned_loc_info,
+                        _common_loc_info,
+                    ),
+                    _expected,
+                )
+
+        with patch("exabox.infrapatching.handlers.targetHandler.targethandler.OracleVersion") as _mock_oracle_version:
+            _mock_oracle_version.return_value.mCompareVersions.return_value = None
+            self.assertEqual(
+                _targetHandler.mCompareDbserverPatchVersionDetails(
+                    _mDbPatchInfo(_full_format, "invalid-version-a"),
+                    _mDbPatchInfo(_full_format, "invalid-version-b"),
+                ),
+                0,
+            )
+
+        ebLogInfo("Unit test on TargetHandler.mCompareDbserverPatchVersionDetails executed successfully")
+
     @patch('exabox.core.Node.exaBoxNode.mConnect')
     @patch('exabox.infrapatching.handlers.generichandler.GenericHandler.mGetTargetVersion')
     @patch('exabox.utils.node.exaBoxNode.mExecuteCmdLog')

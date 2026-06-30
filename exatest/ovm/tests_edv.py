@@ -4,7 +4,7 @@
 #
 # tests_edv.py
 #
-# Copyright (c) 2025, Oracle and/or its affiliates.
+# Copyright (c) 2025, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_edv.py - <one-line expansion of the name>
@@ -72,6 +72,10 @@ class ebTestExaDBXSEdv(ebTestClucontrol):
                         aRc=0,
                         aStdout="activevm\n",
                         aPersist=True,
+                    ),
+                    exaMockCommand(
+                        "/bin/test -e /EXAVMIMAGES/GuestImages/stalevm/under_migration",
+                        aRc=1,
                     ),
                     exaMockCommand(
                         "test.*pgrep",

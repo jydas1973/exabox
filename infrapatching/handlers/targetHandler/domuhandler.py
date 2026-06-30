@@ -16,6 +16,12 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    araghave    05/22/26 - Bug 39424884 - EXACS:26.1.1:BB:DOMU:LIVE
+#                           UPDATE:ALLCVSS ROLLBACK FAILING
+#    sdevasek    05/07/26 - Enh 39310755 - ENABLE DOWNTIME DB HEALTH CHECKS
+#                           BY DEFAULT FOR VM OS PATCHING OPERATIONS
+#    sdevasek    04/09/26 - Bug 39178857 - EXACS:BB:26.1.0:DOMU ROLLBACK:
+#                           FAILING WITH RETURN CODE 0X03030027
 #    bhpati      03/10/26 - Bug 38759700 - OCI: OCI-EXACS - VA-2024-0117 -
 #                           CLAMAV 0.103 LTS END OF LIFE (EOL)
 #    araghave    02/19/26 - Bug 38766026 - FAIL DOMU PATCHING IN CASE OF A
@@ -25,6 +31,8 @@
 #                           CORRECT VERSION
 #    araghave    11/13/25 - Bug 38651311 - REPLACE FULLCVSS ELU OPTION WITH
 #                           FULL IN DOMU ELU INFRA PATCHING CODE
+#    mirrodri    10/12/25  - Enh 38521465 PROVIDE OPTIONS TO MOCK PATCHMGR
+#                            COMMAND ON AUTOMATION ENVIRONMENTS
 #    araghave    09/11/25  - Enh 38173247 - EXACLOUD CHANGES TO SUPPORT DOMU
 #                            ELU INFRA PATCH OPERATIONS
 #    araghave    10/07/25  - Enh 38534332 - ELU PATCHING - VALIDATE NODE IS AT
@@ -633,8 +641,9 @@ class DomUHandler(TargetHandler):
                 self.mPatchLogError(f"Exiting since Return code from mValidateRootFsSpaceUsage is {_ret} ")
                 return _ret, _no_action_taken
 
-            # 3. Perform customcheck
-            if len(_discarded) > 0:  # and aTaskType not in [self.TASK_POSTCHECK]:
+            # 3. Perform postchecks on discarded nodes only when some, but not all, DomUs are discarded.
+            #    If all customized DomUs are discarded, skip this check.
+            if _discarded and len(_discarded) < len(self.mGetCustomizedDomUList()): # and aTaskType not in [self.TASK_POSTCHECK]:
                 _ret = self.mCustomCheck(_discarded)
                 if _ret != PATCH_SUCCESS_EXIT_CODE:
                     return _ret, _no_action_taken
@@ -1634,8 +1643,9 @@ class DomUHandler(TargetHandler):
                 self.mPatchLogError(f"Exiting since Return code from mValidateRootFsSpaceUsage is {_ret} ")
                 return _ret, _no_action_taken
 
-            #3. Perform customcheck
-            if len(_discarded) > 0:
+            # 3. Perform postchecks on discarded nodes only when some, but not all, DomUs are discarded.
+            #    If all customized DomUs are discarded, skip this check.
+            if _discarded and len(_discarded) < len(self.mGetCustomizedDomUList()):
                 _ret = self.mCustomCheck(_discarded)
                 if _ret != PATCH_SUCCESS_EXIT_CODE:
                     return _ret, _no_action_taken
@@ -1902,8 +1912,9 @@ class DomUHandler(TargetHandler):
                 self.mPatchLogError(f"Exiting since Return code from mValidateRootFsSpaceUsage is {_ret} ")
                 return _ret, _no_action_taken
 
-            # 3. Perform customcheck
-            if len(_discarded) > 0:
+            # 3. Perform postchecks on discarded nodes only when some, but not all, DomUs are discarded.
+            #    If all customized DomUs are discarded, skip this check.
+            if _discarded and len(_discarded) < len(self.mGetCustomizedDomUList()):
                 _ret = self.mCustomCheck(_discarded)
                 if _ret != PATCH_SUCCESS_EXIT_CODE:
                     return _ret, _no_action_taken
@@ -3120,7 +3131,7 @@ class DomUHandler(TargetHandler):
                 _selected_launch_nodes.append(_selected_launch_node)
                 _launch_node_candidates.remove(_selected_launch_node)
 
-        if len(_selected_launch_nodes) > 0:
+        if len(_selected_launch_nodes) > 0: 
             self.mPatchLogInfo(f"Selected launch nodes {str(_selected_launch_nodes)}")
         return PATCH_SUCCESS_EXIT_CODE, _selected_launch_nodes
 
@@ -3144,8 +3155,10 @@ class DomUHandler(TargetHandler):
         In case of indepndent post check option, Its better
         to ping for 2secs before proceeding with other checks.
         '''
+
         _checked_domu_up_for_secs = 0
         _ret = PATCH_SUCCESS_EXIT_CODE
+
         if aTaskType in [TASK_POSTCHECK]:
             # In case of independent post check, we wait for
             # the minimum tim possible as most of the detils
@@ -3191,30 +3204,36 @@ class DomUHandler(TargetHandler):
         cant be used in this case.
         '''
         if aTaskType not in [TASK_POSTCHECK]:
-            # Check that the domu is at the requested version. if it was a rollback
-            # we just check for the version to be lower than what it previously was.
-            _crs_enable = ""
-            _current_domu_version = \
-                self.mGetCluPatchCheck().mCheckTargetVersion(aDomU, PATCH_DOMU)
+            '''
+            When mIsMockEnabledByEcra is True, either set _current_domu_version = aPrePatchVersion (so rollout
+            checks still have something to compare) or skip the rollback branch entirely by wrapping it in if not
+            mIsMockEnabledByEcra.
+            '''
+            _current_domu_version = aPrePatchVersion
+            if self.mIsMockEnabledByEcra():
+                self.mPatchLogInfo(f"Mock mode: skipping target-version validation for DomU {aDomU}.")
+            else:
+                # Check that the domu is at the requested version. if it was a rollback
+                # we just check for the version to be lower than what it previously was.
+                _crs_enable = ""
+                _current_domu_version = \
+                    self.mGetCluPatchCheck().mCheckTargetVersion(aDomU, PATCH_DOMU)
 
             if self.mIsElu() and self.mGetEluOptions() == "applypending":
-                 # Patching must fail in case of mGetExadataLiveUpdateDetails returns True.
-                 _is_elu_apply_eligible = False
-                 _, _, _, _is_elu_apply_eligible = self.mGetExadataLiveUpdateDetails(aDomU)
-                 if _is_elu_apply_eligible:
-                     _ret = ELU_OUTSTANDING_WORK_APPLY_FAILURE
-                     _suggestion_msg = f"Apply outstanding work items not applied after an elu upgrade with applypending was performed on {aDomU}."
-                     self.mAddError(_ret, _suggestion_msg)
-                 else:
-                     self.mPatchLogInfo(f"Apply outstanding work items based ELU upgrade successful on {aDomU}.")
-            elif aRollback:
-                if self.mGetCluPatchCheck().mCheckTargetVersion(
-                        aDomU, PATCH_DOMU, aPrePatchVersion, aDomUPostCheck=True) > 0:
-                    _ret = DOMU_VERSION_LOWER_THAN_EXPECTED_VERSION
-                    _suggestion_msg = f"VM rollback was requested but the version seems to be unchanged, found version {aPrePatchVersion}, expected to be lower than {_current_domu_version}."
+                # Patching must fail in case of mGetExadataLiveUpdateDetails returns True.
+                self.mPatchLogInfo(f"Enter ELU applypending validation: node={aDomU}")
+                _is_elu_apply_eligible = False
+                _, _, _, _is_elu_apply_eligible = self.mGetExadataLiveUpdateDetails(aDomU)
+                self.mPatchLogInfo(f"mGetExadataLiveUpdateDetails apply-eligibility: {_is_elu_apply_eligible} for node={aDomU}")
+                if _is_elu_apply_eligible:
+                    _ret = ELU_OUTSTANDING_WORK_APPLY_FAILURE
+                    _suggestion_msg = f"Apply outstanding work items not applied after an elu upgrade with applypending was performed on {aDomU}."
                     self.mAddError(_ret, _suggestion_msg)
-            elif self.mGetCluPatchCheck().mCheckTargetVersion(aDomU, PATCH_DOMU,
+                else:
+                    self.mPatchLogInfo(f"Apply outstanding work items based ELU upgrade successful on {aDomU}.")
+            elif not aRollback and self.mGetCluPatchCheck().mCheckTargetVersion(aDomU, PATCH_DOMU,
                                                           aPostPatchTargetVersion) < 0:
+                self.mPatchLogInfo(f"Enter DomU upgrade-target validation: node={aDomU}, target={aPostPatchTargetVersion}, current={_current_domu_version}")
                 """
                 We proceed with patching only if the target version is higher than the current version.
                 In all other cases, when currentVersion = targetVersion or currentVersion > TargetVersion (as seen in
@@ -3224,7 +3243,6 @@ class DomUHandler(TargetHandler):
                 _ret = DOMU_VERSION_NOT_AT_EXPECTED_VERSION
                 _suggestion_msg = f"VM is not at the requested upgrade version {aPrePatchVersion}, found version {_current_domu_version}."
                 self.mAddError(_ret, _suggestion_msg)
-
             '''
              In case of above postchecks related to version validation fails, CRS checks
              must not be performed and patching must fail.
@@ -3252,10 +3270,17 @@ class DomUHandler(TargetHandler):
             if (self.mGetTask() in [ TASK_PATCH ] and self.mGetEluOptions() and self.mGetEluOptions().lower() in [ "highcvss", "allcvss", "full" ]):
                 self.mPatchLogInfo(f"Skip CRS checks when there is ELU patch applied with elu options - highcvss, allcvss, full - passed.")
             else:
-                _ret = self.mGetCRSHelper().mCheckandRestartCRSonDomU(aDomU)
+                _crs_ret = self.mGetCRSHelper().mCheckandRestartCRSonDomU(aDomU)
+
+                # CRS disabled: do not treat as failure; just log and skip CRS checks
+                if _crs_ret == CRS_IS_DISABLED:
+                    self.mPatchLogInfo(f"CRS auto startup is disabled on DomU {aDomU}; skipping CRS checks for this VM.")
                 # If CRS is running, validate if all the dbs are back up or not(DB healthchecks should not be run in autonomous vm cluster)
-                if _ret == PATCH_SUCCESS_EXIT_CODE and _enable_health_checks_from_cp and not self.mGetIsVMClusterAutonomous():
+                elif _crs_ret == PATCH_SUCCESS_EXIT_CODE and _enable_health_checks_from_cp and not self.mGetIsVMClusterAutonomous():
                     _ret = self.mGetCRSHelper().mCheckCDBPDBHealthPostPatch(aDomU)
+                else:
+                    # For any other non-success CRS code, propagate it
+                    _ret = _crs_ret
         else:
             # Do not perform CRS check when an ELU patch is applied with Elu options set
             # as "highcvss", "allcvss", "full" as no domu reboot is involved during this operation.
@@ -3264,13 +3289,20 @@ class DomUHandler(TargetHandler):
             if (self.mGetTask() in [TASK_PATCH] and self.mGetEluOptions() and self.mGetEluOptions().lower() in [ "highcvss", "allcvss", "full" ]):
                 self.mPatchLogInfo(f"Skip CRS checks when there is ELU patch applied with elu options - highcvss, allcvss, full - passed.")
             else:
-                _ret = self.mGetCRSHelper().mCheckandRestartCRSonDomU(aDomU)
-                if _ret in [ DOMU_INVALID_CRS_HOME, CRS_COMMAND_EXCEPTION_ENCOUNTERED ]:
-                    return _ret
-                elif _ret == PATCH_SUCCESS_EXIT_CODE:
+                _crs_ret = self.mGetCRSHelper().mCheckandRestartCRSonDomU(aDomU)
+                # crs home errors, propagate the error
+                if _crs_ret in [ DOMU_INVALID_CRS_HOME, CRS_COMMAND_EXCEPTION_ENCOUNTERED ]:
+                    return _crs_ret
+                elif _crs_ret == CRS_IS_DISABLED:
+                    self.mPatchLogInfo(f"CRS auto startup is disabled on DomU {aDomU}; skipping CRS checks for this VM.")
+                elif _crs_ret == PATCH_SUCCESS_EXIT_CODE:
+                    # crs auto_start is enabled
                     # only for retry request, trigger post stage calculation on the already upgraded node
                     if self.mPatchRequestRetried() and _enable_health_checks_from_cp and not self.mGetIsVMClusterAutonomous():
                         _ret = self.mGetCRSHelper().mCheckCDBPDBHealthPostPatch(aDomU, aIsRetry=True)
+                else:
+                    # For any other non-success CRS error, propagate it
+                    _ret = _crs_ret
         return _ret
 
     def mSetExaccAtpSettingsOnDomU(self, aDomUList, aStage):
@@ -3504,7 +3536,7 @@ class DomUHandler(TargetHandler):
                     elif _rc == PATCH_SUCCESS_EXIT_CODE:
  
                         # Check crs and Validate for outage scenario(DB healthchecks should not be run in autonomous vm cluster)
-                        if _enable_health_checks_from_cp and not self.mGetIsVMClusterAutonomous():
+                        if self.mGetTask() in [TASK_PATCH] and not self.mGetIsVMClusterAutonomous():
                             _enable_cdb_downtime_check = self.mGetInfrapatchExecutionValidator().mCheckCondition('mIsCDBDowntimeCheckEnabled')
 
                             if _enable_cdb_downtime_check:
@@ -3524,7 +3556,7 @@ class DomUHandler(TargetHandler):
                             _enable_pdb_downtime_check = self.mGetInfrapatchExecutionValidator().mCheckCondition('mIsPDBDowntimeCheckEnabled')
                             _enable_pdb_degradation_check = self.mGetInfrapatchExecutionValidator().mCheckCondition('mIsPDBDegradationCheckEnabled')
 
-                            if _enable_pdb_downtime_check or _enable_pdb_degradation_check:
+                            if _enable_pdb_downtime_check or (_enable_health_checks_from_cp and _enable_pdb_degradation_check):
                                 # Fetch dbsystem details json for post patch comparison to detect if pdb is in degraded state
                                 _rc = self.mGetCRSHelper().mFetchAndStoreDBSystemDetailsToFile(_node_to_patch, "pre")
                                 if _rc == PATCH_SUCCESS_EXIT_CODE and _enable_pdb_downtime_check:
@@ -3678,16 +3710,27 @@ class DomUHandler(TargetHandler):
                                 break
 
                     # Apply outstanding Items post DomU upgrade.
-                    if self.mGetTask() in [ TASK_PATCH ] and self.mIsElu() and self.mGetTask() in [ TASK_PATCH ] and self.mGetEluOptions() and self.mGetEluOptions().lower() == "applypending":
+                    if self.mGetTask() in [ TASK_PATCH ] and self.mIsElu() and self.mGetEluOptions() and self.mGetEluOptions().lower() == "applypending":
                         _is_elu_apply_eligible = False
+
+                        # Set the Exadata Live update schedule outstanding work items flag to
+                        # 'reset' before applying outstanding work items.
+                        _patchMgrObj.mSetResetLiveUpdateScheduleOutstandingWorkPatchFlag(aResetLiveUpdateScheduleOutstandingWork=True)
+                        _patch_cmd = _patchMgrObj.mGetPatchMgrCmd(aResetLiveUpdateScheduleOutstandingWork=True)
+                        _rc = _patchMgrObj.mExecutePatchMgrCmd(_patch_cmd, aResetOutstandingWorkItemsSchedule=True)
+                        if _rc != PATCH_SUCCESS_EXIT_CODE:
+                            break
+
                         _, _, _, _is_elu_apply_eligible = self.mGetExadataLiveUpdateDetails(_node_to_patch)
                         if _is_elu_apply_eligible:
                             _patch_apply_outstanding_work_cmd = None
+
                             # prepare the patchmgr command for execution using the PatchManager object
                             # to apply outstanding work items during elu patch.
+                            _patchMgrObj.mSetResetLiveUpdateScheduleOutstandingWorkPatchFlag(aResetLiveUpdateScheduleOutstandingWork=False)
                             _patchMgrObj.mSetApplyOutstandingWorkDuringEluPatchFlag(aApplyOutstandingWorkDuringEluPatch=True)
                             _patch_cmd = _patchMgrObj.mGetPatchMgrCmd()
-                            _rc = _patchMgrObj.mExecutePatchMgrCmd(_patch_cmd)
+                            _rc = _patchMgrObj.mExecutePatchMgrCmd(_patch_cmd, aForegroundNoNotificationCheck=True)
                             if _rc != PATCH_SUCCESS_EXIT_CODE:
                                 break
                         else:
@@ -4021,7 +4064,7 @@ class DomUHandler(TargetHandler):
                     else:
                         _rc = self.mGetCRSHelper().mCheckandRestartCRSonAllDomUWithinCluster(aListOfEluNodes=aListOfEluNodes)
                         if _rc in [ DOMU_INVALID_CRS_HOME, CRS_COMMAND_EXCEPTION_ENCOUNTERED, DOMU_CRS_SERVICES_DOWN ]:
-                            break
+                            break 
 
                     _pre_patch_version = self.mGetCluPatchCheck().mCheckTargetVersion(
                         _node_to_patch, PATCH_DOMU)
@@ -4167,16 +4210,27 @@ class DomUHandler(TargetHandler):
                                 break
 
                     # Apply outstanding Items post DomU upgrade.
-                    if self.mGetTask() in [ TASK_PATCH ] and self.mIsElu() and self.mGetTask() in [ TASK_PATCH ] and self.mGetEluOptions() and self.mGetEluOptions().lower() == "applypending":
+                    if self.mGetTask() in [ TASK_PATCH ] and self.mIsElu() and self.mGetEluOptions() and self.mGetEluOptions().lower() == "applypending":
                         _is_elu_apply_eligible = False
+
+                        # Set the Exadata Live update schedule outstanding work items flag to
+                        # 'reset' before applying outstanding work items.
+                        _patchMgrObj.mSetResetLiveUpdateScheduleOutstandingWorkPatchFlag(aResetLiveUpdateScheduleOutstandingWork=True)
+                        _patch_cmd = _patchMgrObj.mGetPatchMgrCmd(aResetLiveUpdateScheduleOutstandingWork=True)
+                        _rc = _patchMgrObj.mExecutePatchMgrCmd(_patch_cmd, aResetOutstandingWorkItemsSchedule=True)
+                        if _rc != PATCH_SUCCESS_EXIT_CODE:
+                            break
+
                         _, _, _, _is_elu_apply_eligible = self.mGetExadataLiveUpdateDetails(_node_patch_list[0]) 
                         if _is_elu_apply_eligible:
                             _patch_apply_outstanding_work_cmd = None
+
                             # prepare the patchmgr command for execution using the PatchManager object
                             # to apply outstanding work items during elu patch.
+                            _patchMgrObj.mSetResetLiveUpdateScheduleOutstandingWorkPatchFlag(aResetLiveUpdateScheduleOutstandingWork=False)
                             _patchMgrObj.mSetApplyOutstandingWorkDuringEluPatchFlag(aApplyOutstandingWorkDuringEluPatch=True)
                             _patch_cmd = _patchMgrObj.mGetPatchMgrCmd()
-                            _rc = _patchMgrObj.mExecutePatchMgrCmd(_patch_cmd)
+                            _rc = _patchMgrObj.mExecutePatchMgrCmd(_patch_cmd, aForegroundNoNotificationCheck=True)
                             if _rc != PATCH_SUCCESS_EXIT_CODE:
                                 break
                         else:

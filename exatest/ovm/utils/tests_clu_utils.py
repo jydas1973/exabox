@@ -16,6 +16,9 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    rajsag      05/29/26 - Bug 39283211 - support X11 no-XRMEM cell types
+#    prsshukl    05/22/26 - Bug 39416987 - EXACC: SSL INSPECTION: PHASE1: EXACLOUD ISN'T
+#                           COPYING CUSTOMER ROOT CA AS UNABLE TO LOGIN TO THE CPS WALLET
 #    aararora    03/20/26 - 39106054: Add Falcon agent install helper
 #    prsshukl    03/18/26 - Creation
 #
@@ -27,6 +30,7 @@ from unittest.mock import MagicMock, call, patch
 
 from exabox.core.Error import ExacloudRuntimeError
 from exabox.utils.node import CmdRet
+import exabox.ovm.utils.clu_utils as clu_utils
 from exabox.ovm.utils.clu_utils import ebCluUtils, mRunCrsCommandsWithRetry
 from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
 
@@ -65,6 +69,79 @@ class ebTestCluUtils(ebTestClucontrol):
         with tempfile.TemporaryDirectory() as tmpdir:
             self.assertIsNone(self._utils.mFindLocalRpm(tmpdir, "8"))
 
+    # Auto-generated test for mSetupCustomerRootCACertificates
+    def test_mSetupCustomerRootCACertificates_happy_path(self):
+        utils = self._utils
+
+        mock_cluctrl = utils._ebCluUtils__cluctrl
+        mock_node = MagicMock()
+        mock_node.mFileExists.side_effect = [False, True]
+
+        context_manager = MagicMock()
+        context_manager.__enter__.return_value = mock_node
+        context_manager.__exit__.return_value = False
+
+        with patch.object(mock_cluctrl, "mIsSslInspectionEnabled", return_value=True) as mock_ssl_enabled, \
+             patch.object(mock_cluctrl, "mReturnDom0DomUPair", return_value=[("dom0", "domu1")]), \
+             patch("exabox.ovm.utils.clu_utils.os.path.exists", return_value=True), \
+             patch("exabox.ovm.utils.clu_utils.connect_to_host", return_value=context_manager) as mock_connect, \
+             patch("exabox.ovm.utils.clu_utils.get_gcontext") as mock_context_getter, \
+             patch("exabox.ovm.utils.clu_utils.node_exec_cmd_check") as mock_exec_check:
+            utils.mSetupCustomerRootCACertificates()
+
+        mock_ssl_enabled.assert_called_once_with()
+        mock_connect.assert_called_once_with("domu1", mock_context_getter.return_value, username="root")
+        mock_node.mExecuteCmd.assert_called_once_with("mkdir -p /etc/pki/ca-trust/source/anchors")
+        mock_node.mCopyFile.assert_called_once_with(
+            "/etc/pki/ca-trust/source/anchors/customer-root-ca.crt",
+            "/etc/pki/ca-trust/source/anchors/customer-root-ca.crt",
+        )
+        mock_exec_check.assert_called_once_with(mock_node, "update-ca-trust")
+
+    # Auto-generated test for mSetupCustomerRootCACertificates
+    def test_mSetupCustomerRootCACertificates_skips_when_not_enabled(self):
+        utils = self._utils
+        mock_cluctrl = utils._ebCluUtils__cluctrl
+        with patch.object(mock_cluctrl, "mIsSslInspectionEnabled", return_value=False) as mock_ssl_enabled, \
+             patch("exabox.ovm.utils.clu_utils.os.path.exists", return_value=True), \
+             patch("exabox.ovm.utils.clu_utils.connect_to_host") as mock_connect:
+            utils.mSetupCustomerRootCACertificates()
+
+        mock_ssl_enabled.assert_called_once_with()
+        mock_connect.assert_not_called()
+
+    # Auto-generated test for mSetupCustomerRootCACertificates
+    def test_mSetupCustomerRootCACertificates_raises_when_source_missing(self):
+        utils = self._utils
+        mock_cluctrl = utils._ebCluUtils__cluctrl
+
+        with patch.object(mock_cluctrl, "mIsSslInspectionEnabled", return_value=True), \
+             patch("exabox.ovm.utils.clu_utils.os.path.exists", return_value=False), \
+             patch("exabox.ovm.utils.clu_utils.ExacloudRuntimeError", DummyExacloudRuntimeError):
+            with self.assertRaises(DummyExacloudRuntimeError):
+                utils.mSetupCustomerRootCACertificates()
+
+    # Auto-generated test for mSetupCustomerRootCACertificates
+    def test_mSetupCustomerRootCACertificates_raises_when_copy_fails(self):
+        utils = self._utils
+        mock_cluctrl = utils._ebCluUtils__cluctrl
+
+        with patch.object(mock_cluctrl, "mIsSslInspectionEnabled", return_value=True), \
+             patch.object(mock_cluctrl, "mReturnDom0DomUPair", return_value=[("dom0", "domu1")]):
+            mock_node = MagicMock()
+            mock_node.mFileExists.side_effect = [True, False]
+
+            context_manager = MagicMock()
+            context_manager.__enter__.return_value = mock_node
+            context_manager.__exit__.return_value = False
+
+            with patch("exabox.ovm.utils.clu_utils.os.path.exists", return_value=True), \
+                 patch("exabox.ovm.utils.clu_utils.connect_to_host", return_value=context_manager), \
+                 patch("exabox.ovm.utils.clu_utils.get_gcontext"), \
+                 patch("exabox.ovm.utils.clu_utils.ExacloudRuntimeError", DummyExacloudRuntimeError):
+                with self.assertRaises(DummyExacloudRuntimeError):
+                    utils.mSetupCustomerRootCACertificates()
+
     def test_mDownloadFalconRpm_downloads_with_curl(self):
         utils = self._utils
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -97,6 +174,20 @@ class ebTestCluUtils(ebTestClucontrol):
                 with self.assertRaises(ExacloudRuntimeError):
                     utils.mDownloadFalconRpm(tmpdir, rpm_url)
 
+    # Auto-generated test for mDownloadFalconRpm
+    def test_mDownloadFalconRpm_reuses_existing_file(self):
+        utils = self._utils
+        with tempfile.TemporaryDirectory() as tmpdir:
+            rpm_path = os.path.join(tmpdir, "falcon-existing.rpm")
+            with open(rpm_path, "wb") as rpm_file:
+                rpm_file.write(b"payload")
+
+            with patch.object(utils._ebCluUtils__cluctrl, "mExecuteLocal") as mock_exec:
+                result = utils.mDownloadFalconRpm(tmpdir, "https://storage/falcon-existing.rpm")
+
+            self.assertEqual(result, rpm_path)
+            mock_exec.assert_not_called()
+
     def test_mInstallFalconAgentOnDomus_skips_when_disabled(self):
         utils = self._utils
 
@@ -120,7 +211,7 @@ class ebTestCluUtils(ebTestClucontrol):
             if option == "falcon_sensor_cid":
                 return "CIDVALUE"
             if option == "falcon_sensor_rpm_urls":
-                return {"ol8": "https://objectstorage/falcon.rpm"}
+                return {"ol8": "https://objectstorage/falcon.rpm", "ol9": "https://objectstorage/falcon9.rpm"}
             return None
 
         with patch.object(self.mGetClubox(), "mCheckConfigOption", side_effect=_config_side_effect), \
@@ -128,9 +219,72 @@ class ebTestCluUtils(ebTestClucontrol):
             utils.mInstallFalconAgentOnDomus(["domu1", "domu2"], aOperationLabel="Create Service")
 
         mock_sensor.assert_has_calls([
-            call("domu1", os.path.join(self.mGetClubox().mGetBasePath(), "images"), {"ol8": "https://objectstorage/falcon.rpm"}, "CIDVALUE", "Create Service"),
-            call("domu2", os.path.join(self.mGetClubox().mGetBasePath(), "images"), {"ol8": "https://objectstorage/falcon.rpm"}, "CIDVALUE", "Create Service"),
+            call("domu1", os.path.join(self.mGetClubox().mGetBasePath(), "images"), {"ol8": "https://objectstorage/falcon.rpm", "ol9": "https://objectstorage/falcon9.rpm"}, "CIDVALUE", "Create Service"),
+            call("domu2", os.path.join(self.mGetClubox().mGetBasePath(), "images"), {"ol8": "https://objectstorage/falcon.rpm", "ol9": "https://objectstorage/falcon9.rpm"}, "CIDVALUE", "Create Service"),
         ])
+
+    # Auto-generated test for mInstallFalconAgentOnDomus
+    def test_mInstallFalconAgentOnDomus_uses_default_cid_and_no_urls(self):
+        utils = self._utils
+
+        def _config_side_effect(option, value=None):
+            if option == "falcon_agent_install":
+                return True if value is not None else "True"
+            if option == "falcon_sensor_cid":
+                return None
+            if option == "falcon_sensor_rpm_urls":
+                return None
+            return None
+
+        mock_context = mock.Mock()
+        mock_context.mGetBasePath.return_value = "/base"
+
+        with patch.object(self.mGetClubox(), "mCheckConfigOption", side_effect=_config_side_effect), \
+             patch("exabox.ovm.utils.clu_utils.get_gcontext", return_value=mock_context), \
+             patch.object(utils, "mInstallFalconSensor") as mock_sensor:
+            utils.mInstallFalconAgentOnDomus(["domu1"])
+
+        mock_sensor.assert_called_once()
+        args = mock_sensor.call_args[0]
+        self.assertEqual(args[0], "domu1")
+        self.assertEqual(args[1], os.path.join("/base", "images"))
+        self.assertIsNone(args[2])
+        self.assertEqual(args[3], clu_utils.FALCON_DEFAULT_CID)
+        self.assertEqual(args[4], "DomU operation")
+
+    # Auto-generated test for mInstallFalconAgentOnDomus
+    def test_mInstallFalconAgentOnDomus_raises_when_url_missing_for_version(self):
+        utils = self._utils
+
+        def _config_side_effect(option, value=None):
+            if option == "falcon_agent_install":
+                return True if value is not None else "True"
+            if option == "falcon_sensor_cid":
+                return "CIDVALUE"
+            if option == "falcon_sensor_rpm_urls":
+                return {"ol8": "https://objectstorage/falcon.rpm"}
+            return None
+
+        mock_context = mock.Mock()
+        mock_context.mGetBasePath.return_value = "/base"
+        node = MagicMock()
+        context_mgr = mock.MagicMock()
+        context_mgr.__enter__.return_value = node
+        context_mgr.__exit__.return_value = False
+
+        with patch.object(self.mGetClubox(), "mCheckConfigOption", side_effect=_config_side_effect), \
+             patch("exabox.ovm.utils.clu_utils.get_gcontext", return_value=mock_context), \
+             patch.object(utils, "mDetectOracleLinuxMajor", return_value="9"), \
+             patch.object(utils, "mFindLocalRpm", return_value=None), \
+             patch("exabox.ovm.utils.clu_utils.connect_to_host", return_value=context_mgr), \
+             patch("exabox.ovm.utils.clu_utils.ebLogWarn") as mock_warn, \
+             patch("exabox.ovm.utils.clu_utils.ExacloudRuntimeError", DummyExacloudRuntimeError):
+            with self.assertRaises(DummyExacloudRuntimeError) as exc:
+                utils.mInstallFalconAgentOnDomus(["domu1"])
+
+        self.assertIn("Falcon RPM for OL9 not found locally", str(exc.exception))
+        mock_warn.assert_called_with(f"{clu_utils.FALCON_LOG_PREFIX} RPM URL for OL9 not provided; expecting RPM in images directory.")
+        mock_context.mGetBasePath.assert_called_once()
 
     def test_mConfigureFalconSensor_invokes_expected_commands(self):
         utils = self._utils
@@ -302,6 +456,34 @@ class ebTestCluUtils(ebTestClucontrol):
             with self.assertRaises(ExacloudRuntimeError):
                 utils.mValidateFalconService(node, "domu1")
 
+    # Auto-generated test for mValidateFalconService
+    def test_mValidateFalconService_logs_warning_when_connectivity_missing(self):
+        utils = self._utils
+        node = MagicMock()
+
+        def _cmd_path_side_effect(unused_node, binary):
+            if binary == "systemctl":
+                return "/bin/systemctl"
+            if binary == "grep":
+                return "/bin/grep"
+            return None
+
+        def _exec_side_effect(unused_node, cmd, **kwargs):
+            if "status falcon-sensor.service" in cmd:
+                return CmdRet(0, "active\n", "")
+            if "is-active falcon-sensor.service" in cmd:
+                return CmdRet(0, "active\n", "")
+            if "CrowdStrike /var/log/messages" in cmd:
+                return CmdRet(1, "", "")
+            raise AssertionError(f"Unexpected command: {cmd}")
+
+        with patch("exabox.ovm.utils.clu_utils.node_cmd_abs_path_check", side_effect=_cmd_path_side_effect), \
+             patch("exabox.ovm.utils.clu_utils.node_exec_cmd", side_effect=_exec_side_effect), \
+             patch("exabox.ovm.utils.clu_utils.ebLogWarn") as mock_warn:
+            utils.mValidateFalconService(node, "domu1")
+
+        mock_warn.assert_called_once()
+
     def test_mDetectRegionIdentifier_returns_region(self):
         utils = self._utils
         node = MagicMock()
@@ -330,303 +512,275 @@ class ebTestCluUtils(ebTestClucontrol):
         filename = utils.mExtractFilenameFromUrl("https://host/path/falcon-sensor.rpm?auth=1")
         self.assertEqual(filename, "falcon-sensor.rpm")
 
+
+
 class TestSetupCustomerRootCACertificates(unittest.TestCase):
 
     def setUp(self):
         self._mock_cluctrl = mock.Mock()
-        self._mock_cluctrl.mGetArgsOptions = mock.Mock()
         self._mock_cluctrl.mIsSslInspectionEnabled = mock.Mock()
         self._mock_cluctrl.mReturnDom0DomUPair = mock.Mock()
         self._utils = ebCluUtils(self._mock_cluctrl)
-        self._raw_cert = "-----BEGIN CERTIFICATE-----\nTESTDATA\n-----END CERTIFICATE-----\n"
-        self._encoded_cert = base64.b64encode(self._raw_cert.encode("utf8")).decode("utf8")
+        self._cert_path = "/etc/pki/ca-trust/source/anchors/customer-root-ca.crt"
 
     # Auto-generated test for mSetupCustomerRootCACertificates
     def test_mSetupCustomerRootCACertificates_skip_when_ssl_inspection_disabled(self):
-        options = types.SimpleNamespace(jsonconf={"customer_root_ca": self._encoded_cert})
         self._mock_cluctrl.mIsSslInspectionEnabled.return_value = False
 
-        with mock.patch("exabox.ovm.utils.clu_utils.connect_to_host") as mock_connect, \
-             mock.patch("exabox.ovm.utils.clu_utils.get_gcontext") as mock_get_context, \
-             mock.patch("exabox.ovm.utils.clu_utils.node_exec_cmd_check") as mock_exec_check, \
-             mock.patch("exabox.ovm.utils.clu_utils.node_cmd_abs_path_check") as mock_cmd_abs:
-            self._utils.mSetupCustomerRootCACertificates(options)
+        with mock.patch("exabox.ovm.utils.clu_utils.os.path.exists") as mock_exists,              mock.patch("exabox.ovm.utils.clu_utils.connect_to_host") as mock_connect:
+            self._utils.mSetupCustomerRootCACertificates()
 
+        mock_exists.assert_not_called()
         mock_connect.assert_not_called()
-        mock_get_context.assert_not_called()
-        mock_exec_check.assert_not_called()
-        mock_cmd_abs.assert_not_called()
         self._mock_cluctrl.mReturnDom0DomUPair.assert_not_called()
 
     # Auto-generated test for mSetupCustomerRootCACertificates
-    def test_mSetupCustomerRootCACertificates_fetches_options_when_not_provided(self):
-        options = types.SimpleNamespace(jsonconf={})
-        self._mock_cluctrl.mGetArgsOptions.return_value = options
-        self._mock_cluctrl.mIsSslInspectionEnabled.return_value = False
-
-        self._utils.mSetupCustomerRootCACertificates()
-
-        self._mock_cluctrl.mGetArgsOptions.assert_called_once()
-        self._mock_cluctrl.mIsSslInspectionEnabled.assert_called_once_with(options)
-        self._mock_cluctrl.mReturnDom0DomUPair.assert_not_called()
-
-    # Auto-generated test for mSetupCustomerRootCACertificates
-    def test_mSetupCustomerRootCACertificates_raises_when_certificate_missing(self):
-        options = types.SimpleNamespace(jsonconf={"customer_root_ca": ""})
+    def test_mSetupCustomerRootCACertificates_raises_when_local_cert_missing(self):
         self._mock_cluctrl.mIsSslInspectionEnabled.return_value = True
 
-        with mock.patch("exabox.ovm.utils.clu_utils.ExacloudRuntimeError", DummyExacloudRuntimeError):
-            with self.assertRaises(DummyExacloudRuntimeError) as context:
-                self._utils.mSetupCustomerRootCACertificates(options)
+        with mock.patch("exabox.ovm.utils.clu_utils.os.path.exists", return_value=False),              mock.patch("exabox.ovm.utils.clu_utils.ExacloudRuntimeError", DummyExacloudRuntimeError):
+            with self.assertRaises(DummyExacloudRuntimeError) as exc:
+                self._utils.mSetupCustomerRootCACertificates()
 
-        self.assertIn("Root CA Certificate Str addition failed", str(context.exception))
+        self.assertIn("customer-root-ca.crt addition failed", str(exc.exception))
         self._mock_cluctrl.mReturnDom0DomUPair.assert_not_called()
 
     # Auto-generated test for mSetupCustomerRootCACertificates
-    def test_mSetupCustomerRootCACertificates_happy_path_copies_certificate(self):
-        options = types.SimpleNamespace(jsonconf={"customer_root_ca": self._encoded_cert})
+    def test_mSetupCustomerRootCACertificates_copies_cert_to_domus(self):
         self._mock_cluctrl.mIsSslInspectionEnabled.return_value = True
-        self._mock_cluctrl.mReturnDom0DomUPair.return_value = [("dom0-host", "domu-host")]
+        self._mock_cluctrl.mReturnDom0DomUPair.return_value = [(mock.sentinel.dom0, mock.sentinel.domu)]
 
         mock_node = mock.Mock()
         mock_node.mFileExists.side_effect = [False, True]
-        mock_node.mExecuteCmdLog = mock.Mock()
-        mock_node.mExecuteCmd = mock.Mock()
-        mock_context_manager = mock.MagicMock()
-        mock_context_manager.__enter__.return_value = mock_node
-        mock_context_manager.__exit__.return_value = False
+        context_mgr = mock.MagicMock()
+        context_mgr.__enter__.return_value = mock_node
+        context_mgr.__exit__.return_value = False
 
-        mock_time_value = 123.456
+        with mock.patch("exabox.ovm.utils.clu_utils.os.path.exists", return_value=True),              mock.patch("exabox.ovm.utils.clu_utils.connect_to_host", return_value=context_mgr) as mock_connect,              mock.patch("exabox.ovm.utils.clu_utils.get_gcontext", return_value=mock.sentinel.ctx) as mock_get_context,              mock.patch("exabox.ovm.utils.clu_utils.node_exec_cmd_check") as mock_exec_check:
+            self._utils.mSetupCustomerRootCACertificates()
 
-        with mock.patch("exabox.ovm.utils.clu_utils.connect_to_host", return_value=mock_context_manager) as mock_connect, \
-             mock.patch("exabox.ovm.utils.clu_utils.get_gcontext", return_value=mock.sentinel.context), \
-             mock.patch("exabox.ovm.utils.clu_utils.node_cmd_abs_path_check", return_value="/bin/echo") as mock_cmd_abs, \
-             mock.patch("exabox.ovm.utils.clu_utils.node_exec_cmd_check") as mock_exec_check, \
-             mock.patch("exabox.ovm.utils.clu_utils.time.time", return_value=mock_time_value):
-            self._utils.mSetupCustomerRootCACertificates(options)
-
-        mock_connect.assert_called_once_with("domu-host", mock.sentinel.context, username="root")
-        mock_cmd_abs.assert_called_once_with(mock_node, "echo")
-        mock_node.mExecuteCmd.assert_called_once_with("mkdir -p /etc/pki/ca-trust/source/anchors")
-        mock_node.mExecuteCmdLog.assert_called_once()
-        write_command = mock_node.mExecuteCmdLog.call_args[0][0]
-        self.assertIn(self._raw_cert.strip(), write_command)
-        expected_timestamp = str(mock_time_value).replace(".", "")
-        expected_dest_file = f"/etc/pki/ca-trust/source/anchors/rootca_{expected_timestamp}.crt"
-        placeholder_dest = "/etc/pki/ca-trust/source/anchors/rootca_{_timestamp}.crt"
-        self.assertTrue(
-            any(dest in write_command for dest in (expected_dest_file, placeholder_dest)),
-            f"Destination path not found in command: {write_command}",
-        )
+        mock_get_context.assert_called_once()
+        mock_connect.assert_called_once_with(mock.sentinel.domu, mock.sentinel.ctx, username='root')
+        mock_node.mExecuteCmd.assert_called_once_with(f'mkdir -p {os.path.dirname(self._cert_path)}')
+        mock_node.mCopyFile.assert_called_once_with(self._cert_path, self._cert_path)
         mock_exec_check.assert_called_once_with(mock_node, "update-ca-trust")
 
     # Auto-generated test for mSetupCustomerRootCACertificates
-    def test_mSetupCustomerRootCACertificates_raises_when_dest_file_missing_after_write(self):
-        options = types.SimpleNamespace(jsonconf={"customer_root_ca": self._encoded_cert})
+    def test_mSetupCustomerRootCACertificates_logs_directory_creation_when_missing(self):
         self._mock_cluctrl.mIsSslInspectionEnabled.return_value = True
-        self._mock_cluctrl.mReturnDom0DomUPair.return_value = [("dom0-host", "domu-host")]
+        self._mock_cluctrl.mReturnDom0DomUPair.return_value = [(mock.sentinel.dom0, mock.sentinel.domu)]
+
+        mock_node = mock.Mock()
+        mock_node.mFileExists.side_effect = [False, True]
+        context_mgr = mock.MagicMock()
+        context_mgr.__enter__.return_value = mock_node
+        context_mgr.__exit__.return_value = False
+
+        with mock.patch("exabox.ovm.utils.clu_utils.os.path.exists", return_value=True), \
+             mock.patch("exabox.ovm.utils.clu_utils.connect_to_host", return_value=context_mgr), \
+             mock.patch("exabox.ovm.utils.clu_utils.get_gcontext", return_value=mock.sentinel.ctx), \
+             mock.patch("exabox.ovm.utils.clu_utils.ebLogTrace") as mock_log_trace, \
+             mock.patch("exabox.ovm.utils.clu_utils.node_exec_cmd_check"):
+            self._utils.mSetupCustomerRootCACertificates()
+
+        mock_log_trace.assert_called_once()
+        mock_node.mExecuteCmd.assert_called_once_with(f'mkdir -p {os.path.dirname(self._cert_path)}')
+
+    # Auto-generated test for mSetupCustomerRootCACertificates
+    def test_mSetupCustomerRootCACertificates_skips_directory_creation_when_present(self):
+        self._mock_cluctrl.mIsSslInspectionEnabled.return_value = True
+        self._mock_cluctrl.mReturnDom0DomUPair.return_value = [
+            (mock.sentinel.dom0a, mock.sentinel.domua),
+            (mock.sentinel.dom0b, mock.sentinel.domub),
+        ]
+
+        node_a = mock.Mock()
+        node_a.mFileExists.side_effect = [True, True]
+        node_b = mock.Mock()
+        node_b.mFileExists.side_effect = [True, True]
+
+        ctx_a = mock.MagicMock()
+        ctx_a.__enter__.return_value = node_a
+        ctx_a.__exit__.return_value = False
+
+        ctx_b = mock.MagicMock()
+        ctx_b.__enter__.return_value = node_b
+        ctx_b.__exit__.return_value = False
+
+        ctx_iter = iter([ctx_a, ctx_b])
+
+        def _connect_side_effect(*args, **kwargs):
+            return next(ctx_iter)
+
+        with mock.patch("exabox.ovm.utils.clu_utils.os.path.exists", return_value=True), \
+             mock.patch("exabox.ovm.utils.clu_utils.connect_to_host", side_effect=_connect_side_effect) as mock_connect, \
+             mock.patch("exabox.ovm.utils.clu_utils.get_gcontext", return_value=mock.sentinel.ctx), \
+             mock.patch("exabox.ovm.utils.clu_utils.node_exec_cmd_check") as mock_exec_check:
+            self._utils.mSetupCustomerRootCACertificates()
+
+        self.assertEqual(node_a.mExecuteCmd.call_count, 0)
+        self.assertEqual(node_b.mExecuteCmd.call_count, 0)
+        self.assertEqual(node_a.mCopyFile.call_args_list, [mock.call(self._cert_path, self._cert_path)])
+        self.assertEqual(node_b.mCopyFile.call_args_list, [mock.call(self._cert_path, self._cert_path)])
+        self.assertEqual(mock_exec_check.call_count, 2)
+        self.assertEqual(mock_connect.call_count, 2)
+
+    # Auto-generated test for mSetupCustomerRootCACertificates
+    def test_mSetupCustomerRootCACertificates_raises_when_remote_copy_missing(self):
+        self._mock_cluctrl.mIsSslInspectionEnabled.return_value = True
+        self._mock_cluctrl.mReturnDom0DomUPair.return_value = [(mock.sentinel.dom0, mock.sentinel.domu)]
 
         mock_node = mock.Mock()
         mock_node.mFileExists.side_effect = [True, False]
-        mock_context_manager = mock.MagicMock()
-        mock_context_manager.__enter__.return_value = mock_node
-        mock_context_manager.__exit__.return_value = False
+        context_mgr = mock.MagicMock()
+        context_mgr.__enter__.return_value = mock_node
+        context_mgr.__exit__.return_value = False
 
-        with mock.patch("exabox.ovm.utils.clu_utils.connect_to_host", return_value=mock_context_manager), \
-             mock.patch("exabox.ovm.utils.clu_utils.get_gcontext", return_value=mock.sentinel.context), \
-             mock.patch("exabox.ovm.utils.clu_utils.node_cmd_abs_path_check", return_value="/bin/echo"), \
-             mock.patch("exabox.ovm.utils.clu_utils.time.time", return_value=123.456), \
-             mock.patch("exabox.ovm.utils.clu_utils.node_exec_cmd_check") as mock_exec_check, \
-             mock.patch("exabox.ovm.utils.clu_utils.ExacloudRuntimeError", DummyExacloudRuntimeError):
-            with self.assertRaises(DummyExacloudRuntimeError) as context:
-                self._utils.mSetupCustomerRootCACertificates(options)
-
-        self.assertIn("Root CA Certificate Str addition failed", str(context.exception))
-        mock_exec_check.assert_not_called()
-
-    # Auto-generated test for mSetupCustomerRootCACertificates
-    def test_mSetupCustomerRootCACertificates_wraps_generic_exception(self):
-        options = types.SimpleNamespace(jsonconf={"customer_root_ca": self._encoded_cert})
-        self._mock_cluctrl.mGetArgsOptions.return_value = options
-        self._mock_cluctrl.mIsSslInspectionEnabled.return_value = True
-        self._mock_cluctrl.mReturnDom0DomUPair.return_value = [("dom0-host", "domu-host")]
-
-        with mock.patch("exabox.ovm.utils.clu_utils.connect_to_host", side_effect=RuntimeError("mock failure")), \
-             mock.patch("exabox.ovm.utils.clu_utils.get_gcontext", return_value=mock.sentinel.context), \
-             mock.patch("exabox.ovm.utils.clu_utils.time.time", return_value=123.456), \
-             mock.patch("exabox.ovm.utils.clu_utils.ExacloudRuntimeError", DummyExacloudRuntimeError):
-            with self.assertRaises(DummyExacloudRuntimeError) as context:
+        with mock.patch("exabox.ovm.utils.clu_utils.os.path.exists", return_value=True),              mock.patch("exabox.ovm.utils.clu_utils.connect_to_host", return_value=context_mgr),              mock.patch("exabox.ovm.utils.clu_utils.get_gcontext", return_value=mock.sentinel.ctx),              mock.patch("exabox.ovm.utils.clu_utils.node_exec_cmd_check"),              mock.patch("exabox.ovm.utils.clu_utils.ExacloudRuntimeError", DummyExacloudRuntimeError):
+            with self.assertRaises(DummyExacloudRuntimeError):
                 self._utils.mSetupCustomerRootCACertificates()
 
-        self._mock_cluctrl.mGetArgsOptions.assert_called_once()
-        self.assertIn("mock failure", str(context.exception))
-
-    # Auto-generated test for mSetupCustomerRootCACertificates
-    def test_mSetupCustomerRootCACertificates_processes_each_domu_pair(self):
-        options = types.SimpleNamespace(jsonconf={"customer_root_ca": self._encoded_cert})
-        self._mock_cluctrl.mIsSslInspectionEnabled.return_value = True
-        self._mock_cluctrl.mReturnDom0DomUPair.return_value = [("dom0-a", "domu-a"), ("dom0-b", "domu-b")]
-
-        mock_node_a = mock.Mock()
-        mock_node_a.mFileExists.side_effect = [True, True]
-        mock_node_a.mExecuteCmd = mock.Mock()
-        mock_node_a.mExecuteCmdLog = mock.Mock()
-
-        mock_node_b = mock.Mock()
-        mock_node_b.mFileExists.side_effect = [True, True]
-        mock_node_b.mExecuteCmd = mock.Mock()
-        mock_node_b.mExecuteCmdLog = mock.Mock()
-
-        mock_cm_a = mock.MagicMock()
-        mock_cm_a.__enter__.return_value = mock_node_a
-        mock_cm_a.__exit__.return_value = False
-
-        mock_cm_b = mock.MagicMock()
-        mock_cm_b.__enter__.return_value = mock_node_b
-        mock_cm_b.__exit__.return_value = False
-
-        with mock.patch("exabox.ovm.utils.clu_utils.connect_to_host", side_effect=[mock_cm_a, mock_cm_b]) as mock_connect, \
-             mock.patch("exabox.ovm.utils.clu_utils.get_gcontext", return_value=mock.sentinel.context), \
-             mock.patch("exabox.ovm.utils.clu_utils.node_cmd_abs_path_check", return_value="/bin/echo") as mock_cmd_abs, \
-             mock.patch("exabox.ovm.utils.clu_utils.node_exec_cmd_check") as mock_exec_check, \
-             mock.patch("exabox.ovm.utils.clu_utils.time.time", return_value=456.789):
-            self._utils.mSetupCustomerRootCACertificates(options)
-
-        self.assertEqual(
-            mock_connect.call_args_list,
-            [
-                mock.call("domu-a", mock.sentinel.context, username="root"),
-                mock.call("domu-b", mock.sentinel.context, username="root"),
-            ],
-        )
-        self.assertEqual(mock_cmd_abs.call_count, 2)
-        self.assertEqual(mock_node_a.mExecuteCmd.call_count, 0)
-        self.assertEqual(mock_node_b.mExecuteCmd.call_count, 0)
-        self.assertEqual(mock_node_a.mExecuteCmdLog.call_count, 1)
-        self.assertEqual(mock_node_b.mExecuteCmdLog.call_count, 1)
-        self.assertEqual(
-            mock_exec_check.call_args_list,
-            [
-                mock.call(mock_node_a, "update-ca-trust"),
-                mock.call(mock_node_b, "update-ca-trust"),
-            ],
-        )
-
-    # Auto-generated test for mSetupCustomerRootCACertificates
-    def test_mSetupCustomerRootCACertificates_invalid_base64_payload(self):
-        bad_options = types.SimpleNamespace(jsonconf={"customer_root_ca": "!!!"})
-        self._mock_cluctrl.mIsSslInspectionEnabled.return_value = True
-
-        with mock.patch("exabox.ovm.utils.clu_utils.ExacloudRuntimeError", DummyExacloudRuntimeError), \
-             mock.patch("exabox.ovm.utils.clu_utils.b64decode", side_effect=ValueError("invalid base64 payload")), \
-             mock.patch("exabox.ovm.utils.clu_utils.connect_to_host") as mock_connect, \
-             mock.patch("exabox.ovm.utils.clu_utils.get_gcontext"), \
-             mock.patch("exabox.ovm.utils.clu_utils.node_exec_cmd_check"), \
-             mock.patch("exabox.ovm.utils.clu_utils.time.time", return_value=789.012):
-            with self.assertRaises(DummyExacloudRuntimeError) as context:
-                self._utils.mSetupCustomerRootCACertificates(bad_options)
-
-        self.assertIn("invalid base64 payload", str(context.exception))
-        mock_connect.assert_not_called()
-        self._mock_cluctrl.mReturnDom0DomUPair.assert_not_called()
-
-    # Auto-generated test for mSetupCustomerRootCACertificates
-    def test_mSetupCustomerRootCACertificates_raises_when_key_absent(self):
-        options = types.SimpleNamespace(jsonconf={})
-        self._mock_cluctrl.mIsSslInspectionEnabled.return_value = True
-
-        with mock.patch("exabox.ovm.utils.clu_utils.ExacloudRuntimeError", DummyExacloudRuntimeError):
-            with self.assertRaises(DummyExacloudRuntimeError) as context:
-                self._utils.mSetupCustomerRootCACertificates(options)
-
-        self.assertIn("Root CA Certificate Str addition failed", str(context.exception))
-        self._mock_cluctrl.mReturnDom0DomUPair.assert_not_called()
-
-    # Auto-generated test for mSetupCustomerRootCACertificates
-    def test_mSetupCustomerRootCACertificates_raises_when_jsonconf_missing(self):
-        options = types.SimpleNamespace()  # no jsonconf attribute
-        self._mock_cluctrl.mIsSslInspectionEnabled.return_value = True
-
-        with mock.patch("exabox.ovm.utils.clu_utils.ExacloudRuntimeError", DummyExacloudRuntimeError):
-            with self.assertRaises(DummyExacloudRuntimeError) as context:
-                self._utils.mSetupCustomerRootCACertificates(options)
-
-        self.assertIn("jsonconf", str(context.exception))
-        self._mock_cluctrl.mReturnDom0DomUPair.assert_not_called()
-
-
+        mock_node.mCopyFile.assert_called_once_with(self._cert_path, self._cert_path)
 
     # Auto-generated test for mSetupCustomerRootCACertificates
     def test_mSetupCustomerRootCACertificates_raises_when_update_ca_trust_fails(self):
-        options = types.SimpleNamespace(jsonconf={"customer_root_ca": self._encoded_cert})
         self._mock_cluctrl.mIsSslInspectionEnabled.return_value = True
-        self._mock_cluctrl.mReturnDom0DomUPair.return_value = [("dom0-host", "domu-host")]
+        self._mock_cluctrl.mReturnDom0DomUPair.return_value = [(mock.sentinel.dom0, mock.sentinel.domu)]
 
         mock_node = mock.Mock()
-        mock_node.mFileExists.side_effect = [True, True]
-        mock_node.mExecuteCmdLog = mock.Mock()
-        mock_context_manager = mock.MagicMock()
-        mock_context_manager.__enter__.return_value = mock_node
-        mock_context_manager.__exit__.return_value = False
+        mock_node.mFileExists.side_effect = [False, True]
+        context_mgr = mock.MagicMock()
+        context_mgr.__enter__.return_value = mock_node
+        context_mgr.__exit__.return_value = False
 
-        with mock.patch("exabox.ovm.utils.clu_utils.connect_to_host", return_value=mock_context_manager), \
-             mock.patch("exabox.ovm.utils.clu_utils.get_gcontext", return_value=mock.sentinel.context), \
-             mock.patch("exabox.ovm.utils.clu_utils.node_cmd_abs_path_check", return_value="/bin/echo"), \
-             mock.patch("exabox.ovm.utils.clu_utils.node_exec_cmd_check", side_effect=RuntimeError("update failure")) as mock_exec_check, \
-             mock.patch("exabox.ovm.utils.clu_utils.time.time", return_value=321.654), \
+        with mock.patch("exabox.ovm.utils.clu_utils.os.path.exists", return_value=True), \
+             mock.patch("exabox.ovm.utils.clu_utils.connect_to_host", return_value=context_mgr), \
+             mock.patch("exabox.ovm.utils.clu_utils.get_gcontext", return_value=mock.sentinel.ctx), \
+             mock.patch("exabox.ovm.utils.clu_utils.node_exec_cmd_check", side_effect=DummyExacloudRuntimeError("refresh failed")), \
              mock.patch("exabox.ovm.utils.clu_utils.ExacloudRuntimeError", DummyExacloudRuntimeError):
-            with self.assertRaises(DummyExacloudRuntimeError) as context:
-                self._utils.mSetupCustomerRootCACertificates(options)
+            with self.assertRaises(DummyExacloudRuntimeError) as exc:
+                self._utils.mSetupCustomerRootCACertificates()
 
-        self.assertIn("update failure", str(context.exception))
-        mock_node.mExecuteCmdLog.assert_called_once()
-        mock_exec_check.assert_called_once_with(mock_node, "update-ca-trust")
+        self.assertIn("refresh failed", str(exc.exception))
+        mock_node.mCopyFile.assert_called_once_with(self._cert_path, self._cert_path)
+
+    # Auto-generated test for mSetupCustomerRootCACertificates
+    def test_mSetupCustomerRootCACertificates_wraps_generic_exception(self):
+        self._mock_cluctrl.mIsSslInspectionEnabled.return_value = True
+        self._mock_cluctrl.mReturnDom0DomUPair.return_value = [(mock.sentinel.dom0, mock.sentinel.domu)]
+
+        with mock.patch("exabox.ovm.utils.clu_utils.os.path.exists", return_value=True),              mock.patch("exabox.ovm.utils.clu_utils.connect_to_host", side_effect=RuntimeError("boom")),              mock.patch("exabox.ovm.utils.clu_utils.get_gcontext", return_value=mock.sentinel.ctx),              mock.patch("exabox.ovm.utils.clu_utils.ExacloudRuntimeError", DummyExacloudRuntimeError):
+            with self.assertRaises(DummyExacloudRuntimeError) as exc:
+                self._utils.mSetupCustomerRootCACertificates()
+
+        self.assertIn("boom", str(exc.exception))
 
     # Auto-generated test for mSetupCustomerRootCACertificates
     def test_mSetupCustomerRootCACertificates_handles_empty_dom_pairs(self):
-        options = types.SimpleNamespace(jsonconf={"customer_root_ca": self._encoded_cert})
         self._mock_cluctrl.mIsSslInspectionEnabled.return_value = True
         self._mock_cluctrl.mReturnDom0DomUPair.return_value = []
 
-        with mock.patch("exabox.ovm.utils.clu_utils.connect_to_host") as mock_connect, \
-             mock.patch("exabox.ovm.utils.clu_utils.get_gcontext") as mock_get_context, \
-             mock.patch("exabox.ovm.utils.clu_utils.node_cmd_abs_path_check") as mock_cmd_abs, \
-             mock.patch("exabox.ovm.utils.clu_utils.node_exec_cmd_check") as mock_exec_check, \
-             mock.patch("exabox.ovm.utils.clu_utils.time.time", return_value=654.321):
-            self._utils.mSetupCustomerRootCACertificates(options)
+        with mock.patch("exabox.ovm.utils.clu_utils.os.path.exists", return_value=True),              mock.patch("exabox.ovm.utils.clu_utils.connect_to_host") as mock_connect:
+            self._utils.mSetupCustomerRootCACertificates()
 
         mock_connect.assert_not_called()
-        mock_get_context.assert_not_called()
-        mock_cmd_abs.assert_not_called()
-        mock_exec_check.assert_not_called()
 
     # Auto-generated test for mSetupCustomerRootCACertificates
-    def test_mSetupCustomerRootCACertificates_raises_when_echo_lookup_fails(self):
-        options = types.SimpleNamespace(jsonconf={"customer_root_ca": self._encoded_cert})
+    def test_mSetupCustomerRootCACertificates_raises_with_real_error_when_local_cert_missing(self):
         self._mock_cluctrl.mIsSslInspectionEnabled.return_value = True
-        self._mock_cluctrl.mReturnDom0DomUPair.return_value = [("dom0-host", "domu-host")]
+
+        with mock.patch("exabox.ovm.utils.clu_utils.os.path.exists", return_value=False), \
+             mock.patch("exabox.ovm.utils.clu_utils.ExacloudRuntimeError", DummyExacloudRuntimeError):
+            with self.assertRaises(DummyExacloudRuntimeError) as exc:
+                self._utils.mSetupCustomerRootCACertificates()
+
+        self.assertIn("customer-root-ca.crt addition failed", str(exc.exception))
+        self._mock_cluctrl.mReturnDom0DomUPair.assert_not_called()
+
+    # Auto-generated test for mSetupCustomerRootCACertificates
+    def test_mSetupCustomerRootCACertificates_raises_real_error_when_remote_copy_missing(self):
+        self._mock_cluctrl.mIsSslInspectionEnabled.return_value = True
+        self._mock_cluctrl.mReturnDom0DomUPair.return_value = [(mock.sentinel.dom0, mock.sentinel.domu)]
 
         mock_node = mock.Mock()
-        mock_node.mFileExists.side_effect = [True]
-        mock_node.mExecuteCmd = mock.Mock()
-        mock_node.mExecuteCmdLog = mock.Mock()
-        mock_context_manager = mock.MagicMock()
-        mock_context_manager.__enter__.return_value = mock_node
-        mock_context_manager.__exit__.return_value = False
+        mock_node.mFileExists.side_effect = [True, False]
+        context_mgr = mock.MagicMock()
+        context_mgr.__enter__.return_value = mock_node
+        context_mgr.__exit__.return_value = False
 
-        with mock.patch("exabox.ovm.utils.clu_utils.connect_to_host", return_value=mock_context_manager), \
-             mock.patch("exabox.ovm.utils.clu_utils.get_gcontext", return_value=mock.sentinel.context), \
-             mock.patch("exabox.ovm.utils.clu_utils.node_cmd_abs_path_check", side_effect=RuntimeError("echo missing")), \
-             mock.patch("exabox.ovm.utils.clu_utils.node_exec_cmd_check") as mock_exec_check, \
-             mock.patch("exabox.ovm.utils.clu_utils.time.time", return_value=987.654), \
+        with mock.patch("exabox.ovm.utils.clu_utils.os.path.exists", return_value=True), \
+             mock.patch("exabox.ovm.utils.clu_utils.connect_to_host", return_value=context_mgr), \
+             mock.patch("exabox.ovm.utils.clu_utils.get_gcontext", return_value=mock.sentinel.ctx), \
+             mock.patch("exabox.ovm.utils.clu_utils.node_exec_cmd_check"), \
              mock.patch("exabox.ovm.utils.clu_utils.ExacloudRuntimeError", DummyExacloudRuntimeError):
-            with self.assertRaises(DummyExacloudRuntimeError) as context:
-                self._utils.mSetupCustomerRootCACertificates(options)
+            with self.assertRaises(DummyExacloudRuntimeError) as exc:
+                self._utils.mSetupCustomerRootCACertificates()
 
-        self.assertIn("echo missing", str(context.exception))
-        mock_node.mExecuteCmd.assert_not_called()
-        mock_node.mExecuteCmdLog.assert_not_called()
-        mock_exec_check.assert_not_called()
+        self.assertIn("customer-root-ca.crt addition failed", str(exc.exception))
+        mock_node.mCopyFile.assert_called_once_with(self._cert_path, self._cert_path)
+
+    # Auto-generated test for mSetupCustomerRootCACertificates
+    def test_mSetupCustomerRootCACertificates_invokes_update_ca_trust_successfully(self):
+        self._mock_cluctrl.mIsSslInspectionEnabled.return_value = True
+        self._mock_cluctrl.mReturnDom0DomUPair.return_value = [(mock.sentinel.dom0, mock.sentinel.domu)]
+
+        mock_node = mock.Mock()
+        mock_node.mFileExists.side_effect = [False, True]
+        context_mgr = mock.MagicMock()
+        context_mgr.__enter__.return_value = mock_node
+        context_mgr.__exit__.return_value = False
+
+        with mock.patch("exabox.ovm.utils.clu_utils.os.path.exists", return_value=True), \
+             mock.patch("exabox.ovm.utils.clu_utils.connect_to_host", return_value=context_mgr), \
+             mock.patch("exabox.ovm.utils.clu_utils.get_gcontext", return_value=mock.sentinel.ctx), \
+             mock.patch("exabox.ovm.utils.clu_utils.node_exec_cmd_check") as mock_exec_check:
+            self._utils.mSetupCustomerRootCACertificates()
+
+        mock_exec_check.assert_called_once_with(mock_node, "update-ca-trust")
+
+    # Auto-generated test for mSetupCustomerRootCACertificates
+    def test_mSetupCustomerRootCACertificates_wraps_unexpected_exception_real_error(self):
+        self._mock_cluctrl.mIsSslInspectionEnabled.return_value = True
+        self._mock_cluctrl.mReturnDom0DomUPair.return_value = [(mock.sentinel.dom0, mock.sentinel.domu)]
+
+        with mock.patch("exabox.ovm.utils.clu_utils.os.path.exists", return_value=True), \
+             mock.patch("exabox.ovm.utils.clu_utils.connect_to_host", side_effect=RuntimeError("boom")), \
+             mock.patch("exabox.ovm.utils.clu_utils.get_gcontext", return_value=mock.sentinel.ctx), \
+             mock.patch("exabox.ovm.utils.clu_utils.ExacloudRuntimeError", DummyExacloudRuntimeError):
+            with self.assertRaises(DummyExacloudRuntimeError) as exc:
+                self._utils.mSetupCustomerRootCACertificates()
+
+        self.assertIn("boom", str(exc.exception))
+
+    # Auto-generated test for mSetupCustomerRootCACertificates
+    def test_mSetupCustomerRootCACertificates_raises_when_directory_creation_fails(self):
+        self._mock_cluctrl.mIsSslInspectionEnabled.return_value = True
+        self._mock_cluctrl.mReturnDom0DomUPair.return_value = [(mock.sentinel.dom0, mock.sentinel.domu)]
+
+        mock_node = mock.Mock()
+        mock_node.mFileExists.side_effect = [False]
+        mock_node.mExecuteCmd.side_effect = RuntimeError("mkdir failed")
+
+        context_mgr = mock.MagicMock()
+        context_mgr.__enter__.return_value = mock_node
+        context_mgr.__exit__.return_value = False
+
+        dest_directory_path = os.path.dirname(self._cert_path)
+
+        with mock.patch("exabox.ovm.utils.clu_utils.os.path.exists", return_value=True), \
+             mock.patch("exabox.ovm.utils.clu_utils.connect_to_host", return_value=context_mgr), \
+             mock.patch("exabox.ovm.utils.clu_utils.get_gcontext", return_value=mock.sentinel.ctx), \
+             mock.patch("exabox.ovm.utils.clu_utils.ebLogTrace") as mock_log_trace, \
+             mock.patch("exabox.ovm.utils.clu_utils.ebLogError") as mock_log_error, \
+             mock.patch("exabox.ovm.utils.clu_utils.ExacloudRuntimeError", DummyExacloudRuntimeError):
+            with self.assertRaises(DummyExacloudRuntimeError) as exc:
+                self._utils.mSetupCustomerRootCACertificates()
+
+        mock_node.mExecuteCmd.assert_called_once_with(f'mkdir -p {dest_directory_path}')
+        mock_log_trace.assert_called_once_with(f"Directory path : {dest_directory_path} does not exist , creating the path")
+        mock_log_error.assert_called_once_with('Error while copying customer-root-ca.crt to domU: mkdir failed')
+        self.assertIn("mkdir failed", str(exc.exception))
+
 
 class TestRunCrsCommandsWithRetry(unittest.TestCase):
 
@@ -1102,22 +1256,74 @@ class TestUpdateGlobalEsProperties(unittest.TestCase):
         self._mock_cluctrl.mGetBasePath.return_value = "/tmp/base"
         self._utils = ebCluUtils(self._mock_cluctrl)
 
-    # Auto-generated test for mUpdateGlobalEsProperties
-    def test_mUpdateGlobalEsProperties_handles_append_options(self):
+    def test_mUpdateGlobalEsProperties_appends_noxrmem_from_added_cells(self):
         self._mock_cluctrl.mCheckConfigOption.return_value = "True"
-        with mock.patch.object(self._utils, "mSetPropertyValueOeda") as mock_set, \
+        self._mock_cluctrl.mGetArgsOptions.return_value = types.SimpleNamespace(jsonconf={
+            "reshaped_node_subset": {
+                "added_cells": [
+                    {
+                        "cell_hostname": "cell01",
+                        "model": "X11-HC",
+                        "rack_info": {"description": "Exadata X11-HC Cell Node 22TB"}
+                    },
+                    {
+                        "cell_hostname": "cell02",
+                        "model": "X11-EF",
+                        "rack_info": {"description": "Exadata X11-EF Cell Node 36TB"}
+                    }
+                ]
+            }
+        })
+        with mock.patch("exabox.ovm.utils.clu_utils.ebCellCliUtils.mValidateX11NoXrmemMemory") as mock_validate, \
+             mock.patch.object(self._utils, "mSetPropertyValueOeda") as mock_set, \
              mock.patch.object(self._utils, "mAppendPropertyValueOeda") as mock_append:
+            mock_validate.return_value = True
             self._utils.mUpdateGlobalEsProperties()
 
         mock_set.assert_called_once()
         self.assertEqual(mock_append.call_count, 2)
-        called_props = [call_args[0][0] for call_args in mock_append.call_args_list]
-        self.assertIn("CELLTYPES", called_props)
-        self.assertIn("HC_CELL_TYPES", called_props)
+        append_values = {call_args[0][0]: call_args[0][1] for call_args in mock_append.call_args_list}
+        self.assertIn("CELLTYPES", append_values)
+        self.assertIn("HC_CELL_TYPES", append_values)
+        self.assertIn("X11MHCXRMEM:X11_XRMEM_ROCE_CELL_XC", append_values["CELLTYPES"])
+        self.assertIn("X11MHCNOXRMEM:X11_NOXRMEM_ROCE_CELL_XC", append_values["CELLTYPES"])
+        self.assertIn("X11MEFNOXRMEM:X11_NOXRMEM_ROCE_CELL_EF", append_values["CELLTYPES"])
+        self.assertIn("X11MHCNOXRMEM:X11_NOXRMEM_ROCE_CELL_XC", append_values["HC_CELL_TYPES"])
+        mock_validate.assert_has_calls([call("cell01"), call("cell02")])
+        self.assertNotIn(call("append_celltypes_x11_noxrmem"),
+                         self._mock_cluctrl.mCheckConfigOption.call_args_list)
+
+    def test_mUpdateGlobalEsProperties_skips_hc_append_for_ef_noxrmem(self):
+        self._mock_cluctrl.mCheckConfigOption.return_value = None
+        self._mock_cluctrl.mGetArgsOptions.return_value = types.SimpleNamespace(jsonconf={
+            "reshaped_node_subset": {
+                "added_cells": [
+                    {
+                        "cell_hostname": "cell01",
+                        "model": "X11-EF",
+                        "rack_info": {"description": "Exadata X11-EF Cell Node 36TB"}
+                    }
+                ]
+            }
+        })
+        with mock.patch("exabox.ovm.utils.clu_utils.ebCellCliUtils.mValidateX11NoXrmemMemory",
+                        return_value=True), \
+             mock.patch.object(self._utils, "mSetPropertyValueOeda") as mock_set, \
+             mock.patch.object(self._utils, "mAppendPropertyValueOeda") as mock_append:
+            self._utils.mUpdateGlobalEsProperties()
+
+        mock_set.assert_called_once()
+        self.assertEqual(mock_append.call_count, 1)
+        append_values = {call_args[0][0]: call_args[0][1] for call_args in mock_append.call_args_list}
+        self.assertIn("CELLTYPES", append_values)
+        self.assertNotIn("HC_CELL_TYPES", append_values)
+        self.assertIn("X11MEFNOXRMEM:X11_NOXRMEM_ROCE_CELL_EF", append_values["CELLTYPES"])
 
     # Auto-generated test for mUpdateGlobalEsProperties
     def test_mUpdateGlobalEsProperties_skips_append_when_option_disabled(self):
         self._mock_cluctrl.mCheckConfigOption.return_value = None
+        self._mock_cluctrl.mGetArgsOptions.return_value = types.SimpleNamespace(jsonconf={})
+        self._mock_cluctrl.mReturnCellNodes.return_value = {}
         with mock.patch.object(self._utils, "mSetPropertyValueOeda") as mock_set, \
              mock.patch.object(self._utils, "mAppendPropertyValueOeda") as mock_append:
             self._utils.mUpdateGlobalEsProperties()
@@ -1694,6 +1900,177 @@ class TestValidateSharedMemSettings(unittest.TestCase):
 
         self.assertEqual(mock_node.mExecuteCmd.call_count, 4)
         self._mock_cluctrl.mCheckSubConfigOption.assert_called_once_with("reshape_memory", "shmmax_ratio")
+
+class TestInstallFalconSensor(unittest.TestCase):
+
+    def setUp(self):
+        self._mock_cluctrl = mock.Mock()
+        self._utils = ebCluUtils(self._mock_cluctrl)
+        self._node = mock.Mock()
+        self._context_manager = mock.MagicMock()
+        self._context_manager.__enter__.return_value = self._node
+        self._context_manager.__exit__.return_value = False
+
+    # Auto-generated test for mInstallFalconSensor
+    def test_mInstallFalconSensor_installs_when_local_rpm_available(self):
+        with mock.patch("exabox.ovm.utils.clu_utils.connect_to_host", return_value=self._context_manager), \
+             mock.patch("exabox.ovm.utils.clu_utils.get_gcontext", return_value=mock.sentinel.gctx), \
+             mock.patch.object(self._utils, "mDetectOracleLinuxMajor", return_value="8"), \
+             mock.patch.object(self._utils, "mFindLocalRpm", return_value="/images/falcon.rpm"), \
+             mock.patch.object(self._utils, "mDownloadFalconRpm") as mock_download, \
+             mock.patch.object(self._utils, "mStageLocalRpm") as mock_stage, \
+             mock.patch.object(self._utils, "mIsFalconInstalled", return_value=False), \
+             mock.patch.object(self._utils, "mInstallRpmOnNode") as mock_install, \
+             mock.patch.object(self._utils, "mConfigureFalconSensor") as mock_configure, \
+             mock.patch.object(self._utils, "mValidateFalconService") as mock_validate, \
+             mock.patch.object(self._utils, "mRemoveRemoteFile") as mock_remove:
+            self._utils.mInstallFalconSensor(
+                "domu-1",
+                "/images",
+                {"ol8": "https://example/falcon.rpm"},
+                "CID123",
+                "Create Service",
+            )
+
+        mock_download.assert_not_called()
+        mock_stage.assert_called_once_with(self._node, "domu-1", "/images/falcon.rpm", os.path.join("/tmp", "falcon.rpm"))
+        mock_install.assert_called_once_with(self._node, "domu-1", os.path.join("/tmp", "falcon.rpm"))
+        mock_configure.assert_called_once_with(self._node, "domu-1", "CID123")
+        mock_validate.assert_called_once_with(self._node, "domu-1")
+        mock_remove.assert_called_once_with(self._node, "domu-1", os.path.join("/tmp", "falcon.rpm"))
+
+    # Auto-generated test for mInstallFalconSensor
+    def test_mInstallFalconSensor_skips_rpm_install_when_already_present(self):
+        with mock.patch("exabox.ovm.utils.clu_utils.connect_to_host", return_value=self._context_manager), \
+             mock.patch("exabox.ovm.utils.clu_utils.get_gcontext", return_value=mock.sentinel.gctx), \
+             mock.patch.object(self._utils, "mDetectOracleLinuxMajor", return_value="8"), \
+             mock.patch.object(self._utils, "mFindLocalRpm", return_value="/images/falcon.rpm"), \
+             mock.patch.object(self._utils, "mStageLocalRpm") as mock_stage, \
+             mock.patch.object(self._utils, "mIsFalconInstalled", return_value=True), \
+             mock.patch.object(self._utils, "mInstallRpmOnNode") as mock_install, \
+             mock.patch.object(self._utils, "mConfigureFalconSensor") as mock_configure, \
+             mock.patch.object(self._utils, "mValidateFalconService") as mock_validate, \
+             mock.patch.object(self._utils, "mRemoveRemoteFile") as mock_remove:
+            self._utils.mInstallFalconSensor(
+                "domu-2",
+                "/images",
+                {"ol8": "https://example/falcon.rpm"},
+                "CID999",
+                "Add Compute",
+            )
+
+        mock_stage.assert_called_once()
+        mock_install.assert_not_called()
+        mock_configure.assert_called_once_with(self._node, "domu-2", "CID999")
+        mock_validate.assert_called_once_with(self._node, "domu-2")
+        mock_remove.assert_called_once_with(self._node, "domu-2", os.path.join("/tmp", "falcon.rpm"))
+
+    # Auto-generated test for mInstallFalconSensor
+    def test_mInstallFalconSensor_downloads_when_local_missing(self):
+        downloaded_path = "/images/downloaded/falcon.rpm"
+        with mock.patch("exabox.ovm.utils.clu_utils.connect_to_host", return_value=self._context_manager), \
+             mock.patch("exabox.ovm.utils.clu_utils.get_gcontext", return_value=mock.sentinel.gctx), \
+             mock.patch.object(self._utils, "mDetectOracleLinuxMajor", return_value="8"), \
+             mock.patch.object(self._utils, "mFindLocalRpm", return_value=None), \
+             mock.patch.object(self._utils, "mDownloadFalconRpm", return_value=downloaded_path) as mock_download, \
+             mock.patch.object(self._utils, "mStageLocalRpm") as mock_stage, \
+             mock.patch.object(self._utils, "mIsFalconInstalled", return_value=False), \
+             mock.patch.object(self._utils, "mInstallRpmOnNode") as mock_install, \
+             mock.patch.object(self._utils, "mConfigureFalconSensor") as mock_configure, \
+             mock.patch.object(self._utils, "mValidateFalconService") as mock_validate, \
+             mock.patch.object(self._utils, "mRemoveRemoteFile") as mock_remove:
+            self._utils.mInstallFalconSensor(
+                "domu-3",
+                "/images",
+                {"ol8": "https://storage/falcon.rpm"},
+                "CID777",
+                "Create Service",
+            )
+
+        mock_download.assert_called_once_with("/images", "https://storage/falcon.rpm")
+        mock_stage.assert_called_once_with(self._node, "domu-3", downloaded_path, os.path.join("/tmp", "falcon.rpm"))
+        mock_install.assert_called_once_with(self._node, "domu-3", os.path.join("/tmp", "falcon.rpm"))
+        mock_configure.assert_called_once_with(self._node, "domu-3", "CID777")
+        mock_validate.assert_called_once_with(self._node, "domu-3")
+        mock_remove.assert_called_once_with(self._node, "domu-3", os.path.join("/tmp", "falcon.rpm"))
+
+    # Auto-generated test for mInstallFalconSensor
+    def test_mInstallFalconSensor_raises_when_no_rpm_source_available(self):
+        with mock.patch("exabox.ovm.utils.clu_utils.connect_to_host", return_value=self._context_manager), \
+             mock.patch("exabox.ovm.utils.clu_utils.get_gcontext", return_value=mock.sentinel.gctx), \
+             mock.patch.object(self._utils, "mDetectOracleLinuxMajor", return_value="8"), \
+             mock.patch.object(self._utils, "mFindLocalRpm", return_value=None), \
+             mock.patch.object(self._utils, "mDownloadFalconRpm") as mock_download, \
+             mock.patch.object(self._utils, "mStageLocalRpm"), \
+             mock.patch.object(self._utils, "mIsFalconInstalled", return_value=False), \
+             mock.patch("exabox.ovm.utils.clu_utils.ExacloudRuntimeError", DummyExacloudRuntimeError):
+            with self.assertRaises(DummyExacloudRuntimeError) as exc:
+                self._utils.mInstallFalconSensor(
+                    "domu-4",
+                    "/images",
+                    {},
+                    "CID000",
+                    "Create Service",
+                )
+
+        mock_download.assert_not_called()
+        self.assertIn("Falcon RPM for OL8 not found locally", str(exc.exception))
+
+    # Auto-generated test for mInstallFalconSensor
+    def test_mInstallFalconSensor_propagates_exacloud_runtime_error(self):
+        with mock.patch("exabox.ovm.utils.clu_utils.connect_to_host", return_value=self._context_manager), \
+             mock.patch("exabox.ovm.utils.clu_utils.get_gcontext", return_value=mock.sentinel.gctx), \
+             mock.patch.object(self._utils, "mDetectOracleLinuxMajor", return_value="8"), \
+             mock.patch.object(self._utils, "mFindLocalRpm", return_value="/images/falcon.rpm"), \
+             mock.patch.object(self._utils, "mStageLocalRpm"), \
+             mock.patch.object(self._utils, "mIsFalconInstalled", return_value=False), \
+             mock.patch.object(self._utils, "mInstallRpmOnNode", side_effect=ExacloudRuntimeError("install failed")):
+            with self.assertRaises(ExacloudRuntimeError) as exc:
+                self._utils.mInstallFalconSensor(
+                    "domu-6",
+                    "/images",
+                    {"ol8": "https://example/falcon.rpm"},
+                    "CID111",
+                    "Create Service",
+                )
+
+        self.assertIn("install failed", str(exc.exception))
+
+    # Auto-generated test for mInstallFalconSensor
+    def test_mInstallFalconSensor_wraps_unexpected_errors(self):
+        with mock.patch("exabox.ovm.utils.clu_utils.connect_to_host", return_value=self._context_manager), \
+             mock.patch("exabox.ovm.utils.clu_utils.get_gcontext", return_value=mock.sentinel.gctx), \
+             mock.patch.object(self._utils, "mDetectOracleLinuxMajor", return_value="8"), \
+             mock.patch.object(self._utils, "mFindLocalRpm", return_value="/images/falcon.rpm"), \
+             mock.patch.object(self._utils, "mStageLocalRpm", side_effect=RuntimeError("stage failed")), \
+             mock.patch.object(self._utils, "mIsFalconInstalled", return_value=False), \
+             mock.patch.object(self._utils, "mInstallRpmOnNode"), \
+             mock.patch.object(self._utils, "mConfigureFalconSensor"), \
+             mock.patch.object(self._utils, "mValidateFalconService"), \
+             mock.patch.object(self._utils, "mRemoveRemoteFile") as mock_remove, \
+             mock.patch("exabox.ovm.utils.clu_utils.ExacloudRuntimeError", DummyExacloudRuntimeError):
+            with self.assertRaises(DummyExacloudRuntimeError) as exc:
+                self._utils.mInstallFalconSensor(
+                    "domu-5",
+                    "/images",
+                    {"ol8": "https://example/falcon.rpm"},
+                    "CID555",
+                    "Create Service",
+                )
+
+        mock_remove.assert_not_called()
+
+    # Auto-generated test for mRemoveRemoteFile
+    def test_mRemoveRemoteFile_invokes_rm_with_remote_path(self):
+        with mock.patch("exabox.ovm.utils.clu_utils.node_cmd_abs_path_check", return_value="/bin/rm") as mock_cmd_check, \
+             mock.patch("exabox.ovm.utils.clu_utils.node_exec_cmd") as mock_exec_cmd:
+            self._utils.mRemoveRemoteFile(self._node, "domu-7", "/tmp/falcon.rpm")
+
+        mock_cmd_check.assert_called_once_with(self._node, "rm")
+        mock_exec_cmd.assert_called_once()
+        invoked_cmd = mock_exec_cmd.call_args[0][1]
+        self.assertIn("/bin/rm -f /tmp/falcon.rpm", invoked_cmd)
+
 
 if __name__ == "__main__":
     unittest.main()

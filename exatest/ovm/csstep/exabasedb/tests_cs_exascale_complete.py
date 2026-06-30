@@ -4,7 +4,7 @@
 #
 # tests_cs_exascale_complete.py
 #
-# Copyright (c) 2025, Oracle and/or its affiliates.
+# Copyright (c) 2025, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_cs_exascale_complete.py - <one-line expansion of the name>
@@ -40,7 +40,8 @@ class ebTestExaScaleComplete(ebTestClucontrol):
     @mock.patch('exabox.ovm.csstep.exabasedb.cs_exascale_complete.ImageBOM')
     @mock.patch('exabox.ovm.csstep.exabasedb.cs_exascale_complete.ebCluExaScale')
     @mock.patch('exabox.ovm.csstep.exabasedb.cs_exascale_complete.expand_domu_filesystem')
-    def test_doExecute_substeps_already_executed(self, mock_expand_domu_filesystem, mock_ebCluExaScale, mock_ImageBOM):
+    @mock.patch('exabox.ovm.csstep.cs_util.csUtil.mRemoveDeprecatedSshAlgorithms')
+    def test_doExecute_substeps_already_executed(self, mock_SSHAlgorithms, mock_expand_domu_filesystem, mock_ebCluExaScale, mock_ImageBOM):
         _ebox = self.mGetClubox()
         _options = _ebox.mGetArgsOptions()
         _step_list = ["ESTP_EXASCALE_COMPLETE"]

@@ -15,6 +15,9 @@
 #      Unit test case script for all DomU operations.
 #
 #    MODIFIED   (MM/DD/YY)
+#    sdevasek    05/14/26 - Bug 39365815 - INFRAPATCHING TEST AUTOMATION -
+#                           X9M - DOM0_PATCH_PREREQ_CHECK_WITH_RACK_MODEL TEST
+#                           FAILURE TRACKING
 #    sdevasek    02/26/26 - Bug 39008110 - REMOVE ELUOPTIONS FROM ADDITIONAL
 #                           OPTIONS IN DOMU TEST SETUP
 #    araghave    12/05/25 - Bug 38723453 - OCI: OC35 | DTZ | SMR ROLLBACK
@@ -189,7 +192,7 @@ class Test_domu_class(unittest.TestCase):
     def __init__(self, *initial_data, **kwargs):
         super(Test_domu_class, self).__init__(*initial_data, **kwargs)
         self.__operation = ""
-        self.__operation_style = OP_STYLE_AUTO
+        self.__operation_style = OP_STYLE_ROLLING
         self.__required_nodes_in_node_progress_status = []
         self.__non_required_nodes_in_node_progress_status = []
         self.__patch_node_list = []
@@ -215,12 +218,12 @@ class Test_domu_class(unittest.TestCase):
         mUpdateParamInPayload("PluginTypes", "none")
         mDeletePendingFailedECRARequest()
         #Reset sshd config settings
-        mExecuteRemoteExasshCmd("/bin/sed  \\'s/ClientAliveInterval.*/ClientAliveInterval 600/\\' -i /etc/ssh/sshd_config",Test_domu_class.__domu_list_with_nathostnames)
+        mExecuteRemoteExasshCmd("/bin/sed -i 's/ClientAliveInterval.*/ClientAliveInterval 600/' /etc/ssh/sshd_config",Test_domu_class.__domu_list_with_nathostnames)
 
     # This method runs after every test execution.
     def tearDown(self):
         #Reset sshd config settings
-        mExecuteRemoteExasshCmd("/bin/sed  \\'s/ClientAliveInterval.*/ClientAliveInterval 600/\\' -i /etc/ssh/sshd_config",Test_domu_class.__domu_list_with_nathostnames)
+        mExecuteRemoteExasshCmd("/bin/sed -i 's/ClientAliveInterval.*/ClientAliveInterval 600/' /etc/ssh/sshd_config",Test_domu_class.__domu_list_with_nathostnames)
         # Exasplice flag need to be reverted to 'no' at the end of an
         # exasplice operation is complete.
         mUpdateAdditionalOptionsInPayload("exasplice", "no")
@@ -236,8 +239,8 @@ class Test_domu_class(unittest.TestCase):
         3. Start monitoring status of the above request
         4. Verify if retry failed with expected error message
         """
-        _failure_cmd = "/bin/sed  \\'s/ClientAliveInterval.*/ClientAliveInterval 590/\\' -i /etc/ssh/sshd_config"
-        _restore_cmd = "/bin/sed  \\'s/ClientAliveInterval.*/ClientAliveInterval 600/\\' -i /etc/ssh/sshd_config"
+        _failure_cmd = "/bin/sed -i 's/ClientAliveInterval.*/ClientAliveInterval 590/' /etc/ssh/sshd_config"
+        _restore_cmd = "/bin/sed -i 's/ClientAliveInterval.*/ClientAliveInterval 600/' /etc/ssh/sshd_config"
         _error_code = "0x03050017"
         _result, _msg = mValidatePatchPrereqCheckRetryFailure(mGetInfraPatchingTestVms('domuNatHostname', 'domu'), PATCH_DOMU, _failure_cmd, _restore_cmd, _error_code)
         self.assertTrue(_result, _msg)
@@ -435,7 +438,7 @@ class Test_domu_class(unittest.TestCase):
     @pytest.mark.domu_one_off
     def test_domu_one_off(self):
         self.__operation = TASK_ONEOFF
-        self.__operation_style = OP_STYLE_AUTO
+        self.__operation_style = OP_STYLE_ROLLING
         self.mValidatePatchOperationWithIncludeNodeList()
 
     @pytest.mark.domu_patch
@@ -566,8 +569,8 @@ class Test_domu_class(unittest.TestCase):
         5. Start monitoring status of the above request
         """
 
-        _failure_cmd = "/bin/sed  \\'s/ClientAliveInterval.*/ClientAliveInterval 590/\\' -i /etc/ssh/sshd_config"
-        _restore_cmd = "/bin/sed  \\'s/ClientAliveInterval.*/ClientAliveInterval 600/\\' -i /etc/ssh/sshd_config"
+        _failure_cmd = "/bin/sed -i 's/ClientAliveInterval.*/ClientAliveInterval 590/' /etc/ssh/sshd_config"
+        _restore_cmd = "/bin/sed -i 's/ClientAliveInterval.*/ClientAliveInterval 600/' /etc/ssh/sshd_config"
         _patch_node_list = Test_domu_class.__domu_list_with_nathostnames
 
         _result, _msg = mRunPatchRetryScenario(
@@ -604,10 +607,10 @@ class Test_domu_class(unittest.TestCase):
         import concurrent.futures
 
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            f1 = executor.submit(mExecuteInfraPatchCommand, aOperation=TASK_PREREQ_CHECK, aTarget=PATCH_DOMU, aOperationStyle=OP_STYLE_AUTO)
+            f1 = executor.submit(mExecuteInfraPatchCommand, aOperation=TASK_PREREQ_CHECK, aTarget=PATCH_DOMU, aOperationStyle=OP_STYLE_ROLLING)
             time.sleep(1)
             mUpdateInfraPatchingTestConfigParam("cluster", _cluster_name2)
-            f2 = executor.submit(mExecuteInfraPatchCommand, aOperation=TASK_PREREQ_CHECK, aTarget=PATCH_DOMU, aOperationStyle=OP_STYLE_AUTO)
+            f2 = executor.submit(mExecuteInfraPatchCommand, aOperation=TASK_PREREQ_CHECK, aTarget=PATCH_DOMU, aOperationStyle=OP_STYLE_ROLLING)
 
         mUpdateInfraPatchingTestConfigParam("cluster", _cluster_name1)
 
@@ -656,9 +659,9 @@ class Test_domu_class(unittest.TestCase):
         """
         # Change the ClientAliveInterval interval setting in /etc/ssh/sshd_config file to 590 so that it triggers patch_mgr failure.
         # The error code that gets returned is EXAUPG-00002
-        _result,_ = mExecuteRemoteExasshCmd("/bin/sed  \\'s/ClientAliveInterval.*/ClientAliveInterval 590/\\' -i /etc/ssh/sshd_config",Test_domu_class.__domu_list_with_nathostnames)
+        _result,_ = mExecuteRemoteExasshCmd("/bin/sed -i 's/ClientAliveInterval.*/ClientAliveInterval 590/' /etc/ssh/sshd_config",Test_domu_class.__domu_list_with_nathostnames)
         self.assertTrue(_result,"Could not modify sshd_conf file.")
-        _result, _status_output = mExecuteInfraPatchCommandWithDCSAgentChecks(TASK_PREREQ_CHECK, PATCH_DOMU,OP_STYLE_AUTO)
+        _result, _status_output = mExecuteInfraPatchCommandWithDCSAgentChecks(TASK_PREREQ_CHECK, PATCH_DOMU,OP_STYLE_ROLLING)
 
         """
         Example output for status call:
@@ -867,7 +870,7 @@ class Test_domu_class(unittest.TestCase):
 
         # 1.Prepare the environment
         _result, _ = mExecuteRemoteExasshCmd(
-            "/bin/sed  \\'s/ClientAliveInterval.*/ClientAliveInterval 590/\\' -i /etc/ssh/sshd_config",
+            "/bin/sed -i 's/ClientAliveInterval.*/ClientAliveInterval 590/' /etc/ssh/sshd_config",
             Test_domu_class.__domu_list_with_nathostnames)
         self.assertTrue(_result, "Could not modify sshd_conf file.")
 

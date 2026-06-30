@@ -18,9 +18,10 @@ INTERNAL CLASSES:
 History:
 
     MODIFIED (MM/DD/YY)
-    pbellary    02/24/26 - Bug 38972840 - DELETE-SERVICE WF FAILED TO VERIFY ACL USER ID
-    pbellary    02/24/26 - Bug 38858318 - IF CHACL COMMAND FAILS CREATE SERVICE FLOW SHOULD FAIL
-    pbellary    02/24/26 - Bug 38883255 - VM BACKUP OPERATION IS NOT TAKING BACKUP OF 3RD NODE
+    pbellary  04/27/26 - Bug 39249303 - SECURITY:SSH MASTER KEYS ENABLE DIRECT ROOT ACCESS TO DOM0 AND CELL HOSTS 
+    pbellary  02/24/26 - Bug 38972840 - DELETE-SERVICE WF FAILED TO VERIFY ACL USER ID
+    pbellary  02/24/26 - Bug 38858318 - IF CHACL COMMAND FAILS CREATE SERVICE FLOW SHOULD FAIL
+    pbellary  02/24/26 - Bug 38883255 - VM BACKUP OPERATION IS NOT TAKING BACKUP OF 3RD NODE
     pbellary  11/30/25 - Enh 38708130 - EXASCALE: DELETE SERVICE SHOULD DELETE ADDITIONAL ACFS FILESYSTEMS
     prsshukl  11/19/25 - Bug 38037088 - BASE DB -> MOVE THE DO/UNDO STEPS FOR
                          BASEDB TO A NEW FILE IN CSSTEP
@@ -427,9 +428,6 @@ class csPreVMSetup(CSBase):
             _step_time = time.time()
             ebox.mUpdateStatusCS(True, self.step, steplist, aComment='Create PreVm Keys Oeda WorkDir')
             ebox.mCreatePreVmKeysOedaWorkDir()
-
-            #keys in config directory are injected into dom0s, switches, cells, iloms etc
-            ebox.mInjectSSHMasterKey()
             ebox.mLogStepElapsedTime(_step_time, 'Create PreVm Keys Oeda WorkDir')
 
             if ebox.IsZdlraHThread() is False:

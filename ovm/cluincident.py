@@ -16,6 +16,7 @@ Changelog:
 
 History:
     MODIFIED (MM/DD/YY)
+    shapatna 05/11/26 - Bug 39263027 - REMOVE EXAWATCHER ENDPOINT FROM EXACLOUD AND ECRA
     aypaul   01/16/26 - ER#38277264 SELinux fleet exacloud implementation
     aypaul   01/30/25 - ER#36802805 Add support for generating tfactl logs for
                         reshape failures.
@@ -50,7 +51,6 @@ from exabox.log.LogMgr import ebLogError, ebLogInfo, ebLogWarn, ebLogDebug, ebTh
 from exabox.healthcheck.cluhealthcheck import ebCluHealth
 from exabox.healthcheck.hcconstants import HcConstants, gCreateServiceStepIncidentTestsMap, gCreateServiceMapDO, gCreateServiceMapUNDO
 from exabox.healthcheck.clucheck import NodeConnection
-from exabox.ovm.exawatcher import exaBoxExaWatcher
 from exabox.config.Config import ebCluCmdCheckOptions, ebCsSubCmdCheckOptions
 
 from exabox.core.DBStore import ebGetDefaultDB

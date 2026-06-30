@@ -16,6 +16,8 @@
  History:
 
     MODIFIED   (MM/DD/YY)
+       bhpati    05/04/26 - Bug 39122149 - OCI: EXACS:Get GIHOME from
+                            /etc/oracle/olr.loc
        dekuckre  04/10/26 - Fix UT setup flags to avoid DB/OEDA bootstrap
        dekuckre  04/02/26 - Fix Python 3.6-compatible unittest mock call
                             argument assertions
@@ -144,6 +146,7 @@ class ebTestKVMDiskMgr(ebTestClucontrol):
         get_gcontext().mSetConfigOption('kvm_var_size',None)
         get_gcontext().mSetConfigOption('kvm_u01_size',None)
         get_gcontext().mSetConfigOption('disable_lvm_snapshot_space', None)
+        get_gcontext().mSetConfigOption('force_unmount_u02_child_mounts', None)
 
     @patch("exabox.ovm.kvmdiskmgr.getMountPointInfo")
     @patch("exabox.ovm.clucontrol.exaBoxCluCtrl.mGetActiveDbInstances", side_effect=[(["DB1"]), ([])])
@@ -173,6 +176,7 @@ class ebTestKVMDiskMgr(ebTestClucontrol):
                 ],
                 [
                     exaMockCommand("cat /etc/oratab", aStdout="/u01/app/19.0.0.0/grid", aRc=0, aPersist=0),
+                    exaMockCommand(re.escape("cat /etc/oracle/olr.loc | grep 'crs_home' | cut -f 2 -d '='"), aStdout="/u01/app/19.0.0.0/grid"),
                     exaMockCommand(re.escape("export ORACLE_HOME=/u01/app/19.0.0.0/grid; $ORACLE_HOME/bin/oraversion -baseVersion"), aStdout="19.0.0.0.0"),
                     exaMockCommand(re.escape("export ORACLE_HOME=/u01/app/19.0.0.0/grid; $ORACLE_HOME/bin/orabase"), aStdout="/u01/app/grid"),
                     exaMockCommand("mount ", aRc=0, aPersist=True),
@@ -187,6 +191,7 @@ class ebTestKVMDiskMgr(ebTestClucontrol):
                 ],
                 [
                     exaMockCommand("cat /etc/oratab", aStdout="/u01/app/19.0.0.0/grid", aRc=0, aPersist=0),
+                    exaMockCommand(re.escape("cat /etc/oracle/olr.loc | grep 'crs_home' | cut -f 2 -d '='"), aStdout="/u01/app/19.0.0.0/grid"),
                     exaMockCommand(re.escape("export ORACLE_HOME=/u01/app/19.0.0.0/grid; $ORACLE_HOME/bin/oraversion -baseVersion"), aStdout="19.0.0.0.0"),
                     exaMockCommand("/bin/crsctl check crs", aStdout="is online", aRc=0, aPersist=0),
                     exaMockCommand(re.escape("export ORACLE_HOME=/u01/app/19.0.0.0/grid; $ORACLE_HOME/bin/orabase"), aStdout="/u01/app/grid"),
@@ -1664,6 +1669,7 @@ U02_IMAGE: ********** WARNING: Filesystem still has errors **********
                 ],
                 [
                     exaMockCommand("/bin/cat /etc/oratab", aStdout="/u01/app/19.0.0.0/grid", aRc=0, aPersist=0),
+                    exaMockCommand(re.escape("cat /etc/oracle/olr.loc | grep 'crs_home' | cut -f 2 -d '='"), aStdout="/u01/app/19.0.0.0/grid"),
                     exaMockCommand("/bin/crsctl check crs", aStdout="is online", aRc=0, aPersist=0),
                     exaMockCommand(".*ls -la /var/opt/oracle/creg/grid | head -2 | grep ...x..x..."),
                     exaMockCommand(re.escape("cat /var/opt/oracle/creg/grid/grid.ini | grep \"^sid\""), aStdout="+ASM1", aRc=0, aPersist=True),
@@ -1689,6 +1695,7 @@ U02_IMAGE: ********** WARNING: Filesystem still has errors **********
                     exaMockCommand(re.escape("cat /var/opt/oracle/creg/grid/grid.ini | grep \"^oracle_home\""), aStdout="/u01/app/19.0.0.0/grid", aRc=0, aPersist=True),
                     exaMockCommand("/bin/srvctl config database", aStdout="dbdummy", aRc=0, aPersist=0),
                     exaMockCommand("cat /etc/oratab", aStdout="/u01/app/19.0.0.0/grid", aRc=0, aPersist=0),
+                    exaMockCommand(re.escape("cat /etc/oracle/olr.loc | grep 'crs_home' | cut -f 2 -d '='"), aStdout="/u01/app/19.0.0.0/grid"),
                     exaMockCommand("/bin/srvctl status database", aStdout="dbname dbdummy", aRc=0, aPersist=0)
                 ],
                 [
@@ -3102,6 +3109,191 @@ U02_IMAGE: ********** WARNING: Filesystem still has errors **********
         self.assertIn('/usr/sbin/lvresize -l +100%FREE /dev/mapper/VGExaDbDisk.u02_extra.img-LVDBDisk', commands)
         mock_node_exec_cmd.assert_called_once_with(node_instance, '/bin/shred -fu /tmp/keyapi-path')
         ebox_ctrl.mUpdateErrorObject.assert_not_called()
+
+    def test_mCheckChildMounts_no_child_mounts(self):
+        _cmds = {
+            self.mGetRegexVm(): [
+                [
+                    exaMockCommand("/bin/test -e /sbin/findmnt", aRc=0),
+                    exaMockCommand(
+                        "/sbin/findmnt --output TARGET --noheadings -R -r /u02",
+                        aStdout="/u02\n",
+                        aRc=0
+                    )
+                ]
+            ]
+        }
+        self.mPrepareMockCommands(_cmds)
+
+        _domU = self.mGetClubox().mReturnDom0DomUPair()[0][1]
+        _node = exaBoxNode(self.mGetContext())
+        _node.mConnect(_domU)
+        cluDomUPartitionObj = ebCluManageDomUPartition(self.mGetClubox())
+        self.assertEqual([], cluDomUPartitionObj.mCheckChildMounts(_node, "u02"))
+
+    def test_mCheckChildMounts_returns_child_mounts(self):
+        _cmds = {
+            self.mGetRegexVm(): [
+                [
+                    exaMockCommand("/bin/test -e /sbin/findmnt", aRc=0),
+                    exaMockCommand(
+                        "/sbin/findmnt --output TARGET --noheadings -R -r /u02",
+                        aStdout="/u02\n/u02/app\n",
+                        aRc=0
+                    )
+                ]
+            ]
+        }
+        self.mPrepareMockCommands(_cmds)
+
+        _domU = self.mGetClubox().mReturnDom0DomUPair()[0][1]
+        _node = exaBoxNode(self.mGetContext())
+        _node.mConnect(_domU)
+        cluDomUPartitionObj = ebCluManageDomUPartition(self.mGetClubox())
+        self.assertEqual(
+            ["/u02/app"],
+            cluDomUPartitionObj.mCheckChildMounts(_node, "u02")
+        )
+
+    def test_mShouldUnmountChildMounts_with_force_flag(self):
+        get_gcontext().mSetConfigOption('force_unmount_u02_child_mounts', "True")
+        _domU = self.mGetClubox().mReturnDom0DomUPair()[0][1]
+        cluDomUPartitionObj = ebCluManageDomUPartition(self.mGetClubox())
+        with patch.object(self.mGetClubox(), "isATPCluster", return_value=False) as _is_atp:
+            self.assertTrue(cluDomUPartitionObj.mShouldUnmountChildMounts(_domU))
+            _is_atp.assert_not_called()
+
+    def test_mShouldUnmountChildMounts_with_atp_cluster(self):
+        _domU = self.mGetClubox().mReturnDom0DomUPair()[0][1]
+        cluDomUPartitionObj = ebCluManageDomUPartition(self.mGetClubox())
+        with patch.object(self.mGetClubox(), "isATPCluster", return_value=True) as _is_atp:
+            self.assertTrue(cluDomUPartitionObj.mShouldUnmountChildMounts(_domU))
+            _is_atp.assert_called_once_with(_domU)
+
+    def test_mUnmountChildMounts_unmounts_in_reverse_order(self):
+        _cmds = {
+            self.mGetRegexVm(): [
+                [
+                    exaMockCommand("/usr/bin/ls -l /usr/sbin/lsof", aRc=0),
+                    exaMockCommand("/usr/sbin/lsof -t /u02/app/log", aRc=0),
+                    exaMockCommand("/usr/bin/ls -l /usr/sbin/lsof", aRc=0),
+                    exaMockCommand("/usr/sbin/lsof -t /u02/app/log", aRc=0),
+                    exaMockCommand("/usr/bin/umount -R -f -l /u02/app/log", aRc=0),
+                    exaMockCommand("/usr/bin/ls -l /usr/sbin/lsof", aRc=0),
+                    exaMockCommand("/usr/sbin/lsof -t /u02/app", aRc=0),
+                    exaMockCommand("/usr/bin/ls -l /usr/sbin/lsof", aRc=0),
+                    exaMockCommand("/usr/sbin/lsof -t /u02/app", aRc=0),
+                    exaMockCommand("/usr/bin/umount -R -f -l /u02/app", aRc=0)
+                ]
+            ]
+        }
+        self.mPrepareMockCommands(_cmds)
+
+        _domU = self.mGetClubox().mReturnDom0DomUPair()[0][1]
+        _node = exaBoxNode(self.mGetContext())
+        _node.mConnect(_domU)
+        cluDomUPartitionObj = ebCluManageDomUPartition(self.mGetClubox())
+        cluDomUPartitionObj.mUnmountChildMounts(
+            _node,
+            ["/u02/app", "/u02/app/log"]
+        )
+
+    def test_mExecuteDomUUmountPartition_unmounts_child_mounts_with_atp_cluster(self):
+        _cmds = {
+            self.mGetRegexVm(): [
+                [
+                    exaMockCommand("/bin/test -e /sbin/findmnt", aRc=0, aPersist=True),
+                    exaMockCommand(
+                        "/sbin/findmnt --output TARGET --noheadings -R -r /u02",
+                        aStdout="/u02\n/u02/app\n",
+                        aRc=0
+                    ),
+                    exaMockCommand("/usr/bin/ls -l /usr/sbin/lsof", aRc=0),
+                    exaMockCommand("/usr/sbin/lsof -t /u02/app", aRc=0),
+                    exaMockCommand("/usr/bin/ls -l /usr/sbin/lsof", aRc=0),
+                    exaMockCommand("/usr/sbin/lsof -t /u02/app", aRc=0),
+                    exaMockCommand("/usr/bin/umount -R -f -l /u02/app", aRc=0),
+                    exaMockCommand(
+                        "/sbin/findmnt --output TARGET --noheadings -R -r /u02",
+                        aStdout="/u02\n",
+                        aRc=0
+                    ),
+                    exaMockCommand("/usr/sbin/lsof", aStdout=None, aRc=0, aPersist=True),
+                    exaMockCommand("/usr/bin/umount /u02", aRc=0),
+                    exaMockCommand("/sbin/findmnt /u02", aStdout=None, aRc=1)
+                ]
+            ]
+        }
+        self.mPrepareMockCommands(_cmds)
+
+        _domU = self.mGetClubox().mReturnDom0DomUPair()[0][1]
+        cluDomUPartitionObj = ebCluManageDomUPartition(self.mGetClubox())
+        with patch.object(self.mGetClubox(), "isATPCluster", return_value=True), \
+             patch("exabox.ovm.cludomupartitions.time.sleep", return_value=None):
+            self.assertEqual(
+                0,
+                cluDomUPartitionObj.mExecuteDomUUmountPartition(_domU, "u02")
+            )
+
+    def test_mUnmountChildMounts_kills_child_mount_processes_before_unmount(self):
+        _cmds = {
+            self.mGetRegexVm(): [
+                [
+                    exaMockCommand("/usr/bin/ls -l /usr/sbin/lsof", aRc=0),
+                    exaMockCommand("/usr/sbin/lsof -t /u02/app", aStdout="1234\n", aRc=0),
+                    exaMockCommand(
+                        re.escape(
+                            "/usr/sbin/lsof -t /u02/app | "
+                            "/usr/bin/xargs /bin/sudo kill -15 "
+                        ),
+                        aRc=0
+                    ),
+                    exaMockCommand("/usr/bin/ls -l /usr/sbin/lsof", aRc=0),
+                    exaMockCommand("/usr/sbin/lsof -t /u02/app", aStdout="1234\n", aRc=0),
+                    exaMockCommand(
+                        re.escape(
+                            "/usr/sbin/lsof -t /u02/app | "
+                            "/usr/bin/xargs /bin/sudo kill -9 "
+                        ),
+                        aRc=0
+                    ),
+                    exaMockCommand("/usr/bin/umount -R -f -l /u02/app", aRc=0)
+                ]
+            ]
+        }
+        self.mPrepareMockCommands(_cmds)
+
+        _domU = self.mGetClubox().mReturnDom0DomUPair()[0][1]
+        _node = exaBoxNode(self.mGetContext())
+        _node.mConnect(_domU)
+        cluDomUPartitionObj = ebCluManageDomUPartition(self.mGetClubox())
+        cluDomUPartitionObj.mUnmountChildMounts(_node, ["/u02/app"])
+
+    def test_mExecuteDomUUmountPartition_child_mount_error_without_atp_cluster(self):
+        _cmds = {
+            self.mGetRegexVm(): [
+                [
+                    exaMockCommand("/bin/test -e /sbin/findmnt", aRc=0, aPersist=True),
+                    exaMockCommand(
+                        "/sbin/findmnt --output TARGET --noheadings -R -r /u02",
+                        aStdout="/u02\n/u02/app\n",
+                        aRc=0
+                    )
+                ]
+            ]
+        }
+        self.mPrepareMockCommands(_cmds)
+
+        _domU = self.mGetClubox().mReturnDom0DomUPair()[0][1]
+        cluDomUPartitionObj = ebCluManageDomUPartition(self.mGetClubox())
+        with patch.object(self.mGetClubox(), "isATPCluster", return_value=False):
+            _result = cluDomUPartitionObj.mExecuteDomUUmountPartition(_domU, "u02")
+
+        self.assertNotEqual(0, _result)
+        self.mGetClubox().mUpdateErrorObject.assert_called_with(
+            gReshapeError['ERROR_MOUNTING_FILE_SYS'],
+            ANY
+        )
 
 if __name__ == '__main__':
     unittest.main()

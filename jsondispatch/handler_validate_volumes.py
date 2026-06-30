@@ -4,7 +4,7 @@
 #
 # handler_validate_volumes.py
 #
-# Copyright (c) 2025, Oracle and/or its affiliates.
+# Copyright (c) 2025, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      handler_validate_volumes.py - <one-line expansion of the name>
@@ -16,6 +16,9 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    joysjose    04/16/26 - fix validate_volumes grep no-match handling
+#    joysjose    03/25/26 - Bug 38900232 : FIX FOR ISSUES FOUND BY VOXIO CODEV
+#                           AGENT IN DIRECTORY EXABOX/JSONDISPATCH
 #    prsshukl    08/20/25 - Enh 38180284 - EXADB-XS -> VALIDATE_VOLUME AT THE
 #                           HOST/DOM0 LEVEL
 #    prsshukl    08/20/25 - Creation
@@ -141,12 +144,11 @@ class ValidateVolumesHandler(JDHandler):
                 _dom0_unattached_device_list, _dom0_stale_device_list = self.mReturnUnattachedStaleVolumelists(_node, _dom0_missing_device_list)
 
                 _response = self.mBuildResponse(_dom0_attached_device_list, unattached_vols= _dom0_unattached_device_list, stale_vols= _dom0_stale_device_list)
+                _rc = ValidateVolumesHandler.SUCCESS
             else:
                 _msg = f'Execution of validate_volumes operation Failed with _rc status {_rc} and Error: {_err}'
                 ebLogError(_msg)
                 raise ExacloudRuntimeError(0x0811, 0xA, _msg)
 
         return _rc, _response
-
-
 

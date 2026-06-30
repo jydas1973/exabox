@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    pbellary    05/08/26 - Bug 39293289 - CREATE CONSOLE HISTORY SUPPORT FOR ONSR REGIONS
 #    prsshukl    03/12/26 - Codex UT enhancement
 #    asrigiri    07/29/25 - Bug 38156507 - OCI: CREATEEXACCCONSOLEHIS FAILED AS
 #                           PROXY IS SET TO NULL
@@ -414,6 +415,23 @@ class ebTestResourceConnector(ebTestClucontrol):
             _dns_suffix = _connector.mObtainDnsSuffix()
             self.assertEqual(_dns_suffix, "sea.oraclegovcloud.uk")
 
+    def test_mIsFedramp_variants(self):
+        connector = ResourceConnector.__new__(ResourceConnector)
+        connector._ResourceConnector__realm = "oc5"
+        self.assertTrue(connector.mIsFedramp())
+
+        connector._ResourceConnector__realm = "oc6"
+        self.assertTrue(connector.mIsFedramp())
+
+        connector._ResourceConnector__realm = "oc11"
+        self.assertTrue(connector.mIsFedramp())
+
+        connector._ResourceConnector__realm = "oc3"
+        self.assertFalse(connector.mIsFedramp())
+
+        connector._ResourceConnector__realm = None
+        self.assertFalse(connector.mIsFedramp())
+
     def test_mObtainOxpaFile(self):
 
         ebLogInfo("Running unit test on mObtainOxpaFile")
@@ -524,6 +542,7 @@ class ebTestResourceConnector(ebTestClucontrol):
         connector = ResourceConnector.__new__(ResourceConnector)
         connector._ResourceConnector__region = "r1"
         connector._ResourceConnector__realm = "r1"
+        connector._ResourceConnector__dns_suffix = "r1.oracleiaas.com"
         connector._ResourceConnector__config_bundle = {"databaseUrl": None}
 
         with patch('exabox.exaoci.connectors.ResourceConnector.regions.endpoint_for', return_value="endpoint-r1") as mocked_endpoint:
@@ -541,9 +560,10 @@ class ebTestResourceConnector(ebTestClucontrol):
     def test_mSetEndpoint_database_url_variants(self):
         # Auto-generated test for mSetEndpoint
         scenarios = [
-            ("prod-db.example.com", "base-db-endpoint"),
+            ("prod-db.example.com", "prod-db.example.com"),
             ("preprod-db.example.com", "https://preprod-db.example.com"),
             ("https://preprod-db.example.com", "https://preprod-db.example.com"),
+            ("http://preprod-db.example.com", "https://http://preprod-db.example.com"),
             (None, "base-db-endpoint"),
         ]
 
@@ -552,6 +572,7 @@ class ebTestResourceConnector(ebTestClucontrol):
                 connector = ResourceConnector.__new__(ResourceConnector)
                 connector._ResourceConnector__region = "eu-zurich-1"
                 connector._ResourceConnector__realm = "oc1"
+                connector._ResourceConnector__dns_suffix = "eu-zurich-1.oci.oraclecloud.com"
                 connector._ResourceConnector__config_bundle = {"databaseUrl": database_url}
 
                 with patch('exabox.exaoci.connectors.ResourceConnector.regions.endpoint_for', return_value="base-db-endpoint") as mocked_endpoint:
@@ -898,6 +919,8 @@ class ebTestResourceConnector(ebTestClucontrol):
         # Auto-generated test for mSetEndpoint
         connector = ResourceConnector.__new__(ResourceConnector)
         connector._ResourceConnector__region = "eu-zurich-1"
+        connector._ResourceConnector__realm = "oc1"
+        connector._ResourceConnector__dns_suffix = "eu-zurich-1.oci.oraclecloud.com"
         connector._ResourceConnector__config_bundle = {"databaseUrl": "preprod-db.example.com"}
 
         with patch('exabox.exaoci.connectors.ResourceConnector.regions.endpoint_for',
@@ -1006,6 +1029,7 @@ class ebTestResourceConnector(ebTestClucontrol):
         # Auto-generated test for mSetEndpoint
         connector = ResourceConnector.__new__(ResourceConnector)
         connector._ResourceConnector__region = "r1"
+        connector._ResourceConnector__dns_suffix = "eu-zurich-1.oci.oraclecloud.com"
         connector._ResourceConnector__realm = "r1"
         connector._ResourceConnector__config_bundle = {"databaseUrl": None}
 
@@ -1047,6 +1071,31 @@ class ebTestResourceConnector(ebTestClucontrol):
             self.assertNotIn("REQUESTS_CA_BUNDLE", os.environ)
 
         self.assertEqual(connector.get_oci_config()["realm"], "oc2")
+
+    def test_mGetRPAuthEnv_uses_fedramp_ca_bundle(self):
+        connector = ResourceConnector.__new__(ResourceConnector)
+        connector._ResourceConnector__basepath = "/ade/view"
+        connector._ResourceConnector__realm = "oc5"
+        connector._ResourceConnector__region = "us-gov-ashburn-1"
+        connector._ResourceConnector__dns_suffix = "eu-zurich-1.oci.oraclecloud.com"
+        connector._ResourceConnector__casper_endpoint = "casper"
+        connector._ResourceConnector__dbaas_endpoint = "dbaas"
+        connector._ResourceConnector__auth_endpoint = "auth"
+        connector._ResourceConnector__config_bundle = {}
+
+        oxpa_payload = {"OciExaCapacityParam": {"tenantOcid": "tenant", "exaOcid": "exa"}}
+        ocps_payload = {"proxy": None}
+
+        with patch('exabox.exaoci.connectors.ResourceConnector.read_json_into_string',
+                   side_effect=[oxpa_payload, ocps_payload]), \
+             patch.object(ResourceConnector, "mObtainOxpaFile", return_value="/tmp/oxpa.json"), \
+             patch.object(ResourceConnector, "mObtainOcpsSetupFile", return_value="/tmp/ocps.json"), \
+             patch.object(ResourceConnector, "mGetRPKey", return_value="key-data"), \
+             patch.object(ResourceConnector, "mGetConfigOption", side_effect=["key-path", "2.0"]), \
+             patch('exabox.exaoci.connectors.ResourceConnector.get_resource_principals_signer', return_value="signer"), \
+             patch.object(ResourceConnector, "mIsFedramp", return_value=True), \
+             patch.dict(os.environ, {}, clear=True):
+            connector.mGetRPAuthEnv()
 
 
 if __name__ == '__main__':

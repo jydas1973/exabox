@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    joysjose    05/04/26 - Restrict exabox_conf_operations key policy
+#    joysjose    04/29/26 - Implement exabox conf sensitive key deny policy
 #    kanmanic    02/02/26 - update vm_clusters_limit default
 #    joysjose    07/25/24 - Unit test file to include tests for the exabox.conf
 #                           operations
@@ -58,6 +60,26 @@ MOCK_VIEW_EXABOX_CONF_4 = [{
 }
 ]
 
+MOCK_VIEW_EXABOX_CONF_DENIED = {
+    "operation" : "view",
+    "keys" : ["default_pwd", "oeda_pwd"]
+}
+
+MOCK_VIEW_EXABOX_CONF_MIXED_DENIED = {
+    "operation" : "view",
+    "keys" : ["worker_count", "root_spwd"]
+}
+
+MOCK_VIEW_EXABOX_CONF_REPORTED_DENIED = {
+    "operation" : "view",
+    "keys" : ["worker_count", "exacc_mtls"]
+}
+
+MOCK_VIEW_EXABOX_CONF_EMPTY_KEYS = {
+    "operation" : "view",
+    "keys" : []
+}
+
 MOCK_UPDATE_EXABOX_CONF = {
     "operation" : "update",
     "key_value_pair" : {
@@ -95,6 +117,54 @@ MOCK_UPDATE_EXABOX_CONF_5 = {
     "key_value_pair" : {
         "invalid_key" : "10"
     }
+}
+
+MOCK_UPDATE_EXABOX_CONF_DENIED = {
+    "operation" : "update",
+    "key_value_pair" : {
+        "agent_auth" : ["placeholder-user", "placeholder-secret"]
+    }
+}
+
+MOCK_UPDATE_EXABOX_CONF_MIXED_DENIED = {
+    "operation" : "update",
+    "key_value_pair" : {
+        "worker_count" : "10",
+        "agent_auth" : ["placeholder-user", "placeholder-secret"]
+    }
+}
+
+MOCK_UPDATE_EXABOX_CONF_REPORTED_DENIED = {
+    "operation" : "update",
+    "key_value_pair" : {
+        "enable_block_opctl" : "True"
+    }
+}
+
+MOCK_UPDATE_EXABOX_CONF_NONMUTABLE = {
+    "operation" : "update",
+    "key_value_pair" : {
+        "vmbackup" : {
+            "default_timeout" : "1"
+        }
+    }
+}
+
+MOCK_UPDATE_EXABOX_CONF_TYPE_MISMATCH = {
+    "operation" : "update",
+    "key_value_pair" : {
+        "worker_count" : {
+            "invalid" : "shape"
+        }
+    }
+}
+
+MOCK_UPDATE_EXABOX_CONF_EXTRA_FIELD = {
+    "operation" : "update",
+    "key_value_pair" : {
+        "worker_count" : "10"
+    },
+    "unexpected" : True
 }
 
 MOCK_EXABOX_CONF = {
@@ -200,7 +270,18 @@ class ebTestExaBoxConf(ebTestClucontrol):
         _options = self.mGetContext().mGetArgsOptions()
         _options.jsonconf = MOCK_UPDATE_EXABOX_CONF_3
         _handler = ExaboxConfOperationsHandler(_options)
-        self.assertRaises(ExacloudRuntimeError, _handler.mExecute)
+        with patch.object(_handler, "mBackupExaboxConf") as mock_backup,\
+             patch("builtins.open", mock_open()) as mock_file,\
+             patch("exabox.jsondispatch.handler_exabox_conf_operations.ExaboxConfOperationsHandler.FileLockManager") as mock_lock,\
+             patch("json.dump") as mock_json_dump:
+            _rc, _result = _handler.mExecute()
+        self.assertEqual(_rc, 1)
+        self.assertEqual(_result["reason"], "keys_not_allowed_for_operation")
+        self.assertEqual(_result["denied_keys"], ["invalid_key"])
+        mock_backup.assert_not_called()
+        mock_file.assert_not_called()
+        mock_lock.assert_not_called()
+        mock_json_dump.assert_not_called()
         
     def test_mUpdateExaboxConfParam_err4(self):
         ebLogInfo("Running unit test on ExaboxConfOperationsHandler")
@@ -227,12 +308,178 @@ class ebTestExaBoxConf(ebTestClucontrol):
         ebLogInfo("Running unit test on ExaboxConfOperationsHandler.mUpdateExaboxConfParam")
         _options = self.mGetContext().mGetArgsOptions()
         _options.jsonconf = MOCK_UPDATE_EXABOX_CONF
-        with patch("builtins.open", mock_open(read_data='{"worker_count": "15"}')),\
+        _handler = ExaboxConfOperationsHandler(_options)
+        with patch.object(_handler, "mBackupExaboxConf"),\
+             patch("builtins.open", mock_open(read_data='{"worker_count": "15"}')),\
              patch('exabox.jsondispatch.handler_exabox_conf_operations.ExaboxConfOperationsHandler.FileLockManager'),\
              patch('exabox.jsondispatch.handler_exabox_conf_operations.mBackupFile'),\
              patch('json.dump'):
-            _handler = ExaboxConfOperationsHandler(_options)
             _handler.mExecute()
+
+    @patch("exabox.jsondispatch.handler_exabox_conf_operations.get_gcontext")
+    def test_mViewExaboxConfParam_denied_sensitive_keys(self, mock_get_gcontext):
+        ebLogInfo("Running unit test on ExaboxConfOperationsHandler denied sensitive view")
+        _options = self.mGetContext().mGetArgsOptions()
+        _options.jsonconf = MOCK_VIEW_EXABOX_CONF_DENIED
+        _handler = ExaboxConfOperationsHandler(_options)
+
+        _rc, _result = _handler.mExecute()
+
+        self.assertEqual(_rc, 1)
+        self.assertEqual(_result["status"], "denied")
+        self.assertEqual(_result["operation"], "view")
+        self.assertEqual(_result["reason"], "sensitive_keys_not_allowed")
+        self.assertEqual(_result["denied_keys"], ["default_pwd", "oeda_pwd"])
+        self.assertIn("default_pwd", _result["message"])
+        self.assertIn("oeda_pwd", _result["message"])
+        mock_get_gcontext.return_value.mCheckConfigOption.assert_not_called()
+
+    @patch("exabox.jsondispatch.handler_exabox_conf_operations.get_gcontext")
+    def test_mViewExaboxConfParam_denied_mixed_keys(self, mock_get_gcontext):
+        ebLogInfo("Running unit test on ExaboxConfOperationsHandler denied mixed view")
+        _options = self.mGetContext().mGetArgsOptions()
+        _options.jsonconf = MOCK_VIEW_EXABOX_CONF_MIXED_DENIED
+        _handler = ExaboxConfOperationsHandler(_options)
+
+        _rc, _result = _handler.mExecute()
+
+        self.assertEqual(_rc, 1)
+        self.assertEqual(_result["denied_keys"], ["root_spwd"])
+        self.assertIn("root_spwd", _result["message"])
+        mock_get_gcontext.return_value.mCheckConfigOption.assert_not_called()
+
+    @patch("exabox.jsondispatch.handler_exabox_conf_operations.get_gcontext")
+    def test_mViewExaboxConfParam_denied_reported_security_key(self, mock_get_gcontext):
+        ebLogInfo("Running unit test on ExaboxConfOperationsHandler denied reported security key view")
+        _options = self.mGetContext().mGetArgsOptions()
+        _options.jsonconf = MOCK_VIEW_EXABOX_CONF_REPORTED_DENIED
+        _handler = ExaboxConfOperationsHandler(_options)
+
+        _rc, _result = _handler.mExecute()
+
+        self.assertEqual(_rc, 1)
+        self.assertEqual(_result["reason"], "sensitive_keys_not_allowed")
+        self.assertEqual(_result["denied_keys"], ["exacc_mtls"])
+        self.assertIn("exacc_mtls", _result["message"])
+        mock_get_gcontext.return_value.mCheckConfigOption.assert_not_called()
+
+    def test_mUpdateExaboxConfParam_denied_sensitive_keys(self):
+        ebLogInfo("Running unit test on ExaboxConfOperationsHandler denied sensitive update")
+        _options = self.mGetContext().mGetArgsOptions()
+        _options.jsonconf = MOCK_UPDATE_EXABOX_CONF_DENIED
+        _handler = ExaboxConfOperationsHandler(_options)
+
+        with patch.object(_handler, "mBackupExaboxConf") as mock_backup,\
+             patch("builtins.open", mock_open()) as mock_file,\
+             patch("exabox.jsondispatch.handler_exabox_conf_operations.ExaboxConfOperationsHandler.FileLockManager") as mock_lock,\
+             patch("json.dump") as mock_json_dump:
+            _rc, _result = _handler.mExecute()
+
+        self.assertEqual(_rc, 1)
+        self.assertEqual(_result["status"], "denied")
+        self.assertEqual(_result["operation"], "update")
+        self.assertEqual(_result["reason"], "sensitive_keys_not_allowed")
+        self.assertEqual(_result["denied_keys"], ["agent_auth"])
+        self.assertIn("agent_auth", _result["message"])
+        mock_backup.assert_not_called()
+        mock_file.assert_not_called()
+        mock_lock.assert_not_called()
+        mock_json_dump.assert_not_called()
+
+    def test_mUpdateExaboxConfParam_denied_reported_security_key(self):
+        ebLogInfo("Running unit test on ExaboxConfOperationsHandler denied reported security key update")
+        _options = self.mGetContext().mGetArgsOptions()
+        _options.jsonconf = MOCK_UPDATE_EXABOX_CONF_REPORTED_DENIED
+        _handler = ExaboxConfOperationsHandler(_options)
+
+        with patch.object(_handler, "mBackupExaboxConf") as mock_backup,\
+             patch("builtins.open", mock_open()) as mock_file,\
+             patch("exabox.jsondispatch.handler_exabox_conf_operations.ExaboxConfOperationsHandler.FileLockManager") as mock_lock,\
+             patch("json.dump") as mock_json_dump:
+            _rc, _result = _handler.mExecute()
+
+        self.assertEqual(_rc, 1)
+        self.assertEqual(_result["reason"], "sensitive_keys_not_allowed")
+        self.assertEqual(_result["denied_keys"], ["enable_block_opctl"])
+        self.assertIn("enable_block_opctl", _result["message"])
+        mock_backup.assert_not_called()
+        mock_file.assert_not_called()
+        mock_lock.assert_not_called()
+        mock_json_dump.assert_not_called()
+
+    def test_mUpdateExaboxConfParam_denied_mixed_keys(self):
+        ebLogInfo("Running unit test on ExaboxConfOperationsHandler denied mixed update")
+        _options = self.mGetContext().mGetArgsOptions()
+        _options.jsonconf = MOCK_UPDATE_EXABOX_CONF_MIXED_DENIED
+        _handler = ExaboxConfOperationsHandler(_options)
+
+        with patch.object(_handler, "mBackupExaboxConf") as mock_backup,\
+             patch("builtins.open", mock_open()) as mock_file,\
+             patch("exabox.jsondispatch.handler_exabox_conf_operations.ExaboxConfOperationsHandler.FileLockManager") as mock_lock,\
+             patch("json.dump") as mock_json_dump:
+            _rc, _result = _handler.mExecute()
+
+        self.assertEqual(_rc, 1)
+        self.assertEqual(_result["denied_keys"], ["agent_auth"])
+        self.assertIn("agent_auth", _result["message"])
+        mock_backup.assert_not_called()
+        mock_file.assert_not_called()
+        mock_lock.assert_not_called()
+        mock_json_dump.assert_not_called()
+
+    def test_mUpdateExaboxConfParam_denied_nonmutable_key(self):
+        ebLogInfo("Running unit test on ExaboxConfOperationsHandler denied nonmutable update key")
+        _options = self.mGetContext().mGetArgsOptions()
+        _options.jsonconf = MOCK_UPDATE_EXABOX_CONF_NONMUTABLE
+        _handler = ExaboxConfOperationsHandler(_options)
+
+        with patch.object(_handler, "mBackupExaboxConf") as mock_backup,\
+             patch("builtins.open", mock_open()) as mock_file,\
+             patch("exabox.jsondispatch.handler_exabox_conf_operations.ExaboxConfOperationsHandler.FileLockManager") as mock_lock,\
+             patch("json.dump") as mock_json_dump:
+            _rc, _result = _handler.mExecute()
+
+        self.assertEqual(_rc, 1)
+        self.assertEqual(_result["reason"], "keys_not_allowed_for_operation")
+        self.assertEqual(_result["denied_keys"], ["vmbackup"])
+        self.assertIn("not allowed for this endpoint", _result["message"])
+        mock_backup.assert_not_called()
+        mock_file.assert_not_called()
+        mock_lock.assert_not_called()
+        mock_json_dump.assert_not_called()
+
+    def test_mUpdateExaboxConfParam_type_mismatch(self):
+        ebLogInfo("Running unit test on ExaboxConfOperationsHandler type mismatch update")
+        _options = self.mGetContext().mGetArgsOptions()
+        _options.jsonconf = MOCK_UPDATE_EXABOX_CONF_TYPE_MISMATCH
+        _handler = ExaboxConfOperationsHandler(_options)
+
+        with patch.object(_handler, "mBackupExaboxConf") as mock_backup,\
+             patch("builtins.open", mock_open(read_data=json.dumps(MOCK_EXABOX_CONF))) as mock_file,\
+             patch("exabox.jsondispatch.handler_exabox_conf_operations.ExaboxConfOperationsHandler.FileLockManager") as mock_lock,\
+             patch("json.dump") as mock_json_dump:
+            self.assertRaises(ExacloudRuntimeError, _handler.mExecute)
+
+        mock_backup.assert_called_once()
+        mock_file.assert_called_once()
+        mock_lock.assert_called_once()
+        mock_json_dump.assert_not_called()
+
+    def test_mHandleEndpoint_rejects_empty_view_keys(self):
+        ebLogInfo("Running schema validation test on empty view keys")
+        _options = self.mGetContext().mGetArgsOptions()
+        _options.jsonconf = MOCK_VIEW_EXABOX_CONF_EMPTY_KEYS
+        _handler = ExaboxConfOperationsHandler(_options)
+
+        self.assertRaises(ExacloudRuntimeError, _handler.mHandleEndpoint)
+
+    def test_mHandleEndpoint_rejects_extra_update_field(self):
+        ebLogInfo("Running schema validation test on extra update field")
+        _options = self.mGetContext().mGetArgsOptions()
+        _options.jsonconf = MOCK_UPDATE_EXABOX_CONF_EXTRA_FIELD
+        _handler = ExaboxConfOperationsHandler(_options)
+
+        self.assertRaises(ExacloudRuntimeError, _handler.mHandleEndpoint)
        
     def test_mBackupExaboxConf(self):
         ebLogInfo("Running unit test on ExaboxConfOperationsHandler.mBackupExaboxConf")

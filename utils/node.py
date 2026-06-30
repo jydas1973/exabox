@@ -3,7 +3,7 @@
 #
 # node.py
 #
-# Copyright (c) 2021, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      node.py - Auxiliary functions related to remote nodes.
@@ -17,6 +17,7 @@
 #        with all the default checks enabled.
 #
 #    MODIFIED   (MM/DD/YY)
+#    avimonda    04/08/26 - Bug 39084339: Add PATH fallback for node cmd lookup
 #    jesandov    09/30/25 - 36206155: Add log of strerr and stdout on error
 #    aypaul      09/17/25 - Bug#38440580 Revert changes for add defunct childs
 #                           to be added for corrupt workers.
@@ -66,6 +67,7 @@ import psutil
 import signal
 import time
 from contextlib import contextmanager
+from functools import wraps
 from typing import Generator, Mapping, NamedTuple, Optional, Sequence
 
 from exabox.core.Context import exaBoxContext, get_gcontext
@@ -261,6 +263,50 @@ def node_connect_to_host(
         node.mDisconnect()
 
 
+def _path_lookup_fallback(func):
+    """Fall back to searching the remote PATH after the default lookup."""
+    @wraps(func)
+    def _wrapper(
+            node: exaBoxNode,
+            cmd: str,
+            sbin: bool = False) -> Optional[str]:
+        path = func(node, cmd, sbin)
+
+        if path is not None:
+            return path
+
+        return _node_cmd_abs_path_from_env(node, cmd)
+
+    return _wrapper
+
+
+def _node_cmd_abs_path_from_env(
+        node: exaBoxNode,
+        cmd: str) -> Optional[str]:
+    """Resolve a command by searching the remote PATH directories."""
+    ebLogTrace(f'Falling back to PATH lookup for "{cmd}"')
+
+    path_ret = node_exec_cmd(node, 'echo "$PATH"')
+
+    if path_ret.exit_code != 0 or not path_ret.stdout:
+        return None
+
+    dirs = set()
+    for path_dir in path_ret.stdout.strip().split(':'):
+        if not path_dir or not os.path.isabs(path_dir):
+            continue
+        dirs.add(path_dir)
+
+    for bin_dir in dirs:
+        path = os.path.join(bin_dir, cmd)
+
+        if node.mFileExists(path):
+            return path
+
+    return None
+
+
+@_path_lookup_fallback
 def node_cmd_abs_path(
         node: exaBoxNode,
         cmd: str,

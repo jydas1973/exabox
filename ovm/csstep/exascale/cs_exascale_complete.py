@@ -21,6 +21,11 @@
 #    INTERNAL CLASSES:
 #
 #    MODIFIED   (MM/DD/YY)
+#    prsshukl    05/22/26 - Bug 39416987 - EXACC: SSL INSPECTION: PHASE1:
+#                           EXACLOUD ISN'T COPYING CUSTOMER ROOT CA AS UNABLE
+#                           TO LOGIN TO THE CPS WALLET
+#    pbellary    04/30/26 - ER 39187148 - ECRACLI API TO UPDATE HIGH REDUNDANCY AND 
+#                           ENSURE DEFAULT VLT_INSPECT PRVILEGE IS UNSET FOR VMCLUSTER USERID
 #.   aararora    04/13/26 - 39200237: Issues observed for ca signed certs being
 #.                          copied to domus for exacc
 #.   aararora    03/20/26 - 39106054: Install Falcon agent during postginid
@@ -322,7 +327,7 @@ class csExaScaleComplete(CSBase):
             # ER 32161016: Copy DBCS/CPS agent wallets
             _ebox.mAddAgentWallet()
 
-            _clu_utils.mSetupCustomerRootCACertificates(aOptions)
+            _clu_utils.mSetupCustomerRootCACertificates()
 
         #
         # ER 27371691: Install DBCS agent rpm
@@ -379,6 +384,11 @@ class csExaScaleComplete(CSBase):
         #Install AHF setup on domU for non-ATP services
         if not _ebox.isATP() and _ebox.mGetCmd() == "createservice":
             _csu.mInstallAhfonDomU(_ebox, self.step, _steplist)
+
+        # Ensure deprecated SSH algorithms are removed on the provisioned DomUs
+        _domus = [domu for _, domu in _ebox.mReturnDom0DomUPair()]
+        _algorithms = _ebox.mCheckConfigOption('deprecated_ssh_algorithms')
+        _csu.mRemoveDeprecatedSshAlgorithms(_domus, _algorithms)
 
         #
         # run Exachk
@@ -684,6 +694,11 @@ class csExaScaleComplete(CSBase):
                 _node.mDisconnect()
         except Exception as ex:
             ebLogError(f"*** Could not get output for ls -ltr /var/opt/oracle/dbaas_acfs. Error: {ex}")
+
+        #Remove User privilege
+        _clusterName = _ebox.mGetClusters().mGetCluster().mGetCluName()
+        if _clusterName:
+            _utils.mRemoveClusterUserPrivilege(aOptions, aClusterName=_clusterName)
 
         #Update System Vault Access to the new compute
         if _ebox.mGetCmd() == "createservice" and not _ebox.isBaseDB() and not _ebox.mIsExaScale():

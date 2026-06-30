@@ -4,7 +4,7 @@
 #
 # ExaKmsOCI.py
 #
-# Copyright (c) 2021, 2023, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      ExaKmsOCI.py - <one-line expansion of the name>
@@ -16,6 +16,9 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    jesandov    04/28/26 - Bug#39263025 Fix security issues found using IA
+#    ririgoye    04/27/26 - Updated OCI exception import for urllib3 vendor
+#                           libraries
 #    jesandov    10/20/23 - 35933990: Include label in ExaKmsEntry
 #    jesandov    08/07/23 - 35683301: Removal of linear search in object store
 #    jesandov    06/12/23 - 35484161: Add validation to nathostname in the
@@ -67,7 +70,7 @@ from exabox.exaoci.ExaOCIFactory import ExaOCIFactory
 from typing import List
 from time import sleep
 from six.moves import urllib
-from oci._vendor.urllib3.exceptions import SSLError
+from urllib3.exceptions import SSLError
 urlopen = urllib.request.urlopen
 URLError = urllib.error.URLError
 HTTPError = urllib.error.HTTPError

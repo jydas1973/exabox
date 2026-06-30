@@ -16,10 +16,17 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    ririgoye    05/29/26 - EXACS-170979 ADE dependency path fix
+#    ririgoye    05/21/26 - EXACS-170979 SOP dependency support
+#    ririgoye    05/13/26 - EXACS-170977 localhost exacloud python review fix
+#    ririgoye    05/12/26 - EXACS-170977 use Exacloud Python from SOP metadata
 #    aararora    03/03/26 - Bug 38902170: Correct resource leak issues
 #    aypaul      03/18/25 - Creation
 #
 import uuid
+import os
+import sys
+import tempfile
 import builtins
 import copy
 import json
@@ -30,7 +37,7 @@ from unittest.mock import mock_open, MagicMock
 import warnings
 from unittest.mock import patch, call
 from exabox.sop.sopexecutescripts import SOPExecution, fetch_ilom_password
-from exabox.sop.sopscripts import SOPScript, SOPScriptsRepo, SCRIPT_VERSION
+from exabox.sop.sopscripts import SOPScript, SOPScriptsRepo, SCRIPT_VERSION, SCRIPT_USE_EXACLOUD_PYTHON, SCRIPT_DEPENDENCIES, mGetValidatedScriptDependencies
 from exabox.sop.soputils import process_sop_request, sop_execute_scripts, sop_delete_requests_onhost, sop_list_scripts
 from exabox.log.LogMgr import ebLogInfo, ebLogError
 from exabox.core.Error import ExacloudRuntimeError
@@ -38,6 +45,22 @@ from exabox.core.MockCommand import exaMockCommand
 
 with patch('multiprocessing.Lock', return_value=MagicMock()):
     from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
+
+ETF_FRAMEWORK_DIR = os.path.abspath(
+    os.path.join(os.path.dirname(__file__),
+                 "../../../../test/ecs_test_framework"))
+SOP_TESTING_IMPORT_ERROR = None
+sop_testing = None
+if os.path.isdir(ETF_FRAMEWORK_DIR):
+    if ETF_FRAMEWORK_DIR not in sys.path:
+        sys.path.insert(0, ETF_FRAMEWORK_DIR)
+    try:
+        from etf_sop_testing import sop_testing
+    except ImportError as exp:
+        SOP_TESTING_IMPORT_ERROR = exp
+else:
+    SOP_TESTING_IMPORT_ERROR = ImportError(
+        f"ETF framework directory not found: {ETF_FRAMEWORK_DIR}")
 
 ILOM_PAYLOAD1 = {
   "cmd": "start",
@@ -66,6 +89,7 @@ SCRIPT_PATH = "script_path"
 SCRIPT_PARALLEL_EXEC = "support_parallel_execution"
 SCRPIPT_SHA256SUM = "sha256sum"
 SCRIPT_EXEC = "script_exec"
+SCRIPT_DEPENDENCIES = "dependencies"
 SCRIPT_RETURN_JSON_SUPPORT = "return_json_support"
 SCRIPT_COMMENTS = "comments"
 LAST_REFRESH_TIME_MARKER = "last_refresh_time"
@@ -298,7 +322,218 @@ class ebTestSOPScriptsRepo(ebTestClucontrol):
         self.assertIn("script.sh", repo.mGetScriptsMetadata())  # Loaded from cache
 
         ebLogInfo("Unit test succeeded.")
- 
+
+    def _build_context(self):
+        class _Context(object):
+            def __init__(self):
+                self._config = {
+                    'sop_scripts_storage': 'local',
+                    'sop_scripts_refresh_interval': '1',
+                    'ociexacc': 'True',
+                    'sop_scripts_dir_exacc': '/fake/dir',
+                    'sop_scripts_dir': '/fake/dir'
+                }
+
+            def mGetConfigOptions(self):
+                return self._config
+
+            def mCheckConfigOption(self, key, default=None):
+                return self._config.get(key, default)
+
+            def mGetBasePath(self):
+                return '/tmp'
+
+        return _Context()
+
+    def _sample_metadata(self, aUseExacloudPython=False, aDependencies=None):
+        _metadata = {
+            SCRIPT_PATH: '/fake/scriptA.sh',
+            SCRIPT_PARALLEL_EXEC: True,
+            SCRPIPT_SHA256SUM: 'dummy',
+            SCRIPT_EXEC: '/bin/python3',
+            SCRIPT_USE_EXACLOUD_PYTHON: aUseExacloudPython,
+            SCRIPT_RETURN_JSON_SUPPORT: False,
+            SCRIPT_VERSION: '1',
+            SCRIPT_COMMENTS: 'sample'
+        }
+        if aDependencies is not None:
+            _metadata[SCRIPT_DEPENDENCIES] = aDependencies
+
+        return {
+            'scriptA': _metadata
+        }
+
+    def test_mGetValidatedScriptDependencies_missing_and_empty(self):
+        _metadata = {
+            SCRIPT_PATH: '/fake/scriptA.sh'
+        }
+        self.assertEqual(mGetValidatedScriptDependencies(_metadata, '/fake/scriptA.sh.metadata'), [])
+
+        _metadata[SCRIPT_DEPENDENCIES] = []
+        self.assertEqual(mGetValidatedScriptDependencies(_metadata, '/fake/scriptA.sh.metadata'), [])
+
+    def test_mGetValidatedScriptDependencies_valid_and_duplicates(self):
+        with tempfile.TemporaryDirectory() as _tmpdir:
+            _script_path = os.path.join(_tmpdir, 'scriptA.py')
+            _dependency_path = os.path.join(_tmpdir, 'sop_library.py')
+            with open(_script_path, 'w') as _fh:
+                _fh.write('print("script")\n')
+            with open(_dependency_path, 'w') as _fh:
+                _fh.write('def helper(): pass\n')
+
+            _metadata = {
+                SCRIPT_PATH: _script_path,
+                SCRIPT_DEPENDENCIES: ['sop_library.py', './sop_library.py']
+            }
+            self.assertEqual(
+                mGetValidatedScriptDependencies(_metadata, f'{_script_path}.metadata'),
+                [('sop_library.py', os.path.realpath(_dependency_path))]
+            )
+
+    def test_mGetValidatedScriptDependencies_rejects_invalid_values(self):
+        with tempfile.TemporaryDirectory() as _tmpdir:
+            _script_path = os.path.join(_tmpdir, 'scriptA.py')
+            with open(_script_path, 'w') as _fh:
+                _fh.write('print("script")\n')
+
+            _invalid_dependencies = [
+                'sop_library.py',
+                [123],
+                [{'name': 'sop_library.py'}],
+                [''],
+                ['/tmp/sop_library.py'],
+                ['../sop_library.py'],
+                ['nested/../sop_library.py']
+            ]
+            for _dependencies in _invalid_dependencies:
+                _metadata = {
+                    SCRIPT_PATH: _script_path,
+                    SCRIPT_DEPENDENCIES: _dependencies
+                }
+                with self.assertRaises(ExacloudRuntimeError) as _ctx:
+                    mGetValidatedScriptDependencies(_metadata, f'{_script_path}.metadata')
+                self.assertIn(f'{_script_path}.metadata', str(_ctx.exception))
+
+    def test_mGetValidatedScriptDependencies_rejects_missing_file(self):
+        with tempfile.TemporaryDirectory() as _tmpdir:
+            _script_path = os.path.join(_tmpdir, 'scriptA.py')
+            with open(_script_path, 'w') as _fh:
+                _fh.write('print("script")\n')
+
+            _metadata = {
+                SCRIPT_PATH: _script_path,
+                SCRIPT_DEPENDENCIES: ['missing_library.py']
+            }
+            with self.assertRaises(ExacloudRuntimeError) as _ctx:
+                mGetValidatedScriptDependencies(_metadata, f'{_script_path}.metadata')
+            self.assertIn('missing_library.py', str(_ctx.exception))
+
+    def test_mGetValidatedScriptDependencies_rejects_symlink_outside_script_dir(self):
+        with tempfile.TemporaryDirectory() as _script_dir, tempfile.TemporaryDirectory() as _outside_dir:
+            _script_path = os.path.join(_script_dir, 'scriptA.py')
+            _outside_dependency = os.path.join(_outside_dir, 'sop_library.py')
+            _linked_dependency = os.path.join(_script_dir, 'sop_library.py')
+            with open(_script_path, 'w') as _fh:
+                _fh.write('print("script")\n')
+            with open(_outside_dependency, 'w') as _fh:
+                _fh.write('def helper(): pass\n')
+            os.symlink(_outside_dependency, _linked_dependency)
+
+            _metadata = {
+                SCRIPT_PATH: _script_path,
+                SCRIPT_DEPENDENCIES: ['sop_library.py']
+            }
+            with self.assertRaises(ExacloudRuntimeError) as _ctx:
+                mGetValidatedScriptDependencies(_metadata, f'{_script_path}.metadata')
+            self.assertIn('outside the SOP script directory', str(_ctx.exception))
+
+    def test_mGetValidatedScriptDependencies_accepts_ade_backing_paths(self):
+        with tempfile.TemporaryDirectory() as _tmpdir:
+            _view_script_dir = os.path.join(_tmpdir, 'view', 'ecs', 'test', 'SOP', 'scripts')
+            _ade_script_dir = os.path.join(_tmpdir, 'ade_label', 'ecs', 'test', 'SOP', 'scripts')
+            os.makedirs(_view_script_dir)
+            os.makedirs(_ade_script_dir)
+
+            _ade_script_path = os.path.join(_ade_script_dir, 'scriptA.py')
+            _ade_dependency_path = os.path.join(_ade_script_dir, 'sop_library.py')
+            with open(_ade_script_path, 'w') as _fh:
+                _fh.write('print("script")\n')
+            with open(_ade_dependency_path, 'w') as _fh:
+                _fh.write('def helper(): pass\n')
+
+            os.symlink(_ade_script_dir, os.path.join(_view_script_dir, '.ade_path'))
+            _script_path = os.path.join(_view_script_dir, 'scriptA.py')
+            _dependency_path = os.path.join(_view_script_dir, 'sop_library.py')
+            os.symlink(os.path.join('.ade_path', 'scriptA.py'), _script_path)
+            os.symlink(os.path.join('.ade_path', 'sop_library.py'), _dependency_path)
+
+            _metadata = {
+                SCRIPT_PATH: _script_path,
+                SCRIPT_DEPENDENCIES: ['sop_library.py']
+            }
+            self.assertEqual(
+                mGetValidatedScriptDependencies(_metadata, f'{_script_path}.metadata'),
+                [('sop_library.py', os.path.realpath(_ade_dependency_path))]
+            )
+
+    def test_mPopulateScriptsRepo_reads_use_exacloud_python_metadata(self):
+        with patch('exabox.sop.sopscripts.get_gcontext', return_value=self._build_context()):
+            with patch('exabox.sop.sopscripts.SOPScriptsRepo.mLoadLocalScriptsMetadata', return_value=None):
+                repo = SOPScriptsRepo()
+                repo.mPopulateScriptsRepo(self._sample_metadata(aUseExacloudPython=True))
+                script_obj = repo.mGetScriptsRepo().get('scriptA')
+                self.assertIsNotNone(script_obj)
+                self.assertTrue(script_obj.mUseExacloudPython())
+                self.assertEqual(script_obj.mGetScriptExecutable(), '/bin/python3')
+
+    def test_mPopulateScriptsRepo_defaults_use_exacloud_python_to_false(self):
+        with patch('exabox.sop.sopscripts.get_gcontext', return_value=self._build_context()):
+            with patch('exabox.sop.sopscripts.SOPScriptsRepo.mLoadLocalScriptsMetadata', return_value=None):
+                repo = SOPScriptsRepo()
+                repo.mPopulateScriptsRepo(self._sample_metadata())
+                script_obj = repo.mGetScriptsRepo().get('scriptA')
+                self.assertIsNotNone(script_obj)
+                self.assertFalse(script_obj.mUseExacloudPython())
+                self.assertEqual(script_obj.mGetScriptExecutable(), '/bin/python3')
+
+    def test_mPopulateScriptsRepo_reads_dependencies_metadata(self):
+        with patch('exabox.sop.sopscripts.get_gcontext', return_value=self._build_context()):
+            with patch('exabox.sop.sopscripts.SOPScriptsRepo.mLoadLocalScriptsMetadata', return_value=None):
+                repo = SOPScriptsRepo()
+                repo.mPopulateScriptsRepo(self._sample_metadata(aDependencies=['sop_library.py']))
+                script_obj = repo.mGetScriptsRepo().get('scriptA')
+                self.assertIsNotNone(script_obj)
+                self.assertEqual(script_obj.mGetScriptDependencies(), ['sop_library.py'])
+
+    def test_mLocalParseAndUpdateMetadataCache_skips_declared_dependency_without_metadata(self):
+        with tempfile.TemporaryDirectory() as _tmpdir:
+            _script_path = os.path.join(_tmpdir, 'scriptA.py')
+            _dependency_path = os.path.join(_tmpdir, 'sop_library.py')
+            _stray_path = os.path.join(_tmpdir, 'stray.py')
+            with open(_script_path, 'w') as _fh:
+                _fh.write('print("script")\n')
+            with open(_dependency_path, 'w') as _fh:
+                _fh.write('def helper(): pass\n')
+            with open(_stray_path, 'w') as _fh:
+                _fh.write('print("stray")\n')
+            with open(f'{_script_path}.metadata', 'w') as _fh:
+                json.dump({
+                    SCRIPT_EXEC: '/bin/python3',
+                    SCRIPT_PARALLEL_EXEC: False,
+                    SCRIPT_VERSION: '1',
+                    SCRIPT_DEPENDENCIES: ['sop_library.py']
+                }, _fh)
+
+            with patch('exabox.sop.sopscripts.get_gcontext', return_value=self._build_context()):
+                with patch('exabox.sop.sopscripts.SOPScriptsRepo.mLoadLocalScriptsMetadata', return_value=None):
+                    repo = SOPScriptsRepo()
+                    repo.mLocalParseAndUpdateMetadataCache(_tmpdir)
+
+            self.assertIn('scriptA.py', repo.mGetScriptsRepo())
+            self.assertNotIn(f'{_dependency_path}.metadata', repo.mGetCorruptFiles())
+            self.assertIn(f'{_stray_path}.metadata', repo.mGetCorruptFiles())
+            self.assertEqual(repo.mGetScriptsRepo()['scriptA.py'].mGetScriptDependencies(), ['sop_library.py'])
+
 class ebTestSOPAPI(ebTestClucontrol):
     @classmethod
     def setUpClass(self):
@@ -399,6 +634,22 @@ class ebTestSOPAPI(ebTestClucontrol):
         mock_instance.mGetResult.assert_called_once()
 
         ebLogInfo("Unit test on sop_execute_scripts succeeded.")
+
+    @patch('exabox.sop.soputils.SOPScriptsRepo')
+    def test_sop_list_scripts_preserves_metadata_exec(self, mock_scripts_repo):
+        repo = MagicMock()
+        repo.mGetCorruptFiles.return_value = []
+        repo.mGetScriptsMetadata.return_value = {
+            "scriptA": {
+                SCRIPT_EXEC: '/bin/sh',
+                SCRIPT_USE_EXACLOUD_PYTHON: True
+            }
+        }
+        mock_scripts_repo.return_value = repo
+
+        result = sop_list_scripts({})
+        self.assertEqual(result["scriptA"][SCRIPT_EXEC], '/bin/sh')
+        self.assertTrue(result["scriptA"][SCRIPT_USE_EXACLOUD_PYTHON])
 
     # Test 4: process_sop_request (Covers all cmd branches, raises, and returns)
     @patch('exabox.sop.soputils.sop_execute_scripts')  # Mock helpers
@@ -655,6 +906,7 @@ class ebTestSOPExecution2(ebTestClucontrol):
             "demo_script": {
                 SCRIPT_VERSION: "1",
                 SCRIPT_EXEC: "sh",                 # <-- relative path
+                SCRIPT_USE_EXACLOUD_PYTHON: True,
                 SCRIPT_PATH: "/bin/demo_script.sh",
                 SCRIPT_PARALLEL_EXEC: False,
                 SCRIPT_RETURN_JSON_SUPPORT: False
@@ -701,8 +953,264 @@ class ebTestSOPExecution2(ebTestClucontrol):
 
         # ensure key helper calls were indeed made → proves deep traversal
         mock_node_exec_cmd.assert_called()                # mkdir branch
-        mock_cmd_abs_path_check.assert_called_once()      # exec-path fixup
+        mock_cmd_abs_path_check.assert_called_once_with(dummy_remote, "sh")      # exec-path fixup
         dummy_remote.mCopyFile.assert_called()            # script copy
+
+    @patch("exabox.sop.sopexecutescripts.mGetValidatedScriptDependencies",
+           return_value=[("sop_library.py", "/fake/scripts/sop_library.py")])
+    @patch("exabox.sop.sopexecutescripts.node_exec_cmd")
+    @patch("exabox.sop.sopexecutescripts.connect_to_host")
+    @patch("exabox.sop.sopexecutescripts.exaBoxNode")
+    @patch("exabox.sop.sopexecutescripts.SOPScriptsRepo")
+    @patch("exabox.sop.sopexecutescripts.get_gcontext", return_value=testOptions())
+    def test_mPrecheckProcessing_copies_dependencies_before_execution(
+        self,
+        mock_get_gcontext,
+        mock_SOPScriptsRepo,
+        mock_exaBoxNode,
+        mock_connect_to_host,
+        mock_node_exec_cmd,
+        mock_validate_dependencies
+    ):
+        script_name = "demo_script.py"
+        repo_instance = MagicMock()
+        repo_instance.mGetScriptsMetadata.return_value = {
+            script_name: {
+                SCRIPT_VERSION: "1",
+                SCRIPT_EXEC: "/bin/python3",
+                SCRIPT_PATH: "/fake/scripts/demo_script.py",
+                SCRIPT_PARALLEL_EXEC: False,
+                SCRIPT_RETURN_JSON_SUPPORT: False,
+                SCRIPT_DEPENDENCIES: ["sop_library.py"]
+            }
+        }
+        mock_SOPScriptsRepo.return_value = repo_instance
+
+        exab_node_stub = MagicMock()
+        exab_node_stub.mIsConnectable.return_value = True
+        mock_exaBoxNode.return_value = exab_node_stub
+
+        dummy_remote = MagicMock()
+        mock_connect_to_host.return_value.__enter__.return_value = dummy_remote
+        mock_connect_to_host.return_value.__exit__.return_value = False
+
+        mock_node_exec_cmd.return_value = MagicMock(exit_code=0)
+
+        se = SOPExecution(
+            aUUID="uuid-deps",
+            aNodesList=["node1"],
+            aScriptName=script_name,
+            aScriptParams="",
+            aScriptPayload={},
+            aScriptVersion="1",
+            aNodeType=None
+        )
+        se.mPrecheckProcessing()
+
+        mock_validate_dependencies.assert_called_once()
+        dummy_remote.mCopyFile.assert_has_calls([
+            call("/fake/scripts/demo_script.py", "/opt/exacloud/oadt/requests/uuid-deps/demo_script.py"),
+            call("/fake/scripts/sop_library.py", "/opt/exacloud/oadt/requests/uuid-deps/sop_library.py")
+        ])
+
+    @patch("exabox.sop.sopexecutescripts.connect_to_host")
+    @patch("exabox.sop.sopexecutescripts.exaBoxNode")
+    @patch("exabox.sop.sopexecutescripts.SOPScriptsRepo")
+    @patch("exabox.sop.sopexecutescripts.get_gcontext", return_value=testOptions())
+    def test_mPrecheckProcessing_missing_dependency_fails_before_remote_session(
+        self,
+        mock_get_gcontext,
+        mock_SOPScriptsRepo,
+        mock_exaBoxNode,
+        mock_connect_to_host
+    ):
+        with tempfile.TemporaryDirectory() as _tmpdir:
+            script_name = "demo_script.py"
+            _script_path = os.path.join(_tmpdir, script_name)
+            with open(_script_path, "w") as _fh:
+                _fh.write("print('demo')\n")
+
+            repo_instance = MagicMock()
+            repo_instance.mGetScriptsMetadata.return_value = {
+                script_name: {
+                    SCRIPT_VERSION: "1",
+                    SCRIPT_EXEC: "/bin/python3",
+                    SCRIPT_PATH: _script_path,
+                    SCRIPT_PARALLEL_EXEC: False,
+                    SCRIPT_RETURN_JSON_SUPPORT: False,
+                    SCRIPT_DEPENDENCIES: ["missing_library.py"]
+                }
+            }
+            mock_SOPScriptsRepo.return_value = repo_instance
+
+            se = SOPExecution(
+                aUUID="uuid-missing-dep",
+                aNodesList=["node1"],
+                aScriptName=script_name,
+                aScriptParams="",
+                aScriptPayload={},
+                aScriptVersion="1",
+                aNodeType=None
+            )
+
+            with self.assertRaises(ExacloudRuntimeError) as _ctx:
+                se.mPrecheckProcessing()
+            self.assertIn("missing_library.py", str(_ctx.exception))
+            mock_exaBoxNode.assert_not_called()
+            mock_connect_to_host.assert_not_called()
+
+    @patch("exabox.sop.sopexecutescripts.node_exec_cmd")
+    @patch("exabox.sop.sopexecutescripts.connect_to_host")
+    @patch("exabox.sop.sopexecutescripts.SOPScriptsRepo")
+    @patch("exabox.sop.sopexecutescripts.get_gcontext", return_value=testOptions())
+    def test_mProcessRequest_without_dependencies_keeps_existing_command_shape(
+        self,
+        mock_get_gcontext,
+        mock_SOPScriptsRepo,
+        mock_connect_to_host,
+        mock_node_exec_cmd
+    ):
+        script_name = "demo_script.py"
+        repo_instance = MagicMock()
+        repo_instance.mGetScriptsMetadata.return_value = {
+            script_name: {
+                SCRIPT_VERSION: "1",
+                SCRIPT_EXEC: "/bin/python3",
+                SCRIPT_PATH: "/fake/scripts/demo_script.py",
+                SCRIPT_PARALLEL_EXEC: False,
+                SCRIPT_RETURN_JSON_SUPPORT: False
+            }
+        }
+        mock_SOPScriptsRepo.return_value = repo_instance
+
+        mock_connect_to_host.return_value.__enter__.return_value = MagicMock()
+        mock_connect_to_host.return_value.__exit__.return_value = False
+        mock_node_exec_cmd.return_value = MagicMock(exit_code=0, stdout="OK", stderr="")
+
+        se = SOPExecution(
+            aUUID="uuid-nodeps",
+            aNodesList=["node1"],
+            aScriptName=script_name,
+            aScriptParams="--flag",
+            aScriptPayload={},
+            aScriptVersion="1",
+            aNodeType=None
+        )
+        se.mProcessRequest()
+
+        _cmd_to_execute = mock_node_exec_cmd.call_args[0][1]
+        self.assertEqual(
+            _cmd_to_execute,
+            "/bin/python3 /opt/exacloud/oadt/requests/uuid-nodeps/demo_script.py --flag"
+        )
+
+    @patch("exabox.sop.sopexecutescripts.node_exec_cmd")
+    @patch("exabox.sop.sopexecutescripts.connect_to_host")
+    @patch("exabox.sop.sopexecutescripts.SOPScriptsRepo")
+    @patch("exabox.sop.sopexecutescripts.get_gcontext", return_value=testOptions())
+    def test_mProcessRequest_with_dependencies_runs_from_staging_directory(
+        self,
+        mock_get_gcontext,
+        mock_SOPScriptsRepo,
+        mock_connect_to_host,
+        mock_node_exec_cmd
+    ):
+        script_name = "demo_script.py"
+        repo_instance = MagicMock()
+        repo_instance.mGetScriptsMetadata.return_value = {
+            script_name: {
+                SCRIPT_VERSION: "1",
+                SCRIPT_EXEC: "/bin/python3",
+                SCRIPT_PATH: "/fake/scripts/demo_script.py",
+                SCRIPT_PARALLEL_EXEC: False,
+                SCRIPT_RETURN_JSON_SUPPORT: False,
+                SCRIPT_DEPENDENCIES: ["sop_library.py"]
+            }
+        }
+        mock_SOPScriptsRepo.return_value = repo_instance
+
+        mock_connect_to_host.return_value.__enter__.return_value = MagicMock()
+        mock_connect_to_host.return_value.__exit__.return_value = False
+        mock_node_exec_cmd.return_value = MagicMock(exit_code=0, stdout="OK", stderr="")
+
+        se = SOPExecution(
+            aUUID="uuid-cmd-deps",
+            aNodesList=["node1"],
+            aScriptName=script_name,
+            aScriptParams="--flag",
+            aScriptPayload={},
+            aScriptVersion="1",
+            aNodeType=None
+        )
+        se._SOPExecution__script_dependencies = [("sop_library.py", "/fake/scripts/sop_library.py")]
+        se.mProcessRequest()
+
+        _cmd_to_execute = mock_node_exec_cmd.call_args[0][1]
+        self.assertEqual(
+            _cmd_to_execute,
+            "/bin/sh -c 'cd /opt/exacloud/oadt/requests/uuid-cmd-deps && exec /bin/python3 /opt/exacloud/oadt/requests/uuid-cmd-deps/demo_script.py --flag'"
+        )
+
+    @patch("exabox.sop.sopexecutescripts.mGetValidatedScriptDependencies",
+           return_value=[("sop_library.py", "/fake/scripts/sop_library.py")])
+    @patch("exabox.sop.sopexecutescripts.node_exec_cmd")
+    @patch("exabox.sop.sopexecutescripts.connect_to_host")
+    @patch("exabox.sop.sopexecutescripts.exaBoxNode")
+    @patch("exabox.sop.sopexecutescripts.SOPScriptsRepo")
+    @patch("exabox.sop.sopexecutescripts.get_gcontext", return_value=testOptions())
+    def test_mExecuteOperation_dependency_copy_failure_skips_execution_and_cleans_up(
+        self,
+        mock_get_gcontext,
+        mock_SOPScriptsRepo,
+        mock_exaBoxNode,
+        mock_connect_to_host,
+        mock_node_exec_cmd,
+        mock_validate_dependencies
+    ):
+        script_name = "demo_script.py"
+        repo_instance = MagicMock()
+        repo_instance.mGetScriptsMetadata.return_value = {
+            script_name: {
+                SCRIPT_VERSION: "1",
+                SCRIPT_EXEC: "/bin/python3",
+                SCRIPT_PATH: "/fake/scripts/demo_script.py",
+                SCRIPT_PARALLEL_EXEC: False,
+                SCRIPT_RETURN_JSON_SUPPORT: False,
+                SCRIPT_DEPENDENCIES: ["sop_library.py"]
+            }
+        }
+        mock_SOPScriptsRepo.return_value = repo_instance
+
+        exab_node_stub = MagicMock()
+        exab_node_stub.mIsConnectable.return_value = True
+        mock_exaBoxNode.return_value = exab_node_stub
+
+        dummy_remote = MagicMock()
+        dummy_remote.mCopyFile.side_effect = [None, Exception("copy boom")]
+        mock_connect_to_host.return_value.__enter__.return_value = dummy_remote
+        mock_connect_to_host.return_value.__exit__.return_value = False
+
+        mock_node_exec_cmd.return_value = MagicMock(exit_code=0, stdout="", stderr="")
+
+        se = SOPExecution(
+            aUUID="uuid-copyfail",
+            aNodesList=["node1"],
+            aScriptName=script_name,
+            aScriptParams="",
+            aScriptPayload={},
+            aScriptVersion="1",
+            aNodeType=None
+        )
+        se.mExecuteOperation()
+
+        _result = se.mGetResult()["node1"]
+        self.assertEqual(_result["return_code"], 500)
+        self.assertIn("sop_library.py", _result["stderr_msgs"])
+        self.assertIn("copy boom", _result["stderr_msgs"])
+        _commands = [call_args[0][1] for call_args in mock_node_exec_cmd.call_args_list]
+        self.assertIn("/bin/rm -rf /opt/exacloud/oadt/requests/uuid-copyfail", _commands)
+        self.assertEqual(mock_node_exec_cmd.call_count, 2)
+        mock_validate_dependencies.assert_called_once()
         
     
     
@@ -996,6 +1504,60 @@ class ebTestSOPExecution2(ebTestClucontrol):
         self.assertEqual(mock_json_load.call_count, 2)          # one per node
 
         ebLogInfo("Unit test on SOPExecution.mProcessRequest succeeded.")
+
+    @patch("exabox.sop.sopexecutescripts.node_exec_cmd")
+    @patch("exabox.sop.sopexecutescripts.connect_to_host")
+    @patch("exabox.sop.sopexecutescripts.SOPScriptsRepo")
+    @patch("exabox.sop.sopexecutescripts.get_gcontext", return_value=testOptions())
+    def test_mProcessRequest_uses_exacloud_python_from_metadata(
+        self,
+        mock_get_gcontext,
+        mock_SOPScriptsRepo,
+        mock_connect_to_host,
+        mock_node_exec_cmd
+    ):
+        script_name = "demo_script.py"
+        repo_instance = MagicMock()
+        repo_instance.mGetScriptsMetadata.return_value = {
+            script_name: {
+                SCRIPT_VERSION: "1",
+                SCRIPT_EXEC: "python3",
+                SCRIPT_USE_EXACLOUD_PYTHON: True,
+                SCRIPT_PATH: "/fake/script/path.py",
+                SCRIPT_PARALLEL_EXEC: False,
+                SCRIPT_RETURN_JSON_SUPPORT: False
+            }
+        }
+        mock_SOPScriptsRepo.return_value = repo_instance
+
+        dummy_node = MagicMock()
+        mock_connect_to_host.return_value.__enter__.return_value = dummy_node
+        mock_connect_to_host.return_value.__exit__.return_value = False
+
+        cmd_struct = MagicMock()
+        cmd_struct.exit_code = 0
+        cmd_struct.stdout = "OK"
+        cmd_struct.stderr = ""
+        mock_node_exec_cmd.return_value = cmd_struct
+
+        se = SOPExecution(
+            aUUID="uuid-exa-python",
+            aNodesList=["localhost", "remotehost"],
+            aScriptName=script_name,
+            aScriptParams="--flag",
+            aScriptPayload={},
+            aScriptVersion="1",
+            aNodeType=None
+        )
+
+        se.mProcessRequest()
+
+        self.assertEqual(mock_node_exec_cmd.call_count, 2)
+        _cmds_to_execute = [call_args[0][1] for call_args in mock_node_exec_cmd.call_args_list]
+        self.assertTrue(_cmds_to_execute[0].startswith("/scratch/username/exacloud/bin/python "))
+        self.assertIn("/scratch/username/exacloud/oadt/requests/uuid-exa-python/demo_script.py", _cmds_to_execute[0])
+        self.assertTrue(_cmds_to_execute[1].startswith("python3 "))
+        self.assertIn("/opt/exacloud/oadt/requests/uuid-exa-python/demo_script.py", _cmds_to_execute[1])
         
 
     # ------------------------------------------------------------------
@@ -1195,6 +1757,7 @@ class ebTestSOPExecution2(ebTestClucontrol):
             script_name: {
                 SCRIPT_VERSION:            "1",
                 SCRIPT_EXEC:               "/bin/echo",
+                SCRIPT_USE_EXACLOUD_PYTHON: True,
                 SCRIPT_PATH:               "/fake/script.sh",
                 SCRIPT_PARALLEL_EXEC:      True,   # ← triggers async mode
                 SCRIPT_RETURN_JSON_SUPPORT: True
@@ -1272,10 +1835,88 @@ class ebTestSOPExecution2(ebTestClucontrol):
 
         # helper interactions occurred as expected
         self.assertEqual(mock_node_exec_cmd.call_count, 2)         # nodeSkip was skipped
+        _cmds_to_execute = [call_args[0][1] for call_args in mock_node_exec_cmd.call_args_list]
+        self.assertTrue(_cmds_to_execute[0].startswith("/scratch/username/exacloud/bin/python "))
+        self.assertIn("/scratch/username/exacloud/oadt/requests/uuid-async-pr/demo_async_script", _cmds_to_execute[0])
+        self.assertTrue(_cmds_to_execute[1].startswith("/bin/echo "))
+        self.assertIn("/opt/exacloud/oadt/requests/uuid-async-pr/demo_async_script", _cmds_to_execute[1])
         remote_node.mCopy2Local.assert_called_once()               # remote branch executed
         self.assertEqual(mock_json_load.call_count, 2)
 
         ebLogInfo("Unit test on SOPExecution.mProcessRequestInAynscMode succeeded.")
+
+class ebTestETFSOPTesting(ebTestClucontrol):
+    @classmethod
+    def setUpClass(self):
+        super(ebTestETFSOPTesting, self).setUpClass()
+        if sop_testing is None:
+            raise unittest.SkipTest(
+                f"ETF SOP testing harness not available: {SOP_TESTING_IMPORT_ERROR}")
+
+    def test_run_remotenode_sop_runs_cells_and_dom0s(self):
+        tester = object.__new__(sop_testing)
+        tester.cluster_exaunit_id = "exaunit-1"
+        tester.get_cluster_detail = MagicMock(return_value={
+            "cells": [
+                {"HostName": "cell01.example.com"},
+                {"HostName": "cell02.example.com"}
+            ],
+            "dom0s": [
+                {"HostName": "dom01.example.com"}
+            ]
+        })
+        tester.run_sop = MagicMock()
+
+        tester.run_remotenode_sop("scripts/shortoutput.py")
+
+        tester.get_cluster_detail.assert_called_once_with("exaunit-1")
+        tester.run_sop.assert_has_calls([
+            call("scripts/shortoutput.py",
+                 ["cell01.example.com", "cell02.example.com"]),
+            call("scripts/shortoutput.py",
+                 ["dom01.example.com"])
+        ])
+
+    def test_validate_sop_output_accepts_remote_cell_details(self):
+        tester = object.__new__(sop_testing)
+        nodes = ["cell01.example.com", "cell02.example.com"]
+        endpoint_status = {
+            "message": "Done",
+            "ec_details": json.dumps({
+                "cell01.example.com": {
+                    "return_code": 0,
+                    "stdout_msgs": "SOP testing\n",
+                    "stderr_msgs": ""
+                },
+                "cell02.example.com": {
+                    "return_code": 0,
+                    "stdout_msgs": "prefix SOP testing suffix",
+                    "stderr_msgs": ""
+                }
+            })
+        }
+
+        tester.validate_sop_output(endpoint_status, nodes,
+                                   "scripts/shortoutput.py")
+
+    def test_validate_sop_output_fails_missing_remote_cell(self):
+        tester = object.__new__(sop_testing)
+        nodes = ["cell01.example.com", "cell02.example.com"]
+        endpoint_status = {
+            "message": "Done",
+            "ec_details": json.dumps({
+                "cell01.example.com": {
+                    "return_code": 0,
+                    "stdout_msgs": "SOP testing\n"
+                }
+            })
+        }
+
+        with self.assertRaises(Exception) as ctx:
+            tester.validate_sop_output(endpoint_status, nodes,
+                                       "scripts/shortoutput.py")
+
+        self.assertIn("cell02.example.com", str(ctx.exception))
 
 if __name__ == '__main__':
     unittest.main()

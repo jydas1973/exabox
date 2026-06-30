@@ -55,10 +55,7 @@ from exabox.core.CrashDump import CrashDump
 from exabox.network.dns.DNSConfig import ebDNSConfig
 from exabox.agent.AuthenticationStorage import ebConvertToWalletStorage,ebConfigAuthStorage
 from exabox.core.DBLockTableUtils import sDBLockCleanAllLeftoverLocks
-from exabox.proxy.ECAgentOperationUpdate import fetch_update_ecregistrationinfo
 from exabox.proxy.router import Router
-from exabox.proxy.heartbeat import ProxyHeartbeat
-from exabox.agent.ProxyClient import ProxyClient, ProxyOperation
 from exabox.tools.ebXmlGen.ebFacadeXmlGen import ebFacadeXmlGen
 from exabox.exakms.ExaKmsSingleton import ExaKmsSingleton
 from exabox.exakms.ExaKmsEndpoint import ExaKmsEndpoint
@@ -511,13 +508,6 @@ def execute_from_commandline(aArgv, aExaboxState):
         _rackControl.mExecute()
         return
 
-    #--eccontrol
-    if options.eccontrol:
-        options.proxy = True
-        ebInitDBLayer(ebContext, options)
-        fetch_update_ecregistrationinfo(options)
-        return
-
     # -id and -cf
     if not options.proxy and options.id is not None and options.configpath is None:
         _cfpath = None
@@ -596,11 +586,6 @@ def execute_from_commandline(aArgv, aExaboxState):
         _rc = _workerHandle.mWorker_Start()
         aExaboxState.mUpdateResourceState(ebRType.WORKER,ebRState.STARTED,_workerHandle)
         return _rc
-    
-    if options.proxy and options.heartbeat:
-        _proxy_hb = ProxyHeartbeat()
-        _proxy_hb.mStart()
-        return
 
     if not options.proxy and options.dispatcher:
         dispatcher = ebDispatcher()
@@ -925,15 +910,6 @@ def execute_from_commandline(aArgv, aExaboxState):
             options.forcekill = True
             options.killworkers = True
             agentStopInternal()
-        elif options.agent == "suspend":
-            # Send proxy command only
-            ProxyClient().mSendOperation(ProxyOperation.UPDATE_STATUS_SUSPEND)
-        elif options.agent == 'activate':
-            ProxyClient().mSendOperation(ProxyOperation.UPDATE_STATUS_ACTIVE)       
-        elif options.agent == 'register':
-            ProxyClient().mSendOperation(ProxyOperation.REGISTER)
-        elif options.agent == 'deregister':
-            ProxyClient().mSendOperation(ProxyOperation.DEREGISTER)
 
         elif options.proxy == "import":
             # Import data from file to tables
@@ -1014,7 +990,7 @@ def execute_from_commandline(aArgv, aExaboxState):
             sys.exit(-1)
         ebLogInfo('::ClusterCtrl Command: '+options.clusterctrl)
         cluhandle = exaBoxCluCtrl(aCtx=ebContext, aNode=node, aOptions=options)
-        if options.clusterctrl in ["validate_elastic_shapes", "xsvault", "infra_vm_states", "xsput", "xsget", "enable_qinq"]: # pragma: no cover
+        if options.clusterctrl in ["validate_elastic_shapes", "xsvault", "infra_vm_states", "xsput", "xsget", "enable_qinq", "exascale_disable_normal_redundancy", "exascale_remove_user_privilege"]: # pragma: no cover
              _rc = cluhandle.mDispatchNonXMLCluster(options.clusterctrl, options)
         else:
             _rc = cluhandle.mDispatchCluster(options.clusterctrl, options)

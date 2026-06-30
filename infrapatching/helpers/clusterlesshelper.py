@@ -1,7 +1,7 @@
 #
 # singlevmhelper.py
 #
-# Copyright (c) 2020, 2025, Oracle and/or its affiliates. 
+# Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      clusterlesshelper.py - Place holder for common functionalities for
@@ -13,6 +13,9 @@
 #    NOTES
 #      <other useful comments, qualifications, etc.>
 #
+#    nelango     05/12/26 - Bug 39333475: Handle df empty output
+#    araghave    03/25/26 - Enh 39082322 - INFRAPATCHING ARTIFACTS - SPACE
+#                           MANAGEMENT ON MANAGEMENT HOST AS LAUNCH NODE
 #    antamil     01/31/25 - Enh 37300427 -Creation: Enable clusterless cell patching
 #                           using management host
 
@@ -27,7 +30,7 @@ from exabox.infrapatching.handlers.targetHandler.infrapatchmgrhandler import Inf
 from exabox.infrapatching.utils.constants import *
 from exabox.infrapatching.core.infrapatcherror import *
 from exabox.infrapatching.utils.utility import MANAGEMENT_HOST_LAUNCH_NODE_PATCH_BASE, mRegisterInfraPatchingHandlers, PATCH_BASE, mFormatOut, mReadPatcherInfo, mGetFirstDirInZip,\
-  mReadCallback, mErrorCallback, mGetInfraPatchingHandler, flocked, mChangeOwnerofDir
+  mReadCallback, mErrorCallback, mGetInfraPatchingHandler, flocked, mChangeOwnerofDir, runInfraPatchCommandsLocally
 from exabox.ovm.clumisc import ebCluSshSetup, ebCluPreChecks
 from exabox.BaseServer.AsyncProcessing import ProcessManager, ProcessStructure
 from exabox.utils.common import version_compare
@@ -267,6 +270,11 @@ class ClusterlessPatchHelper(LogHandler):
                                     f"/usr/bin/chmod 775 {aRemotePatchBase}/{_remote_dbserver_patchdir}")
                         self.mPatchLogInfo(
                             f'*** Patch file : {_local_patch_file} >>>> {_remote_patch_file} transferred to Node : {_remote_node}')
+
+                        # Local launch-node cleanup and END space log (management host)
+                        self.mGetHandler().mCleanupRemoteDbserverPatchDirs(_node, aRemotePatchBase, _local_patch_file)
+                        self.mGetHandler().mLogSpaceUtilization(aRemotePatchBase, "END space", node=_node, aNodeType=_remote_node)
+
             except Exception as e:
                 if _node.mIsConnected():
                     _suggestion_msg = f"Copy operation failed with errors on Node : {_remote_node} Error : {str(e)}."
@@ -318,17 +326,22 @@ class ClusterlessPatchHelper(LogHandler):
                         _node.mExecuteCmdLog(f"/usr/bin/chmod 775 {self.mGetHandler().mGetDom0PatchBase()}")
 
                 _i, _o, _e = _node.mExecuteCmd(_patch_base_df_cmd)
-                _patch_base_space_available = int(mFormatOut(_o))
+                _df_out = mFormatOut(_o).strip()
+                if not _df_out:
+                    _stderr = mFormatOut(_e).strip()
+                    raise ValueError(f"df command returned empty output for {aRemotePatchBase}. stderr: {_stderr}")
+                _patch_base_space_available = int(_df_out)
 
                 # If the space to copy patch is not available on the target node
                 # this node will be skipped.
 
                 self.mPatchLogInfo(f"Clusterless aRemoteNecessarySpaceMb {aRemoteNecessarySpaceMb}")
                 self.mPatchLogInfo(f"Clusterless _patch_base_space_available {_patch_base_space_available}")
-                if _patch_base_space_available < (aRemoteNecessarySpaceMb * 3):
+                _space_multiplier = self.mGetHandler().mGetPatchSpaceMultiplierLocalLaunchNode() if self.mGetHandler().mGetInfrapatchExecutionValidator().mCheckCondition('mIsManagementHostLaunchNodeForClusterless') else self.mGetHandler().mGetPatchSpaceMultiplierRemoteLaunchNode()
+                if _patch_base_space_available < (aRemoteNecessarySpaceMb * _space_multiplier):
                     if _node.mIsConnected():
                         _node.mDisconnect()
-                    _suggestion_msg = f"{_remote_node} does not have enough space in {aRemotePatchBase} to be used as the patching base. Needed {((aRemoteNecessarySpaceMb * 3) / 1024):.2f} GB({(aRemoteNecessarySpaceMb * 3):.2f} MB), got {(_patch_base_space_available / 1024):.2f} GB({(_patch_base_space_available):.2f} MB)."
+                    _suggestion_msg = f"{_remote_node} does not have enough space in {aRemotePatchBase} to be used as the patching base. Needed {((aRemoteNecessarySpaceMb * _space_multiplier) / 1024):.2f} GB({(aRemoteNecessarySpaceMb * _space_multiplier):.2f} MB), got {(_patch_base_space_available / 1024):.2f} GB({(_patch_base_space_available):.2f} MB)."
                     _ret = INSUFFICIENT_SPACE_ON_PATCH_BASE
                     self.mGetHandler().mAddError(_ret, _suggestion_msg)
                     aStatus.append(
@@ -367,8 +380,12 @@ class ClusterlessPatchHelper(LogHandler):
                             self.mPatchLogInfo(
                                 f"Patch file : {_remote_patch_file} already staged on node : {_remote_node} and matches with source file checksum.")
 
+                            # Local launch-node cleanup and END space log (management host)
+                            self.mGetHandler().mCleanupRemoteDbserverPatchDirs(_node, aRemotePatchBase, _local_patch_file)
+                            self.mGetHandler().mLogSpaceUtilization(aRemotePatchBase, "END space", node=_node, aNodeType=_remote_node)
+
             except ValueError as e:
-                _suggestion_msg = f"Could not parse {aRemotePatchBase} for free space on {str(_remote_node)}. Expected a number, got {str(e)}. Trying a different node"
+                _suggestion_msg = f"Could not determine free space on {str(_remote_node)} at {aRemotePatchBase}. Reason: {str(e)}. Trying a different node"
                 _ret = PATCH_COPY_ERROR
                 aStatus.append(
                     {'node': _remote_node, 'status': 'failed', 'errorcode': _ret, 'errormessage': _suggestion_msg})
@@ -434,8 +451,12 @@ class ClusterlessPatchHelper(LogHandler):
         for _output in _out.readlines():
             _file_size = _output.strip()
 
-        # Patch unzip command is prepared based on patch file extension.
-        if _remote_patch_file.endswith('.zip'):
+        # Patch unzip command is prepared based on target type and file extension.
+        _patch_unzip_cmd = None
+        if self.mGetHandler().mGetCurrentTargetType() in [ PATCH_DOM0, PATCH_DOMU ]:
+            if 'dbserver.patch.zip' in os.path.basename(_remote_patch_file):
+                _patch_unzip_cmd = f"unzip -d {aRemotePatchBase} -o {_remote_patch_file}"
+        else:
             _patch_unzip_cmd = f"unzip -d {aRemotePatchBase} -o {_remote_patch_file}"
 
         """
@@ -537,5 +558,3 @@ class ClusterlessPatchHelper(LogHandler):
                 self.mPatchLogTrace(traceback.format_exc())
         if _node.mIsConnected():
             _node.mDisconnect()
-
-

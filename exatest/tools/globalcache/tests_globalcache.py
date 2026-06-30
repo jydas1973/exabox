@@ -2,7 +2,7 @@
 
  $Header: 
 
- Copyright (c) 2018, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2018, 2026, Oracle and/or its affiliates.
 
  NAME:
       tests_ebNode.py - Unitest for ebNode on clucontrol
@@ -16,6 +16,13 @@
  History:
 
     MODIFIED   (MM/DD/YY)
+       joysjose 06/22/26 - Check OEDA replay cp status
+       joysjose 06/22/26 - Test OEDA replay cp status failure
+       joysjose 06/22/26 - Bug 39588664 validate OEDA alias before shell
+                           commands
+       joysjose 06/22/26 - Bug 39588664 update global cache replay tests
+       joysjose 06/19/26 - Update global cache replay unit test
+       joysjose 05/12/26 - Bug 39354509 Add multigi OEDA requiredfile alias fallback
        joysjose 11/07/25 - Bug  38599605 - n-3 naming convention change
        ririgoye 02/20/24 - Bug 36315154 - Fixed unit tests to work with images
                            as dictionaries
@@ -226,7 +233,148 @@ class ebTestGlobalCache(ebTestClucontrol, unittest.TestCase):
         _factory.mValidateImageInventory()
         # Assert that process manager append is not called
         self.assertFalse(mock_manager_append.called)       
+
+    @patch("exabox.globalcache.GlobalCacheFactory.mGetMultiGIOedaSelection")
+    @patch("exabox.globalcache.GlobalCacheFactory.GlobalCacheWorker")
+    @patch("exabox.globalcache.GlobalCacheFactory.mStartWorker")
+    @patch("exabox.BaseServer.AsyncProcessing.ProcessManager.mJoinProcess")
+    @patch("exabox.BaseServer.AsyncProcessing.ProcessManager.mStartAppend")
+    def test_004_replay_multigi_oeda_alias_last(self, mock_manager_append,
+                                                mock_manager_join,
+                                                mock_start_worker,
+                                                mock_worker_class,
+                                                mock_get_selection):
+        _repoImages = [
+            {
+                "filename": "grid-klone-Linux-x86-64-232600251021.zip",
+                "shortversion": 10,
+                "longversion": 10,
+                "map": "grid-klone-Linux-x86-64-232600251021.zip",
+                "local": "images/grid-klone-Linux-x86-64-232600251021.zip",
+                "service": "EXACS",
+                "cdb": "False",
+                "sha256sum": "hash-old"
+            },
+            {
+                "filename": "grid-klone-Linux-x86-64-232610260115.zip",
+                "shortversion": 10,
+                "longversion": 10,
+                "map": "grid-klone-Linux-x86-64-232610260115.zip",
+                "local": "images/grid-klone-Linux-x86-64-232610260115.zip",
+                "service": "EXACS",
+                "cdb": "False",
+                "sha256sum": "hash-new"
+            }
+        ]
+        _dyndepImages = {
+            "dyndep_version": "2019.288"
+        }
+        self.mGetClubox().mSetImageFiles(_repoImages)
+        self.mGetClubox().mSetDyndepFiles(_dyndepImages)
+        mock_get_selection.return_value = {
+            "staged_basename": "grid-klone-Linux-x86-64-232610260115.zip",
+            "required_basename": "grid-klone-Linux-x86-64-2300026000.zip"
+        }
+
+        _events = []
+        _mock_worker = MagicMock()
+        _mock_worker.mReplayOedaRequiredReflink.side_effect = lambda *_args, **_kwargs: _events.append("replay")
+        mock_worker_class.return_value = _mock_worker
+        mock_manager_append.side_effect = lambda *_args, **_kwargs: _events.append("append")
+        mock_manager_join.side_effect = lambda *_args, **_kwargs: _events.append("join")
+
+        _dom0s, _, _, _ = self.mGetClubox().mReturnAllClusterHosts()
+        _factory = GlobalCacheFactory(self.mGetClubox())
+        _factory.mDoParallelCopy()
+
+        self.assertEqual(mock_manager_append.call_count, 2)
+        mock_start_worker.assert_not_called()
+        self.assertEqual(_events, ["append", "append", "join", "replay"])
+        mock_worker_class.assert_called_once_with(
+            "images/grid-klone-Linux-x86-64-232610260115.zip",
+            "hash-new",
+            _dom0s
+        )
+        _mock_worker.mReplayOedaRequiredReflink.assert_called_once_with(
+            "grid-klone-Linux-x86-64-2300026000.zip")
+
+
+    @patch('exabox.globalcache.GlobalCacheFactory.mGetMultiGIOedaSelection')
+    @patch('exabox.globalcache.GlobalCacheFactory.mStartWorker')
+    @patch('exabox.BaseServer.AsyncProcessing.ProcessManager.mJoinProcess')
+    @patch('exabox.BaseServer.AsyncProcessing.ProcessManager.mStartAppend')
+    def test_005_skip_replay_when_alias_matches_staged_name(self, mock_manager_append,
+                                                            mock_manager_join,
+                                                            mock_start_worker,
+                                                            mock_get_selection):
+        _repoImages = [
+            {
+                "filename": "grid-klone-Linux-x86-64-232610260115.zip",
+                "shortversion": 10,
+                "longversion": 10,
+                "map": "grid-klone-Linux-x86-64-232610260115.zip",
+                "local": "images/grid-klone-Linux-x86-64-232610260115.zip",
+                "service": "EXACS",
+                "cdb": "False",
+                "sha256sum": "hash-new"
+            }
+        ]
+        self.mGetClubox().mSetImageFiles(_repoImages)
+        self.mGetClubox().mSetDyndepFiles({"dyndep_version": "2019.288"})
+        mock_get_selection.return_value = {
+            "staged_basename": "grid-klone-Linux-x86-64-232610260115.zip",
+            "required_basename": "grid-klone-Linux-x86-64-232610260115.zip"
+        }
+
+        _factory = GlobalCacheFactory(self.mGetClubox())
+        _factory.mDoParallelCopy()
+
+        mock_manager_append.assert_called_once()
+        mock_manager_join.assert_called_once()
+        mock_start_worker.assert_not_called()
+
+    @patch("exabox.globalcache.GlobalCacheFactory.mGetMultiGIOedaSelection")
+    @patch("exabox.globalcache.GlobalCacheFactory.GlobalCacheWorker")
+    @patch("exabox.globalcache.GlobalCacheFactory.mStartWorker")
+    @patch("exabox.BaseServer.AsyncProcessing.ProcessManager.mJoinProcess")
+    @patch("exabox.BaseServer.AsyncProcessing.ProcessManager.mStartAppend")
+    def test_006_replay_multigi_oeda_alias_propagates_worker_failure(
+            self, mock_manager_append, mock_manager_join, mock_start_worker,
+            mock_worker_class, mock_get_selection):
+        _repoImages = [
+            {
+                "filename": "grid-klone-Linux-x86-64-232610260115.zip",
+                "shortversion": 10,
+                "longversion": 10,
+                "map": "grid-klone-Linux-x86-64-232610260115.zip",
+                "local": "images/grid-klone-Linux-x86-64-232610260115.zip",
+                "service": "EXACS",
+                "cdb": "False",
+                "sha256sum": "hash-new"
+            }
+        ]
+        self.mGetClubox().mSetImageFiles(_repoImages)
+        self.mGetClubox().mSetDyndepFiles({"dyndep_version": "2019.288"})
+        mock_get_selection.return_value = {
+            "staged_basename": "grid-klone-Linux-x86-64-232610260115.zip",
+            "required_basename": "grid-klone-Linux-x86-64-2300026000.zip"
+        }
+        _mock_worker = MagicMock()
+        _mock_worker.mReplayOedaRequiredReflink.side_effect = ExacloudRuntimeError(
+            0x0754, 0x0A, "Staged image missing")
+        mock_worker_class.return_value = _mock_worker
+
+        _factory = GlobalCacheFactory(self.mGetClubox())
+        with self.assertRaises(ExacloudRuntimeError):
+            _factory.mDoParallelCopy()
+
+        mock_manager_append.assert_called_once()
+        mock_manager_join.assert_called_once()
+        mock_start_worker.assert_not_called()
+        _mock_worker.mReplayOedaRequiredReflink.assert_called_once_with(
+            "grid-klone-Linux-x86-64-2300026000.zip")
         
+
 class TestGlobalCacheWorker(ebTestClucontrol, unittest.TestCase):
     def setUp(self):
         # Create a GlobalCacheWorker instance
@@ -257,7 +405,151 @@ class TestGlobalCacheWorker(ebTestClucontrol, unittest.TestCase):
         )
         self.assertGreaterEqual(self.dummy_node.mExecuteCmd.call_count, 3)
 
+    @patch.object(GlobalCacheWorker, 'mGetImageRemotePath')
+    def test_mCreateSymbolicLink_grid_klone_with_oeda_alias(self, mock_mGetImageRemotePath):
+        mock_mGetImageRemotePath.return_value = '/EXAVMIMAGES/GlobalCache/grid-klone-Linux-x86-64-232610260115.zip'
+        self.worker._GlobalCacheWorker__additionalAliases = ['grid-klone-Linux-x86-64-2300026000.zip']
+        with patch('os.path.basename', return_value='grid-klone-Linux-x86-64-232610260115.zip'):
+            self.worker.mCreateSymbolicLink('dom0-test')
 
+        self.dummy_node.mExecuteCmd.assert_any_call(
+            '/bin/rm -f /EXAVMIMAGES/grid-klone-Linux-x86-64-2300026000.zip')
+        self.dummy_node.mExecuteCmd.assert_any_call(
+            '/bin/cp --reflink /EXAVMIMAGES/GlobalCache/grid-klone-Linux-x86-64-232610260115.zip /EXAVMIMAGES/grid-klone-Linux-x86-64-2300026000.zip')
+
+    @patch.object(GlobalCacheWorker, 'mGetImageRemotePath')
+    def test_mCreateSymbolicLink_rejects_invalid_oeda_alias(self, mock_mGetImageRemotePath):
+        mock_mGetImageRemotePath.return_value = '/EXAVMIMAGES/GlobalCache/grid-klone-Linux-x86-64-232610260115.zip'
+        self.worker._GlobalCacheWorker__additionalAliases = ['../grid-klone.zip']
+        with patch('os.path.basename', return_value='grid-klone-Linux-x86-64-232610260115.zip'):
+            with self.assertRaises(ExacloudRuntimeError):
+                self.worker.mCreateSymbolicLink('dom0-test')
+
+        self.dummy_node.mExecuteCmd.assert_not_called()
+
+    @patch.object(GlobalCacheWorker, 'mGetImageRemotePath')
+    def test_mCreateSymbolicLink_rejects_invalid_image_basename(self, mock_mGetImageRemotePath):
+        mock_mGetImageRemotePath.return_value = '/EXAVMIMAGES/GlobalCache/grid-klone-Linux-x86-64-latest.zip'
+        with patch('os.path.basename', return_value='grid-klone-Linux-x86-64-latest.zip'):
+            with self.assertRaises(ExacloudRuntimeError):
+                self.worker.mCreateSymbolicLink('dom0-test')
+
+        self.dummy_node.mExecuteCmd.assert_not_called()
+
+    @patch.object(GlobalCacheWorker, 'mGetImageRemotePath')
+    def test_mCreateSymbolicLink_skips_duplicate_oeda_alias(self, mock_mGetImageRemotePath):
+        mock_mGetImageRemotePath.return_value = '/EXAVMIMAGES/GlobalCache/grid-klone-Linux-x86-64-232600251021.zip'
+        self.worker._GlobalCacheWorker__additionalAliases = ['grid-klone-Linux-x86-64-2300026000.zip']
+        with patch('os.path.basename', return_value='grid-klone-Linux-x86-64-232600251021.zip'):
+            self.worker.mCreateSymbolicLink('dom0-test')
+
+        self.assertEqual(self.worker.mGetAdditionalAliases(), ['grid-klone-Linux-x86-64-2300026000.zip'])
+        self.assertEqual(self.dummy_node.mExecuteCmd.call_count, 3)
+
+
+
+    def test_mCreateOedaRequiredReflink_uses_staged_global_cache_image(self):
+        _worker = GlobalCacheWorker(
+            "images/grid-klone-Linux-x86-64-232610260115.zip",
+            "hash-new",
+            ["dom0-test"])
+        _node = MagicMock()
+        _node.mFileExists.return_value = True
+        _node.mGetCmdExitStatus.return_value = 0
+        _worker._GlobalCacheWorker__connections = {"dom0-test": _node}
+
+        _worker.mCreateOedaRequiredReflink(
+            "dom0-test",
+            "grid-klone-Linux-x86-64-2300026000.zip")
+
+        _node.mFileExists.assert_called_once_with(
+            "/EXAVMIMAGES/GlobalCache/grid-klone-Linux-x86-64-232610260115.zip")
+        _node.mExecuteCmd.assert_any_call(
+            "/bin/rm -f /EXAVMIMAGES/grid-klone-Linux-x86-64-2300026000.zip")
+        _node.mExecuteCmd.assert_any_call(
+            "/bin/cp --reflink /EXAVMIMAGES/GlobalCache/grid-klone-Linux-x86-64-232610260115.zip "
+            "/EXAVMIMAGES/grid-klone-Linux-x86-64-2300026000.zip")
+
+    def test_mCreateOedaRequiredReflink_fails_when_cp_reflink_fails(self):
+        _worker = GlobalCacheWorker(
+            "images/grid-klone-Linux-x86-64-232610260115.zip",
+            "hash-new",
+            ["dom0-test"])
+        _node = MagicMock()
+        _node.mFileExists.return_value = True
+        _node.mGetCmdExitStatus.return_value = 1
+        _worker._GlobalCacheWorker__connections = {"dom0-test": _node}
+
+        with self.assertRaises(ExacloudRuntimeError) as _err:
+            _worker.mCreateOedaRequiredReflink(
+                "dom0-test",
+                "grid-klone-Linux-x86-64-2300026000.zip")
+
+        _msg = _err.exception.mGetErrorMsg()
+        self.assertIn("dom0-test", _msg)
+        self.assertIn(
+            "/EXAVMIMAGES/GlobalCache/grid-klone-Linux-x86-64-232610260115.zip",
+            _msg)
+        self.assertIn(
+            "/EXAVMIMAGES/grid-klone-Linux-x86-64-2300026000.zip",
+            _msg)
+        _node.mExecuteCmd.assert_any_call(
+            "/bin/cp --reflink /EXAVMIMAGES/GlobalCache/grid-klone-Linux-x86-64-232610260115.zip "
+            "/EXAVMIMAGES/grid-klone-Linux-x86-64-2300026000.zip")
+
+    def test_mCreateOedaRequiredReflink_fails_when_staged_missing(self):
+        _worker = GlobalCacheWorker(
+            "images/grid-klone-Linux-x86-64-232610260115.zip",
+            "hash-new",
+            ["dom0-test"])
+        _node = MagicMock()
+        _node.mFileExists.return_value = False
+        _worker._GlobalCacheWorker__connections = {"dom0-test": _node}
+
+        with self.assertRaises(ExacloudRuntimeError):
+            _worker.mCreateOedaRequiredReflink(
+                "dom0-test",
+                "grid-klone-Linux-x86-64-2300026000.zip")
+
+        _node.mFileExists.assert_called_once_with(
+            "/EXAVMIMAGES/GlobalCache/grid-klone-Linux-x86-64-232610260115.zip")
+        _node.mExecuteCmd.assert_not_called()
+
+    def test_mReplayOedaRequiredReflink_uses_worker_lock(self):
+        _worker = GlobalCacheWorker(
+            "images/grid-klone-Linux-x86-64-232610260115.zip",
+            "hash-new",
+            ["dom0-test"])
+        _node = MagicMock()
+        _node.mFileExists.return_value = True
+        _node.mGetCmdExitStatus.return_value = 0
+        _worker._GlobalCacheWorker__connections = {"dom0-test": _node}
+
+        with patch.object(_worker, "mCreateConnections"), \
+             patch.object(_worker, "mCloseConnections"), \
+             patch("exabox.globalcache.GlobalCacheWorker.ExaLock") as mock_lock:
+            _worker.mReplayOedaRequiredReflink(
+                "grid-klone-Linux-x86-64-2300026000.zip")
+
+        mock_lock.assert_called_once_with(
+            "dom0_global_cache_grid-klone-Linux-x86-64-232610260115.zip")
+        _node.mExecuteCmd.assert_any_call(
+            "/bin/rm -f /EXAVMIMAGES/grid-klone-Linux-x86-64-2300026000.zip")
+        _node.mExecuteCmd.assert_any_call(
+            "/bin/cp --reflink /EXAVMIMAGES/GlobalCache/grid-klone-Linux-x86-64-232610260115.zip "
+            "/EXAVMIMAGES/grid-klone-Linux-x86-64-2300026000.zip")
+
+    def test_mReplayOedaRequiredReflink_rejects_invalid_required_basename(self):
+        _worker = GlobalCacheWorker(
+            "images/grid-klone-Linux-x86-64-232610260115.zip",
+            "hash-new",
+            ["dom0-test"])
+
+        with patch.object(_worker, "mCreateConnections") as mock_create_connections:
+            with self.assertRaises(ExacloudRuntimeError):
+                _worker.mReplayOedaRequiredReflink("../grid-klone.zip")
+
+        mock_create_connections.assert_not_called()
 
 if __name__ == '__main__':
     unittest.main(warnings='ignore')

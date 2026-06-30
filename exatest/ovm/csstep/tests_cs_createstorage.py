@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    avimonda    05/12/26 - Add critical CELL alert precheck tests
 #    bhpati      01/13/26 - Bug 38734450 - Added CELL services validation
 #                           before createstorage step
 #    aararora    03/19/25 - Bug 37508799: Optimize call to mValidateGridDisks -
@@ -44,6 +45,7 @@ class ebTestCSCreateStorage(ebTestClucontrol):
     @patch("exabox.ovm.clucontrol.exaBoxCluCtrl.mValidateGridDisks", return_value=0)
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mFetchOedaStep')
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mCheckCellConfig')
+    @patch('exabox.ovm.csstep.cs_createstorage.ebCluPreChecks')
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mCellAssertNormalStatus')
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mUpdateStatusCS')
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mReleaseRemoteLock')
@@ -52,18 +54,22 @@ class ebTestCSCreateStorage(ebTestClucontrol):
     @patch('exabox.ovm.csstep.cs_util.csUtil.mExecuteOEDAStep')
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mDeleteCloudUser')
     def test_doExecute(self, mock_mDeleteCloudUser, mock_mExecuteOEDAStep, mock_mCheckCellsServicesUp, mock_mAcquireRemoteLock,
-                         mock_mReleaseRemoteLock, mock_mUpdateStatusCS, mock_mCellAssertNormalStatus, mock_mCheckCellConfig,
-                         mock_mFetchOedaStep, mock_mValidateGridDisks):
+                         mock_mReleaseRemoteLock, mock_mUpdateStatusCS, mock_mCellAssertNormalStatus,
+                         mock_ebCluPreChecks, mock_mCheckCellConfig, mock_mFetchOedaStep,
+                         mock_mValidateGridDisks):
       _ebox = self.mGetClubox()
       _options = copy.deepcopy(self.mGetClubox().mGetArgsOptions())
       _step_list = ["ESTP_CREATE_STORAGE"]
 
       _handler = csCreateStorage()
       _handler.doExecute(_ebox, _options, _step_list)
+      mock_ebCluPreChecks.assert_called_once_with(_ebox)
+      mock_ebCluPreChecks.return_value.mCheckCellCriticalHardwareAlerts.assert_called_once()
     
     @patch("exabox.ovm.clucontrol.exaBoxCluCtrl.mValidateGridDisks", return_value=0)
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mFetchOedaStep')
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mCheckCellConfig')
+    @patch('exabox.ovm.csstep.cs_createstorage.ebCluPreChecks')
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mCellAssertNormalStatus')
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mUpdateStatusCS')
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mReleaseRemoteLock')
@@ -72,14 +78,17 @@ class ebTestCSCreateStorage(ebTestClucontrol):
     @patch('exabox.ovm.csstep.cs_util.csUtil.mExecuteOEDAStep')
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mDeleteCloudUser')
     def test_doExecute_success(self, mock_mDeleteCloudUser, mock_mExecuteOEDAStep, mock_mCheckCellsServicesUp, mock_mAcquireRemoteLock,
-                         mock_mReleaseRemoteLock, mock_mUpdateStatusCS, mock_mCellAssertNormalStatus, mock_mCheckCellConfig,
-                         mock_mFetchOedaStep, mock_mValidateGridDisks):
+                         mock_mReleaseRemoteLock, mock_mUpdateStatusCS, mock_mCellAssertNormalStatus,
+                         mock_ebCluPreChecks, mock_mCheckCellConfig, mock_mFetchOedaStep,
+                         mock_mValidateGridDisks):
       _ebox = self.mGetClubox()
       _options = copy.deepcopy(self.mGetClubox().mGetArgsOptions())
       _step_list = ["ESTP_CREATE_STORAGE"]
 
       _handler = csCreateStorage()
       _handler.doExecute(_ebox, _options, _step_list)
+      mock_ebCluPreChecks.assert_called_once_with(_ebox)
+      mock_ebCluPreChecks.return_value.mCheckCellCriticalHardwareAlerts.assert_called_once()
 
     @patch("exabox.ovm.clucontrol.exaBoxCluCtrl.mValidateGridDisks", return_value=0)
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mCellAssertNormalStatus')

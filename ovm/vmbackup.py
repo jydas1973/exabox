@@ -13,6 +13,9 @@ NOTE:
 History:
 
     MODIFIED   (MM/DD/YY)
+       enrivera 05/21/26 - Bug 39370281 - VM BACKUP VERSION INCONSISTENCY
+                           ACROSS PYTHON VERSIONS IN NEW QMR BUNDLE
+       remamid  03/31/26 - Refactor SSH config handling
        arturjim 03/26/26 - Enh 39029904 - ECRA:VMBACKUP: ADD SUPPORT TO
                            RUN VM BACKUP PER CLUSTER
        aararora 02/27/26 - Bug 38902170: Correct resource leak issues
@@ -196,12 +199,15 @@ from exabox.BaseServer.AsyncProcessing import ProcessManager, ProcessStructure
 from multiprocessing import Manager, Process
 from tempfile import NamedTemporaryFile
 from exabox.utils.ExaRegion import get_r1_certificate_path
-from exabox.utils.node import (connect_to_host, node_exec_cmd,
-        node_exec_cmd_check, node_cmd_abs_path_check)
+from exabox.utils.node import (
+    connect_to_host, node_exec_cmd, node_exec_cmd_check,
+    node_cmd_abs_path_check)
+from exabox.ovm.csstep.cs_util import csUtil
 
 import socket
 import time
 import os
+import shlex
 import json
 import fileinput
 import uuid
@@ -213,7 +219,6 @@ import ast
 import datetime
 import copy
 import shutil
-import tarfile
 from concurrent import futures
 
 class ebCluManageVMBackup(object):
@@ -733,65 +738,314 @@ class ebCluManageVMBackup(object):
         #ebLogDebug('*** VMBackup version: {0}'.format(_out.split()[1]))
         return True
 
+    def mQuoteVMbackupManagedPath(self, aPath):
+        """Validate and shell-quote a managed vmbackup path."""
+
+        _path = os.path.normpath(aPath)
+        _allowed_roots = (
+            '/opt/exacloud/vmbackup',
+            '/opt/python-vmbackup',
+            '/opt/python-vmbackup.new',
+            '/opt/python-vmbackup.old',
+        )
+
+        if not any(_path == _root or _path.startswith(_root + os.sep)
+                for _root in _allowed_roots):
+            raise ValueError(f"Unexpected vmbackup managed path: {_path}")
+
+        return shlex.quote(_path)
+
+    def mCleanupVMbackupRuntimePaths(self, aNode, aDestDir, aInstallPath,
+            aIncludeBackup=False, aWarnOnly=True):
+        """Remove temporary vmbackup runtime paths used by install/patch.
+
+        Args:
+            aNode: Connected dom0 node object.
+            aDestDir: Remote vmbackup staging directory.
+            aInstallPath: Active vmbackup runtime path.
+            aIncludeBackup: Remove the backup runtime path when True.
+            aWarnOnly: Log cleanup failures as warnings when True.
+
+        Returns:
+            int: 0 on success, 1 on cleanup error when aWarnOnly is False.
+        """
+
+        _paths = [
+                  os.path.join(aDestDir, 'python-runtime-stage'),
+                  aInstallPath + '.new'
+                 ]
+        if aIncludeBackup:
+            _paths.append(aInstallPath + '.old')
+
+        _quoted_paths = [self.mQuoteVMbackupManagedPath(_path) for _path in _paths]
+
+        for _path, _path_q in zip(_paths, _quoted_paths):
+            aNode.mExecuteCmd(f'rm -rf {_path_q}')
+            if aNode.mGetCmdExitStatus():
+                _log = (f"*** Failed to cleanup vmbackup runtime path "
+                    f"'{_path}' on node '{aNode.mGetHostname()}'")
+                if aWarnOnly:
+                    ebLogWarn(_log)
+                else:
+                    ebLogError(_log)
+                    return 1
+        return 0
+
+    def mActivateVMbackupRuntime(self, aNode, aInterpreterBitsRemote,
+            aDestDir, aInstallPath):
+        """Stage and activate the vmbackup Python runtime during install/patch.
+
+        Args:
+            aNode: Connected dom0 node object.
+            aInterpreterBitsRemote: Remote path to python-for-vmbackup.tgz.
+            aDestDir: Remote vmbackup staging directory.
+            aInstallPath: Final vmbackup runtime path.
+
+        Returns:
+            int: 0 on success, 1 if staging or activation fails.
+        """
+
+        _stage_root = os.path.join(aDestDir, 'python-runtime-stage')
+        _stage_install_path = os.path.join(_stage_root, 'opt', 'python-vmbackup')
+        _staged_install_path = aInstallPath + '.new'
+        _backup_install_path = aInstallPath + '.old'
+        _stage_root_q = self.mQuoteVMbackupManagedPath(_stage_root)
+        _stage_install_path_q = self.mQuoteVMbackupManagedPath(_stage_install_path)
+        _staged_install_path_q = self.mQuoteVMbackupManagedPath(_staged_install_path)
+        _backup_install_path_q = self.mQuoteVMbackupManagedPath(_backup_install_path)
+        _install_path_q = self.mQuoteVMbackupManagedPath(aInstallPath)
+        _interpreter_bits_remote_q = self.mQuoteVMbackupManagedPath(aInterpreterBitsRemote)
+
+        if self.mCleanupVMbackupRuntimePaths(
+                aNode, aDestDir, aInstallPath, aIncludeBackup=True,
+                aWarnOnly=False) != 0:
+            return 1
+
+        aNode.mExecuteCmd(f'mkdir -p {_stage_root_q}')
+        if aNode.mGetCmdExitStatus():
+            _log = (f"*** Failed to create vmbackup runtime stage path "
+                f"'{_stage_root}' on node '{aNode.mGetHostname()}'")
+            ebLogError(_log)
+            return 1
+
+        aNode.mExecuteCmd(
+            f'tar -xzf {_interpreter_bits_remote_q} -C {_stage_root_q}')
+        if aNode.mGetCmdExitStatus():
+            _log = (f"*** Failed to extract vmbackup interpreter bits "
+                f"'{aInterpreterBitsRemote}' into '{_stage_root}' on node "
+                f"'{aNode.mGetHostname()}'")
+            ebLogError(_log)
+            self.mCleanupVMbackupRuntimePaths(
+                aNode, aDestDir, aInstallPath, aWarnOnly=True)
+            return 1
+
+        if not aNode.mFileExists(_stage_install_path):
+            _log = (f"*** Failed to locate staged vmbackup runtime "
+                f"'{_stage_install_path}' on node '{aNode.mGetHostname()}'")
+            ebLogError(_log)
+            self.mCleanupVMbackupRuntimePaths(
+                aNode, aDestDir, aInstallPath, aWarnOnly=True)
+            return 1
+
+        aNode.mExecuteCmd(f'mv {_stage_install_path_q} {_staged_install_path_q}')
+        if aNode.mGetCmdExitStatus():
+            _log = (f"*** Failed to move staged vmbackup runtime from "
+                f"'{_stage_install_path}' to '{_staged_install_path}' on "
+                f"node '{aNode.mGetHostname()}'")
+            ebLogError(_log)
+            self.mCleanupVMbackupRuntimePaths(
+                aNode, aDestDir, aInstallPath, aWarnOnly=True)
+            return 1
+
+        aNode.mExecuteCmd(f'rm -rf {_stage_root_q}')
+        if aNode.mGetCmdExitStatus():
+            ebLogWarn(f"*** Failed to cleanup vmbackup runtime stage path "
+                f"'{_stage_root}' on node '{aNode.mGetHostname()}'")
+
+        if aNode.mFileExists(aInstallPath):
+            aNode.mExecuteCmd(f'mv {_install_path_q} {_backup_install_path_q}')
+            if aNode.mGetCmdExitStatus():
+                _log = (f"*** Failed to move current vmbackup runtime from "
+                    f"'{aInstallPath}' to '{_backup_install_path}' on node "
+                    f"'{aNode.mGetHostname()}'")
+                ebLogError(_log)
+                self.mCleanupVMbackupRuntimePaths(
+                    aNode, aDestDir, aInstallPath, aWarnOnly=True)
+                return 1
+
+        aNode.mExecuteCmd(f'mv {_staged_install_path_q} {_install_path_q}')
+        if aNode.mGetCmdExitStatus():
+            _log = (f"*** Failed to activate staged vmbackup runtime from "
+                f"'{_staged_install_path}' to '{aInstallPath}' on node "
+                f"'{aNode.mGetHostname()}'")
+            ebLogError(_log)
+            self.mRestorePreviousVMbackupRuntime(aNode, aDestDir, aInstallPath)
+            return 1
+        return 0
+
+    def mRestorePreviousVMbackupRuntime(self, aNode, aDestDir, aInstallPath):
+        """Restore the previous vmbackup runtime after install/patch failure.
+
+        Args:
+            aNode: Connected dom0 node object.
+            aDestDir: Remote vmbackup staging directory.
+            aInstallPath: Final vmbackup runtime path.
+
+        Returns:
+            int: 0 when the previous runtime is restored, 1 otherwise.
+        """
+
+        _backup_install_path = aInstallPath + '.old'
+        _backup_install_path_q = self.mQuoteVMbackupManagedPath(_backup_install_path)
+        _install_path_q = self.mQuoteVMbackupManagedPath(aInstallPath)
+        _rc = 1
+
+        if aNode.mFileExists(_backup_install_path):
+            aNode.mExecuteCmd(f'rm -rf {_install_path_q}')
+            if aNode.mGetCmdExitStatus():
+                ebLogWarn(f"*** Failed to cleanup vmbackup runtime path "
+                    f"'{aInstallPath}' before restore on node "
+                    f"'{aNode.mGetHostname()}'")
+
+            aNode.mExecuteCmd(f'mv {_backup_install_path_q} {_install_path_q}')
+            if aNode.mGetCmdExitStatus():
+                _log = (f"*** Failed to restore previous vmbackup runtime "
+                    f"from '{_backup_install_path}' to '{aInstallPath}' on "
+                    f"node '{aNode.mGetHostname()}'")
+                ebLogError(_log)
+            else:
+                ebLogInfo(f"*** Restored previous vmbackup runtime on node "
+                    f"'{aNode.mGetHostname()}'")
+                _rc = 0
+        else:
+            ebLogWarn(f"*** No previous vmbackup runtime found to restore "
+                f"on node '{aNode.mGetHostname()}'")
+
+        self.mCleanupVMbackupRuntimePaths(
+            aNode, aDestDir, aInstallPath, aWarnOnly=True)
+        return _rc
+
+    def mCleanupVMbackupInterpreterBits(self, aNode, aDestDir):
+        """Remove the staged vmbackup Python tarball after install/patch success.
+
+        Args:
+            aNode: Connected dom0 node object.
+            aDestDir: Remote vmbackup staging directory.
+
+        Returns:
+            int: 0 on success, 1 if the tarball cleanup fails.
+        """
+
+        _interpreter_bits_remote = os.path.join(
+            aDestDir, 'python-for-vmbackup.tgz')
+        _interpreter_bits_remote_q = self.mQuoteVMbackupManagedPath(
+            _interpreter_bits_remote)
+        if not aNode.mFileExists(_interpreter_bits_remote):
+            return 0
+
+        aNode.mExecuteCmd(f'rm -f {_interpreter_bits_remote_q}')
+        if aNode.mGetCmdExitStatus():
+            ebLogWarn(f"*** Failed to remove staged vmbackup interpreter bits "
+                f"'{_interpreter_bits_remote}' on node "
+                f"'{aNode.mGetHostname()}'")
+            return 1
+
+        ebLogInfo(f"*** Removed staged vmbackup interpreter bits "
+            f"'{_interpreter_bits_remote}' on node '{aNode.mGetHostname()}'")
+        return 0
+
     # mInstallVMbackupOnDom0:
     # Install VMbackup utility on single dom0, for local backups
     def mInstallVMbackupOnDom0(self, aOptions, aNode, aPatching=False):
+        """Install or patch vmbackup on one dom0.
+
+        Steps:
+            1. Stage the vmbackup runtime and package bits on the dom0.
+            2. Activate the staged Python runtime.
+            3. Extract the vmbackup release package.
+            4. Run install.sh from the staged release directory.
+            5. On failure, restore the previous runtime.
+            6. On success, clean staging paths and optionally configure vmbackup.
+            7. Remove the staged Python tarball after success.
+
+        Args:
+            aOptions: Parsed install or patch options.
+            aNode: Connected dom0 node object.
+            aPatching: True when running the patch flow.
+
+        Returns:
+            int: 0 on success, 1 on install or patch failure.
+        """
 
         _options = aOptions
         _vmbackupdata = self.mGetVMBackupData()
         _node = aNode
         _dest_dir = '/opt/exacloud/vmbackup/'
         _install_path = '/opt/python-vmbackup'
+        _interpreter_bits_remote = os.path.join(
+            _dest_dir, 'python-for-vmbackup.tgz')
+        _package_bits_remote = os.path.join(
+            _dest_dir, 'release-vmbackup.tgz')
+        _release_dir = os.path.join(_dest_dir, 'release-vmbackup')
+        _package_bits_remote_q = self.mQuoteVMbackupManagedPath(_package_bits_remote)
+        _release_dir_q = self.mQuoteVMbackupManagedPath(_release_dir)
 
         # Regardless of OL6 or OL7, we use the same python bits
         # Bug 35054534
         _interpreter_bits = self.VMBACKUPINT_BITS + '.tgz'
         _package_bits = glob.glob(self.VMBACKUPPKG_BITS + '*[0-9].tgz').pop()
-        _node.mExecuteCmd('mkdir -p ' + _dest_dir + 'release-vmbackup/')
-        _node.mExecuteCmd('rm -f ' + _dest_dir + 'release-vmbackup/*')
-        _node.mCopyFile(_interpreter_bits, _dest_dir + 'python-for-vmbackup.tgz')
-        _node.mCopyFile(_package_bits, _dest_dir +  'release-vmbackup.tgz')
+        _node.mExecuteCmd(f'mkdir -p {_release_dir_q}')
+        _node.mExecuteCmd(f'rm -f {_release_dir_q}/*')
+        _node.mCopyFile(_interpreter_bits, _interpreter_bits_remote)
+        _node.mCopyFile(_package_bits, _package_bits_remote)
 
-        # Check if dom0 on-disk has Python 3.6
-        _i, _o, _e = _node.mExecuteCmd('test -f {0}/bin/python3.6 && echo "exists" || echo "notfound"'.format(_install_path))
-        _disk_36 = "exists" in _o.read().strip()
-
-        # Check if tar.gz has Python 3.8
-        _tar_38 = False  # Initialize
-        try:
-            with tarfile.open(_interpreter_bits, 'r:gz') as tar:
-                members = tar.getnames()
-                _tar_38 = any('python3.8' in m and 'python-vmbackup/bin' in m for m in members)
-        except Exception as e:
-            ebLogError("Error reading tar file {0}: {1}".format(_interpreter_bits, str(e)))
-
-        # Delete /opt/python-vmbackup ONLY if upgrading from 3.6 to 3.8
-        # this is to avoid mangling of 3.6 & 3.8 libs, leading to runtime errors.
-        if _disk_36 and _tar_38:
-            ebLogInfo("Upgrading Python 3.6 → 3.8: Deleting old python 3.6 installation")
-            _node.mExecuteCmd('rm -rf {0}'.format(_install_path))
-
-        _node.mExecuteCmd('tar -xzf {0}python-for-vmbackup.tgz -C /'.format(_dest_dir))
-        _node.mExecuteCmd('tar -xzf {0}release-vmbackup.tgz --strip-components=1 -C {0}release-vmbackup'.format(_dest_dir))
-        _cmd_str = 'cd {0}release-vmbackup && ./install.sh'.format(_dest_dir)
-        _i,_o,_e = _node.mExecuteCmd(_cmd_str)
-        if self.mCheckVMbackupInstalled(_node):
-            # Proceed to configuration
-            if not aPatching:
-                self.mConfigureVMBackup(_options,_node,aPatching)
-                _log = '*** Vmbackup is installed and configured on dom0: {0}'.format(_node.mGetHostname())
-            else:
-                _log = '*** Vmbackup is patched on dom0: {0}'.format(_node.mGetHostname())
-            ebLogInfo(_log)
+        if self.mActivateVMbackupRuntime(
+                _node, _interpreter_bits_remote, _dest_dir, _install_path) != 0:
+            _log = ("*** Error while activating vmbackup python runtime "
+                f"on dom0: {_node.mGetHostname()}")
+            ebLogError(_log)
             _vmbackupdata["Log"] = _log
-            _vmbackupdata["Exacloud Cmd Status"] = self.PASS
-            _rc = 0
-        else:
-            _log = '*** Error during Vmbackup installation: cmd {0} returned {1}, error {2}'.format(_cmd_str, str(_o.readlines()), str(_e.readlines()))
+            _vmbackupdata["Exacloud Cmd Status"] = self.FAIL
+            return 1
+
+        _node.mExecuteCmd(
+            f'tar -xzf {_package_bits_remote_q} --strip-components=1 -C {_release_dir_q}')
+        if _node.mGetCmdExitStatus():
+            self.mRestorePreviousVMbackupRuntime(_node, _dest_dir, _install_path)
+            _log = (f"*** Error while extracting vmbackup package on dom0: "
+                f"{_node.mGetHostname()}")
+            ebLogError(_log)
+            _vmbackupdata["Log"] = _log
+            _vmbackupdata["Exacloud Cmd Status"] = self.FAIL
+            return 1
+
+        _cmd_str = f'cd {_release_dir_q} && ./install.sh'
+        _i,_o,_e = _node.mExecuteCmd(_cmd_str)
+        if _node.mGetCmdExitStatus() or not self.mCheckVMbackupInstalled(_node):
+            self.mRestorePreviousVMbackupRuntime(_node, _dest_dir, _install_path)
+            _log = (f"*** Error during Vmbackup installation: cmd {_cmd_str} "
+                f"returned {str(_o.readlines())}, error {str(_e.readlines())}")
             ebLogError(_log)
             _vmbackupdata["Log"] = _log
             _vmbackupdata["Exacloud Cmd Status"] = self.FAIL
             _rc = 1
+        else:
+            # Cleanup runtime staging paths
+            self.mCleanupVMbackupRuntimePaths(
+                _node, _dest_dir, _install_path, aIncludeBackup=True,
+                aWarnOnly=True)
+            # Proceed to configuration
+            if not aPatching:
+                self.mConfigureVMBackup(_options,_node,aPatching)
+                _log = ("*** Vmbackup is installed and configured on dom0: "
+                    f"{_node.mGetHostname()}")
+            else:
+                _log = f"*** Vmbackup is patched on dom0: {_node.mGetHostname()}"
+            self.mCleanupVMbackupInterpreterBits(_node, _dest_dir)
+            ebLogInfo(_log)
+            _vmbackupdata["Log"] = _log
+            _vmbackupdata["Exacloud Cmd Status"] = self.PASS
+            _rc = 0
         return _rc
 
     # mInstallVMbackup:
@@ -2646,21 +2900,35 @@ class ebCluManageVMBackup(object):
         _node.mDisconnect()
 
     def mSetSSHDOptions(self, aOptions, aNode):
-        _options = aOptions
-        _cmd_list = list()
         _rc = 0
-        _cmd_list.append("/bin/sed 's/^ClientAliveCountMax.*/ClientAliveCountMax 24/' -i /etc/ssh/sshd_config")
-        _cmd_list.append("/bin/sed 's/^ClientAliveInterval.*/ClientAliveInterval 600/' -i /etc/ssh/sshd_config")
-        _cmd_list.append("/sbin/service sshd restart")
-        for _cmd in _cmd_list:
-            _, _o, _e = aNode.mExecuteCmd(_cmd)
-            _rc = aNode.mGetCmdExitStatus() 
-            if aNode.mGetCmdExitStatus() != 0:
-                _err = _e.read()
-                _log = "*** Failed to execute command : '{0}', Node: '{1}' Error:[{2}]".format(_cmd,\
-                    aNode.mGetHostname(), str(_err.rstrip()))
-                ebLogError(_log)
-                return _rc 
+        cs_util = csUtil()
+        try:
+            _, changed = cs_util.mUpdateExacloudSshd(
+                aNode,
+                {
+                    'ClientAliveCountMax': '24',
+                    'ClientAliveInterval': '600'
+                },
+                disable_cb=lambda: node_exec_cmd_check(
+                    aNode, "/opt/oracle.SupportTools/exadataAIDE -disable"
+                ),
+                enable_cb=lambda: node_exec_cmd_check(
+                    aNode, "/opt/oracle.SupportTools/exadataAIDE -enable"
+                ),
+                update_cb=lambda: node_exec_cmd_check(
+                    aNode, "/opt/oracle.SupportTools/exadataAIDE -update"
+                ),
+            )
+            if changed:
+                node_exec_cmd_check(aNode, "/sbin/service sshd restart")
+            else:
+                ebLogInfo("*** SSHD keep-alive settings already configured; "
+                          "skipping service restart")
+        except ExacloudRuntimeError as ex:
+            _log = ("*** Failed to update sshd options on '{0}': {1}"
+                    .format(aNode.mGetHostname(), ex))
+            ebLogError(_log)
+            _rc = 1
         return _rc
 
 

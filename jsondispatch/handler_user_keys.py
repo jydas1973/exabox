@@ -4,7 +4,7 @@
 #
 # handler_user_keys.py
 #
-# Copyright (c) 2024, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2024, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      handler_user_keys.py - <one-line expansion of the name>
@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    joysjose    03/25/26 - 38900232 Voxio code fix - Dir exabox/jsondispatch/
 #    gparada     07/15/25 - 38145249 Need to consider DomUs in ExaCC ADB
 #    gparada     04/14/25 - 37828983 ssh CPS' as ecra usr, exec cmds with sudo
 #    gparada     11/21/24 - 37260301 Handle Warning on secscan create in CPS
@@ -87,6 +88,8 @@ class UserHandler(JDHandler):
 
         _rc = 0
         _response = {}
+        _response["success"] = []
+        _response["fail"] = []
         _response["reason"] = ""
         _priv_key = '/etc/ssh-keys/secscan.priv'
 
@@ -123,13 +126,16 @@ class UserHandler(JDHandler):
             _key = self.mGenerateKey()
 
             _responseInfraNodes = {}
-            _rc, _responseInfraNodes = self.mCreateUser(destHosts,_user,_key)
+            _infra_rc, _responseInfraNodes = self.mCreateUser(destHosts,_user,_key)
 
             _responseCPS = {}
-            _rc, _responseCPS = self.mCreateUser(destCPSHosts,_user,_key,True)
+            _cps_rc, _responseCPS = self.mCreateUser(destCPSHosts,_user,_key,True)
 
-            _success = _responseInfraNodes["success"] + _responseCPS["success"]
-            _fail = _responseInfraNodes["fail"] + _responseCPS["fail"]            
+            _success = _responseInfraNodes.get("success", []) + _responseCPS.get("success", [])
+            _fail = _responseInfraNodes.get("fail", []) + _responseCPS.get("fail", [])
+            _response["success"] = _success
+            _response["fail"] = _fail
+            _rc = UserHandler.FAIL if _infra_rc or _cps_rc else UserHandler.SUCCESS
             _response["reason"] = \
                 f"User creation: Success on {_success}, Fail on {_fail}."
 
@@ -139,17 +145,20 @@ class UserHandler(JDHandler):
                 return _rc, _response
 
             _responseInfraNodes = {}
-            _rc, _responseInfraNodes = self.mDeleteUser(destHosts,_user)            
-            if _rc:
+            _infra_rc, _responseInfraNodes = self.mDeleteUser(destHosts,_user)
+            if _infra_rc:
                 ebLogWarn(f"Warning deleting user {_user} in nodes.")
 
             _responseCPS = {}
-            _rc, _responseCPS = self.mDeleteUser(destCPSHosts,_user,True)
-            if _rc:
+            _cps_rc, _responseCPS = self.mDeleteUser(destCPSHosts,_user,True)
+            if _cps_rc:
                 ebLogWarn(f"Warning deleting user {_user} in CPS nodes.")
 
-            _success = _responseInfraNodes["success"] + _responseCPS["success"]
-            _fail = _responseInfraNodes["fail"] + _responseCPS["fail"]            
+            _success = _responseInfraNodes.get("success", []) + _responseCPS.get("success", [])
+            _fail = _responseInfraNodes.get("fail", []) + _responseCPS.get("fail", [])
+            _response["success"] = _success
+            _response["fail"] = _fail
+            _rc = UserHandler.FAIL if _infra_rc or _cps_rc else UserHandler.SUCCESS
             _response["reason"] = \
                 f"User deletion: Success on {_success}, Fail on {_fail}."
 
@@ -302,7 +311,7 @@ class UserHandler(JDHandler):
         _user = aUser
         _key = aKey
         _rc = 0
-        _response = {}
+        _response = {"success": [], "fail": []}
         _usr = 'root' if not aIsCPS else 'ecra'
 
         # {"host1":(0,output)}
@@ -342,7 +351,8 @@ class UserHandler(JDHandler):
                     _node, _secscan_uid, _user, _extra_cmd)
                 
                 if _hostRC[host][0] != 0:
-                    ebLogInfo(f"User creation failed on: {host}. Abort.")                    
+                    _rc = UserHandler.FAIL
+                    ebLogInfo(f"User creation failed on: {host}. Abort.")
                     break
 
         # Ensure ALL host were able to CREATE the user
@@ -358,15 +368,15 @@ class UserHandler(JDHandler):
 
         if _rc:
             for key, value in _hostRC.items():
-                if value > 0:
+                if value[0] > 0:
                     errHosts.append(key)
                     ebLogInfo(f"User creation to undo over: {errHosts}")
                 else:
                     succHosts.append(key)
             # Call Undo        
-            _del_rc = self.mDeleteUser(errHosts,_user)
+            _del_rc, _del_resp = self.mDeleteUser(succHosts, _user, aIsCPS)
             _rc = UserHandler.FAIL
-            _response["success"] = aDestHosts
+            _response["success"] = succHosts
             _response["fail"] = errHosts
             ebLogWarn(_response)
             return _rc, _response            
@@ -412,4 +422,3 @@ class UserHandler(JDHandler):
             _response["fail"] = errHosts
 
         return _rc, _response
-

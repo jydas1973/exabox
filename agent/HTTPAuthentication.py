@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2020, Oracle and/or its affiliates. All rights reserved.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     HTTPAuthentication.py
@@ -43,6 +43,19 @@ class ebHTTPAuthentication(object):
         self.__credential = aHTTPCredentialStorage.mGetCredential()
         self.__credentialType = aHTTPCredentialStorage.mGetCredentialType()
 
+    def mEvaluateHashAuth(self, aPassword, aStoredCredential):
+        if not isinstance(aStoredCredential, (bytes, bytearray)) \
+           or not aStoredCredential.startswith(b'$2') \
+           or len(aStoredCredential) != 60:
+            ebLogError('Unsupported type of Hashed Credential')
+            return False
+
+        try:
+            return bcrypt.checkpw(aPassword, bytes(aStoredCredential))
+        except Exception as _err:
+            ebLogError('Malformed hashed credential: {}'.format(_err))
+            return False
+
     def mEvaluateAuth(self, aAuthorizationHeader):
         """
             Process aAuthorizationHeader against credential
@@ -80,10 +93,7 @@ class ebHTTPAuthentication(object):
         
         # COMPUTE THE ACTUAL AUTHENTICATION depending on Cred type
         if self.__credentialType == ebHttpCredentialType.HASH:
-            if _stored_credential[:2] == '$2':
-                _auth_result = bcrypt.checkpw(_pwd, self.__credential[_user])
-            else:
-                raise ValueError('Unsupported type of Hashed Credential')
+            _auth_result = self.mEvaluateHashAuth(_pwd, _stored_credential)
         elif self.__credentialType == ebHttpCredentialType.MASKED:
             _auth_result = (_pwd == umask(self.__credential[_user]))
         elif self.__credentialType == ebHttpCredentialType.LEGACY:
@@ -96,4 +106,3 @@ class ebHTTPAuthentication(object):
             return ebHTTPAuthResult.AUTH_ERROR
 
         return ebHTTPAuthResult.AUTH_OK
-

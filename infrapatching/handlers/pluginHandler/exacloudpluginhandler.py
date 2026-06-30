@@ -15,6 +15,13 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    jyotdas     06/16/26 - Enh 39523473 - Track Plugin Progress Status in
+#                           Infrapatching Tooling
+#    araghave    06/08/26 - Bug 39483306 - QMR PATCHING FAILING DUE TO "BAD
+#                           AUTHENTICATION TYPE; ALLOWED TYPES: [PUBLICKEY] ON
+#                           DOMU TARGET
+#    sdevasek    06/03/26 - Bug 39483306 - QMR PATCHING FAILING FOR
+#                           DOM0DOMU PLUGIN FAILURE
 #    araghave    04/11/26 - Enhancement Request 39143049 - FIX PLUGIN HANDLER
 #                           RELATED CODE ISSUES REPORTED BY CODEV
 #    araghave    03/12/26 - Enh 38932829 - PROVIDE A PLUGIN SUPPORT DURING DOM0
@@ -238,6 +245,13 @@ class ExacloudPluginHandler(PluginHandler):
                 self.mAddError(ret, _suggestion_msg)
             return ret
 
+        # Seed the plugin progress record as not_started 
+        if _pre_post_str:
+            _component = self.mResolvePluginComponent(_pre_post_str)
+            self.mUpsertPluginProgress(aNode, self.mGetPluginTypes(), _component, aStage,
+                                       PLUGIN_STATUS_NOT_STARTED,
+                                       aScriptAlias=os.path.basename(_pre_post_str))
+
 
         _plugin_log_file = ''
         _plugin_log_file_local_path = ''
@@ -342,6 +356,15 @@ class ExacloudPluginHandler(PluginHandler):
                                 self.mPatchLogWarn(
                                     f"DOM0 '{aNode}' is not having guest vm since it is not part of any node subset group. Skipping exacloud copy plugin on dummy VM = '{_domUs}'")
                                 continue
+                            
+                            # Pre-seed the dom0domu fan-out as not_started up front so all
+                            # of this dom0's domus are visible for ETA before each VM starts.
+                            # script_alias matches the dom0_domu.sh entry the progressing/terminal upserts use
+                            self.mUpsertPluginProgress(_domUs, self.mGetPluginTypes(),
+                                                       PLUGIN_COMPONENT_DOM0DOMU, aStage,
+                                                       PLUGIN_STATUS_NOT_STARTED,
+                                                       aAssociatedDom0=_dom0_hostname,
+                                                       aScriptAlias="dom0_domu.sh")
 
                             ret = self.mCopyPluginsToTargetNode(_domUs, PATCH_DOMU, _plugins_to_run)
                             if ret != PATCH_SUCCESS_EXIT_CODE:
@@ -403,7 +426,7 @@ class ExacloudPluginHandler(PluginHandler):
                                     f"DOM0 '{aNode}' is not having VMs since it is not part of any node subset group. Skipping exacloud plugin execution on dummy VM = '{_domUs}'")
                                 continue
                             _userHostname = self.mGetDomUCustomerNameforDomuNatHostName(_domUs)
-                            ret = self.mExecutePrePostExacloudPlugins(_domUs, PATCH_DOMU, _remote_plugin_dir_exacloud, _pre_post_dom0_domU_str, aStage, aRollback)
+                            ret = self.mExecutePrePostExacloudPlugins(_domUs, PATCH_DOMU, _remote_plugin_dir_exacloud, _pre_post_dom0_domU_str, aStage, aRollback, aAssociatedDom0=_dom0_hostname)
                             '''
                              Copy exacloud plugins to local node only
                              in case of plugin failure.
@@ -476,8 +499,11 @@ class ExacloudPluginHandler(PluginHandler):
         try:
             self.mPatchLogInfo(f"Copying plugins to {_node_type_name} '{aDom0UNode}':")
             _node = exaBoxNode(get_gcontext())
+            _user_to_connect_with = None
             # Connect as opc for domU if exist, otherwise, as root user
-            _user_to_connect_with = self.mGetUserDetailsBasedOnDomUhostnameToRunPlugins(aDom0UNode)
+            if aNodeType == PATCH_DOMU and self.mGetTargetTypes()[0].lower() in [PATCH_DOM0]:
+                _user_to_connect_with = self.mGetUserDetailsBasedOnDomUhostnameToRunPlugins(aDom0UNode)
+
             if aNodeType == PATCH_DOMU and _user_to_connect_with:
                 if _user_to_connect_with != 'root':
                     _connected_as_non_root_user = True
@@ -566,7 +592,7 @@ class ExacloudPluginHandler(PluginHandler):
             _ret = self.mRunExacloudPluginV2inNonRolling(aNodeList, aStage)
         return _ret
 
-    def mRunExacloudPluginV2inRolling(self, aNodeList, aStage):
+    def mRunExacloudPluginV2inRolling(self, aNodeList, aStage, aAssociatedDom0=None):
         """
         Execute Exacloud metadata-based plugins in rolling fashion.
 
@@ -643,7 +669,7 @@ class ExacloudPluginHandler(PluginHandler):
                             # Step 3. Run Exacloud plugin operation.
                             self.mPatchLogInfo(
                                 f"Copy of exacloud plugins is successful. Executing exacloud plugin on node {_node_name}")
-                            _rc = self.mExecuteMetadataExadataPlugins(_node_name, _exacloud_plugin_data)
+                            _rc = self.mExecuteMetadataExadataPlugins(_node_name, _exacloud_plugin_data, aAssociatedDom0=None)
 
                         # Step 4. Cleanup exacloud plugins and copy logs to exacloud
                         # irrespetive of plugin operation was successful or failed.
@@ -984,7 +1010,7 @@ class ExacloudPluginHandler(PluginHandler):
             if _node.mIsConnected():
                 _node.mDisconnect()
 
-    def mExecuteMetadataExadataPlugins(self, aNode, aExacloudPluginsdata):
+    def mExecuteMetadataExadataPlugins(self, aNode, aExacloudPluginsdata, aAssociatedDom0=None):
         """
          This method executes the exacloud plugin scripts and options specified
          by user. Currently a exacloud plugin script is checked in and
@@ -993,6 +1019,11 @@ class ExacloudPluginHandler(PluginHandler):
 
           -> return PATCH_SUCCESS_EXIT_CODE if successful.
           -> return any other error code other than PATCH_SUCCESS_EXIT_CODE if failure.
+
+         Registered (metadata V2) plugin execution progress is captured into the shared
+         plugin_progressing_status block: a metadata record per (node, plugin_component) with
+         one stage entry per script_alias. failed is recorded irrespective of FailOnError.
+         aAssociatedDom0 is the parent dom0 hostname for dom0domu records.
         """
 
         _ret = PATCH_SUCCESS_EXIT_CODE
@@ -1005,14 +1036,26 @@ class ExacloudPluginHandler(PluginHandler):
 
         _exacloud_plugin_args = self.mGetOneOffPluginArguments()
         _node = exaBoxNode(get_gcontext())
+        
+        # Plugin progress tracking context. Only dom0/domu/dom0domu are
+        # instrumented; cell/exacompute are out of scope.
+        _pp_script_alias = mGetScriptAlias(aExacloudPluginsdata)
+        _pp_component = str(mGetPluginTargetV2(aExacloudPluginsdata)).lower()
+        _pp_stage = (PRE_PATCH if str(mGetPhase(aExacloudPluginsdata)).lower() == "pre"
+                     else POST_PATCH)
+        _pp_track = _pp_component in (PLUGIN_COMPONENT_DOM0, PLUGIN_COMPONENT_DOMU,
+                                      PLUGIN_COMPONENT_DOM0DOMU)
+        _pp_start_time = self.mGetPluginProgressTimestamp()
         try:
             _plugin_log = self.mGetPluginLog(aExacloudPluginsdata)
             _plugin_target = mGetPluginTargetV2(aExacloudPluginsdata)
             _remote_script_name_for_exacloud_plugins = self.mGetRemoteScriptNameForExacloudPlugins(aExacloudPluginsdata)
             _fail_on_error = mGetFailonError(aExacloudPluginsdata)
 
-            # Connect as opc for domU if exist, otherwise, as root user
-            _user_to_connect_with = self.mGetUserDetailsBasedOnDomUhostnameToRunPlugins(aNode)
+            _user_to_connect_with = None
+            if str(mGetPluginTargetV2(aExacloudPluginsdata)).lower() == PATCH_DOMU and _cur_target in [PATCH_DOM0]:
+                # Connect as opc for domU if exist, otherwise, as root user
+                _user_to_connect_with = self.mGetUserDetailsBasedOnDomUhostnameToRunPlugins(aNode)
             if str(mGetPluginTargetV2(aExacloudPluginsdata)).lower() == PATCH_DOMU and _user_to_connect_with:
                 _node.mSetUser(_user_to_connect_with)
                 _node.mSetMaxRetries(self.mGetMaxNumberofSshRetries())
@@ -1031,6 +1074,13 @@ class ExacloudPluginHandler(PluginHandler):
                 _cmd_exacloud_run = f"chmod +x {_remote_script_name_for_exacloud_plugins};{_remote_script_name_for_exacloud_plugins} {_exacloud_plugin_args} > {_plugin_log} "
 
             self.mPatchLogInfo(f"exacloud plugin run command is : {_cmd_exacloud_run}")
+
+            # Record this registered script as in progress before the (blocking) run.
+            if _pp_track:
+                self.mUpsertPluginProgress(aNode, self.mGetPluginTypes(), _pp_component, _pp_stage,
+                                           PLUGIN_STATUS_PROGRESSING, aStartTime=_pp_start_time,
+                                           aAssociatedDom0=aAssociatedDom0,
+                                           aScriptAlias=_pp_script_alias, aIsMetadataPlugin=True)
 
             _node.mConnect(aHost=aNode, aTimeout=20)
             if not _node.mFileExists(_remote_script_name_for_exacloud_plugins):
@@ -1089,6 +1139,17 @@ class ExacloudPluginHandler(PluginHandler):
                 self.mPatchLogWarn(f"Unable to execute exacloud plugins on {aNode}. Error : {str(e)}")
             self.mPatchLogWarn(traceback.format_exc())
         finally:
+
+            # Single terminal upsert: success/failed from _ret, regardless of FailOnError.
+            # Covers the normal run, the missing-script early return and the exception path.
+            if _pp_track:
+                _pp_term = (PLUGIN_STATUS_SUCCESS if _ret == PATCH_SUCCESS_EXIT_CODE
+                            else PLUGIN_STATUS_FAILED)
+                self.mUpsertPluginProgress(aNode, self.mGetPluginTypes(), _pp_component, _pp_stage,
+                                           _pp_term, aStartTime=_pp_start_time,
+                                           aEndTime=self.mGetPluginProgressTimestamp(),
+                                           aAssociatedDom0=aAssociatedDom0,
+                                           aScriptAlias=_pp_script_alias, aIsMetadataPlugin=True)
             if _node.mIsConnected():
                 _node.mDisconnect()
             return _ret
@@ -1133,8 +1194,9 @@ class ExacloudPluginHandler(PluginHandler):
                             self.mPatchLogWarn(
                                 f"DOM0 '{aNode}' is not having guest vm since it is not part of any node subset group. Skipping exacloud copy plugin on dummy VM = '{_domUs}'")
                             continue                        
-                    # Execute dom0domu plugins in parallel on the current dom0
-                    _ret = self.mRunExacloudPluginV2inRolling(_dom0s_domU, aPhase)
+                    # Execute dom0domu plugins in parallel on the current dom0. Pass the
+                    # parent dom0 so dom0domu progress records carry associated_dom0
+                    _ret = self.mRunExacloudPluginV2inRolling(_dom0s_domU, aPhase, aAssociatedDom0=aNode)
 
         except Exception as e:
             if _fail_on_error:

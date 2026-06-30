@@ -16,9 +16,19 @@
 #      This module contains common methods for each of the Test target handlers.
 #
 #    MODIFIED   (MM/DD/YY)
+#    jyotdas     06/16/26 - Enh 39523473 - Track Plugin Progress Status in
+#                           Infrapatching Tooling
+#    jyotdas     05/27/26 - Bug 39431447 - EXACC - smr workflow is blocking cpu
+#                           reshape operation
+#    araghave    04/23/26 - Enh 39152619 - MODIFY ALL SMR/ELU OPERATIONS TO
+#                           ROLLING OPERATIONS STYLE IN INFRA PATCHING CODE
+#    sdevasek    03/23/26 - Enh 38521465 - Handle mock node_progress_status
+#                           parsing and allow mock time stats
 #    sdevasek    03/09/26 - Enh 39044163 - INFRAPATCHING TEST AUTOMATION - UPDATE
 #                           TESTS FOR FREE POOL NODE PATCHING IN EXACOMPUTE
 #                           PATCHING TOVALIDATE NODE_PROGRESS_DATA
+#    mirrodri    02/28/26 - Enh 38521465 PROVIDE OPTIONS TO MOCK PATCHMGR
+#                           COMMAND ON AUTOMATION ENVIRONMENTS
 #    sdevasek    02/24/26 - Bug 38971433 - FIX PLUGIN LOG VERIFICATION FOR 
 #                           LOWERCASE STAGE NAMES
 #    sdevasek    01/22/26 - Enh 38821433 - EXACOMPUTE FREE POOL NODE PATCHING:
@@ -221,6 +231,7 @@ import glob
 from pathlib import Path
 from subprocess import Popen, PIPE, STDOUT
 from constants import *
+import functools
 
 try:
     from collections import OrderedDict
@@ -465,7 +476,6 @@ def mVmCntrlOperation(aExaunitId, aVM, aOperation):
     mPatchLogInfo("mVmCntrlOperation status output  is : %s " % _status_output)
     return _ret
 
-
 def mUpdateAdditionalOptionsInPayload(aParam, aValue):
     """
     This method is used to update a parameter with a value in additional_options of payload.json
@@ -559,7 +569,6 @@ def mComposeDecos(aDecos):
         return func
 
     return composition
-
 
 def mInvokeInfrapatchCurlCmd(aOperationStyle):
     mPatchLogInfo("Invoking the patch type operation.")
@@ -941,7 +950,7 @@ def mExecuteLocal(aCmd):
     return _output, _status
 
 
-def mCheckPatchOperationStatus(aURL, aMockMode=None):
+def mCheckPatchOperationStatus(aURL, aMockMode=None, aTimeoutSec=EXADATA_PATCHMGR_CONSOLE_READ_TIMEOUT_SEC):
     """
 
     Method to poll the progress status of the patch operation initiated through curl command.
@@ -972,7 +981,7 @@ def mCheckPatchOperationStatus(aURL, aMockMode=None):
     _duration_passed_in_sec = 0
     _result = False
     _status_out_put = ""
-    while _duration_passed_in_sec < EXADATA_PATCHMGR_CONSOLE_READ_TIMEOUT_SEC:
+    while _duration_passed_in_sec < aTimeoutSec:
         _status_out_put = mExecuteCmd(_curl_cmd)
         mPatchLogInfo("Infra Patch operation progress status output : \n" + _status_out_put)
         if "\"status\"" in _status_out_put:
@@ -1242,12 +1251,40 @@ def mGetInfraPatchingTestConfigParam(aKey):
     """
     return mGetParamValueFromJsonFile(TEST_INFRAPATCHING_CONFIG_FILE_LOCATION, aKey)
 
+def mIsPluginProgressStatusValidationEnabled():
+    """
+    Return whether plugin_progressing_status validation is enabled. Older test
+    config files may not have the newly seeded validate_plugin_progress_status
+    key yet, so missing key is treated as the default False.
+    """
+    try:
+        return mGetInfraPatchingTestConfigParam('validate_plugin_progress_status') == 'True'
+    except KeyError:
+        return False
+
 
 def mGetParamValueFromPayLoadJson(aKey):
     """
     This is method is used to read any parameter value in payload.json file.
     """
     return mGetParamValueFromJsonFile(TEST_PAYLOAD_FILE, aKey)
+
+
+def mIsMockEnabled():
+    """
+    Returns True when EnableMock is set to yes in payload.json.
+    """
+    _is_mock = False
+    try:
+        _payload_json = mLoadJson(TEST_PAYLOAD_FILE)
+        _additional_options = _payload_json.get("additional_options", [{}])
+        _enable_mock = ""
+        if _additional_options:
+            _enable_mock = _additional_options[0].get("EnableMock", "")
+        _is_mock = str(_enable_mock).strip().lower() in "yes"
+    except Exception:
+        _is_mock = False
+    return _is_mock
 
 
 def mGetDomuClusterDetails(domu_hostname):
@@ -2284,42 +2321,23 @@ def mGetInfrapatchingSanityCheckStatus(aTarget, aAction, aOperationStyle):
 
 def mFetchNodeProgressData(aStatusOutput):
     _node_progress_status_final_str = ""
-    _node_progress_status_patttern = "\"node_progressing_status.*status.*status_details.*:.*Succeeded.*\"}]},"
+    try:
+        _status_obj = json.loads(aStatusOutput)
+        _patch_list_str = _status_obj.get("patch_list", "")
+        if _patch_list_str:
+            _patch_list = json.loads(_patch_list_str)
+            for _, _patch in _patch_list.items():
+                _node_progress = _patch.get("report", {}).get("data", {}).get("node_progressing_status")
+                if _node_progress:
+                    _node_progress_status_final_str = json.dumps(_node_progress)
+                    break
+    except Exception as _exc:
+        mPatchLogError("Failed to parse node_progress_status from status output: %s" % (str(_exc)))
+        _node_progress_status_final_str = ""
 
-    """
-    The mFetchNodeProgressData function filters the patch manager status output and returns the node progress
-    date from it   
-
-    Sample input is as follows:
-
-    "node_progressing_status\":{\"sleep_infra_patch\":\"no\",\"infra_patch_start_time\":\"2022-05-25 05:51:39-0700\",
-    \"node_patching_progress_data\":[{\"node_name\":\"slcs27celadm05.us.oracle.com\",\"target_type\":\"cell\",
-    \"patchmgr_start_time\":\"2022-05-25 05:51:39-0700\",\"last_updated_time\":\"2022-05-25 05:51:39-0700\",\"status\":\"Completed\",
-    \"status_details\":\"Succeeded\"},{\"node_name\":\"slcs27celadm04.us.oracle.com\",\"target_type\":\"cell\",
-    \"patchmgr_start_time\":\"2022-05-25 05:51:39-0700\",\"last_updated_time\":\"2022-05-25 05:51:39-0700\",\"status\":\"Completed\",
-    \"status_details\":\"Succeeded\"}]},
-    """
-    _node_progress_status_matches = re.findall(_node_progress_status_patttern, aStatusOutput)
-
-    _node_progress_status_str = ""
-    if len(_node_progress_status_matches) > 0:
-        _node_progress_status_str = _node_progress_status_matches[0]
-    else:
+    if not _node_progress_status_final_str:
         mPatchLogError("Failed to extract node_progress_status from status output.")
         return _node_progress_status_final_str
-
-    # Extract only the value of node_progress_status
-    _node_progress_status_str = _node_progress_status_str[_node_progress_status_str.find('{'):-1]
-
-    mPatchLogInfo("Node progress status before filtering the content - %s.\n" % (_node_progress_status_str))
-
-    _node_progress_status_final_str = ""
-    # Remove unnecessary \ present in status output
-    for i in _node_progress_status_str:
-        if i == '\\':
-            pass
-        else:
-            _node_progress_status_final_str += i
 
     """
     output of node progress status after filtering is of the below format
@@ -2336,6 +2354,196 @@ def mFetchNodeProgressData(aStatusOutput):
 
     mPatchLogInfo("Node progress status after filtering the content - %s.\n" % (_node_progress_status_final_str))
     return _node_progress_status_final_str
+
+def mFetchPluginProgressData(aStatusOutput):
+    """
+    Extract the plugin_progressing_status dict (sibling of node_progressing_status) from a
+    patch status output. Mirrors mFetchNodeProgressData, but intentionally returns the dict
+    itself (or None) rather than a json.dumps string, because the caller
+    mCheckPluginProgressStatus wants _pps["plugin_type"]/_pps["plugin_progress_data"] directly.
+
+    A status output can legitimately have NO plugin_progressing_status (plugins disabled);
+    in that case return None silently and let callers decide. 
+    """
+    try:
+        _status_obj = json.loads(aStatusOutput)
+        _patch_list_str = _status_obj.get("patch_list", "")
+        if _patch_list_str:
+            _patch_list = json.loads(_patch_list_str)
+            for _, _patch in _patch_list.items():
+                _plugin_progress = _patch.get("report", {}).get("data", {}).get("plugin_progressing_status")
+                if _plugin_progress:
+                    mPatchLogInfo("plugin_progressing_status after filtering the content - %s.\n" % (
+                        json.dumps(_plugin_progress)))
+                    return _plugin_progress
+    except Exception as _exc:
+        mPatchLogError("Failed to parse plugin_progressing_status from status output: %s" % (str(_exc)))
+        return None
+
+    return None
+
+def mCheckPluginProgressStatus(aStatusOutput, aPluginType, aExpectedDom0s, aExpectedDomus,
+                               aOperationStyle, aStage="pre_patch", aExpectedStatus="success",
+                               aFailedNodes=None):
+    """
+    Validate the plugin_progressing_status block emitted by the v2 production feature against
+    the JSON contract. Mirrors mCheckNodesPresenceInNodeProgressStatus (present/absent set
+    checks, mPatchLogError/mPatchLogInfo, True/False return).
+
+    Expected records (per the v2 contract and the validator's own rules):
+      - one plugin_component="dom0" record per node in aExpectedDom0s
+      - for dom0+dom0domu AND a rolling style, additionally one plugin_component="dom0domu"
+        record per node in aExpectedDomus, each carrying a non-empty associated_dom0.
+        For non-rolling, the dom0domu plugin is not run, so no dom0domu records are expected.
+      - for a "domu" plugin type, one plugin_component="domu" record per node in aExpectedDomus.
+
+    Any record whose (node_name, plugin_component) key is not in the expected set fails the
+    check, so records of the wrong component type (e.g. a leaked dom0domu record on a
+    non-rolling dom0 run) are rejected rather than silently accepted.
+
+    For each expected record the aStage sub-block must carry status==aExpectedStatus (or
+    "failed" for any node in aFailedNodes); terminal statuses (success/failed) must also carry
+    start_time and a non-null end_time. 
+    """
+    _plugin_progress = mFetchPluginProgressData(aStatusOutput)
+    if _plugin_progress is None:
+        mPatchLogError("plugin_progressing_status is absent in status output.")
+        return False
+
+    _failed_nodes = aFailedNodes if aFailedNodes else []
+
+    # Container-level plugin_type is hoisted and constant for the whole run.
+    if _plugin_progress.get("plugin_type") != aPluginType:
+        mPatchLogError("Expected container plugin_type %s but found %s." % (
+            aPluginType, _plugin_progress.get("plugin_type")))
+        return False
+
+    _records = _plugin_progress.get("plugin_progress_data", [])
+    _records_by_key = {}
+    for _record in _records:
+        # Only the parent-path (non-metadata) records are validated here; registered
+        # metadata (V2) records share the same block and are validated separately by
+        # mCheckMetadataPluginProgressStatus. 
+        if _record.get("is_metadata_plugin"):
+            continue
+        _records_by_key[(_record.get("node_name"), _record.get("plugin_component"))] = _record
+        # plugin_type must NOT be stamped per record (it is hoisted to the container).
+        if "plugin_type" in _record:
+            mPatchLogError("plugin_type must be hoisted to the container, but found it in record for %s." % (
+                str(_record.get("node_name"))))
+            return False
+
+    # Build the expected (node_name, plugin_component) set.
+    _expected = []
+    for _dom0 in aExpectedDom0s:
+        _expected.append((_dom0, "dom0"))
+    if aPluginType == "dom0+dom0domu" and aOperationStyle != OP_STYLE_NON_ROLLING:
+        for _domu in aExpectedDomus:
+            _expected.append((_domu, "dom0domu"))
+    elif aPluginType == "domu":
+        _expected = [(_domu, "domu") for _domu in aExpectedDomus]
+
+    # Reject any record whose key is not in the expected set. Existence checks
+    # alone let regressions that emit records of the wrong component type pass
+    # silently, e.g. dom0domu records leaked during a non-rolling dom0 run or
+    # dom0 records appearing in a domu-only run
+    _expected_keys = set(_expected)
+    _unexpected_keys = set(_records_by_key.keys()) - _expected_keys
+    if _unexpected_keys:
+        mPatchLogError("Unexpected plugin progress record(s) found: %s." % (
+            sorted(str(_key) for _key in _unexpected_keys)))
+        return False
+
+    for (_node, _component) in _expected:
+        _record = _records_by_key.get((_node, _component))
+        if _record is None:
+            mPatchLogError("Expected plugin progress record for (%s, %s) not found." % (_node, _component))
+            return False
+
+        # associated_dom0 is present only on dom0domu records.
+        if _component == "dom0domu":
+            if not _record.get("associated_dom0"):
+                mPatchLogError("associated_dom0 missing on dom0domu record for %s." % (_node))
+                return False
+        elif "associated_dom0" in _record:
+            mPatchLogError("associated_dom0 must be absent on %s record for %s." % (_component, _node))
+            return False
+
+        # pre_patch/post_patch are a list of per-script entries. For the parent path the
+        # list holds a single entry (script_alias = the parent script name). (Bug 39523473)
+        _stage_entries = _record.get(aStage)
+        if not _stage_entries:
+            mPatchLogError("Stage sub-block %s missing for (%s, %s)." % (aStage, _node, _component))
+            return False
+
+        _node_expected_status = "failed" if _node in _failed_nodes else aExpectedStatus
+        for _entry in _stage_entries:
+            if not _entry.get("script_alias"):
+                mPatchLogError("script_alias missing in %s entry for (%s, %s)." % (aStage, _node, _component))
+                return False
+            if _entry.get("status") != _node_expected_status:
+                mPatchLogError("Expected %s status %s for %s but found %s." % (
+                    aStage, _node_expected_status, _node, _entry.get("status")))
+                return False
+            # Terminal statuses must carry start_time and a non-null end_time.
+            if _node_expected_status in ["success", "failed"]:
+                if not _entry.get("start_time"):
+                    mPatchLogError("start_time missing for %s on %s stage." % (_node, aStage))
+                    return False
+                if not _entry.get("end_time"):
+                    mPatchLogError("end_time missing for terminal status on %s %s stage." % (_node, aStage))
+                    return False
+
+    mPatchLogInfo("plugin_progressing_status has correct records and stage statuses.")
+    return True
+
+
+def mCheckMetadataPluginProgressStatus(aStatusOutput, aExpectedNodes, aExpectedScriptAliases,
+                                       aStage="pre_patch", aExpectedStatus="success",
+                                       aFailedNodes=None):
+    """
+    Validate the registered (metadata V2) plugin progress entries in the shared
+    plugin_progressing_status block. Metadata records carry is_metadata_plugin=true and a
+    list of per-script entries (keyed by script_alias) under aStage. For each expected node
+    and script_alias, the entry must exist and carry the expected status (and start_time +
+    non-null end_time for terminal statuses)
+    """
+    _plugin_progress = mFetchPluginProgressData(aStatusOutput)
+    if _plugin_progress is None:
+        mPatchLogError("plugin_progressing_status is absent in status output.")
+        return False
+
+    _failed_nodes = aFailedNodes if aFailedNodes else []
+
+    # Collect metadata stage entries per node, keyed by script_alias.
+    _entries_by_node = {}
+    for _record in _plugin_progress.get("plugin_progress_data", []):
+        if not _record.get("is_metadata_plugin"):
+            continue
+        _by_alias = _entries_by_node.setdefault(_record.get("node_name"), {})
+        for _entry in (_record.get(aStage) or []):
+            _by_alias[_entry.get("script_alias")] = _entry
+
+    for _node in aExpectedNodes:
+        _by_alias = _entries_by_node.get(_node, {})
+        for _alias in aExpectedScriptAliases:
+            _entry = _by_alias.get(_alias)
+            if _entry is None:
+                mPatchLogError("Expected metadata plugin entry (%s, %s) not found in %s stage." % (
+                    _node, _alias, aStage))
+                return False
+            _node_expected_status = "failed" if _node in _failed_nodes else aExpectedStatus
+            if _entry.get("status") != _node_expected_status:
+                mPatchLogError("Expected metadata %s status %s for (%s, %s) but found %s." % (
+                    aStage, _node_expected_status, _node, _alias, _entry.get("status")))
+                return False
+            if _node_expected_status in ["success", "failed"]:
+                if not _entry.get("start_time") or not _entry.get("end_time"):
+                    mPatchLogError("start_time/end_time missing for metadata entry (%s, %s)." % (_node, _alias))
+                    return False
+
+    mPatchLogInfo("registered metadata plugin_progressing_status entries validated.")
+    return True
 
 
 def mGetNodesWithPatchOperation(aStatusOutput):
@@ -2356,6 +2564,8 @@ def mGetNodesWithPatchOperation(aStatusOutput):
 
     progress_status_str = mFetchNodeProgressData(aStatusOutput)
 
+    if not progress_status_str:
+        return _nodes
     _node_progress_status = json.loads(progress_status_str)
     _node_progress_status_data = _node_progress_status["node_patching_progress_data"]
     for _node_data in _node_progress_status_data:
@@ -2380,6 +2590,9 @@ def mCheckNodesPresenceInNodeProgressStatus(aStatusOutput, aExistableNodes, aNon
 
     _node_progress_status_final_str = mFetchNodeProgressData(aStatusOutput)
 
+    if not _node_progress_status_final_str:
+        mPatchLogError("node_progress_status is empty.")
+        return False
     mPatchLogInfo("Nodes those should be present in node_progress_status are - %s.\n" % (str(aExistableNodes)))
     mPatchLogInfo(
         "Nodes those should not be present in node_progress_status are - %s.\n" % (str(aNonExistableNodes)))
@@ -2784,6 +2997,7 @@ def mCopyTimeStatsFileForTimeDiffAnalysis(aStatusOutput):
       i.e copy ${EXACLOUD_ROOT}/log/threads/0000-0000-0000-0000/132eb072-8036-11ed-8622-fa163e10869c_infrapatch_patch_time_stats.log to
       ${ECRA_BASE}/cur_success_time_stats/cell_rolling_patch_stats.log
     """
+
     _ecra_install_base = mGetInfraPatchingTestConfigParam('ecra_install_base')
     _patching_metadata = mCreatePatchOperationMetaDataFromStatusOutput(aStatusOutput)
     _exaclolud_path = mGetExacloudInstallPath()
@@ -3464,9 +3678,10 @@ def mRunViaSubprocess(aExecutionType, aExecute, aArg=None):
             _process = Popen(aExecute, stdout=PIPE, stderr=STDOUT)
         with _process.stdout:
             _output = mLogSubprocessOutput(aPipe=_process.stdout)
-            return _output
         if _process.wait() != 0:
-            raise Exception("Error while running: {cmd}".format(cmd=aExecute))
+            raise Exception("Error while running: {cmd}\nOutput:\n{output}".format(
+                cmd=aExecute, output='\n'.join(_output)))
+        return _output
 
 
 def mCheckAndStartEcraServices(aEcraInstallFolder):
@@ -3579,14 +3794,17 @@ def mGetEcraDbConnectionString(aEcraInstallFolder):
                                                _ecraDeploymentFile))
     _ecraDbPassword = base64.b64decode(mGetInfraPatchingTestConfigParam('ecrapassword')).decode('utf-8')
 
+    _sqlplusInstantClient = "{ecraInstallFolder}/sql_home/sqlplus".format(ecraInstallFolder=aEcraInstallFolder)
+    _sqlplusBin = _sqlplusInstantClient if os.path.isfile(_sqlplusInstantClient) else "{dbHome}/bin/sqlplus".format(dbHome=_dbHome)
+
     _dbRelease = mGetDbReleaseFolderNumber(aEcraInstallFolder)
     if _dbRelease.startswith('19'):
-        _ecraDbConnectionString = "{ORACLE_HOME}/bin/sqlplus {ECRA_DB_USERNAME}/{ECRA_DB_PASSWORD}@{ECRA_DB_HOSTNAME}:{ECRA_DB_PORT}/{ECRA_DB_SERVICE_NAME}".format(
-            ORACLE_HOME=_dbHome, ECRA_DB_USERNAME=_ecraDbUsername, ECRA_DB_PASSWORD=_ecraDbPassword,
+        _ecraDbConnectionString = "{sqlplus} {ECRA_DB_USERNAME}/{ECRA_DB_PASSWORD}@//{ECRA_DB_HOSTNAME}:{ECRA_DB_PORT}/{ECRA_DB_SERVICE_NAME}".format(
+            sqlplus=_sqlplusBin, ECRA_DB_USERNAME=_ecraDbUsername, ECRA_DB_PASSWORD=_ecraDbPassword,
             ECRA_DB_HOSTNAME=_ecraDbHostname, ECRA_DB_PORT=_ecraDbPort, ECRA_DB_SERVICE_NAME=_ecraDbServiceName)
     else:
-        _ecraDbConnectionString = "{ORACLE_HOME}/bin/sqlplus {ECRA_DB_USERNAME}/{ECRA_DB_PASSWORD}".format(
-            ORACLE_HOME=_dbHome, ECRA_DB_USERNAME=_ecraDbUsername, ECRA_DB_PASSWORD=_ecraDbPassword)
+        _ecraDbConnectionString = "{sqlplus} {ECRA_DB_USERNAME}/{ECRA_DB_PASSWORD}".format(
+            sqlplus=_sqlplusBin, ECRA_DB_USERNAME=_ecraDbUsername, ECRA_DB_PASSWORD=_ecraDbPassword)
 
     return _ecraDbConnectionString
 
@@ -3601,6 +3819,7 @@ def mExecuteDbCmd(aEcraInstallFolder, aSqlFileToExecute, aOnSqlError=None):
 
     os.environ['DB_HOME'] = mGetDbHome(aEcraInstallFolder)
     os.environ['ECRA_DB_CONNECTION_STRING'] = mGetEcraDbConnectionString(aEcraInstallFolder)
+    os.environ['LD_LIBRARY_PATH'] = "{ecraInstallFolder}/sql_home".format(ecraInstallFolder=aEcraInstallFolder)
     os.environ['SQL_FILE'] = aSqlFileToExecute
     if aOnSqlError is None:
         os.environ['ON_SQL_ERROR_DO_THIS'] = "NONE"
@@ -3716,9 +3935,10 @@ def mGetMockResponseDetailsForTargetInTaskType(aEcraInstallFolder, aTaskType, aT
 
 def mExecuteSqlonEcraDb(sqlStr):
 
+    _install_user = mGetInfraPatchingTestConfigParam('ecra_install_user') or os.getlogin()
     _ecra_install_folder = os.path.join(
         mGetInfraPatchingTestConfigParam('ecra_install_base'),
-        os.getlogin(),
+        _install_user,
         "ecra_installs",
         mGetInfraPatchingTestConfigParam('ecra_install_directory')
     )
@@ -3735,7 +3955,77 @@ def mExecuteSqlonEcraDb(sqlStr):
     output = mExecuteDbCmd(aEcraInstallFolder=_ecra_install_folder, aSqlFileToExecute=_sql_file, aOnSqlError="CONTINUE")
     return output
 
+def mInsertFakePatchRegistryEntry(aCluster, aFakeRequestId):
+    """
+    Insert a fake 'patch' row into ecs_registries to simulate a patch in progress.
+    Used by compatibility matrix tests (Bug 39005054).
+    The caller is responsible for deleting this row after the test via mDeleteFakeRegistryEntry.
+    """
+    mPatchLogInfo("Inserting fake patch registry entry: cluster=%s requestId=%s"
+                  % (aCluster, aFakeRequestId))
+    _sql = ("\nINSERT INTO ecs_registries (rack_id, request_id, operation)"
+            " VALUES ('%s', '%s', 'patch');\nCOMMIT;" % (aCluster, aFakeRequestId))
+    mExecuteSqlonEcraDb(_sql)
+    _count = mGetRegistryEntryCount(aCluster)
+    if _count == 0:
+        raise Exception(
+            "mInsertFakePatchRegistryEntry: INSERT did not persist for cluster=%s requestId=%s"
+            % (aCluster, aFakeRequestId)
+        )
+    mPatchLogInfo("Fake patch registry entry inserted.")
 
+
+def mDeleteFakeRegistryEntry(aFakeRequestId):
+    """
+    Delete a fake registry entry from ecs_registries by request_id.
+    Used for cleanup after compatibility matrix tests (Bug 39005054).
+    """
+    mPatchLogInfo("Deleting fake registry entry: requestId=%s" % aFakeRequestId)
+    _sql = ("\nDELETE FROM ecs_registries WHERE request_id = '%s';\nCOMMIT;"
+            % aFakeRequestId)
+    mExecuteSqlonEcraDb(_sql)
+    mPatchLogInfo("Fake registry entry deleted.")
+
+
+def mGetRegistryEntryCount(aCluster):
+    """
+    Return the count of active rows in ecs_registries for the given rack_id.
+    Used by compatibility matrix tests (Bug 39005054) to verify concurrent entries.
+    Parses the integer COUNT(*) from sqlplus output.
+    """
+    _sql = "\nSELECT COUNT(*) FROM ecs_registries WHERE rack_id = '%s';\n" % aCluster
+    _output = mExecuteSqlonEcraDb(_sql)
+    for _line in _output:
+        _stripped = _line.strip()
+        if _stripped.isdigit():
+            return int(_stripped)
+    return 0
+
+def mDeleteReservedAllocEntry(aCluster):
+    """
+    Delete any stale reshape-cores row from ecs_exaservice_reserved_alloc for the
+    given rack.
+
+    A reshape that fails mid-workflow (e.g. SSL/OCI connectivity error) leaves this
+    row orphaned because the workflow cleanup task never runs.  The next reshape
+    attempt is then rejected with error 0x01000021 ('existing record in
+    ECS_EXASERVICE_RESERVED_ALLOC').  This helper replicates what ECRA's internal
+    restoreAllocationForFailedRequest() does when a workflow aborts cleanly.
+
+    Call before firing the reshape PUT and in the finally block for post-test hygiene.
+    Used by compatibility matrix tests (Bug 39005054).
+    """
+    mPatchLogInfo(
+        "Deleting stale reserved alloc entry: cluster=%s reserve_type=reshape-cores"
+        % aCluster
+    )
+    _sql = (
+        "\nDELETE FROM ecs_exaservice_reserved_alloc"
+        " WHERE rackname = '%s' AND reserve_type = 'reshape-cores';\nCOMMIT;"
+        % aCluster
+    )
+    mExecuteSqlonEcraDb(_sql)
+    mPatchLogInfo("Reserved alloc cleanup complete for cluster=%s." % aCluster)
 
 def mRunPatchRetryScenario(aPatchType, aPatchTask, aPatchNodeList, aFailureCmd, aRestoreCmd, aErrorCode, aErrorMsg, aLaunchNode=None):
     """
@@ -3892,7 +4182,7 @@ def mValidatePatchPrereqCheckRetryFailure(aNodeList, aTargetName, aFailureCmd, a
 
 class PluginScriptExecutionValidator:
 
-    def __init__(self, aTargetName, aOperation, aOperationStyle=OP_STYLE_AUTO):
+    def __init__(self, aTargetName, aOperation, aOperationStyle=OP_STYLE_ROLLING):
         self.__target_name = aTargetName
         self.__operation = aOperation
         self.__operation_style = aOperationStyle
@@ -3932,7 +4222,7 @@ class PluginScriptExecutionValidator:
 
 class OneOffPluginScriptExecutionValidator(PluginScriptExecutionValidator):
 
-    def __init__(self, aTarget_name, aOperation, aOperationStyle=OP_STYLE_AUTO):
+    def __init__(self, aTarget_name, aOperation, aOperationStyle=OP_STYLE_ROLLING):
         super().__init__(aTarget_name, aOperation, aOperationStyle)
 
     def mValidate(self, aStatusOutput, aExclusiveNodesListToCheckPluginConsoleLogs=[]):
@@ -3983,7 +4273,7 @@ class OneOffPluginScriptExecutionValidator(PluginScriptExecutionValidator):
 
 class ExacloudPluginScriptExecutionValidator(PluginScriptExecutionValidator):
 
-    def __init__(self, aTarget_name, aOperation, aOperationStyle=OP_STYLE_AUTO):
+    def __init__(self, aTarget_name, aOperation, aOperationStyle=OP_STYLE_ROLLING):
         super().__init__(aTarget_name, aOperation, aOperationStyle)
 
     def mValidate(self, aStatusOutput, aExclusiveNodesListToCheckPluginConsoleLogs=[]):
@@ -4068,6 +4358,38 @@ class ExacloudPluginScriptExecutionValidator(PluginScriptExecutionValidator):
                     else:
                         mPatchLogInfo("Plugin console log file path %s exists." % _plugin_console_log_path)
 
+        # plugin_progressing_status validation .Strictly additive and gated
+        # behind a default-OFF flag so this cane be turned off if necessary.
+        # Only the pre_patch stage is validated here (per scope).
+
+        if mIsPluginProgressStatusValidationEnabled():
+            _plugin_types = mGetParamValueFromPayLoadJson("PluginTypes")
+            _expected_domus = []
+            if _plugin_types == "dom0+dom0domu" and self.mGetOperationStyle() != OP_STYLE_NON_ROLLING:
+                _vm_map = mGetInfraPatchingTestVms("domuNatHostname", "all")
+                for _dom0 in _dom0s:
+                    _expected_domus = _expected_domus + _vm_map.get(_dom0, [])
+            elif _plugin_types == "domu":
+                _expected_domus = _domus
+            if not mCheckPluginProgressStatus(aStatusOutput, _plugin_types, _dom0s, _expected_domus,
+                                              self.mGetOperationStyle(), aStage="pre_patch",
+                                              aExpectedStatus="success"):
+                mPatchLogError("plugin_progressing_status validation failed.")
+                _ret = False
+
+            # Registered (metadata V2) plugin progress. The test framework registers only the
+            # Pre exacloud script, whose ScriptAlias follows script_<target>_exacloud_pre,
+            # consistent with the metadata plugin console-log check above. (Bug 39523473)
+            if self.mGetOperation() == TASK_PATCH:
+                _expected_metadata_aliases = ["script_%s_exacloud_pre" % _target_type]
+                if not mCheckMetadataPluginProgressStatus(aStatusOutput, _dom0s,
+                                                          _expected_metadata_aliases,
+                                                          aStage="pre_patch",
+                                                          aExpectedStatus="success"):
+                    mPatchLogError("registered metadata plugin_progressing_status validation failed.")
+                    _ret = False
+
+
         if _ret:
             mPatchLogInfo("Verification of plugin console logs completed successfully.")
         else:
@@ -4104,6 +4426,7 @@ class TimeProfileDataValidator:
         _ret = True
         _disable_time_profile_data_validation = (
                 mGetInfraPatchingTestConfigParam('disable_time_profile_data_validation') == 'True')
+        _is_mock = mIsMockEnabled()
         if not _disable_time_profile_data_validation:
             _time_profile_data = None
             _status_json = json.loads(aStatusOutput)
@@ -4172,27 +4495,38 @@ class TimeProfileDataValidator:
                 Validate for all the attributes(exacloud_start_time,exacloud_end_time and node_patching_time_stats) to be present in time_profile_data
                 """
                 _expected_time_profile_data_keys = set()
+                _ignore_time_stats = _is_mock or len(aExistableNodes) == 0
                 if _time_profile_data:
                     mPatchLogInfo("time_profile_data from status output is %s" % _time_profile_data)
                     _expected_time_profile_data_keys.add("exacloud_start_time")
                     _expected_time_profile_data_keys.add("exacloud_end_time")
 
                     # When all the nodes are up-to-date, no patch_mgr is run and so node_patching_time_stats key does not exist in time_profile_data
-                    if len(aExistableNodes) > 0:
+                    if len(aExistableNodes) > 0 and not _ignore_time_stats:
                         _expected_time_profile_data_keys.add("node_patching_time_stats")
 
-                    if len(_expected_time_profile_data_keys) != len(_time_profile_data.keys()):
-                        mPatchLogError("time_profile_data from status output does not contain all the attributes.")
-                        return False
-
-                    for _key in _time_profile_data.keys():
-                        if _key not in _expected_time_profile_data_keys:
-                            mPatchLogError(
-                                "time_profile_data from status output contains different attribute- %s." % _key)
+                    if not _ignore_time_stats:
+                        if len(_expected_time_profile_data_keys) != len(_time_profile_data.keys()):
+                            mPatchLogError("time_profile_data from status output does not contain all the attributes.")
                             return False
+
+                        for _key in _time_profile_data.keys():
+                            if _key not in _expected_time_profile_data_keys:
+                                mPatchLogError(
+                                    "time_profile_data from status output contains different attribute- %s." % _key)
+                                return False
+                    else:
+                        for _key in _expected_time_profile_data_keys:
+                            if _key not in _time_profile_data:
+                                mPatchLogError(
+                                    "time_profile_data from status output missing attribute- %s." % _key)
+                                return False
                 else:
                     mPatchLogError("time_profile_data from status output is empty.")
                     return False
+
+                if _ignore_time_stats:
+                    return _ret
 
                 """
                 Validate for attributes in patch_mgr_time_stats and validate for nodes in it.
@@ -4514,10 +4848,17 @@ class InfrapatchPluginMetadataHandler(object):
         _ret, _output = self.__curl_executor.mExecute("infrapatchpluginscripts/registration/%s" % aScriptAlias,
                                                       "DELETE", _data)
 
-        _output = _output.strip().splitlines()[-1]
+        _output = _output.strip()
+        if _output:
+            _output = _output.splitlines()[-1]
+        else:
+            _output = ""
+
         mPatchLogInfo("mDeleteRegisteredInfrapatchPlugineMetadataScripts : command response is %s " % _output)
         if _ret == 0:
-            _output = _output.strip().splitlines()[-1]
+            _output = _output.strip()
+            if _output:
+                _output = _output.splitlines()[-1]
 
             _cmd = "rm -rf %s/exadataPrePostPlugins/%s/%s" % (
                 mGetExacloudInstallPath(), _plugin_type_directory_mapping.get(aPluginType), "script*")

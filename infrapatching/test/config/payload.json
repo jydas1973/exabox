@@ -27,6 +27,7 @@
             "ForceRemoveCustomRpms": "no",
             "CellCountFromCP": 0,
             "EnableDBHealthChecks": "yes",
+            "EnableMock": "no",
             "PatchSwitchType": ""
         }
     ],

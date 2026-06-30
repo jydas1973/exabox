@@ -14,6 +14,16 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    jyotdas     06/16/26 - Enh 39523473 - Track Plugin Progress Status in
+#                           Infrapatching Tooling
+#    kdas        06/16/26 - Bug 39519373 - OCI: DWCSPROD|EXACS|SJC1|QMR 
+#                           PRECHECK FAILING DUE TO CRITICAL SOFTWARE ALERTS
+#    araghave    06/08/26 - exacs:26.1.1:bb:domu:live update:allcvss rollback
+#                           failing
+#    vikasras    05/18/26 - Bug 39348752 - EXACS | ADD TIME-OUT FOR 
+#                           MCHECKSYSTEMCONSITENCY RPM CHECKS 
+#    mirrodri    05/05/26 - Bug 39149806 - EXACC GEN 2  PATCHING  OPTIMIZE 
+#                           THE NUMBER OF PATCHMGR CLEANUPS  
 #    sdevasek    04/08/26 - Enh 39181872 - REMOVE
 #                           MFIXINVALIDELUVERSIONENTRIES FROM ECS_MAIN
 #    sdevasek    03/18/26 - Bug 39051493 - SMR PATCHING FAILED WITH ERROR :
@@ -27,6 +37,8 @@
 #                           RESILIENCY OF CRS RESTART FOR INFRAPATCHING FLOW
 #    araghave    12/16/25 - Enh 38766076 - CONFIGURE UPDATE-CRYPTO-POLICIES
 #                           BEFORE AND AFTER SWITCH PATCHING
+#    mirrodri    10/12/25 - Enh 38521465 PROVIDE OPTIONS TO MOCK PATCHMGR
+#                           COMMAND ON AUTOMATION ENVIRONMENTS
 #    araghave    09/11/25 - Enh 38173247 - EXACLOUD CHANGES TO SUPPORT DOMU ELU
 #                           INFRA PATCH OPERATIONS
 #    araghave    06/24/25 - Enhancement Request 38082882 - HANDLING EXACLOUD
@@ -261,7 +273,41 @@ PATCH_ALL = "all_nodes"
 PATCH_TYPE_QUARTERLY = "quarterly"
 PATCH_TYPE_MONTHLY   = "monthly"
 
+
+# Plugin execution progress
+# A sibling attribute under the patch-report `data` block that records custom
+# exacloud plugin execution progress, analogous to node_progressing_status.
+PLUGIN_PROGRESSING_STATUS = "plugin_progressing_status"
+PLUGIN_PROGRESS_DATA = "plugin_progress_data"
+PLUGIN_PROGRESS_PLUGIN_TYPE = "plugin_type"          # container-level (hoisted)
+PLUGIN_PROGRESS_NODE_NAME = "node_name"
+PLUGIN_PROGRESS_PLUGIN_COMPONENT = "plugin_component"
+PLUGIN_PROGRESS_ASSOCIATED_DOM0 = "associated_dom0"
+# Stage sub-block keys
+PLUGIN_PROGRESS_PRE_PATCH = "pre_patch"
+PLUGIN_PROGRESS_POST_PATCH = "post_patch"
+# Stage sub-block fields
+PLUGIN_PROGRESS_STATUS_KEY = "status"
+PLUGIN_PROGRESS_START_TIME = "start_time"
+PLUGIN_PROGRESS_END_TIME = "end_time"
+PLUGIN_PROGRESS_SCRIPT_ALIAS = "script_alias"          # per stage-entry: parent script name or registered alias
+PLUGIN_PROGRESS_IS_METADATA_PLUGIN = "is_metadata_plugin"   # record-level: True for registered metadata (V2) plugins
+
+# plugin_component values (the role/script that actually ran)
+PLUGIN_COMPONENT_DOM0 = "dom0"            # dom0.sh / dom0_exasplice.sh on a dom0 node
+PLUGIN_COMPONENT_DOMU = "domu"            # domu.sh on a domu node
+PLUGIN_COMPONENT_DOM0DOMU = "dom0domu"    # dom0_domu.sh on a domu of a dom0
+
+# plugin progress status vocabulary
+PLUGIN_STATUS_NOT_STARTED = "not_started"
+PLUGIN_STATUS_STARTED = "started"
+PLUGIN_STATUS_PROGRESSING = "progressing"
+PLUGIN_STATUS_SUCCESS = "success"
+PLUGIN_STATUS_FAILED = "failed"
+
 THREADS_LOG_DIRECTORY = "log/threads/0000-0000-0000-0000"
+
+USE_MOCK_IMPLEMENTATION = False
 
 #Task Handler Map
 TASK_HANDLER_MAP = {
@@ -428,7 +474,7 @@ INFRA_PATCHING_HANDLERS = {}
 
 # Constants that are rarely modified.
 PARALLEL_OPERATION_TIMEOUT_IN_SECONDS = 180
-SLEEP_CELL_PATCHMGR_CLEANUP_IN_SECONDS = 60
+SLEEP_CELL_PATCHMGR_CLEANUP_IN_SECONDS = 30
 SLEEP_CELL_WAIT_BEFORE_POSTCHECK_IN_SECONDS = 300
 PARALLEL_OPERATION_CRS_TIMEOUT_IN_SECONDS = 1200
 
@@ -438,9 +484,11 @@ SHUTDOWN_STARTUP_SLEEP_INTERVAL_IN_SECONDS = 10
 INFRA_PATCHING_KNOWN_ALERTS_EXACC = "infra_patching_known_alerts_exacc"
 INFRA_PATCHING_KNOWN_ALERTS_EXACS = "infra_patching_known_alerts_exacs"
 INFRA_PATCHING_KNOWN_ALERTS_EXACOMPUTE = "infra_patching_known_alerts_exacompute"
-INFRA_PATCHING_KNOWN_SOFTWARE_ALERTS_EXACC = "infra_patching_known_software_alerts_exacc"
-INFRA_PATCHING_KNOWN_SOFTWARE_ALERTS_EXACS = "infra_patching_known_software_alerts_exacs"
-INFRA_PATCHING_KNOWN_SOFTWARE_ALERTS_EXACOMPUTE = "infra_patching_known_software_alerts_exacompute"
+# Software alert config uses a blocking-list semantic. We are keeping the
+# constant names unchanged to minimize code churn while clarifying the config key.
+INFRA_PATCHING_KNOWN_SOFTWARE_ALERTS_EXACC = "infra_patching_known_software_alerts_blacklist_exacc"
+INFRA_PATCHING_KNOWN_SOFTWARE_ALERTS_EXACS = "infra_patching_known_software_alerts_blacklist_exacs"
+INFRA_PATCHING_KNOWN_SOFTWARE_ALERTS_EXACOMPUTE = "infra_patching_known_software_alerts_blacklist_exacompute"
 PDB_DEGRADED_STATES_MATRIX_KEY = "pdb_degraded_states_matrix"
 INFRA_PATCHING_CONF_FILE = "infrapatching.conf"
 EXACOMPUTE_PATCH_CONF_FILE = "exacomputepatch.conf"
@@ -541,6 +589,7 @@ CUSTOM_MOCK_PATCH_FILE_NAME = "custom_mock_patch.json"
 
 # Default timeout value in secs for all infra patching cmds executed via Exacloud mExecute api
 SHELL_CMD_DEFAULT_TIMEOUT_IN_SECONDS = 180
+RPM_VALIDATION_TIMEOUT_SECONDS = 600
 
 # Exacloud mExecute api exit code when cmd timeout
 SHELL_CMD_TIMEOUT_EXIT_CODE = 124
@@ -556,6 +605,7 @@ LAUNCHNODE_TYPE_COMPUTE = 'COMPUTE'
 INVALID_REGISTERED_PATCH_VERSIONS = [ "0.0.0.0.0.0" ]
 ELU_VERSION_STR ="Exadata Live Update Version"
 ELU_TYPE_STR ="Exadata Live Update Type"
-ELU_APPLIED_REBOOT_MESSAGE = "(Live Update applied. Reboot at any time to finalize outstanding items.)"
+ELU_APPLIED_REBOOT_MESSAGE_RESET = "(Live Update applied. Reboot at any time to finalize outstanding items.)"
 ELU_HAS_OUTSTANDING_WORK_STR = "Exadata Live Update Has Outstanding Work"
 CURRENT_QMR_VERSION_STR = "Image version"
+ELU_OUTSTANDING_ITEMS_EXIST_MESSAGE_NEVER = "(Live Update applied. Outstanding items exist but there is no schedule for finalization.)"

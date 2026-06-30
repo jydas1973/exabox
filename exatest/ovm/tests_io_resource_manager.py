@@ -22,12 +22,35 @@
 #    joysjose    08/01/24 - ER 36727567 Add support for IORM resetclusterplan
 #    jfsaldan    12/20/21 - Creation
 
+import sys
+import types
 import unittest
+import xml.etree.ElementTree as etree
+from unittest.mock import patch, MagicMock, PropertyMock, mock_open
+
+
+def _install_import_stubs():
+    if 'pymysql' not in sys.modules:
+        sys.modules['pymysql'] = types.ModuleType('pymysql')
+
+    if 'defusedxml' not in sys.modules:
+        sys.modules['defusedxml'] = types.ModuleType('defusedxml')
+
+    if 'defusedxml.ElementTree' not in sys.modules:
+        _element_tree = types.ModuleType('defusedxml.ElementTree')
+        _element_tree.Element = etree.Element
+        _element_tree.fromstring = etree.fromstring
+        _element_tree.parse = etree.parse
+        sys.modules['defusedxml.ElementTree'] = _element_tree
+        sys.modules['defusedxml'].ElementTree = _element_tree
+
+
+_install_import_stubs()
+
 from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
 from exabox.log.LogMgr import ebLogInfo
 from exabox.core.MockCommand import exaMockCommand
 from exabox.ovm.cluresmgr import ebCluResManager
-from unittest.mock import patch, MagicMock, PropertyMock, mock_open
 
 
 class ebTestIOResourceManager(ebTestClucontrol):
@@ -531,6 +554,135 @@ class ebTestIOResourceManager(ebTestClucontrol):
         self.assertEqual(_data["dbPlan"][0]["type"], "profile")
         self.assertEqual(_data["dbPlan"][0]["flashcachelimit"], "3886370184045")
         self.assertNotIn("malformedtoken", _data["dbPlan"][0])
+
+    def test_mClusterSetClusterPlan_includes_cache_attributes(self):
+        """
+        Verify clusterplan updates include flash/xrmem cache attributes.
+        """
+        _ebox = self.mGetClubox()
+        _options = self.mGetPayload()
+        _options.jsonmode = True
+        _options.jsonconf = {
+            "clusterPlan": [
+                {
+                    "name": "asmclu1",
+                    "share": "4",
+                    "flashCacheMin": "70G",
+                    "flashCacheSize": "100G",
+                    "xrmemCacheMin": "25G",
+                    "xrmemCacheSize": "50G",
+                },
+                {
+                    "name": "asmclu2",
+                    "share": "2",
+                    "flashcachemin": "50G",
+                    "flashcachesize": "75G",
+                    "xrmemcachemin": "10G",
+                    "xrmemcachesize": "20G",
+                },
+            ]
+        }
+
+        _ebox.mSetExabm(True)
+        _options.resmanage = "setclusterplan"
+        _iormobj = ebCluResManager(_ebox, _options)
+        _captured_cmds = []
+
+        class _FakeManager(object):
+            def list(self):
+                return []
+
+        class _FakeProcessManager(object):
+            def __init__(self):
+                self._manager = _FakeManager()
+
+            def mGetManager(self):
+                return self._manager
+
+            def mStartAppend(self, aProcess):
+                aProcess._callback(*aProcess._args)
+
+            def mJoinProcess(self):
+                return None
+
+        class _FakeProcessStructure(object):
+            def __init__(self, aCallback, aArgs, aName):
+                self._callback = aCallback
+                self._args = aArgs
+                self.name = aName
+
+            def mSetMaxExecutionTime(self, *_args):
+                return None
+
+            def mSetJoinTimeout(self, *_args):
+                return None
+
+            def mSetLogTimeoutFx(self, *_args):
+                return None
+
+        def _mock_get_cluster_plan(_):
+            _data = _iormobj.mGetData()
+            _data["clusterPlan"] = []
+            _data["Status"] = "Pass"
+            _data["ErrorCode"] = "0"
+            _data["cell"] = {}
+            return 0
+
+        def _mock_exec_command(_cell, _options, aCmd):
+            _captured_cmds.append(aCmd)
+            return "", "", 0
+
+        with patch('exabox.ovm.cluresmgr.ProcessManager', _FakeProcessManager), \
+             patch('exabox.ovm.cluresmgr.ProcessStructure', _FakeProcessStructure), \
+             patch.object(_iormobj, 'mGetClusterPlan', side_effect=_mock_get_cluster_plan), \
+             patch.object(_iormobj, 'mGetCells', return_value=['cell1']), \
+             patch.object(_iormobj, 'mExecCommandOnCell', side_effect=_mock_exec_command):
+            _result = _iormobj.mSetClusterPlan(_options)
+
+        self.assertIsNone(_result)
+        self.assertEqual(
+            _captured_cmds,
+            [
+                "cellcli -e 'alter iormplan clusterplan=((name=asmclu1, share=4, flashCacheMin=70G, flashCacheSize=100G, xrmemCacheMin=25G, xrmemCacheSize=50G),(name=asmclu2, share=2, flashCacheMin=50G, flashCacheSize=75G, xrmemCacheMin=10G, xrmemCacheSize=20G))'"
+            ],
+        )
+
+    def test_mParseGetIORMPlan_clusterplan_trims_keys_and_values(self):
+        """
+        Verify clusterplan parser strips whitespace around keys and values.
+        """
+
+        _ebox = self.mGetClubox()
+        _options = self.mGetPayload()
+        _iormobj = ebCluResManager(_ebox, _options)
+        _iormdata = {"cell": {"cell1": {}}}
+        _output = [
+            "name:                   scaqab10celadm01_IORMPLAN",
+            "clusterPlan:            name = asmclu1, share = 4, flashCacheMin = 70G, flashCacheSize = 100G",
+            "                        name = asmclu2, flashcachemin = 50G, xrmemCacheMin = 10G, xrmemCacheSize = 20G",
+            "objective:              auto",
+        ]
+
+        _result = _iormobj.mParseGetIORMPlan("cell1", _iormdata, _output, "clusterPlan")
+
+        self.assertEqual(_result, 0)
+        self.assertEqual(
+            _iormdata["cell"]["cell1"]["clusterPlan"],
+            [
+                {
+                    "name": "asmclu1",
+                    "share": "4",
+                    "flashCacheMin": "70G",
+                    "flashCacheSize": "100G",
+                },
+                {
+                    "name": "asmclu2",
+                    "flashcachemin": "50G",
+                    "xrmemCacheMin": "10G",
+                    "xrmemCacheSize": "20G",
+                },
+            ],
+        )
 
     def get_error_code(self, aErrorCode: int) -> str:
         """

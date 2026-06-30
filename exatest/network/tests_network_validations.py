@@ -16,6 +16,9 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    bhpati      06/01/26 - Bug 39404491 - OCIEXACC: EXACLOUD: PREVMCHECKS:
+#                           EXACLOUD TRYING TO ALWAYS SET 100GB SPEED,
+#                           REGARDLESS OF ACTUAL LINK SPEED
 #    aararora    01/08/26 - Bug 38785417: Set the supported flag correctly if
 #                           100 Gbps speed is unsupported
 #    akkar       04/06/25 - 37641178: 100gbs client network support
@@ -379,7 +382,149 @@ class TestXTablesExaCCNAT(ebTestClucontrol):
 
         _dom0 = _ebox.mReturnDom0DomUPair()[0][0]
         self.assertEqual(None, _net_val_mgr.mUpdateDom0EthernetSpeeds({_dom0: { "eth1" : (50000, True)}}))
+    
+    def test_mCheckDom0EthernetSpeed_x11_uses_highest_valid_speed(self):
+        """
+        Test mCheckDom0EthernetSpeed() does not queue unsupported 100G on X11.
+        """
 
+        _dom0 = "dom0.example.com"
+        _domU = "domu.example.com"
+
+        class FakeNode:
+            def mExecuteCmd(self, aCmd):
+                if aCmd == "/usr/sbin/ethtool eth10 ":
+                    return mockStream([]), mockStream([
+                        "Supported link modes:   1000baseT/Full\n",
+                        "                        10000baseT/Full\n",
+                        "                        25000baseCR/Full\n",
+                        "Advertised link modes:  1000baseT/Full\n",
+                        "                        25000baseCR/Full\n",
+                        "Speed: 1000Mb/s\n",
+                    ]), mockStream([])
+                return mockStream([]), mockStream([]), mockStream([])
+
+        class FakeConnect:
+            def __enter__(self):
+                return FakeNode()
+
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                return False
+
+        class FakeEbox:
+            def mGetArgsOptions(self):
+                return None
+
+            def mGenBondMap(self, aNode, aForce=False):
+                return {"eth10": "bondeth0"}
+
+            def mGetExadataDom0Model(self, aDom0):
+                return "X11"
+
+            def mCompareExadataModel(self, aModel, aMinModel):
+                return 1
+
+            def mIssueSoftWarningOnLinkfailure(self, aDom0, aEthx):
+                return False
+
+        def fake_read_text_file(aNode, aPath):
+            if aPath == "/sys/class/net/eth10/speed":
+                return "1000\n"
+            if aPath == "/sys/class/net/eth10/carrier":
+                return "1\n"
+            return ""
+
+        with patch('exabox.ovm.clunetworkvalidations.connect_to_host',
+                   return_value=FakeConnect()), \
+            patch('exabox.ovm.clunetworkvalidations.node_read_text_file',
+                  side_effect=fake_read_text_file), \
+            patch('exabox.ovm.clumisc.ebCluEthernetConfig.mValidateInterface',
+                  return_value=True):
+            _net_val_mgr = ebNetworkValidations(FakeEbox(), [(_dom0, _domU)])
+            self.assertEqual({_dom0: {"eth10": (25000, True)}},
+                             _net_val_mgr.mCheckDom0EthernetSpeed())
+    
+    def test_mSetCustomSpeed_skips_when_current_speed_matches_target(self):
+        """
+        Test mSetCustomSpeed() does not reset speed already at the target value.
+        """
+
+        class FakeNode:
+            def __init__(self):
+                self.commands = []
+
+            def mGetHostname(self):
+                return "dom0.example.com"
+
+            def mExecuteCmd(self, aCmd):
+                self.commands.append(aCmd)
+                if aCmd == "/bin/cat /sys/class/net/eth10/speed":
+                    return mockStream([]), mockStream(["25000\n"]), mockStream([])
+                return mockStream([]), mockStream([]), mockStream([])
+
+        class FakeEbox:
+            def mGetArgsOptions(self):
+                return None
+
+        _node = FakeNode()
+        _config = ebCluEthernetConfig(FakeEbox(), None)
+
+        self.assertEqual(0, _config.mSetCustomSpeed(_node, "eth10", 1000, 25000, "X11"))
+        self.assertNotIn("/usr/sbin/ethtool -s eth10 speed 25000 autoneg on",
+                         _node.commands)
+    
+    def test_mUpdateCustomEthernetSpeed_retries_valid_speed_not_unsupported_default(self):
+        """
+        Test mUpdateCustomEthernetSpeed() retries valid speeds instead of 100G.
+        """
+
+        class FakeNode:
+            def mGetHostname(self):
+                return "dom0.example.com"
+
+            def mExecuteCmd(self, aCmd):
+                if aCmd == "/usr/sbin/ethtool eth10 ":
+                    return mockStream([]), mockStream([
+                        "Supported link modes:   1000baseT/Full\n",
+                        "                        10000baseT/Full\n",
+                        "                        25000baseCR/Full\n",
+                        "Advertised link modes:  1000baseT/Full\n",
+                        "                        25000baseCR/Full\n",
+                        "Speed: 1000Mb/s\n",
+                    ]), mockStream([])
+                if aCmd == "cat /sys/class/net/eth10/speed":
+                    return mockStream([]), mockStream(["25000\n"]), mockStream([])
+                return mockStream([]), mockStream([]), mockStream([])
+
+            def mDisconnect(self):
+                return
+
+        class FakeEbox:
+            def mGetArgsOptions(self):
+                return None
+
+            def mCompareExadataModel(self, aModel, aMinModel):
+                return 1
+
+            def mIssueSoftWarningOnLinkfailure(self, aDom0, aEthx):
+                return False
+
+            def mEnvTarget(self):
+                return False
+
+        _config = ebCluEthernetConfig(FakeEbox(), None)
+        _node = FakeNode()
+
+        with patch('exabox.ovm.clumisc.ebCluEthernetConfig.mValidateInterface',
+                   return_value=True), \
+            patch('exabox.ovm.clumisc.ebCluEthernetConfig.mSetCustomSpeed',
+                  side_effect=[-1, -1, 0]) as mock_set_speed:
+            _config.mUpdateCustomEthernetSpeed(_node, "dom0.example.com",
+                                               "eth10", 1000, "X11")
+
+        _tried_speeds = [call.args[3] for call in mock_set_speed.call_args_list]
+        self.assertEqual([25000, 1000, 25000], _tried_speeds)
+        self.assertNotIn(100000, _tried_speeds)
 
     def test_mGenerateSupportedNetworkMap(self):
         """_sample_output = {

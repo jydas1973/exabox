@@ -5,7 +5,6 @@ from exabox.core.Context import get_gcontext
 from exabox.core.Node import exaBoxNode
 from exabox.core.MockCommand import exaMockCommand
 from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
-from exabox.ovm.exawatcher import exaBoxExaWatcher, cleanupExaWatcherLogs, deleteOldLogs
 from exabox.core.Error import ExacloudRuntimeError
 import os
 import shutil

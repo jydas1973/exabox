@@ -4,7 +4,7 @@
 #
 # dactlMgr.py
 #
-# Copyright (c) 2025, Oracle and/or its affiliates.
+# Copyright (c) 2025, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      dactlMgr.py - Delegation Access Control Management Operations
@@ -16,6 +16,8 @@
 #      None
 #
 #    MODIFIED   (MM/DD/YY)
+#    kkviswan    04/28/26 - 39263023 - EXACS - SECURITY SCAN FINDINGS IN
+#                           EXABOX/OVM/DACTLMGR.PY
 #    kkviswan    07/23/25 - 38225214 - DELEGATION MANAGEMENT BACKEND
 #                           INTEGRATION ISSUES ON EXADB-XS ENVIRONMENT
 #    nisrikan    06/05/25 - ENH 38035583 - BACKPORT DELEGATION ACCESS CONTROL
@@ -28,6 +30,8 @@
 import base64
 import json
 import os
+import re
+import shlex
 from time import time, sleep
 from exabox.exaoci.ExaOCIFactory import ExaOCIFactory
 from exabox.exakms.ExaKmsEntry import ExaKmsHostType
@@ -49,6 +53,83 @@ OPERATION_INTERNAL_ERROR = "500"
 OPERATION_INVALID_PARAMS = "400"
 OPERATION_SERVICE_UNAVAILABLE = "503"
 
+MAX_IDEMTOKEN_LENGTH = 64
+MAX_BACKEND_IDEMTOKEN_LENGTH = 96
+MAX_RPM_VERSION_LENGTH = 128
+MAX_RPM_PAR_URL_LENGTH = 1024
+SHELL_META_CHARS = set("`$()|<>\\*?[]{}~#!")
+IDEMTOKEN_PATTERN = re.compile(r"^[A-Za-z0-9._-]+$")
+RPM_VERSION_PATTERN = re.compile(r"^supportctl-\d+\.\d+\.\d+\.\d+\.\d+-\d{6}\.\d{4}\.x86_64\.rpm$")
+
+
+def mNormalizeRpmVersion(aRpmVersion):
+    if not isinstance(aRpmVersion, str):
+        return aRpmVersion
+    if aRpmVersion.endswith(".rpm"):
+        return aRpmVersion
+    return aRpmVersion + ".rpm"
+
+
+def mNormalizeRpmParUrl(aRpmParUrl):
+    if not isinstance(aRpmParUrl, str):
+        return aRpmParUrl
+    if aRpmParUrl.endswith(".rpm"):
+        _path_parts = aRpmParUrl.rsplit('/', 1)
+        if len(_path_parts) == 2 and _path_parts[0]:
+            return _path_parts[0] + '/'
+    return aRpmParUrl
+
+
+def mContainsShellMetaChars(aValue, aAllowSpaces=False):
+    if not isinstance(aValue, str):
+        return True
+    for _char in aValue:
+        if _char in SHELL_META_CHARS:
+            return True
+        if _char in "\r\n\t":
+            return True
+        if _char == " " and aAllowSpaces is False:
+            return True
+    return False
+
+
+def mBuildQuotedCommand(aArgs):
+    return " ".join(shlex.quote(str(_arg)) for _arg in aArgs)
+
+
+def mValidateIdemtoken(aIdemtoken, aMaxLength=MAX_IDEMTOKEN_LENGTH):
+    if not isinstance(aIdemtoken, str) or len(aIdemtoken) == 0 or len(aIdemtoken) > aMaxLength:
+        return False
+    if mContainsShellMetaChars(aIdemtoken):
+        return False
+    return IDEMTOKEN_PATTERN.match(aIdemtoken) is not None
+
+
+def mValidateRpmVersion(aRpmVersion):
+    _rpm_version = mNormalizeRpmVersion(aRpmVersion)
+    if not isinstance(_rpm_version, str) or len(_rpm_version) == 0 or len(_rpm_version) > MAX_RPM_VERSION_LENGTH:
+        return False
+    if mContainsShellMetaChars(_rpm_version):
+        return False
+    return RPM_VERSION_PATTERN.match(_rpm_version) is not None
+
+
+def mValidateRpmParUrl(aRpmParUrl):
+    _rpm_par_url = mNormalizeRpmParUrl(aRpmParUrl)
+    if not isinstance(_rpm_par_url, str) or len(_rpm_par_url) == 0 or len(_rpm_par_url) > MAX_RPM_PAR_URL_LENGTH:
+        return False
+    if mContainsShellMetaChars(_rpm_par_url):
+        return False
+    if not _rpm_par_url.startswith("https://"):
+        return False
+    _url_without_scheme = _rpm_par_url[len("https://"):]
+    if "/" not in _url_without_scheme:
+        return False
+    _host_name, _path = _url_without_scheme.split("/", 1)
+    if not _host_name:
+        return False
+    return _rpm_par_url.endswith("/") or _rpm_par_url.endswith(".rpm")
+
 
 class ebDactlMgr(object):
     def __init__(self):
@@ -58,9 +139,13 @@ class ebDactlMgr(object):
 
     @classmethod
     def mValidateCommonParams(cls, aCommonParams):
+        if not isinstance(aCommonParams, dict):
+            return False, "Invalid commonParameters"
         # resourceType Already validated.
         if "idemtoken" not in aCommonParams:
             return False, "Invalid commonParameters, Missing idemtoken"
+        if not mValidateIdemtoken(aCommonParams.get("idemtoken")):
+            return False, "Invalid commonParameters, Invalid idemtoken"
         dom0_domu_pairs = aCommonParams.get("dom0domUPairs")
         if not isinstance(dom0_domu_pairs, dict):
             return False, "Invalid commonParameters, Missing/Invalid dom0domUPairs"
@@ -71,8 +156,12 @@ class ebDactlMgr(object):
             return False, "Invalid commonParameters, Missing secretId"
         if  not aCommonParams.get("rpmVersion"):
             return False, "Invalid commonParameters, Missing rpmVersion"
+        if not mValidateRpmVersion(aCommonParams.get("rpmVersion")):
+            return False, "Invalid commonParameters, Invalid rpmVersion"
         if  not aCommonParams.get("rpmParUrl"):
             return False, "Invalid commonParameters, Missing rpmParUrl"
+        if not mValidateRpmParUrl(aCommonParams.get("rpmParUrl")):
+            return False, "Invalid commonParameters, Invalid rpmParUrl"
         return True, None
 
     def mExecuteCmd(self, aOptions):
@@ -242,8 +331,6 @@ class DaCtlOperationWrapper(object):
     REMOTE_PYTHON3_EXE = '/usr/bin/python3'
     WRAPPER_SCRIPT = '/usr/local/supportctl/supportctlwrapper/supctlWrapper.py'
     OPERATION_POLL_WAIT_INTERVAL = 10  # sec
-    CURL_RPM_DOWNLOAD_CMD_TEMPLATE = "/usr/bin/curl -X GET --silent --show-error {URL}{RPM} {EXTRA_OPTIONS} >/tmp/{RPM}"
-    INSTALL_UPGRADE_RPM_CMD_TEMPLATE = "/usr/bin/sudo /usr/bin/rpm -U --force /tmp/{RPM}"
     QUERY_SUPPORTCTL_RPM = '/usr/bin/rpm -qa supportctl* | grep "supportctl-"'
     OPERATION_MAP = {
         "deploy": dactlOperationConfig(json_tag="deployInfo", pre_assign_check=False, backend_op=["install", "deploy"]),
@@ -266,12 +353,8 @@ class DaCtlOperationWrapper(object):
         self.common_parameters = aJsonPayloadOptions.get("commonParameters", {})
         self.idemtoken = self.common_parameters.get('idemtoken')
         self.domu_list = self.common_parameters.get("dom0domUPairs", {}).get("DOMU", [])
-        self.rpm_version = self.common_parameters.get('rpmVersion')
-        self.rpm_par_url = self.common_parameters.get('rpmParUrl')
-        if not self.rpm_version.endswith(".rpm"):
-            self.rpm_version += ".rpm"
-        if self.rpm_par_url.endswith(".rpm"):
-            self.rpm_par_url = os.path.dirname(self.rpm_par_url) + '/'
+        self.rpm_version = mNormalizeRpmVersion(self.common_parameters.get('rpmVersion'))
+        self.rpm_par_url = mNormalizeRpmParUrl(self.common_parameters.get('rpmParUrl'))
         self.par_url = self.common_parameters.get('parUrl')
         self.secret_id = self.common_parameters.get('secretId')
 
@@ -284,6 +367,13 @@ class DaCtlOperationWrapper(object):
         self.sudo = True
         self.__sudoPath = "/usr/bin/sudo"
 
+    @classmethod
+    def mGetSupportedBackendOperations(cls):
+        _backend_operations = set()
+        for _operation_cfg in cls.OPERATION_MAP.values():
+            _backend_operations.update(_operation_cfg.backend_op)
+        return _backend_operations
+
     def mConnectToDomuNode(self, aHost, aUser, aPrivateKey):
         """
         This function connect to DOM-U using kms object with ssh private key retrieved from secrets
@@ -291,7 +381,7 @@ class DaCtlOperationWrapper(object):
             aHost: DOM-U NAT Hostname
             aUser: Username - for all operation opc user; for validate assignment and command execution
                    Uses temp username.
-            aPrivateKey: Corresponding user's private key always retrieved from secret.
+            aPrivateKey - SSH key material retrieved from the secret store for the user.
         Returns: None
         """
         # Connect to DOM-U Host name, with
@@ -395,9 +485,13 @@ class DaCtlOperationWrapper(object):
             return output.splitlines()[0]
 
     def mDownloadAndInstallRpmOnDomu(self, aDomuName):
-        extra_options = "-k" if "r1.oracleiaas" in self.rpm_par_url else ""
-        download_rpm_cmd = self.CURL_RPM_DOWNLOAD_CMD_TEMPLATE.format(URL=self.rpm_par_url, RPM=self.rpm_version,
-                                                                      EXTRA_OPTIONS=extra_options)
+        extra_options = ["-k"] if "r1.oracleiaas" in self.rpm_par_url else []
+        rpm_target_path = "/tmp/{0}".format(self.rpm_version)
+        rpm_download_url = "{0}{1}".format(self.rpm_par_url, self.rpm_version)
+        download_rpm_cmd = mBuildQuotedCommand(
+            ['/usr/bin/curl', '-X', 'GET', '--silent', '--show-error'] + extra_options + ['--output', rpm_target_path,
+                                                                                           rpm_download_url]
+        )
         ret, output, error = self.mExecuteOnDomU(aDomuName, download_rpm_cmd)
             # self.executor_context[aDomuName].mExecuteCmd(download_rpm_cmd))
         if ret != 0:
@@ -405,7 +499,9 @@ class DaCtlOperationWrapper(object):
             ebLogError(error)
             return -1
 
-        rpm_install_or_upgrade_cmd = self.INSTALL_UPGRADE_RPM_CMD_TEMPLATE.format(RPM=self.rpm_version)
+        rpm_install_or_upgrade_cmd = mBuildQuotedCommand(
+            ['/usr/bin/sudo', '/usr/bin/rpm', '-U', '--force', rpm_target_path]
+        )
         ret, output, error =  self.mExecuteOnDomU(aDomuName, rpm_install_or_upgrade_cmd)
         if ret != 0:
             error = f"Failed to install {self.rpm_version} on node {aDomuName} stdout: {output} error: {error}"
@@ -477,6 +573,10 @@ class DaCtlOperationWrapper(object):
         return return_json
 
     def mFormDactlBackendWrapperCommand(self, idemtoken, operation, json_input, comment=None, sudo=False):
+        if not mValidateIdemtoken(idemtoken, aMaxLength=MAX_BACKEND_IDEMTOKEN_LENGTH):
+            raise ValueError("Invalid backend idemtoken")
+        if operation not in self.mGetSupportedBackendOperations():
+            raise ValueError("Invalid backend operation")
         sudo_cmd = [self.__sudoPath, "--"] if (self.sudo is True or sudo is True) else []
         cmd = sudo_cmd + [self.REMOTE_PYTHON3_EXE, self.WRAPPER_SCRIPT, 'supportctl',
                           '-i', idemtoken,
@@ -485,10 +585,7 @@ class DaCtlOperationWrapper(object):
         if comment:
             cmd.append('-c')
             cmd.append(comment)
-        cmd_str = cmd[0]
-        for arg in cmd[1:]:
-            cmd_str += " '" + str(arg) + "'"
-        return cmd_str
+        return mBuildQuotedCommand(cmd)
 
     def mExecuteBackendOperationWaitForResult(self, aOperation, aIdemtoken, aJsonInput, aComment, timeout=1800,
                                               aTargetDomuNodes=None):
@@ -748,7 +845,15 @@ class DaCtlOperationWrapper(object):
             ret = self.mVerifyRpmOnAllRequiredDomus(operation_cfg.pre_assign_check, self.user_cmd == "deploy")
             if ret != 0:
                 if operation_cfg.node_policy == ALL_SUCCESS and operation_cfg.skip_install_failure is False:
+                    error_message = ""
+                    connection_failure_nodes = [_dom_u for _dom_u in self.domu_list
+                                                if self.executor_context.get(_dom_u) is None]
+                    if connection_failure_nodes:
+                        error_message = "Failed to connect to DACTL nodes: {}".format(
+                            ",".join(connection_failure_nodes)
+                        )
                     return self.mReportError(OPERATION_INTERNAL_ERROR, output="Failed to install RPM in some of DOM-U",
+                                             error_message=error_message,
                                              failure_domus=self.failure_nodes)
             for operation in operation_cfg.backend_op:
                 ret = self.mExecuteBackendOperationOnAllDomus(operation, operation_json, operation_cfg)
@@ -764,4 +869,3 @@ class DaCtlOperationWrapper(object):
         finally:
             # it is mandatory to release all ssh connection.
             self.mReleaseClusterOperations()
-

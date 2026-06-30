@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    pbellary    04/30/26 - ER 39187148 - ECRACLI API TO UPDATE HIGH REDUNDANCY AND 
+#                           ENSURE DEFAULT VLT_INSPECT PRVILEGE IS UNSET FOR VMCLUSTER USERID
 #    scoral      01/29/26 - Bug 38904592: Add EDV volumes to response payload
 #                           of add_vm_extra_size endpoint.
 #    jesandov    01/13/26 - 38841087: Add support of u02 resize
@@ -1375,4 +1377,21 @@ class CommandHandler:
 
         return 0
 
+    def mHandlerXsRemoveVMUserPrivilege(self, aOptions=None):
+        _ebox = self.__cluctrlobj
+        if not aOptions:
+            aOptions = _ebox.mGetArgsOptions()
+
+        _utils = _ebox.mGetExascaleUtils()
+        _utils.mRemoveClusterUserPrivilege(aOptions)
+        return 0
+
+    def mHandlerXsDisableNormalRedundancy(self, aOptions=None):
+        _ebox = self.__cluctrlobj
+        if not aOptions:
+            aOptions = _ebox.mGetArgsOptions()
+
+        _utils = _ebox.mGetExascaleUtils()
+        _utils.mDisableNormalRedundancy(aOptions)
+        return 0
 

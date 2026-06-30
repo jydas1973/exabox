@@ -22,6 +22,7 @@ NOTE:
 History:
 
     MODIFIED   (MM/DD/YY)
+    ririgoye 05/04/26 - Fix lockvm input validation
     scoral   03/26/26 - Enh 39133953 - Now mRemoveSecurityRulesExaBM also
                         also removes the "_lock" rules.
     scoral   03/11/26 - Enh 39003138 - Now mLockGuestSSHTraffic enables the
@@ -74,6 +75,7 @@ History:
 """
 
 import json
+import ipaddress
 import re
 import time
 import tempfile
@@ -119,6 +121,46 @@ EB_IPTABLES_ATP_IMPLICIT_RULES = {
 }
 
 class ebIpTablesRoCE(object):
+
+    _LOCKVM_HOSTNAME_RE = re.compile(
+        r"^(?=.{1,253}\Z)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
+        r"(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*\Z"
+    )
+
+    @staticmethod
+    def mNormalizeLockVMHostname(aHostname, aFieldName="hostname"):
+
+        if not isinstance(aHostname, str):
+            raise ValueError(f"Invalid {aFieldName}: expected hostname string")
+
+        if aHostname != aHostname.strip() or not ebIpTablesRoCE._LOCKVM_HOSTNAME_RE.match(aHostname):
+            raise ValueError(f"Invalid {aFieldName}: expected DNS hostname")
+
+        return aHostname
+
+    @staticmethod
+    def mNormalizeLockVMDomUHostname(aDomUHostname):
+
+        _hostname = ebIpTablesRoCE.mNormalizeLockVMHostname(aDomUHostname, "domu")
+        return _hostname.split(".", 1)[0]
+
+    @staticmethod
+    def mNormalizeLockVMClientIPs(aClientIPs):
+
+        if not isinstance(aClientIPs, list):
+            raise ValueError("Invalid clientIPs: expected list")
+
+        _client_ips = []
+        for _client_ip in aClientIPs:
+            if not isinstance(_client_ip, str):
+                raise ValueError("Invalid clientIPs entry: expected IPv4 address string")
+
+            try:
+                _client_ips.append(str(ipaddress.IPv4Address(_client_ip)))
+            except ValueError as e:
+                raise ValueError("Invalid clientIPs entry: expected IPv4 address") from e
+
+        return _client_ips
 
     @staticmethod
     def mExistsNetFilter(aDom0: str, aNetFilterName: str) -> bool:
@@ -1285,6 +1327,9 @@ case a manual removal of the filter must be performed on Dom0 ***")
     @staticmethod
     def mLockGuestSSHTraffic(aNode, aDomUNATHostname, aClientIPs):
 
+        aDomUNATHostname = ebIpTablesRoCE.mNormalizeLockVMDomUHostname(aDomUNATHostname)
+        aClientIPs = ebIpTablesRoCE.mNormalizeLockVMClientIPs(aClientIPs)
+
         # Find the DomU client bonding interface
         _vm_chain_name = f"vm_{aDomUNATHostname}"
         _nft_cmd = "/usr/sbin/nft"
@@ -1370,6 +1415,8 @@ case a manual removal of the filter must be performed on Dom0 ***")
     
     @staticmethod
     def mUnlockGuestSSHTraffic(aNode, aDomUNATHostname):
+
+        aDomUNATHostname = ebIpTablesRoCE.mNormalizeLockVMDomUHostname(aDomUNATHostname)
 
         _vm_chain_lock_name = f"vm_{aDomUNATHostname}_lock"
         _nft_cmd = "/usr/sbin/nft"

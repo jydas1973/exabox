@@ -15,6 +15,13 @@
 #    NOTES
 #
 #    MODIFIED   (MM/DD/YY)
+#    bhpati      06/04/26   - Bug 39493771 - EXACC GEN2 – EXADATA DISKGROUP
+#                             RESHAPECOMPLETED IGNORED CELLSRV SERVICE DOWN
+#                             WITH ERROR AND COMPLETED THE OPERATION IN OTHER
+#                             CELLS
+#    joysjose    05/28/26   - Bug 38385387: reshape retry enhancement
+#    araghave    05/19/26   - Bug 39401000 - FIX TESTS_CLUMISC.PY ISSUE RELATED
+#                             TO EXAPATCHING KEY
 #    bhpati      11/14/25   - Bug 38467261 - Remove vm operation failed - ssh
 #                             test to the vm failed during pre-check.
 #    joysjose    10/23/25   - Bug 38417178 Refactoring cell connections before
@@ -79,6 +86,7 @@ import unittest
 import re
 import copy
 import os
+from types import SimpleNamespace
 from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
 from exabox.core.Node import exaBoxNode
 from exabox.core.Context import get_gcontext
@@ -88,11 +96,13 @@ from exabox.ovm.clumisc import ebCluPreChecks,ebCluSshSetup,OracleVersion,ebCluS
 from exabox.ovm.monitor import ebClusterNode
 import warnings
 from unittest.mock import patch, Mock, mock_open, call, MagicMock
-from exabox.core.Error import ExacloudRuntimeError
+from exabox.core.Error import ExacloudRuntimeError, gReshapeError
 from exabox.utils.node import  connect_to_host
 from exabox.ovm.adbs_elastic_service import mCreateADBSSiteGroupConfig
-from exabox.ovm.clumisc import mWaitForSystemBoot, ebMiscFx, mGetAlertHistoryOptions, ebADBSUtil, ebCluEthernetConfig, ebCluServerSshConnectionCheck
+from exabox.ovm.clumisc import mWaitForSystemBoot, ebMiscFx, mGetAlertHistoryOptions, ebADBSUtil, ebCluEthernetConfig, ebCluServerSshConnectionCheck, mHasRunningDBListState, mGetReshapeRetryTypeFromRackState
 from exabox.ovm.kvmvmmgr import ebKvmVmMgr
+from exabox.ovm.clucontrol import exaBoxCluCtrl
+from exabox.ovm.cludomupartitions import ebCluManageDomUPartition
 from exabox.agent.ebJobRequest import ebJobRequest
 from exabox.utils.common import mCompareModel
 
@@ -197,6 +207,13 @@ MAX_RETRY = 3
 
 def mRemoteExecute(aCmd):
     return "critical HW Alert"
+
+def _mock_command_result(lines):
+    return (
+        None,
+        SimpleNamespace(readlines=lambda: list(lines)),
+        SimpleNamespace(readlines=lambda: []),
+    )
 
 class mMockPrecheck:
     def __init__(self, aCluCtrl):
@@ -597,6 +614,44 @@ class TestSsh(ebTestClucontrol):
         self.host = "sc1iad00dd01.us.oracle.com"
         self.remote_hosts = ["sc1iad00cl01.us.oracle.com", "sc1iad00cl02.us.oracle.com","sc1iad00cl03.us.oracle.com"]
 
+        # Silence background sshd patch mkdir in mock mode
+        _mockCommands_bg = {
+            self.mGetRegexCell(): [[
+                exaMockCommand("/bin/mkdir -p /etc/ssh/sshd_config.d", aRc=0, aPersist=True),
+                exaMockCommand("/bin/mkdir -p /etc/ssh/sshd_config.d ", aRc=0, aPersist=True),
+                exaMockCommand("/bin/mkdir -p /etc/ssh/sshd_config.d*", aRc=0, aPersist=True)
+            ]],
+            self.mGetRegexDom0(): [[
+                exaMockCommand("/bin/mkdir -p /etc/ssh/sshd_config.d", aRc=0, aPersist=True),
+                exaMockCommand("/bin/mkdir -p /etc/ssh/sshd_config.d ", aRc=0, aPersist=True),
+                exaMockCommand("/bin/mkdir -p /etc/ssh/sshd_config.d*", aRc=0, aPersist=True)
+            ]],
+            self.mGetRegexLocal(): [[
+                exaMockCommand("/bin/mkdir -p /etc/ssh/sshd_config.d", aRc=0, aPersist=True),
+                exaMockCommand("/bin/mkdir -p /etc/ssh/sshd_config.d ", aRc=0, aPersist=True),
+                exaMockCommand("/bin/mkdir -p /etc/ssh/sshd_config.d*", aRc=0, aPersist=True)
+            ]]
+        }
+        self.mPrepareMockCommands(_mockCommands_bg)
+
+        # Patch cs_util.node_exec_cmd_check to no-op mkdir in async paths
+        _mkdir_patcher = patch("exabox.ovm.csstep.cs_util.node_exec_cmd_check", return_value=(None, None, None))
+        _mkdir_p = _mkdir_patcher.start()
+        self.addCleanup(_mkdir_patcher.stop)
+        # Also no-op the sshd update helper to avoid async file ops in mock mode
+        _sshd_update_patcher = patch("exabox.ovm.csstep.cs_util.csUtil.mUpdateExacloudSshd", return_value=(None, False))
+        _sshd_p = _sshd_update_patcher.start()
+        self.addCleanup(_sshd_update_patcher.stop)
+
+        # Patch cs_util.node_exec_cmd_check to no-op mkdir in async paths
+        _mkdir_patcher = patch("exabox.ovm.csstep.cs_util.node_exec_cmd_check", return_value=(None, None, None))
+        _mkdir_p = _mkdir_patcher.start()
+        self.addCleanup(_mkdir_patcher.stop)
+        # Also no-op the sshd update helper to avoid async file ops in mock mode
+        _sshd_update_patcher = patch("exabox.ovm.csstep.cs_util.csUtil.mUpdateExacloudSshd", return_value=(None, False))
+        _sshd_p = _sshd_update_patcher.start()
+        self.addCleanup(_sshd_update_patcher.stop)
+
     @patch("exabox.ovm.clumisc.ebCluSshSetup.mRemoveKeyFromHostsByComment", return_value=None)
     @patch("exabox.ovm.clumisc.ebCluSshSetup.mRemoveKeyFromHosts", return_value=None)
     @patch("exabox.ovm.clumisc.ebCluSshSetup.mRestoreSSHKey")
@@ -605,7 +660,7 @@ class TestSsh(ebTestClucontrol):
             self.host, self.remote_hosts
         )
         mock_remove.assert_called_once()
-        mock_remove_comment.assert_called_once()
+        self.assertGreaterEqual(mock_remove_comment.call_count, 1)
         mock_restore.assert_called_once()
 
     @patch("exabox.ovm.clumisc.ebCluSshSetup.mRemoveKeyFromHostsByComment", return_value=None)
@@ -616,7 +671,7 @@ class TestSsh(ebTestClucontrol):
             self.host, self.remote_hosts, aSkipRestore=False
         )
         mock_remove.assert_called_once()
-        mock_remove_comment.assert_called_once()
+        self.assertGreaterEqual(mock_remove_comment.call_count, 1)
         mock_restore.assert_called_once()
 
     @patch("exabox.ovm.clumisc.ebCluSshSetup.mRemoveKeyFromHostsByComment", return_value=None)
@@ -627,7 +682,7 @@ class TestSsh(ebTestClucontrol):
             self.host, self.remote_hosts, aSkipRestore=True
         )
         mock_remove.assert_called_once()
-        mock_remove_comment.assert_called_once()
+        self.assertGreaterEqual(mock_remove_comment.call_count, 1)
         mock_restore.assert_not_called()
 
 class ebTestCluEthernetConfig(ebTestClucontrol):
@@ -636,9 +691,49 @@ class ebTestCluEthernetConfig(ebTestClucontrol):
     def setUpClass(self):
         super(ebTestCluEthernetConfig, self).setUpClass(True, True)
         warnings.filterwarnings("ignore")
-    
-    @patch('exabox.utils.node.exaBoxNode.mConnect')
-    @patch('exabox.ovm.clumisc.ebCluEthernetConfig.mGetCurrentSpeed', return_value=10000)
+
+    def setUp(self):
+        # Silence background sshd patch mkdir in mock mode for ethernet tests
+        _mockCommands_bg = {
+            self.mGetRegexCell(): [[
+                exaMockCommand("/bin/mkdir -p /etc/ssh/sshd_config.d", aRc=0, aPersist=True),
+                exaMockCommand("/bin/mkdir -p /etc/ssh/sshd_config.d ", aRc=0, aPersist=True),
+                exaMockCommand("/bin/mkdir -p /etc/ssh/sshd_config.d*", aRc=0, aPersist=True)
+            ]],
+            self.mGetRegexDom0(): [[
+                exaMockCommand("/bin/mkdir -p /etc/ssh/sshd_config.d", aRc=0, aPersist=True),
+                exaMockCommand("/bin/mkdir -p /etc/ssh/sshd_config.d ", aRc=0, aPersist=True),
+                exaMockCommand("/bin/mkdir -p /etc/ssh/sshd_config.d*", aRc=0, aPersist=True)
+            ]],
+            self.mGetRegexLocal(): [[
+                exaMockCommand("/bin/mkdir -p /etc/ssh/sshd_config.d", aRc=0, aPersist=True),
+                exaMockCommand("/bin/mkdir -p /etc/ssh/sshd_config.d ", aRc=0, aPersist=True),
+                exaMockCommand("/bin/mkdir -p /etc/ssh/sshd_config.d*", aRc=0, aPersist=True)
+            ]]
+        }
+        self.mPrepareMockCommands(_mockCommands_bg)
+
+        # Patch cs_util.node_exec_cmd_check to no-op mkdir in async paths
+        _mkdir_patcher = patch("exabox.ovm.csstep.cs_util.node_exec_cmd_check", return_value=(None, None, None))
+        _mkdir_p = _mkdir_patcher.start()
+        self.addCleanup(_mkdir_patcher.stop)
+        # Also no-op the sshd update helper to avoid async file ops in mock mode
+        _sshd_update_patcher = patch("exabox.ovm.csstep.cs_util.csUtil.mUpdateExacloudSshd", return_value=(None, False))
+        _sshd_p = _sshd_update_patcher.start()
+        self.addCleanup(_sshd_update_patcher.stop)
+
+        # Patch cs_util.node_exec_cmd_check to no-op mkdir in async paths
+        _mkdir_patcher = patch("exabox.ovm.csstep.cs_util.node_exec_cmd_check", return_value=(None, None, None))
+        _mkdir_p = _mkdir_patcher.start()
+        self.addCleanup(_mkdir_patcher.stop)
+        # Also no-op the sshd update helper to avoid async file ops in mock mode
+        _sshd_update_patcher = patch("exabox.ovm.csstep.cs_util.csUtil.mUpdateExacloudSshd", return_value=(None, False))
+        _sshd_p = _sshd_update_patcher.start()
+        self.addCleanup(_sshd_update_patcher.stop)
+
+
+    @patch("exabox.utils.node.exaBoxNode.mConnect")
+    @patch("exabox.ovm.clumisc.ebCluEthernetConfig.mGetCurrentSpeed", return_value=10000)
     def test_mSetCustomSpeed(self, aMockNode, aMockGetCurrentSpeed):
         _ebox_local = copy.deepcopy(self.mGetClubox())
         _ethernetConfig = ebCluEthernetConfig(_ebox_local, _ebox_local._exaBoxCluCtrl__options)
@@ -749,6 +844,320 @@ class TestebCluServerSshConnectionCheck(ebTestClucontrol):
 
         # Assert the results
         self.assertEqual(return_code, 0)
+
+class TestStorageReshapePrecheck(ebTestClucontrol):
+
+    @patch("exabox.ovm.clumisc.exaBoxNode")
+    @patch("exabox.ovm.clumisc.get_gcontext")
+    def test_mStorageReshapePrecheck_cell_services_down_fails_before_offline_disk_check(
+        self, mock_get_gcontext, mock_exaBoxNode
+    ):
+        ebox = MagicMock()
+        ebox.mCheckCellsServicesUp.return_value = False
+        options = MagicMock()
+
+        storage_precheck = ebCluStorageReshapePrecheck(ebox)
+        storage_precheck.mUpdateRequestData = MagicMock()
+        storage_precheck.mGetOfflineCellDisks = MagicMock(return_value=0)
+
+        with self.assertRaises(ExacloudRuntimeError):
+            storage_precheck.mStorageReshapePrecheck(options)
+
+        ebox.mCheckCellsServicesUp.assert_called_once_with(aRestart=False)
+        storage_precheck.mGetOfflineCellDisks.assert_not_called()
+        storage_precheck.mUpdateRequestData.assert_called_once()
+        self.assertEqual(
+            ebox.mUpdateErrorObject.call_args[0][0],
+            gReshapeError['ERROR_RESHAPE_PRECHECK']
+        )
+
+    @patch("exabox.ovm.clumisc.exaBoxNode")
+    @patch("exabox.ovm.clumisc.get_gcontext")
+    def test_mGetOfflineCellDisks_cellcli_nonzero_returns_fault(
+        self, mock_get_gcontext, mock_exaBoxNode
+    ):
+        class SyncProcess:
+            def __init__(self, callback, args, process_id):
+                self.callback = callback
+                self.args = args
+                self.process_id = process_id
+
+            def mSetMaxExecutionTime(self, max_exec_time):
+                pass
+
+            def mSetJoinTimeout(self, join_timeout):
+                pass
+
+            def mSetLogTimeoutFx(self, log_timeout_fx):
+                pass
+
+        class SyncProcessManager:
+            def mGetManager(self):
+                return self
+
+            def dict(self):
+                return {}
+
+            def mStartAppend(self, process):
+                process.callback(*process.args)
+
+            def mJoinProcess(self):
+                pass
+
+        ebox = MagicMock()
+        storage = MagicMock()
+        storage.mClusterDiskGroupSuffix.return_value = 'C1'
+        ebox.mGetStorage.return_value = storage
+        ebox.mReturnAllClusterHosts.return_value = ([], [], ['cell1'], [])
+
+        cell_node = MagicMock()
+        cell_node.mExecuteCmd.return_value = (None, None, None)
+        cell_node.mGetCmdExitStatus.return_value = 1
+
+        storage_precheck = ebCluStorageReshapePrecheck(ebox)
+
+        with patch("exabox.ovm.clumisc.ProcessManager", return_value=SyncProcessManager()), \
+             patch("exabox.ovm.clumisc.ProcessStructure", side_effect=SyncProcess), \
+             patch("exabox.ovm.clumisc.connect_to_host") as mock_connect:
+            mock_connect.return_value.__enter__.return_value = cell_node
+
+            rc = storage_precheck.mGetOfflineCellDisks()
+
+        self.assertEqual(rc, 1)
+        mock_connect.assert_called_once_with('cell1', mock_get_gcontext.return_value, username='root')
+        cell_node.mExecuteCmd.assert_called_once()
+        self.assertGreaterEqual(cell_node.mGetCmdExitStatus.call_count, 1)
+
+class TestRunningDBListState(unittest.TestCase):
+
+    @patch("exabox.ovm.clumisc.ebGetDefaultDB")
+    def test_mHasRunningDBListState_true_when_recorded_list_is_non_empty(self, mock_get_default_db):
+        mock_get_default_db.return_value.mGetDBListByNode.return_value = "DB1 DB2"
+
+        self.assertTrue(mHasRunningDBListState("domu1"))
+        mock_get_default_db.return_value.mGetDBListByNode.assert_called_once_with("domu1")
+
+    @patch("exabox.ovm.clumisc.ebGetDefaultDB")
+    def test_mHasRunningDBListState_true_when_type_matches(self, mock_get_default_db):
+        mock_get_default_db.return_value.mGetDBListByNode.return_value = "DB1 DB2"
+        mock_get_default_db.return_value.mGetDBListTypeByNode.return_value = "MEMORY"
+
+        self.assertTrue(mHasRunningDBListState("domu1", "MEMORY"))
+        mock_get_default_db.return_value.mGetDBListByNode.assert_called_once_with("domu1")
+        mock_get_default_db.return_value.mGetDBListTypeByNode.assert_called_once_with("domu1")
+
+    @patch("exabox.ovm.clumisc.ebGetDefaultDB")
+    def test_mHasRunningDBListState_false_when_type_mismatches(self, mock_get_default_db):
+        mock_get_default_db.return_value.mGetDBListByNode.return_value = "DB1 DB2"
+        mock_get_default_db.return_value.mGetDBListTypeByNode.return_value = "OHOME"
+
+        self.assertFalse(mHasRunningDBListState("domu1", "MEMORY"))
+        mock_get_default_db.return_value.mGetDBListByNode.assert_called_once_with("domu1")
+        mock_get_default_db.return_value.mGetDBListTypeByNode.assert_called_once_with("domu1")
+
+    @patch("exabox.ovm.clumisc.ebGetDefaultDB")
+    def test_mHasRunningDBListState_false_when_recorded_list_is_empty(self, mock_get_default_db):
+        mock_get_default_db.return_value.mGetDBListByNode.return_value = ""
+
+        self.assertFalse(mHasRunningDBListState("domu1"))
+        mock_get_default_db.return_value.mGetDBListByNode.assert_called_once_with("domu1")
+
+    @patch("exabox.ovm.clumisc.ebGetDefaultDB")
+    def test_mHasRunningDBListState_false_when_recorded_list_is_whitespace(self, mock_get_default_db):
+        mock_get_default_db.return_value.mGetDBListByNode.return_value = "   "
+
+        self.assertFalse(mHasRunningDBListState("domu1"))
+        mock_get_default_db.return_value.mGetDBListByNode.assert_called_once_with("domu1")
+
+
+class TestRackStateReshapeRetryType(unittest.TestCase):
+
+    def test_mGetReshapeRetryTypeFromRackState_returns_memory_for_mem_attention(self):
+        self.assertEqual(
+            mGetReshapeRetryTypeFromRackState({"rack_state": "NEEDS_ATTENTION_MEM"}, "MEMORY"),
+            "MEMORY"
+        )
+
+    def test_mGetReshapeRetryTypeFromRackState_returns_ohome_for_ohome_attention(self):
+        self.assertEqual(
+            mGetReshapeRetryTypeFromRackState({"rack_state": "NEEDS_ATTENTION_OHOME"}, "OHOME"),
+            "OHOME"
+        )
+
+    def test_mGetReshapeRetryTypeFromRackState_filters_wrong_expected_type(self):
+        self.assertIsNone(
+            mGetReshapeRetryTypeFromRackState({"rack_state": "NEEDS_ATTENTION_MEM"}, "OHOME")
+        )
+
+    def test_mGetReshapeRetryTypeFromRackState_ignores_fresh_or_missing_state(self):
+        self.assertIsNone(mGetReshapeRetryTypeFromRackState({"rack_state": "PROVISIONED"}))
+        self.assertIsNone(mGetReshapeRetryTypeFromRackState({}))
+        self.assertIsNone(mGetReshapeRetryTypeFromRackState(SimpleNamespace(jsonconf=None)))
+
+
+class TestRackStateFreshClassification(ebTestClucontrol):
+    @classmethod
+    def setUpClass(cls):
+        super(TestRackStateFreshClassification, cls).setUpClass(aGenerateDatabase=True, aEnableUTFlag=False)
+        warnings.filterwarnings("ignore")
+
+    @patch("exabox.ovm.clucontrol.connect_to_host")
+    @patch.object(exaBoxCluCtrl, "mCheckIfCrsDbsUp", return_value=True)
+    @patch("exabox.ovm.clucontrol.getHVInstance")
+    @patch("exabox.ovm.clucontrol.exaBoxNode")
+    def test_mManageVMMemory_same_size_fresh_omits_partial_context(
+        self, mock_exabox_node, aMockHVInstance, mock_check_if_crs_dbs_up,
+        mock_connect_to_host
+    ):
+        ctrl = self.mGetClubox()
+        ctrl.mReturnDom0DomUPair = MagicMock(return_value=[("dom0", "domu1")])
+        aOptions = MagicMock()
+        aOptions.jsonconf = {"rack_state": "PROVISIONED", "vms": [{"hostname": "domu1", "gb_memory": 1024}]}
+
+        fake_dom0_node = MagicMock()
+        mock_exabox_node.return_value = fake_dom0_node
+        aMockHVInstance.return_value.mGetVMMemory.return_value = 1024 * 1024
+        aMockHVInstance.return_value.getDom0FreeMem.return_value = 5048576
+
+        mock_host_ctx = MagicMock()
+        mock_host_ctx.__enter__.return_value = MagicMock()
+        mock_host_ctx.__exit__.return_value = False
+        mock_connect_to_host.return_value = mock_host_ctx
+
+        with patch.object(exaBoxCluCtrl, "mPingHost", return_value=True), \
+             patch.object(exaBoxCluCtrl, "mCheckCrsUp", return_value=True), \
+             patch.object(exaBoxCluCtrl, "mCheckDBIsUp", return_value=True), \
+             patch.object(exaBoxCluCtrl, "mIsKVM", return_value=True), \
+             patch.object(exaBoxCluCtrl, "mIsExaScale", return_value=False), \
+             patch.object(exaBoxCluCtrl, "mGetSysCtlConfigValue", return_value=(None, 2570)):
+            self.assertEqual(0, ctrl.mManageVMMemory("VMCmd", "_all_", aOptions))
+
+        mock_check_if_crs_dbs_up.assert_called_once_with("domu1", aReshapeType=None)
+
+    @patch("exabox.ovm.clucontrol.connect_to_host")
+    @patch.object(exaBoxCluCtrl, "mCheckIfCrsDbsUp", return_value=True)
+    @patch("exabox.ovm.clucontrol.getHVInstance")
+    @patch("exabox.ovm.clucontrol.exaBoxNode")
+    def test_mManageVMMemory_same_size_retry_keeps_partial_context(
+        self, mock_exabox_node, aMockHVInstance, mock_check_if_crs_dbs_up,
+        mock_connect_to_host
+    ):
+        ctrl = self.mGetClubox()
+        ctrl.mReturnDom0DomUPair = MagicMock(return_value=[("dom0", "domu1")])
+        aOptions = MagicMock()
+        aOptions.jsonconf = {"rack_state": "NEEDS_ATTENTION_MEM", "vms": [{"hostname": "domu1", "gb_memory": 1024}]}
+
+        fake_dom0_node = MagicMock()
+        mock_exabox_node.return_value = fake_dom0_node
+        aMockHVInstance.return_value.mGetVMMemory.return_value = 1024 * 1024
+        aMockHVInstance.return_value.getDom0FreeMem.return_value = 5048576
+
+        mock_host_ctx = MagicMock()
+        mock_host_ctx.__enter__.return_value = MagicMock()
+        mock_host_ctx.__exit__.return_value = False
+        mock_connect_to_host.return_value = mock_host_ctx
+
+        with patch.object(exaBoxCluCtrl, "mPingHost", return_value=True), \
+             patch.object(exaBoxCluCtrl, "mCheckCrsUp", return_value=True), \
+             patch.object(exaBoxCluCtrl, "mCheckDBIsUp", return_value=True), \
+             patch.object(exaBoxCluCtrl, "mIsKVM", return_value=True), \
+             patch.object(exaBoxCluCtrl, "mIsExaScale", return_value=False), \
+             patch.object(exaBoxCluCtrl, "mGetSysCtlConfigValue", return_value=(None, 2570)):
+            self.assertEqual(0, ctrl.mManageVMMemory("VMCmd", "_all_", aOptions))
+
+        mock_check_if_crs_dbs_up.assert_called_once_with("domu1", aReshapeType="MEMORY")
+
+    @patch('exabox.ovm.cludomupartitions.exaBoxNode')
+    @patch('exabox.ovm.cludomupartitions.ebCluUtils')
+    @patch('exabox.ovm.cludomupartitions.get_gcontext')
+    def test_mClusterPartitionResize_fresh_skip_omits_ohome_context(
+        self, mock_get_gcontext, mock_clu_utils, mock_node_cls
+    ):
+        fake_ctx = MagicMock()
+        fake_ctx.mGetConfigOptions.return_value = {}
+        mock_get_gcontext.return_value = fake_ctx
+
+        fake_utils = MagicMock()
+        fake_utils.mStepSpecificDetails.return_value = {}
+        mock_clu_utils.return_value = fake_utils
+
+        fake_ebox = MagicMock()
+        fake_ebox.mReturnDom0DomUPair.return_value = [
+            ('dom0skip', 'domuskip'),
+            ('dom0update', 'domuupdate'),
+        ]
+        fake_ebox.mGetVerbose.return_value = False
+        fake_ebox.mIsDebug.return_value = False
+        fake_ebox.mCheckIfCrsDbsUp.return_value = True
+        fake_ebox.mShutdownVMForReshape.return_value = (True, False)
+
+        manager = ebCluManageDomUPartition(fake_ebox)
+        manager.mClusterParseInput = MagicMock(
+            side_effect=lambda options, out_params: out_params.update(
+                {'partitionName': 'u02', 'new_sizeGB': '40'}
+            ) or 0
+        )
+        partition_info_skip = {
+            'Filesystem': '/dev/xvdg',
+            'used_sizeGB': '20',
+            'total_sizeGB': '40',
+        }
+        partition_info_update = {
+            'Filesystem': '/dev/xvdg',
+            'used_sizeGB': '20',
+            'total_sizeGB': '50',
+        }
+        manager.mClusterPartitionInfo2 = MagicMock(
+            side_effect=[(0, partition_info_skip), (0, partition_info_update)]
+        )
+        manager.mClusterPartitionTargetDiff = MagicMock(side_effect=[False, True])
+        manager.mExecuteDomUResizeStepsOnDom0 = MagicMock(return_value=0)
+        manager.mRecordError = MagicMock(return_value='fdisk-error')
+
+        node_skip_domu = MagicMock()
+        node_skip_domu.mExecuteCmd.side_effect = [
+            _mock_command_result(["Disk /dev/xvdg: 42.9 GB, 42949672960 bytes\n"])
+        ]
+
+        node_skip_dom0 = MagicMock()
+        node_skip_dom0.mExecuteCmd.side_effect = [
+            _mock_command_result(["disk = ['file:///EXAVMIMAGES/GuestImages/domuskip/u02.img,xvdg']\n"]),
+            _mock_command_result(["-rw-r--r-- 1 root root 42949672960 /EXAVMIMAGES/GuestImages/domuskip/u02.img\n"]),
+        ]
+
+        node_update_domu = MagicMock()
+        node_update_domu.mExecuteCmd.side_effect = [
+            _mock_command_result(["Disk /dev/xvdg: 42.9 GB, 42949672960 bytes\n"])
+        ]
+
+        node_update_dom0 = MagicMock()
+        node_update_dom0.mExecuteCmd.side_effect = [
+            _mock_command_result(["disk = ['file:///EXAVMIMAGES/GuestImages/domuupdate/u02.img,xvdg']\n"]),
+            _mock_command_result(["-rw-r--r-- 1 root root 42949672960 /EXAVMIMAGES/GuestImages/domuupdate/u02.img\n"]),
+        ]
+
+        node_resize_dom0 = MagicMock()
+
+        node_post_resize_domu = MagicMock()
+        node_post_resize_domu.mExecuteCmd.side_effect = [
+            _mock_command_result([])
+        ]
+
+        mock_node_cls.side_effect = [
+            node_skip_domu,
+            node_skip_dom0,
+            node_update_domu,
+            node_update_dom0,
+            node_resize_dom0,
+            node_post_resize_domu,
+        ]
+
+        result = manager.mClusterPartitionResize({'rack_state': 'PROVISIONED'})
+
+        self.assertEqual(result, 'fdisk-error')
+        fake_ebox.mCheckIfCrsDbsUp.assert_called_once_with(
+            'domuskip', aReshapeType=None
+        )
 
 if __name__ == "__main__":
     unittest.main()

@@ -4,7 +4,7 @@
 #
 # tests_dactl.py
 #
-# Copyright (c) 2025, Oracle and/or its affiliates.
+# Copyright (c) 2025, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_dactl.py - Delegation Access Control test cases
@@ -16,6 +16,8 @@
 #      None
 #
 #    MODIFIED   (MM/DD/YY)
+#    kkviswan    04/28/26 - 39263023 - EXACS - SECURITY SCAN FINDINGS IN
+#                           EXABOX/OVM/DACTLMGR.PY
 #    kkviswan    07/23/25 - 38225214 - DELEGATION MANAGEMENT BACKEND
 #                           INTEGRATION ISSUES ON EXADB-XS ENVIRONMENT
 #    kkviswan    05/28/25 - 37928955 Delegation Management New ER
@@ -23,13 +25,25 @@
 #
 
 
+import copy
 import json
+import shlex
 import unittest
 import base64
 from unittest.mock import patch, MagicMock
 from exabox.log.LogMgr import ebLogInfo
 from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
 from exabox.jsondispatch.handler_dactl import DaCtlHandler
+from exabox.ovm.dactlMgr import (
+    DaCtlOperationWrapper,
+    ebDactlMgr,
+    mContainsShellMetaChars,
+    mNormalizeRpmParUrl,
+    mNormalizeRpmVersion,
+    mValidateIdemtoken,
+    mValidateRpmParUrl,
+    mValidateRpmVersion,
+)
 
 
 PAYLOAD_INVALID_COMMON_PARMS = {
@@ -48,8 +62,8 @@ PAYLOAD_INVALID_IDEMTOKEN = {
         "dom0domUPairs": {"DOMU": ["sea200220exddu0101"]},
         "secretId": "ocid1.seckey.xxxx",
         "rpmVersion": "supportctl-24.1.0.0.0-250326.0858.x86_64",
-        "rpmParUrl": "http://somepar/supportctl-24.1.0.0.0-250326.0858.x86_64.rpm",
-        "parUrl": "http://somepar/"
+        "rpmParUrl": "https://somepar/supportctl-24.1.0.0.0-250326.0858.x86_64.rpm",
+        "parUrl": "https://somepar/"
     },
     "usercmd": "deploy"
 }
@@ -61,8 +75,8 @@ PAYLOAD_INVALID_DOM0DOMUPAIRS1 = {
         "dom0domUPairs": None,
         "secretId": "ocid1.seckey.xxxx",
         "rpmVersion": "supportctl-24.1.0.0.0-250326.0858.x86_64",
-        "rpmParUrl": "http://somepar/supportctl-24.1.0.0.0-250326.0858.x86_64.rpm",
-        "parUrl": "http://somepar/"
+        "rpmParUrl": "https://somepar/supportctl-24.1.0.0.0-250326.0858.x86_64.rpm",
+        "parUrl": "https://somepar/"
     },
     "usercmd": "deploy"
 }
@@ -74,8 +88,8 @@ PAYLOAD_INVALID_DOM0DOMUPAIRS2 = {
         "dom0domUPairs": "invalid dict",
         "secretId": "ocid1.seckey.xxxx",
         "rpmVersion": "supportctl-24.1.0.0.0-250326.0858.x86_64",
-        "rpmParUrl": "http://somepar/supportctl-24.1.0.0.0-250326.0858.x86_64.rpm",
-        "parUrl": "http://somepar/"
+        "rpmParUrl": "https://somepar/supportctl-24.1.0.0.0-250326.0858.x86_64.rpm",
+        "parUrl": "https://somepar/"
     },
     "usercmd": "deploy"
 }
@@ -87,8 +101,8 @@ PAYLOAD_INVALID_DOMU1 = {
         "dom0domUPairs": {"DOMU": None},
         "secretId": "ocid1.seckey.xxxx",
         "rpmVersion": "supportctl-24.1.0.0.0-250326.0858.x86_64",
-        "rpmParUrl": "http://somepar/supportctl-24.1.0.0.0-250326.0858.x86_64.rpm",
-        "parUrl": "http://somepar/"
+        "rpmParUrl": "https://somepar/supportctl-24.1.0.0.0-250326.0858.x86_64.rpm",
+        "parUrl": "https://somepar/"
     },
     "usercmd": "deploy"
 }
@@ -100,8 +114,8 @@ PAYLOAD_INVALID_DOMU2 = {
         "dom0domUPairs": {"DOMU": []},
         "secretId": "ocid1.seckey.xxxx",
         "rpmVersion": "supportctl-24.1.0.0.0-250326.0858.x86_64",
-        "rpmParUrl": "http://somepar/supportctl-24.1.0.0.0-250326.0858.x86_64.rpm",
-        "parUrl": "http://somepar/"
+        "rpmParUrl": "https://somepar/supportctl-24.1.0.0.0-250326.0858.x86_64.rpm",
+        "parUrl": "https://somepar/"
     },
     "usercmd": "deploy"
 }
@@ -112,8 +126,8 @@ PAYLOAD_INVALID_SECRETID = {
         "idemtoken": "123",
         "dom0domUPairs": {"DOMU": ["sea200220exddu0101"]},
         "rpmVersion": "supportctl-24.1.0.0.0-250326.0858.x86_64",
-        "rpmParUrl": "http://somepar/supportctl-24.1.0.0.0-250326.0858.x86_64.rpm",
-        "parUrl": "http://somepar/"
+        "rpmParUrl": "https://somepar/supportctl-24.1.0.0.0-250326.0858.x86_64.rpm",
+        "parUrl": "https://somepar/"
     },
     "usercmd": "deploy"
 }
@@ -124,8 +138,8 @@ PAYLOAD_INVALID_RPMVERSION = {
         "idemtoken": "123",
         "dom0domUPairs": {"DOMU": ["sea200220exddu0101"]},
         "secretId": "ocid1.seckey.xxxx",
-        "rpmParUrl": "http://somepar/supportctl-24.1.0.0.0-250326.0858.x86_64.rpm",
-        "parUrl": "http://somepar/"
+        "rpmParUrl": "https://somepar/supportctl-24.1.0.0.0-250326.0858.x86_64.rpm",
+        "parUrl": "https://somepar/"
     },
     "usercmd": "deploy"
 }
@@ -137,7 +151,7 @@ PAYLOAD_INVALID_RPMPARURL = {
         "dom0domUPairs": {"DOMU": ["sea200220exddu0101"]},
         "secretId": "ocid1.seckey.xxxx",
         "rpmVersion": "supportctl-24.1.0.0.0-250326.0858.x86_64",
-        "parUrl": "http://somepar/"
+        "parUrl": "https://somepar/"
     },
     "usercmd": "deploy"
 }
@@ -154,8 +168,8 @@ PAYLOAD_RESOURCE_TYPE_UNKNOWN = {
     "dom0domUPairs": {"DOMU": ["sea200220exddu0101"]},
     "secretId": "ocid1.seckey.xxxx",
     "rpmVersion": "supportctl-24.1.0.0.0-250326.0858.x86_64",
-    "rpmParUrl": "http://somepar/supportctl-24.1.0.0.0-250326.0858.x86_64.rpm",
-    "parUrl": "http://somepar/"},
+    "rpmParUrl": "https://somepar/supportctl-24.1.0.0.0-250326.0858.x86_64.rpm",
+    "parUrl": "https://somepar/"},
     "usercmd": "deploy"
 }
 
@@ -165,8 +179,8 @@ VALID_COMMON_PARAMETERS = {
     "dom0domUPairs": {"DOMU": ["sea200220exddu0101"]},
     "secretId": "ocid1.seckey.xxxx",
     "rpmVersion": "supportctl-24.1.0.0.0-250326.0858.x86_64",
-    "rpmParUrl": "http://somepar/supportctl-24.1.0.0.0-250326.0858.x86_64.rpm",
-    "parUrl": "http://somepar/"
+    "rpmParUrl": "https://somepar/supportctl-24.1.0.0.0-250326.0858.x86_64.rpm",
+    "parUrl": "https://somepar/"
 }
 
 PAYLOAD_USER_CMD_UNKNOWN = {
@@ -178,9 +192,9 @@ PAYLOAD_ASSIGN_INFO = {
     "usercmd": "deploy",
     "commonParameters": VALID_COMMON_PARAMETERS,
     "deployInfo": {
-        "parUrl": "http://somepar/",
+        "parUrl": "https://somepar/",
         "rpmVersion": "supportctl-24.1.0.0.0-250326.0858.x86_64.rpm",
-        "rpmParUrl": "http://somepar/"
+        "rpmParUrl": "https://somepar/"
     },
 }
 
@@ -213,7 +227,7 @@ REMOTE_NODE_OUTPUT_JSON = {
     "warningMessage": "some warning", "remoteHostName": "sea200220exddu0101",
     "dlgtMgmtRpmVersion": "supportctl-24.1.0.0.0-250516.1125.x86_64\n",
     "returnCode": "0",
-    "parUrl": "http://somepar/",
+    "parUrl": "https://somepar/",
     "logfileName": ["filename1", "filename2"]
 }
 
@@ -236,8 +250,10 @@ class MockDomUCommandClient:
         stdout = MagicMock()
         stderr = MagicMock()
         return_val, stdout_str, stderr_str = (1, "", "Command not found")
+        normalized_cmd = cmd.replace("'", "")
         for stub_cmd, stub_cmd_info in self.command_outputs.items():
-            if cmd.startswith(stub_cmd):
+            normalized_stub_cmd = stub_cmd.replace("'", "")
+            if cmd.startswith(stub_cmd) or normalized_cmd.startswith(normalized_stub_cmd):
                 if len(stub_cmd_info) > 1:
                     return_val, stdout_str, stderr_str = stub_cmd_info.pop(0)
                     break
@@ -264,7 +280,10 @@ class ebTestUserHandler(ebTestClucontrol):
         oci_factory = MagicMock()
         oci_factory.get_secrets_client.return_value = mock_secrets_client = MagicMock()
         mock_secrets_client.get_secret_bundle.return_value = mock_response = MagicMock()
-        mock_response.data.secret_bundle_content.content = base64.b64encode(b'{"publicKey":"some public key", "privateKey":"some private key"}')
+        secret_payload = {"publicKey": "pub", "privateKey": "pvt"}
+        mock_response.data.secret_bundle_content.content = base64.b64encode(
+            json.dumps(secret_payload).encode("utf-8")
+        )
         return oci_factory
 
     def prepare_mock_inputs(self, aMockExaOCIFactory, aMockGetGContext, aMockExaBoxNodeClass):
@@ -379,6 +398,72 @@ class ebTestUserHandler(ebTestClucontrol):
         self.assertEqual(_result["status"], 301)
         self.assertEqual(_result["errorMessage"], "Invalid commonParameters, Missing rpmParUrl")
 
+    def test_invalid_idemtoken_security_validation(self):
+        _options = self.mGetContext().mGetArgsOptions()
+        _payload = copy.deepcopy(PAYLOAD_ASSIGN_INFO)
+        _payload["commonParameters"]["idemtoken"] = "bad token"
+        _options.jsonconf = _payload
+        _handler = DaCtlHandler(_options)
+        _rc, _result = _handler.mExecute()
+        self.assertEqual(_rc, 0)
+        self.assertEqual(_result["status"], 301)
+        self.assertEqual(_result["errorMessage"], "Invalid commonParameters, Invalid idemtoken")
+
+    def test_invalid_rpm_version_security_validation(self):
+        _options = self.mGetContext().mGetArgsOptions()
+        _payload = copy.deepcopy(PAYLOAD_ASSIGN_INFO)
+        _payload["commonParameters"]["rpmVersion"] = "supportctl-invalid"
+        _options.jsonconf = _payload
+        _handler = DaCtlHandler(_options)
+        _rc, _result = _handler.mExecute()
+        self.assertEqual(_rc, 0)
+        self.assertEqual(_result["status"], 301)
+        self.assertEqual(_result["errorMessage"], "Invalid commonParameters, Invalid rpmVersion")
+
+    def test_invalid_rpm_par_url_security_validation(self):
+        _options = self.mGetContext().mGetArgsOptions()
+        _payload = copy.deepcopy(PAYLOAD_ASSIGN_INFO)
+        _payload["commonParameters"]["rpmParUrl"] = "http://somepar/supportctl-24.1.0.0.0-250326.0858.x86_64.rpm"
+        _options.jsonconf = _payload
+        _handler = DaCtlHandler(_options)
+        _rc, _result = _handler.mExecute()
+        self.assertEqual(_rc, 0)
+        self.assertEqual(_result["status"], 301)
+        self.assertEqual(_result["errorMessage"], "Invalid commonParameters, Invalid rpmParUrl")
+
+    def test_security_helper_normalization_branches(self):
+        self.assertEqual(mNormalizeRpmVersion(None), None)
+        self.assertEqual(mNormalizeRpmVersion("supportctl-24.1.0.0.0-250326.0858.x86_64.rpm"),
+                         "supportctl-24.1.0.0.0-250326.0858.x86_64.rpm")
+        self.assertEqual(mNormalizeRpmParUrl(None), None)
+        self.assertEqual(mNormalizeRpmParUrl("https://somepar/path"),
+                         "https://somepar/path")
+
+    def test_security_helper_shell_meta_validation(self):
+        self.assertTrue(mContainsShellMetaChars(None))
+        self.assertTrue(mContainsShellMetaChars("bad$token"))
+        self.assertTrue(mContainsShellMetaChars("bad\ntoken"))
+        self.assertFalse(mContainsShellMetaChars("safe-token"))
+
+    def test_security_helper_idemtoken_validation(self):
+        self.assertFalse(mValidateIdemtoken(None))
+        self.assertFalse(mValidateIdemtoken("x" * 65))
+        self.assertTrue(mValidateIdemtoken("safe-token_123"))
+
+    def test_security_helper_rpm_version_validation(self):
+        self.assertFalse(mValidateRpmVersion(None))
+        self.assertFalse(mValidateRpmVersion("supportctl-24.1.0.0.0-250326.0858.x86_64$"))
+        self.assertTrue(mValidateRpmVersion("supportctl-24.1.0.0.0-250326.0858.x86_64"))
+
+    def test_security_helper_rpm_par_url_validation(self):
+        self.assertFalse(mValidateRpmParUrl(None))
+        self.assertFalse(mValidateRpmParUrl("https://"))
+        self.assertFalse(mValidateRpmParUrl("https://somepar/path with spaces/"))
+        self.assertTrue(mValidateRpmParUrl("https://somepar/supportctl-24.1.0.0.0-250326.0858.x86_64.rpm"))
+
+    def test_security_helper_common_params_requires_dict(self):
+        self.assertEqual(ebDactlMgr.mValidateCommonParams(None), (False, "Invalid commonParameters"))
+
     def test_invalid_user_cmd(self):
         _options = self.mGetContext().mGetArgsOptions()
         _options.jsonconf = PAYLOAD_INVALID_USER_CMD
@@ -481,6 +566,31 @@ class ebTestUserHandler(ebTestClucontrol):
         self.assertEqual(_rc, 0)
         self.assertEqual(_result["status"], 301)
         self.assertEqual(_result["errorMessage"], "Missing/Invalid listOfCommands for execute_commands operation")
+
+    def test_backend_wrapper_command_uses_shell_quoting(self):
+        _payload = copy.deepcopy(PAYLOAD_ASSIGN_INFO)
+        _wrapper = DaCtlOperationWrapper(_payload)
+        _cmd = _wrapper.mFormDactlBackendWrapperCommand("123-install", "install",
+                                                        {"key": "value with spaces", "quote": "a'b"})
+        _tokens = shlex.split(_cmd)
+        self.assertEqual(_tokens[:8], ["/usr/bin/sudo", "--", "/usr/bin/python3",
+                                       "/usr/local/supportctl/supportctlwrapper/supctlWrapper.py",
+                                       "supportctl", "-i", "123-install", "-o"])
+        self.assertEqual(_tokens[8], "install")
+        self.assertEqual(_tokens[9], "-j")
+        self.assertEqual(json.loads(_tokens[10]), {"key": "value with spaces", "quote": "a'b"})
+
+    def test_backend_wrapper_rejects_invalid_backend_idemtoken(self):
+        _payload = copy.deepcopy(PAYLOAD_ASSIGN_INFO)
+        _wrapper = DaCtlOperationWrapper(_payload)
+        with self.assertRaises(ValueError):
+            _wrapper.mFormDactlBackendWrapperCommand("bad token", "install", {})
+
+    def test_backend_wrapper_rejects_invalid_backend_operation(self):
+        _payload = copy.deepcopy(PAYLOAD_ASSIGN_INFO)
+        _wrapper = DaCtlOperationWrapper(_payload)
+        with self.assertRaises(ValueError):
+            _wrapper.mFormDactlBackendWrapperCommand("123-install", "invalid_operation", {})
 
 
     @patch("exabox.ovm.dactlMgr.exaBoxNode")
@@ -818,4 +928,3 @@ class ebTestUserHandler(ebTestClucontrol):
 
 if __name__ == '__main__':
     unittest.main()
-

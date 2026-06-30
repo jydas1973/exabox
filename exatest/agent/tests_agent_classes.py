@@ -7,15 +7,23 @@
 # Copyright (c) 2022, 2026, Oracle and/or its affiliates.
 #
 #    NAME
-#      tests_agent_classes.py - <one-line expansion of the name>
+#      tests_agent_classes.py - Unit tests for exacloud agent classes
 #
 #    DESCRIPTION
-#      <short description of component this file declares/defines>
+#      Tests agent request handling, worker lifecycle helpers, REST callbacks,
+#      and shutdown behavior.
 #
 #    NOTES
-#      <other useful comments, qualifications, etc.>
+#      Uses mocks to isolate agent logic from external services and worker
+#      processes.
 #
 #    MODIFIED   (MM/DD/YY)
+#    aypaul    06/17/26 - Add unit tests for 39392679
+#    kanmanic  06/15/26 - 39560339 - Fix ECRA DB connection close guards
+#    aypaul    05/26/26 - Fix unit tests for 39392771
+#    kanmanic    03/17/26 - 37764703 AQ Status Tracker Support
+#    shapatna  04/28/26 - Bug 39255986: Remove ecinstmaintenance endpoint
+#    aypaul    04/28/26 - Add unit tests for 39261045
 #    aararora  03/03/26 - Bug 38902170: Correct resource leak issues
 #    nisrikan  01/20/26 - Bug 38702503 - NEED A MECHANISM TO ROUTE CALLS TO OPCTL IN CASE OF NODE CONNECTION FAILURES
 #    aypaul      02/26/24 - Issue#36134753 Add unit tests for changes in
@@ -31,12 +39,14 @@ import unittest
 import warnings
 import socket
 import os
+import sys
 import logging
 import shutil
 import uuid
 import copy
 import posix
 import errno
+from types import SimpleNamespace
 from unittest.mock import patch, MagicMock, PropertyMock, mock_open
 
 with patch('multiprocessing.Lock', return_value=MagicMock()):
@@ -114,31 +124,6 @@ class ebTestAgentClasses(ebTestClucontrol):
 
         ebLogInfo("test on ebRestHttpListener.mCheckAgentState succeeded.")
 
-    @patch('exabox.proxy.router.Router.mRegisterECInstance')
-    @patch('exabox.proxy.router.Router.mDeregisterECInstance')
-    @patch('exabox.proxy.router.Router.mUpdateECInstance')
-    def test_mHandleECInstance_mHeartbeatECInstance(self, mock_router_register, mock_router_deregister, mock_router_update):
-        ebLogInfo("")
-        ebLogInfo("Running unit test on ebRestHttpListener.mHandleECInstance_mHeartbeatECInstance")
-
-        _server_class = ebRestHttpListener(aConfig=None, aRouterInstance=Router())
-        _resp = {}
-        _server_class.mHandleECInstance({}, _resp)
-        self.assertEqual(_resp["success"], "False")
-
-        _resp = {}
-        _server_class.mHandleECInstance({"op":"mock_op"}, _resp)
-        self.assertEqual(_resp["success"], "False")
-        _params = {"op":"register", "host":"mockhost", "port":"mockport", "version":"mockversion", "request_type":"mock_req_type",\
-                   "auth_key":"mock_auth_key", "oeda_version":"mock_oeda_version", "key":"mock_key", "value":"mockvalue"}
-        _server_class.mHandleECInstance(_params, _resp)
-        _params["op"] = "deregister"
-        _server_class.mHandleECInstance(_params, _resp)
-        _params["op"] = "update"
-        _server_class.mHandleECInstance(_params, _resp)
-        _server_class.mHeartbeatECInstance({}, {})
-        ebLogInfo("test on ebRestHttpListener.mHandleECInstance_mHeartbeatECInstance succeeded.")
-
     def test_mWorkerStatus(self):
         ebLogInfo("")
         ebLogInfo("Running unit test on ebRestHttpListener.mWorkerStatus")
@@ -204,6 +189,96 @@ class ebTestAgentClasses(ebTestClucontrol):
         mock_close.assert_called_once()
         ebLogInfo("test on ebRestHttpListener.serve_forever succeeded.")
 
+    def test_mAgent_Start_triggers_sync_workers(self):
+        ebLogInfo("")
+        ebLogInfo("Running unit test on ebAgentDaemon.mAgent_Start for AQ sync worker start.")
+
+        class FakeContext(object):
+            def mCheckConfigOption(self, key, default=None):
+                if key == 'ociexacc':
+                    return False
+                if key == 'enable_pushstatus_support':
+                    return 'True'
+                if key == 'backup_configuration_during_start':
+                    return False
+                return False
+
+            def mGetPropagateProcOptions(self):
+                return []
+
+        agent = ebAgentDaemon.__new__(ebAgentDaemon)
+        agent._ebAgentDaemon__config_opts = {
+            'agent_port': 1521,
+            'agent_delegation_enabled': 'FALSE',
+            'supervisor': 'False',
+            'scheduler': 'False'
+        }
+        agent._ebAgentDaemon__config = {'agent_port': 1521}
+        agent._ebAgentDaemon__args_options = SimpleNamespace(proxy=False, nosupervisor=True, daemonize=False)
+        agent._ebAgentDaemon__workerFactory = MagicMock()
+        agent._ebAgentDaemon__proxy_client = None
+        agent._ebAgentDaemon__exatest = False
+        agent._ebAgentDaemon__specialWorkersPids = []
+        agent._ebAgentDaemon__restlistener = MagicMock()
+        agent._ebAgentDaemon__disable_monitor = True
+        agent._mDaemonizedSubProcesses_mStart = MagicMock()
+
+        previous_ld = os.environ.get('LD_LIBRARY_PATH')
+        os.environ['LD_LIBRARY_PATH'] = '/tmp'
+        fake_conn = MagicMock()
+        fake_conn.close = MagicMock()
+        fake_oracledb = SimpleNamespace(
+            init_oracle_client=lambda: None,
+            connect=MagicMock(return_value=fake_conn)
+        )
+
+        try:
+            with patch.object(ebAgentDaemon, 'mCheckAgentState', side_effect=SystemExit), \
+                 patch('exabox.agent.Agent.get_gcontext', return_value=FakeContext()), \
+                 patch('exabox.agent.Agent.get_ecradb_details', return_value={
+                     'user': 'user', 'password': 'pwd', 'host': 'host', 'port': '1521', 'service_name': 'svc'
+                 }), \
+                 patch.dict(sys.modules, {'oracledb': fake_oracledb}), \
+                 patch('exabox.core.AQResponse._start_aqname_sync_worker') as start_aq_mock, \
+                 patch('exabox.core.AQResponse._start_liveliness_worker') as start_live_mock:
+                with self.assertRaises(SystemExit):
+                    agent.mAgent_Start()
+                start_aq_mock.assert_called_once()
+                start_live_mock.assert_called_once()
+        finally:
+            if previous_ld is not None:
+                os.environ['LD_LIBRARY_PATH'] = previous_ld
+            else:
+                del os.environ['LD_LIBRARY_PATH']
+
+    def test_mAgent_Stop_triggers_sync_shutdown(self):
+        ebLogInfo("")
+        ebLogInfo("Running unit test on ebAgentDaemon.mAgent_Stop for AQ sync worker shutdown.")
+
+        agent = ebAgentDaemon.__new__(ebAgentDaemon)
+        agent._ebAgentDaemon__stopped = False
+        agent._ebAgentDaemon__proxy_client = None
+        agent._ebAgentDaemon__restlistener = MagicMock()
+        agent._ebAgentDaemon__workerFactory = MagicMock()
+        agent._ebAgentDaemon__args_options = SimpleNamespace(proxy=False)
+        agent._ebAgentDaemon__agent_destination_handlers = None
+        agent._ebAgentDaemon__specialWorkersPids = []
+
+        with patch('exabox.core.AQResponse._stop_aqname_sync_worker') as stop_aq_mock, \
+             patch('exabox.core.AQResponse._stop_liveliness_worker') as stop_live_mock, \
+             patch('exabox.agent.Agent.ebGetDefaultDB') as get_db_mock, \
+             patch('exabox.agent.Agent.time.sleep', return_value=None):
+            fake_db = MagicMock()
+            fake_db.mGetSpecialWorkerPIDs.return_value = {}
+            get_db_mock.return_value = fake_db
+            agent.mAgent_Stop()
+
+        stop_aq_mock.assert_called_once()
+        stop_live_mock.assert_called_once()
+        agent._ebAgentDaemon__restlistener.mStopRestListener.assert_called_once()
+        agent._ebAgentDaemon__workerFactory.mShutdownFactory.assert_called_once()
+        self.assertTrue(agent._ebAgentDaemon__stopped)
+
     def test_mBDS(self):
         ebLogInfo("")
         ebLogInfo("Running unit test on ebRestHttpListener.mBDS")
@@ -222,6 +297,49 @@ class ebTestAgentClasses(ebTestClucontrol):
              patch('exabox.agent.Agent.dispatchJobToWorker', return_value=False):
              _server_class.mBDS({"jsonconf": {}, "configpath":"mock config path"}, _resp, "cluctrl.bds_install")
         ebLogInfo("test on ebRestHttpListener.mBDS succeeded.")
+
+    def test_log_message_masks_jsonconf_in_access_logs(self):
+        ebLogInfo("")
+        ebLogInfo("Running unit test on ebRestHttpListener.log_message")
+
+        _server_class = ebRestHttpListener(aConfig=None)
+        _request_lines = [
+            'GET /AgentCtrl?jsonconf=%7B%22oeda_pwd%22%3A%22secret%22%7D HTTP/1.1',
+            'GET /CLUCtrl?hostname=h?cmd=infra_patch_operation?jsonconf=%7B%22oeda_pwd%22%3A%22secret%22%7D HTTP/1.1',
+            'GET /AgentCtrl?cmd=status&jsonconf=%7B%22oeda_pwd%22%3A%22secret%22%7D HTTP/1.1'
+        ]
+
+        with patch('exabox.agent.Agent.ebLogAgent') as mock_log:
+            for _request_line in _request_lines:
+                with self.subTest(requestline=_request_line):
+                    mock_log.reset_mock()
+                    _server_class.log_message('"%s" %s %s', _request_line, '200', '-')
+                    _logged_message = mock_log.call_args[0][1]
+                    self.assertNotIn('secret', _logged_message)
+                    self.assertNotIn('%7B%22oeda_pwd%22%3A%22secret%22%7D', _logged_message)
+                    self.assertIn('jsonconf=sanitized', _logged_message)
+                    self.assertTrue(_logged_message.endswith('" 200 -'))
+
+            _malformed_request_line = '/AgentCtrl?jsonconf=%7B%22oeda_pwd%22%3A%22secret%22%7D invalid syntax from client'
+            mock_log.reset_mock()
+            _server_class.log_message('%s', _malformed_request_line)
+            _logged_message = mock_log.call_args[0][1]
+            self.assertNotIn('secret', _logged_message)
+            self.assertNotIn('%7B%22oeda_pwd%22%3A%22secret%22%7D', _logged_message)
+            self.assertIn('jsonconf=sanitized', _logged_message)
+            self.assertIn('invalid syntax from client', _logged_message)
+
+            _error_message = '/AgentCtrl?jsonconf=%7B%22oeda_pwd%22%3A%22secret%22%7D invalid syntax from client'
+            mock_log.reset_mock()
+            _server_class.log_error('code %d, message %s', 400, _error_message)
+            _logged_message = mock_log.call_args[0][1]
+            self.assertIn('code 400, message', _logged_message)
+            self.assertNotIn('secret', _logged_message)
+            self.assertNotIn('%7B%22oeda_pwd%22%3A%22secret%22%7D', _logged_message)
+            self.assertIn('jsonconf=sanitized', _logged_message)
+            self.assertIn('invalid syntax from client', _logged_message)
+
+        ebLogInfo("test on ebRestHttpListener.log_message succeeded.")
 
     def test_mHardwareInfo(self):
         ebLogInfo("")
@@ -323,8 +441,15 @@ class ebTestAgentClasses(ebTestClucontrol):
         _server_class.mAgentOedaLogs({},{})
         params = {"uuid": f"{uuid.uuid1()}", "patch": "mockpatch"}
         response = {}
-        with patch('os.stat'),\
-             patch('os.path.join'),\
+        def _mock_stat(path):
+            return MagicMock(st_mtime=1 if path.endswith("logile1") else 2)
+
+        def _mock_isfile_error(path):
+            if "/log/patch/" in path or "/oeda/requests/" in path or "/log/bmcctrl/" in path:
+                raise Exception("mock file error")
+            return True
+
+        with patch('os.stat', side_effect=_mock_stat),\
              patch('os.listdir', return_value=["logile1", "logfile2"]),\
              patch('os.path.isfile', return_value=True):
              _server_class.path = "https://localhost:1707/dummyendpoint"
@@ -345,10 +470,9 @@ class ebTestAgentClasses(ebTestClucontrol):
 
         params = {"uuid": f"{uuid.uuid1()}", "patch": "mockpatch"}
         response = {}
-        with patch('os.stat'),\
-             patch('os.path.join'),\
+        with patch('os.stat', side_effect=_mock_stat),\
              patch('os.listdir', return_value=["logile1", "logfile2"]),\
-             patch('os.path.isfile', side_effect=Exception("mock file error")):
+             patch('os.path.isfile', side_effect=_mock_isfile_error):
              _server_class.path = "https://localhost:1707/dummyendpoint"
              _server_class.mAgentOedaLogs(params, response)
         
@@ -421,13 +545,37 @@ class ebTestAgentClasses(ebTestClucontrol):
         ebLogInfo("")
         ebLogInfo("Running unit test on ebRestHttpListener.mVMRequest")
 
-        _server_class = ebRestHttpListener(aConfig=None)
-        _server_class.mVMRequest(None, {})
-        _server_class.mVMRequest({"hostname":"val1"}, {})
-        
-        with patch('exabox.agent.ebJobRequest.ebJobRequest.mRegister') as mock1,\
-             patch('exabox.agent.Agent.dispatchJobToWorker', return_value=True) as mock2:
-             _server_class.mVMRequest({"hostname":"dummyhostname", "cmd":"start"}, {})
+        coptions = get_gcontext().mGetConfigOptions()
+        _agent_debug = coptions.get('agent_debug')
+        get_gcontext().mSetConfigOption('agent_debug', "False")
+
+        try:
+            _server_class = ebRestHttpListener(aConfig=None)
+            _server_class.mVMRequest(None, {})
+            _server_class.mVMRequest({"hostname":"val1"}, {})
+
+            with patch('exabox.agent.ebJobRequest.ebJobRequest.mRegister') as mock1,\
+                 patch('exabox.agent.Agent.dispatchJobToWorker', return_value=True) as mock2:
+                 _server_class.mVMRequest({"hostname":"dummyhostname", "cmd":"start"}, {})
+
+            _params = {
+                "hostname": "dummyhostname",
+                "cmd": "start",
+                "jsonconf": {"oeda_pwd": "secret"}
+            }
+            with patch('exabox.agent.ebJobRequest.ebJobRequest.mRegister'),\
+                 patch('exabox.agent.Agent.dispatchJobToWorker', return_value=True),\
+                 patch('exabox.agent.Agent.ebLogInfo') as mock_log:
+                 _server_class.mVMRequest(_params, {})
+            _sanitized_logs = [
+                _call.args[0] for _call in mock_log.call_args_list
+                if _call.args and '* Request parameters (sanitized):' in _call.args[0]
+            ]
+            self.assertEqual(len(_sanitized_logs), 1)
+            self.assertIn("'oeda_pwd': '********'", _sanitized_logs[0])
+            self.assertNotIn("secret", _sanitized_logs[0])
+        finally:
+            get_gcontext().mSetConfigOption('agent_debug', _agent_debug)
         ebLogInfo("test on ebRestHttpListener.mVMRequest succeeded.")
 
     def test_mXmlGeneration(self):
@@ -937,6 +1085,10 @@ class ebTestAgentClasses(ebTestClucontrol):
         _response = _server_class.mValidateNetworkInfoPayload({"interface": _interface_value, "information": "value", "nodes": "value"})
         self.assertEqual(_response, f"Interface value is expected of type string but passed {type(_interface_value)}")
 
+        _interface_value = "bond0;touch /tmp/x"
+        _response = _server_class.mValidateNetworkInfoPayload({"interface": _interface_value, "information": "value", "nodes": "value"})
+        self.assertEqual(_response, f"Interface value is an improper string which doesn't contain standard interfaces values")
+
         _interface_value = "stre0"
         _response = _server_class.mValidateNetworkInfoPayload({"interface": _interface_value, "information": "value", "nodes": "value"})
         self.assertEqual(_response, f"Information value is either not of type list or empty list is passed in payload.")
@@ -949,7 +1101,14 @@ class ebTestAgentClasses(ebTestClucontrol):
         _response = _server_class.mValidateNetworkInfoPayload({"interface": _interface_value, "information": _information_value, "nodes": []})
         self.assertEqual(_response, f"Nodes value is either not of type list or empty list is passed in payload.")
 
-        _nodes = ["nodesvalue"]
+        _nodes = ["host-.example.com"]
+        _response = _server_class.mValidateNetworkInfoPayload({"interface": _interface_value, "information": _information_value, "nodes": _nodes})
+        self.assertEqual(_response, "Hostname: host-.example.com is not a valid hostname/FQDN")
+        _nodes = ["myhost.oracle.com","myhost","host..example.com"]
+        _response = _server_class.mValidateNetworkInfoPayload({"interface": _interface_value, "information": _information_value, "nodes": _nodes})
+        self.assertEqual(_response, "Hostname: host..example.com is not a valid hostname/FQDN")
+
+        _nodes = ["myhost.oracle.com","myhost"]
         _response = _server_class.mValidateNetworkInfoPayload({"interface": _interface_value, "information": _information_value, "nodes": _nodes})
         self.assertEqual(_response, "")
 
@@ -1271,15 +1430,320 @@ class ebTestAgentClasses(ebTestClucontrol):
         
         ebLogInfo("Unit test on ebRestHttpListener.mCheckOpctlStatus completed successfully.")
 
+
+class ebAgentAQStartupCoverageTest(unittest.TestCase):
+
+    class _FakeContext(object):
+        def mCheckConfigOption(self, key, default=None):
+            if key == 'ociexacc':
+                return False
+            if key == 'enable_pushstatus_support':
+                return 'True'
+            if key == 'backup_configuration_during_start':
+                return False
+            return default
+
+        def mGetPropagateProcOptions(self):
+            return []
+
+    def _build_agent(self):
+        agent = ebAgentDaemon.__new__(ebAgentDaemon)
+        agent._ebAgentDaemon__config_opts = {
+            'agent_port': 1521,
+            'agent_delegation_enabled': 'FALSE',
+            'supervisor': 'False',
+            'scheduler': 'False'
+        }
+        agent._ebAgentDaemon__config = {'agent_port': 1521}
+        agent._ebAgentDaemon__args_options = SimpleNamespace(proxy=False, nosupervisor=True, daemonize=False)
+        agent._ebAgentDaemon__workerFactory = MagicMock()
+        agent._ebAgentDaemon__proxy_client = None
+        agent._ebAgentDaemon__exatest = False
+        agent._ebAgentDaemon__specialWorkersPids = []
+        agent._ebAgentDaemon__restlistener = MagicMock()
+        agent._ebAgentDaemon__disable_monitor = True
+        agent._mDaemonizedSubProcesses_mStart = MagicMock()
+        return agent
+
+    def test_mAgent_Start_returns_when_ld_library_path_missing(self):
+        agent = self._build_agent()
+        previous_ld = os.environ.pop('LD_LIBRARY_PATH', None)
+
+        try:
+            with patch('exabox.agent.Agent.get_gcontext', return_value=self._FakeContext()), \
+                 patch.object(ebAgentDaemon, 'mCheckAgentState') as check_state_mock:
+                agent.mAgent_Start()
+
+            check_state_mock.assert_not_called()
+        finally:
+            if previous_ld is not None:
+                os.environ['LD_LIBRARY_PATH'] = previous_ld
+
+    def test_mAgent_Start_returns_when_mandatory_conn_param_missing(self):
+        agent = self._build_agent()
+        previous_ld = os.environ.get('LD_LIBRARY_PATH')
+        os.environ['LD_LIBRARY_PATH'] = '/tmp'
+        fake_oracledb = SimpleNamespace(
+            init_oracle_client=lambda: None,
+            connect=MagicMock()
+        )
+
+        try:
+            with patch('exabox.agent.Agent.get_gcontext', return_value=self._FakeContext()), \
+                 patch('exabox.agent.Agent.get_ecradb_details', return_value={
+                     'user': 'user', 'password': 'pwd', 'host': 'host', 'port': '1521'
+                 }), \
+                 patch.object(ebAgentDaemon, 'mCheckAgentState') as check_state_mock, \
+                 patch.dict(sys.modules, {'oracledb': fake_oracledb}):
+                agent.mAgent_Start()
+
+            fake_oracledb.connect.assert_not_called()
+            check_state_mock.assert_not_called()
+        finally:
+            if previous_ld is not None:
+                os.environ['LD_LIBRARY_PATH'] = previous_ld
+            else:
+                del os.environ['LD_LIBRARY_PATH']
+
+    def test_mAgent_Start_returns_on_connection_failure(self):
+        agent = self._build_agent()
+        previous_ld = os.environ.get('LD_LIBRARY_PATH')
+        os.environ['LD_LIBRARY_PATH'] = '/tmp'
+        fake_oracledb = SimpleNamespace(
+            init_oracle_client=lambda: None,
+            connect=MagicMock(side_effect=Exception("oracle down"))
+        )
+
+        try:
+            with patch('exabox.agent.Agent.get_gcontext', return_value=self._FakeContext()), \
+                 patch('exabox.agent.Agent.get_ecradb_details', return_value={
+                     'user': 'user', 'password': 'pwd', 'host': 'host', 'port': '1521', 'service_name': 'svc'
+                 }), \
+                 patch.object(ebAgentDaemon, 'mCheckAgentState') as check_state_mock, \
+                 patch.dict(sys.modules, {'oracledb': fake_oracledb}):
+                agent.mAgent_Start()
+
+            fake_oracledb.connect.assert_called_once()
+            check_state_mock.assert_not_called()
+        finally:
+            if previous_ld is not None:
+                os.environ['LD_LIBRARY_PATH'] = previous_ld
+            else:
+                del os.environ['LD_LIBRARY_PATH']
+
+    def test_mAgent_Start_continues_when_sync_worker_start_fails(self):
+        agent = self._build_agent()
+        previous_ld = os.environ.get('LD_LIBRARY_PATH')
+        os.environ['LD_LIBRARY_PATH'] = '/tmp'
+        fake_oracledb = SimpleNamespace(
+            init_oracle_client=lambda: None,
+            connect=MagicMock(return_value=MagicMock())
+        )
+
+        try:
+            with patch('exabox.agent.Agent.get_gcontext', return_value=self._FakeContext()), \
+                 patch('exabox.agent.Agent.get_ecradb_details', return_value={
+                     'user': 'user', 'password': 'pwd', 'host': 'host', 'port': '1521', 'service_name': 'svc'
+                 }), \
+                 patch.object(ebAgentDaemon, 'mCheckAgentState', side_effect=SystemExit), \
+                 patch.dict(sys.modules, {'oracledb': fake_oracledb}), \
+                 patch('exabox.core.AQResponse._start_aqname_sync_worker', side_effect=RuntimeError("boom")), \
+                 patch('exabox.core.AQResponse._start_liveliness_worker') as start_live_mock:
+                with self.assertRaises(SystemExit):
+                    agent.mAgent_Start()
+
+            start_live_mock.assert_not_called()
+            fake_oracledb.connect.assert_called_once()
+        finally:
+            if previous_ld is not None:
+                os.environ['LD_LIBRARY_PATH'] = previous_ld
+            else:
+                del os.environ['LD_LIBRARY_PATH']
+
+    def test_mAgent_Start_triggers_sync_workers(self):
+        agent = self._build_agent()
+        previous_ld = os.environ.get('LD_LIBRARY_PATH')
+        os.environ['LD_LIBRARY_PATH'] = '/tmp'
+        fake_conn = MagicMock()
+        fake_oracledb = SimpleNamespace(
+            init_oracle_client=lambda: None,
+            connect=MagicMock(return_value=fake_conn)
+        )
+
+        try:
+            with patch('exabox.agent.Agent.get_gcontext', return_value=self._FakeContext()), \
+                 patch('exabox.agent.Agent.get_ecradb_details', return_value={
+                     'user': 'user', 'password': 'pwd', 'host': 'host', 'port': '1521', 'service_name': 'svc'
+                 }), \
+                 patch.object(ebAgentDaemon, 'mCheckAgentState', side_effect=SystemExit), \
+                 patch.dict(sys.modules, {'oracledb': fake_oracledb}), \
+                 patch('exabox.core.AQResponse._start_aqname_sync_worker') as start_aq_mock, \
+                 patch('exabox.core.AQResponse._start_liveliness_worker') as start_live_mock:
+                with self.assertRaises(SystemExit):
+                    agent.mAgent_Start()
+
+            fake_oracledb.connect.assert_called_once()
+            fake_conn.close.assert_called_once()
+            start_aq_mock.assert_called_once()
+            start_live_mock.assert_called_once()
+        finally:
+            if previous_ld is not None:
+                os.environ['LD_LIBRARY_PATH'] = previous_ld
+            else:
+                del os.environ['LD_LIBRARY_PATH']
+
+    def test_mAgent_Start_import_error_still_runs_sync_workers(self):
+        agent = self._build_agent()
+        previous_ld = os.environ.get('LD_LIBRARY_PATH')
+        os.environ['LD_LIBRARY_PATH'] = '/tmp'
+        original_import = __import__
+
+        def _import_with_oracledb_failure(name, globals=None, locals=None, fromlist=(), level=0):
+            if name == 'oracledb':
+                raise ImportError("missing oracledb")
+            return original_import(name, globals, locals, fromlist, level)
+
+        try:
+            with patch('exabox.agent.Agent.get_gcontext', return_value=self._FakeContext()), \
+                 patch.object(ebAgentDaemon, 'mCheckAgentState', side_effect=SystemExit), \
+                 patch('builtins.__import__', side_effect=_import_with_oracledb_failure), \
+                 patch('exabox.core.AQResponse._start_aqname_sync_worker') as start_aq_mock, \
+                 patch('exabox.core.AQResponse._start_liveliness_worker') as start_live_mock:
+                with self.assertRaises(SystemExit):
+                    agent.mAgent_Start()
+
+            start_aq_mock.assert_called_once()
+            start_live_mock.assert_called_once()
+        finally:
+            if previous_ld is not None:
+                os.environ['LD_LIBRARY_PATH'] = previous_ld
+            else:
+                del os.environ['LD_LIBRARY_PATH']
+
+    def test_mAgent_Stop_continues_when_sync_shutdown_fails(self):
+        agent = ebAgentDaemon.__new__(ebAgentDaemon)
+        agent._ebAgentDaemon__stopped = False
+        agent._ebAgentDaemon__proxy_client = None
+        agent._ebAgentDaemon__restlistener = MagicMock()
+        agent._ebAgentDaemon__workerFactory = MagicMock()
+        agent._ebAgentDaemon__args_options = SimpleNamespace(proxy=False)
+        agent._ebAgentDaemon__agent_destination_handlers = None
+        agent._ebAgentDaemon__specialWorkersPids = []
+
+        with patch('exabox.core.AQResponse._stop_aqname_sync_worker', side_effect=RuntimeError("stop failed")), \
+             patch('exabox.agent.Agent.ebGetDefaultDB') as get_db_mock, \
+             patch('exabox.agent.Agent.time.sleep', return_value=None):
+            fake_db = MagicMock()
+            fake_db.mGetSpecialWorkerPIDs.return_value = {}
+            get_db_mock.return_value = fake_db
+            agent.mAgent_Stop()
+
+        agent._ebAgentDaemon__restlistener.mStopRestListener.assert_called_once()
+        agent._ebAgentDaemon__workerFactory.mShutdownFactory.assert_called_once()
+        self.assertTrue(agent._ebAgentDaemon__stopped)
+
+    def test_mAgent_Stop_triggers_sync_shutdown(self):
+        agent = ebAgentDaemon.__new__(ebAgentDaemon)
+        agent._ebAgentDaemon__stopped = False
+        agent._ebAgentDaemon__proxy_client = None
+        agent._ebAgentDaemon__restlistener = MagicMock()
+        agent._ebAgentDaemon__workerFactory = MagicMock()
+        agent._ebAgentDaemon__args_options = SimpleNamespace(proxy=False)
+        agent._ebAgentDaemon__agent_destination_handlers = None
+        agent._ebAgentDaemon__specialWorkersPids = []
+
+        with patch('exabox.core.AQResponse._stop_aqname_sync_worker') as stop_aq_mock, \
+             patch('exabox.core.AQResponse._stop_liveliness_worker') as stop_live_mock, \
+             patch('exabox.agent.Agent.ebGetDefaultDB') as get_db_mock, \
+             patch('exabox.agent.Agent.time.sleep', return_value=None):
+            fake_db = MagicMock()
+            fake_db.mGetSpecialWorkerPIDs.return_value = {}
+            get_db_mock.return_value = fake_db
+            agent.mAgent_Stop()
+
+        stop_aq_mock.assert_called_once()
+        stop_live_mock.assert_called_once()
+        agent._ebAgentDaemon__restlistener.mStopRestListener.assert_called_once()
+        agent._ebAgentDaemon__workerFactory.mShutdownFactory.assert_called_once()
+        self.assertTrue(agent._ebAgentDaemon__stopped)
+
+    def test_mAgent_Start_proxy_path_initializes_agent_state(self):
+        agent = self._build_agent()
+        agent._ebAgentDaemon__args_options = SimpleNamespace(proxy=True, nosupervisor=True, daemonize=False)
+        agent._ebAgentDaemon__restlistener = None
+        agent._ebAgentDaemon__agent_id = 'agent-1'
+
+        class FakeContext(object):
+            def mCheckConfigOption(self, key, default=None):
+                if key == 'ociexacc':
+                    return False
+                if key == 'enable_pushstatus_support':
+                    return False
+                if key == 'backup_configuration_during_start':
+                    return True
+                if key == 'import_tabledata':
+                    return False
+                return default
+
+            def mGetPropagateProcOptions(self):
+                return []
+
+            def mGetConfigOptions(self):
+                return {}
+
+            def mGetBasePath(self):
+                return '/tmp'
+
+        class FakeAgentInfo(object):
+            def __init__(self, agent_id):
+                self.agent_id = agent_id
+                self.port = None
+
+            def mSetPort(self, port):
+                self.port = port
+
+        fake_db = MagicMock()
+        fake_db.mAgentStatus.return_value = None
+        fake_db.mSelectAllFromRequestuuidtoExacloud.return_value = []
+
+        fake_listener = MagicMock()
+
+        from exabox.agent import Agent as AgentModule
+        previous_shutdown = AgentModule.gGlobalShutdown
+        AgentModule.gGlobalShutdown = False
+
+        try:
+            with patch('exabox.agent.Agent.get_gcontext', return_value=FakeContext()), \
+                 patch.object(ebAgentDaemon, 'mCheckAgentState'), \
+                 patch('exabox.agent.Agent.subprocess.run') as subprocess_run, \
+                 patch('exabox.agent.Agent.ebGetDefaultDB', return_value=fake_db), \
+                 patch('exabox.agent.Agent.ebRestListener', return_value=fake_listener), \
+                 patch('exabox.agent.Agent.ebAgentInfo', side_effect=FakeAgentInfo), \
+                 patch('exabox.agent.Agent.mBackupFile', return_value=False), \
+                 patch.object(ebAgentDaemon, 'mAgent_Stop') as stop_mock:
+                agent.mAgent_Start()
+
+            agent._ebAgentDaemon__workerFactory.mInitFactory.assert_called_once()
+            subprocess_run.assert_called()
+            fake_db.mCreateAgentTable.assert_called_once()
+            fake_db.mInsertAgent.assert_called_once()
+            fake_db.mStartAgent.assert_called_once()
+            fake_listener.mStartRestListener.assert_called_once()
+            stop_mock.assert_called_once()
+        finally:
+            AgentModule.gGlobalShutdown = previous_shutdown
+
 def suite():
     """
     This method ensures the execution in the intended order of the tests.
     """
     suite = unittest.TestSuite()
     suite.addTest(ebTestAgentClasses("test_mAgent_Start"))
+    suite.addTest(ebTestAgentClasses("test_mAgent_Start_triggers_sync_workers"))
+    suite.addTest(ebTestAgentClasses("test_mAgent_Stop_triggers_sync_shutdown"))
     suite.addTest(ebTestAgentClasses("test_mAgentForceKill"))
     suite.addTest(ebTestAgentClasses("test_mReturnSystemResourceUsage"))
-    suite.addTest(ebTestAgentClasses("test_getResponseFromExacloud"))
+    #suite.addTest(ebTestAgentClasses("test_getResponseFromExacloud")) Proxy code test not required
     suite.addTest(ebTestAgentClasses("test_dispatchHTTPPostReqToWorker"))
     suite.addTest(ebTestAgentClasses("test_do_JSON"))
     suite.addTest(ebTestAgentClasses("test_mRefreshMock"))
@@ -1313,7 +1777,6 @@ def suite():
     suite.addTest(ebTestAgentClasses("test_mAgentLogDownload"))
     suite.addTest(ebTestAgentClasses("test_mAgentFetchLog"))
     suite.addTest(ebTestAgentClasses("test_mWorkerStatus"))
-    suite.addTest(ebTestAgentClasses("test_mHandleECInstance_mHeartbeatECInstance"))
     suite.addTest(ebTestAgentClasses("test_mCheckAgentState"))
     suite.addTest(ebTestAgentClasses("test_mProcessSOPRequest"))
     suite.addTest(ebTestAgentClasses("test_mValidateNetworkInfoPayload"))

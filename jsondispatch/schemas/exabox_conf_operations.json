@@ -1,16 +1,53 @@
 {
-    "properties": {
-        "operation": {
-            "type": "string"
-        },
-        "key_value_pair": {
+    "oneOf": [
+        {
+            "additionalProperties": false,
+            "properties": {
+                "keys": {
+                    "items": {
+                        "minLength": 1,
+                        "type": "string"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                },
+                "operation": {
+                    "enum": [
+                        "view"
+                    ],
+                    "type": "string"
+                }
+            },
+            "required": [
+                "operation",
+                "keys"
+            ],
             "type": "object"
         },
-        "keys": {
-            "type": "array"
+        {
+            "additionalProperties": false,
+            "properties": {
+                "key_value_pair": {
+                    "additionalProperties": true,
+                    "minProperties": 1,
+                    "propertyNames": {
+                        "minLength": 1,
+                        "type": "string"
+                    },
+                    "type": "object"
+                },
+                "operation": {
+                    "enum": [
+                        "update"
+                    ],
+                    "type": "string"
+                }
+            },
+            "required": [
+                "operation",
+                "key_value_pair"
+            ],
+            "type": "object"
         }
-    },
-    "required": [
-    ],
-    "type": "object"
+    ]
 }

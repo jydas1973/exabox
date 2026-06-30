@@ -1,5 +1,5 @@
 """
- Copyright (c) 2017, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2017, 2026, Oracle and/or its affiliates.
 
 NAME:
     ScheduleRegistry - Insert schedule jobs
@@ -11,6 +11,7 @@ NOTE:
     None
 
 History:
+    shapatna    05/12/2026 - Bug 39263027 - REMOVE EXAWATCHER ENDPOINT FROM EXACLOUD AND ECRA
     prsshukl    05/20/2025 - Bug 37695971 - PROVIDE A ENABLE-DISABLE FLAG FOR METRIC_COLLECTION FEATURE IN ALL THE BRANCHES
     aypaul      07/18/2024 - Bug#36850055 Deprecate MYSQL backup functionality.
     shapatna    06/24/2024 - Bug 36732867: Add metrics_collector job to the scheduler
@@ -25,25 +26,6 @@ from exabox.log.LogMgr import ebLogInfo, ebLogWarn, ebLogError
 from exabox.agent.Agent import ebScheduleInfo
 from datetime import datetime, timedelta
 from exabox.core.Context import get_gcontext
-
-def insert_job_exawatcher_cleanup():
-    aDB=ebGetDefaultDB()
-    _rc = aDB.mGetScheduleByCommand('cleanup_exawatcher_log')
-    if _rc is None:
-        ebLogInfo('Adding job schedule for cleanup_exawatcher_log !')
-        _sched_info = ebScheduleInfo(None, aDB)
-        _sched_info.mSetScheduleCommand('cleanup_exawatcher_log')
-        _sched_info.mSetScheduleMode('generic')
-        _sched_info.mSetScheduleOperation('schedule')
-        _sched_info.mSetScheduleTimerType('repeat')
-        _sched_info.mSetScheduleTimestamp(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-        _sched_info.mSetScheduleInterval('04:00:00')
-        _sched_info.mSetScheduleRepeatCount('forever')
-        _sched_info.mSetScheduleEvent('timer_job')
-        _sched_info.mSetScheduleStatus('Idle')
-        _sched_info.mRegister()
-    else:
-        ebLogInfo('job schedule for cleanup_exawatcher_log already exists !')
 
 def insert_job_cleanup_oeda_requests():
     aDB=ebGetDefaultDB()
@@ -193,7 +175,6 @@ def insert_job_metrics_collector():
 
 def register_schedule_jobs():
     """This method inserts cluster independent jobs to scheduler table """
-    insert_job_exawatcher_cleanup()
     insert_job_cleanup_oeda_requests()
     insert_job_cleanup_incident_tar_zipfiles()
     insert_job_cleanup_log_files()

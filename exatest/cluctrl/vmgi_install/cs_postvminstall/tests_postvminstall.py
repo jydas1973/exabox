@@ -2,7 +2,7 @@
 
  $Header: 
 
- Copyright (c) 2021, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 
  NAME:
       tests_postvminstall.py - Unitest for postvm install steps
@@ -216,7 +216,51 @@ class ebTestPostVMInstall(ebTestClucontrol):
         _step = csPostVMInstall()
         _options = self.mGetClubox().mGetOptions()
         self.mGetClubox().mSetOciExacc(False)
-        _step.doExecute(self.mGetClubox(), _options, _steplist)
+        with patch('exabox.ovm.clucontrol.mEnsureOedaJavaHome', return_value=None), \
+             patch('exabox.ovm.clucontrol.connect_to_host') as mock_connect, \
+             patch('exabox.ovm.clucontrol.node_cmd_abs_path_check',
+                   side_effect=lambda node, cmd, sbin=False: f'/usr/bin/{cmd}'), \
+             patch('exabox.ovm.clucontrol.node_write_text_file') as mock_write, \
+             patch('exabox.ovm.clucontrol.node_exec_cmd') as mock_exec:
+            mock_write.return_value = None
+
+            def _exec_side_effect(node, cmd, **kwargs):
+                if 'inet addr show eth0' in cmd:
+                    return CmdRet(0, 'inet 169.254.0.2/16 brd 169.254.255.255 scope link eth0', '')
+                if 'grep -q' in cmd:
+                    return CmdRet(1, '', '')
+                return CmdRet(0, '', '')
+
+            mock_exec.side_effect = _exec_side_effect
+
+            mock_node = Mock()
+
+            def _exec_side_effect(*args, **kwargs):
+                cmd = args[1] if len(args) > 1 else ''
+                lines = []
+                stdout_stream = Mock()
+                stdout_stream.readlines.return_value = lines
+                stdout_stream.read.return_value = '\n'.join(lines)
+                stdout_stream.close.return_value = None
+                stderr_stream = Mock()
+                stderr_stream.readlines.return_value = []
+                stderr_stream.read.return_value = ''
+                stderr_stream.close.return_value = None
+
+                if 'grep' in cmd and 'sshd_config' in cmd:
+                    stdout_stream.readlines.return_value = []
+                if 'grep' in cmd and 'ListenAddress' in cmd:
+                    stdout_stream.readlines.return_value = []
+
+                return (None, stdout_stream, stderr_stream)
+
+            mock_node.mExecuteCmd.side_effect = _exec_side_effect
+            mock_node.mExecuteCmdLog.side_effect = lambda *a, **k: None
+            mock_node.mGetCmdExitStatus.return_value = 0
+            mock_connect.return_value.__enter__.return_value = mock_node
+            mock_connect.return_value.__exit__.return_value = False
+
+            _step.doExecute(self.mGetClubox(), _options, _steplist)
         self.mGetClubox().mSetUt(False)
 
     def test_undoExecute(self):

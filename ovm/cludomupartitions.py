@@ -13,6 +13,7 @@ NOTE:
     None
 
 History:
+    joysjose  05/08/26 - Bug 38385387 Memory & OH reshape partial success
     bhpati    06/10/25 - Bug 38018344 - UPDATECVMLOCALSTORAGE FAILED FOR 
                          COULD NOT UNMOUNT FILESYSTEM U02
     rajsag    06/04/25 - Enhancement Request 38022921 support additional
@@ -50,6 +51,7 @@ from exabox.core.DBStore import ebGetDefaultDB
 from exabox.ovm.clucontrol import exaBoxNode
 from exabox.ovm.cludomufilesystems import get_disk_for_part_dev
 from exabox.ovm.kvmdiskmgr import exaBoxKvmDiskMgr
+from exabox.ovm.clumisc import mGetReshapeRetryTypeFromRackState
 from exabox.utils.node import node_exec_cmd_check, node_cmd_abs_path_check, connect_to_host
 from exabox.infrapatching.core.clupatchhealthcheck import ebCluPatchHealthCheck
 from exabox.ovm.utils.clu_utils import ebCluUtils
@@ -433,7 +435,8 @@ class ebCluManageDomUPartition(object):
                 _percentage_increase = _percentage_increase + _percentageStepSize
                 _lastNode.append(_domU)
                 if _domU not in _node_toUpdate_list:
-                    if _eBoxCluCtrl.mCheckIfCrsDbsUp(_domU):
+                    _reshape_type = mGetReshapeRetryTypeFromRackState(aOptions, 'OHOME')
+                    if _eBoxCluCtrl.mCheckIfCrsDbsUp(_domU, aReshapeType=_reshape_type):
                         ebLogInfo("*** node already at the resize Value. Continuing with next node")
                         continue
 
@@ -443,7 +446,8 @@ class ebCluManageDomUPartition(object):
                 # perform shutdown
                 _node = exaBoxNode(get_gcontext())
                 _node.mConnect(aHost=_dom0)
-                _crs_status, _db_status = _eBoxCluCtrl.mShutdownVMForReshape(_dom0,_domU,aOptions,_node)
+                _crs_status, _db_status = _eBoxCluCtrl.mShutdownVMForReshape(_dom0,_domU,aOptions,_node,
+                                                                             aReshapeType='OHOME')
 
                 ebLogInfo("*** Resize partition : " + _inparams[_partition_name_key])
                 _rc = self.mExecuteDomUResizeStepsOnDom0(_dom0, \
@@ -454,7 +458,8 @@ class ebCluManageDomUPartition(object):
 
                 ebLogInfo('*** Starting VM %s after resize' %(_domU))
                 _eBoxCluCtrl.mUpdateStatus('Starting VM %s after resize' %(_domU), False)
-                _eBoxCluCtrl.mStartVMAfterReshape(_dom0,_domU, aOptions, _crs_status, _db_status, _node)
+                _eBoxCluCtrl.mStartVMAfterReshape(_dom0,_domU, aOptions, _crs_status, _db_status, _node,
+                                                 aReshapeType='OHOME')
                 _node.mDisconnect()
                 _node = exaBoxNode(get_gcontext())
                 _node.mConnect(aHost=_domU)                
@@ -640,6 +645,11 @@ class ebCluManageDomUPartition(object):
         _eBoxCluCtrl = self.mGetEbox()
         with connect_to_host(_domU, _eBoxCluCtrl.mGetCtx()) as _node:
             _child_mounts = self.mCheckChildMounts(_node,_partitionName)
+            if _child_mounts and self.mShouldUnmountChildMounts(_domU):
+                ebLogInfo(f"*** Child mounts detected on /{_partitionName}; trying to unmount them")
+                self.mUnmountChildMounts(_node, _child_mounts)
+                _child_mounts = self.mCheckChildMounts(_node, _partitionName)
+
             if _child_mounts:
                 _detail_error = f"Child Mounts {', '.join(_child_mounts)} exists on /{_partitionName}. Could not unmount filesystem /{_partitionName} on {_domU}"
                 _eBoxCluCtrl.mUpdateErrorObject(gReshapeError['ERROR_MOUNTING_FILE_SYS'], _detail_error)
@@ -724,6 +734,41 @@ class ebCluManageDomUPartition(object):
 
         # Return the list of child paths
         return _child_mounts
+
+    def mShouldUnmountChildMounts(self, aDomU):
+        """
+        returns bool:
+            True: if we should try to umount Filesystems that may
+                be mounted on a child mount point of the main
+                partition were shrinking (e.g. /u02).
+                ATP is detected from the DomU directly, and
+                other services can force the attempt through an
+                exabox.conf flag.
+            False: If we should not try
+        """
+        if str(
+            get_gcontext().mGetConfigOptions().get(
+                "force_unmount_u02_child_mounts", "False"
+            )
+        ).lower() == "true":
+            return True
+
+        return self.mGetEbox().isATPCluster(aDomU)
+
+    def mUnmountChildMounts(self, aNode, aChildMounts):
+        for _child_mount in reversed(aChildMounts):
+            _child_partition = _child_mount.lstrip("/")
+            self.mCheckTerminateProcess(aNode, _child_partition, 15)
+            self.mCheckTerminateProcess(aNode, _child_partition, 9)
+            _cmdstr = f"/usr/bin/umount -R -f -l {_child_mount}"
+            ebLogInfo(f"*** Unmounting child mount {_child_mount}")
+            _i, _o, _e = aNode.mExecuteCmd(_cmdstr)
+            _out = _o.readlines()
+            _err = _e.readlines()
+            _rc = aNode.mGetCmdExitStatus()
+            ebLogInfo(f"*** Command {_cmdstr} stdout: {str(_out)} stderr: {str(_err)}")
+            if _rc != 0:
+                ebLogWarn(f"*** Command {_cmdstr} failed with output: {str(_out)} error: {str(_err)}")
 
     """
     check and kill running processes with provide kill code

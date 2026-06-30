@@ -1697,6 +1697,12 @@ class ebTestNodeRecovery(ebTestClucontrol):
             cleanup_monitor=False
         )
         mock_clubonding.update_bonded_bridges.assert_called_once_with(cluctrl, payload=payload)
+        mock_clubonding.configure_bonding_if_enabled.assert_called_once_with(
+            cluctrl,
+            payload=payload,
+            configure_bridge=False,
+            configure_monitor=True
+        )
 
     # Auto-generated test for mGetGridImageFromDom0
     @patch('exabox.ovm.cluvmrecoveryutils.ebLogTrace')

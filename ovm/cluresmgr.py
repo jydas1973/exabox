@@ -13,6 +13,7 @@ NOTE:
 
 History:
     MODIFIED (MM/DD/YY)
+    dekuckre  05/12/26 - Add IORM clusterplan cache attributes
     avimonda  04/11/26 - Bug 39182562: Fix IORM multiline dbPlan parser
     ririgoye  11/20/25 - Bug 38667586 - EXACS: MAIN: PYTHON3.11: SUPRASS ALL
                          PYTHON WARNINGS
@@ -1492,6 +1493,12 @@ class ebCluResManager(object):
             _iormdata["ErrorCode"] = "0"
             _iormdata["cell"] = {}
 
+            def _mGetClusterPlanAttrValue(aClusterPlan, aAttrNames):
+                for _attr_name in aAttrNames:
+                    if _attr_name in aClusterPlan and aClusterPlan[_attr_name]:
+                        return str(aClusterPlan[_attr_name]).strip()
+                return None
+
             if _options.resmanage == "resetclusterplan":
                 _clusterpstring = "clusterplan=\"\""
             else:
@@ -1566,9 +1573,21 @@ class ebCluResManager(object):
                 # Create the clusterplan string for cellcli command formation
                 _clusterpstring = "clusterplan=("
                 for _clusterp in _new_cluster_plan:
+                    _flashcachemin = _mGetClusterPlanAttrValue(_clusterp, ["flashCacheMin", "flashcachemin"])
+                    _flashcachesize = _mGetClusterPlanAttrValue(_clusterp, ["flashCacheSize", "flashcachesize"])
+                    _xrmemcachemin = _mGetClusterPlanAttrValue(_clusterp, ["xrmemCacheMin", "xrmemcachemin"])
+                    _xrmemcachesize = _mGetClusterPlanAttrValue(_clusterp, ["xrmemCacheSize", "xrmemcachesize"])
 
-                    _clusterpstring = _clusterpstring + "(name=" + _clusterp['name'] + ","
-                    _clusterpstring = _clusterpstring + " share=" + _clusterp['share'] + "),"
+                    _cluster_entry = "(name=" + _clusterp['name'] + ", share=" + _clusterp['share']
+                    if _flashcachemin:
+                        _cluster_entry = _cluster_entry + ", flashCacheMin=" + _flashcachemin
+                    if _flashcachesize:
+                        _cluster_entry = _cluster_entry + ", flashCacheSize=" + _flashcachesize
+                    if _xrmemcachemin:
+                        _cluster_entry = _cluster_entry + ", xrmemCacheMin=" + _xrmemcachemin
+                    if _xrmemcachesize:
+                        _cluster_entry = _cluster_entry + ", xrmemCacheSize=" + _xrmemcachesize
+                    _clusterpstring = _clusterpstring + _cluster_entry + "),"
                         
                 # Remove trailing comma and complete command string
                 _clusterpstring = _clusterpstring[:-1]
@@ -1713,8 +1732,7 @@ class ebCluResManager(object):
 
                 if _iormdata["Status"] == "Pass":
                     _iormdata[_key] = _idata
-                    _iormdata.pop("cell", None)
-                    
+
                     _iormdata["cells"] = []
                     for _cell in _cells:
                         _iormdata["cells"].append(_cell)
@@ -1995,7 +2013,7 @@ class ebCluResManager(object):
                             if "=" not in _kvp:
                                 continue
                             _key, _value = _kvp.split("=", 1)
-                            _iormplan[_key] = _value
+                            _iormplan[_key.strip()] = _value.strip()
                         ebLogTrace(f"_iormplan to append to _iormdata: {_iormplan}")
                         _iormdata["cell"][_cell][_iorm_data_type].append(_iormplan)
                     

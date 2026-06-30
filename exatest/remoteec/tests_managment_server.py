@@ -162,7 +162,6 @@ class ebTestManagmentServer(ebTestClucontrol):
         _get_ca.assert_not_called()
         _context.load_verify_locations.assert_called_once_with("/tmp/oci-rootca.pem")
         _context.load_cert_chain.assert_called_once_with("/tmp/oci-server.pem", "/tmp/oci-server.key")
-        self.assertEqual(_context.verify_mode, ssl.CERT_NONE)
         self.assertEqual(_server.socket, "wrapped-socket")
 
     # Auto-generated test for mCreateExacloudUtil
@@ -239,7 +238,6 @@ class ebTestManagmentServer(ebTestClucontrol):
         _get_ca.assert_called_once_with(app_cfg=None)
         _context.load_verify_locations.assert_called_once_with("/tmp/exacc-ca.pem")
         _context.load_cert_chain.assert_called_once_with("/tmp/oci-server.pem", "/tmp/oci-server.key")
-        self.assertEqual(_context.verify_mode, ssl.CERT_NONE)
         self.assertEqual(_server.socket, "wrapped-socket")
 
     # Auto-generated test for mCreateSocket

@@ -16,6 +16,11 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    bhpati      06/04/26 - Bug 39493771 - EXACC GEN2 – EXADATA DISKGROUP
+#                           RESHAPECOMPLETED IGNORED CELLSRV SERVICE DOWN WITH
+#                           ERROR AND COMPLETED THE OPERATION IN OTHER CELLS
+#    joysjose    05/14/26 - Add unit tests for EF rack celldisk selection
+#    rajsag      04/15/26 - Add unit tests for storage precision
 #    zpallare    04/14/26 - Bug 39203556 - EXACS:25.4.1 one off3: custom
 #                           data-reco-sparse: reshape fails when percentage
 #                           stay the same: keyerror: cell_count
@@ -1390,6 +1395,27 @@ class ebTestCludiskgroups(ebTestClucontrol):
 
         self.assertEqual(rc, 512)
         manager.mClusterDgrpInfo2.assert_called_once_with(options, 'DGY', [constants._propkey_storage])
+
+    @patch('exabox.ovm.cludiskgroups.ebCluDbaas', autospec=True)
+    @patch('exabox.ovm.cludiskgroups.get_gcontext', autospec=True)
+    def test_mUtilGetDiskgroupSize_rounds_to_two_decimal_places(self, mock_get_gcontext, mock_ebCluDbaas):
+        manager, _, dbaas_obj, options = self._create_manager_with_stubs(mock_get_gcontext, mock_ebCluDbaas)
+        constants = manager.mGetConstantsObj()
+        manager.mSetOutJson('/tmp/out.json')
+        manager.mSetLastDomUused('domu1')
+
+        manager.mClusterDgrpInfo2 = MagicMock(return_value=0)
+        dbaas_obj.mReadStatusFromDomU.return_value = {
+            'DGZ': {
+                constants._propkey_storage: {
+                    constants._storprop_totalMb: '123.4567'
+                }
+            }
+        }
+
+        rc = manager.mUtilGetDiskgroupSize(options, 'DGZ', constants)
+
+        self.assertEqual(rc, 123.46)
 
     # Auto-generated test for mUtilGetDiskgroupSize
     @patch('exabox.ovm.cludiskgroups.ebCluDbaas', autospec=True)
@@ -3491,6 +3517,147 @@ class ebTestCludiskgroups(ebTestClucontrol):
 
         self.assertEqual(percent, 0)
         mock_log_warn.assert_called_once()
+    
+
+    @patch('exabox.ovm.cludiskgroups.connect_to_host')
+    @patch('exabox.ovm.cludiskgroups.ebCluDbaas')
+    @patch('exabox.ovm.cludiskgroups.get_gcontext')
+    def test_mGetFailGroupList_cell_query_exception_raises(
+        self, mock_get_gcontext, mock_ebCluDbaas, mock_connect_to_host
+    ):
+        manager, ebox, _, _ = self._create_manager_with_stubs(mock_get_gcontext, mock_ebCluDbaas)
+        storage = MagicMock()
+        storage.mListCellDG.side_effect = Exception('cellcli failed')
+        ebox.mGetStorage.return_value = storage
+        ebox.mReturnCellNodes.return_value = {'cell1': MagicMock()}
+
+        cell_node = MagicMock()
+        mock_connect_to_host.return_value.__enter__.return_value = cell_node
+
+        with self.assertRaises(ExacloudRuntimeError):
+            manager.mGetFailGroupList('DATAC1')
+
+        mock_connect_to_host.assert_called_once_with('cell1', mock_get_gcontext.return_value)
+        storage.mListCellDG.assert_called_once_with(cell_node, 'DATAC1')
+        ebox.mUpdateErrorObject.assert_called_once_with(
+            gReshapeError['ERROR_FETCHING_DETAILS_DG'],
+            mock.ANY
+        )
+
+    @patch('exabox.ovm.cludiskgroups.connect_to_host')
+    @patch('exabox.ovm.cludiskgroups.ebEscliUtils')
+    @patch('exabox.ovm.cludiskgroups.ebDiskgroupOpConstants')
+    @patch('exabox.ovm.cludiskgroups.ebCluDbaas')
+    @patch('exabox.ovm.cludiskgroups.get_gcontext')
+    def test_mListCelldiskOutput_efrack_x8_uses_cf_pattern(self, mock_get_gcontext, mock_ebCluDbaas,
+                                                            mock_ebDiskgroupOpConstants, mock_ebEscliUtils,
+                                                            mock_connect_to_host):
+        mock_get_gcontext.return_value = MagicMock(
+            mGetConfigOptions=MagicMock(return_value={}),
+            mGetBasePath=MagicMock(return_value="/tmp")
+        )
+        mock_ebox_instance = MagicMock()
+        mock_ebox_instance.mGetClusterPath.return_value = "/u01/app/19.0.0.0/grid"
+        mock_ebox_instance.mReturnDom0DomUPair.return_value = []
+        mock_ebox_instance.mGetVerbose.return_value = False
+        mock_ebox_instance.mGetNodeModel.return_value = "X10"
+        mock_ebox_instance.mCompareExadataModel.return_value = 1
+        
+        mock_ebEscliUtils.return_value.mIsEFRack.return_value = True
+
+        mock_node = MagicMock()
+        mock_node.mExecuteCmd.return_value = (None, StringIO("CF_00_cell01\n"), StringIO(""))
+        mock_node.mGetCmdExitStatus.return_value = 0
+        mock_connect_to_host.return_value.__enter__.return_value = mock_node
+
+        eb_clu_manage_diskgroup = ebCluManageDiskgroup(mock_ebox_instance, MagicMock())
+        result = eb_clu_manage_diskgroup.mListCelldiskOutput("cell01", "name")
+
+        self.assertEqual(result, ["CF_00_cell01\n"])
+        mock_node.mExecuteCmd.assert_called_once_with(
+            'cellcli -e LIST CELLDISK WHERE name LIKE \\"CF_.*\\" attributes name;'
+        )
+
+    @patch('exabox.ovm.cludiskgroups.connect_to_host')
+    @patch('exabox.ovm.cludiskgroups.ebEscliUtils')
+    @patch('exabox.ovm.cludiskgroups.ebDiskgroupOpConstants')
+    @patch('exabox.ovm.cludiskgroups.ebCluDbaas')
+    @patch('exabox.ovm.cludiskgroups.get_gcontext')
+    def test_mListCelldiskOutput_non_efrack_uses_cd_pattern(self, mock_get_gcontext, mock_ebCluDbaas,
+                                                             mock_ebDiskgroupOpConstants, mock_ebEscliUtils,
+                                                             mock_connect_to_host):
+        mock_get_gcontext.return_value = MagicMock(
+            mGetConfigOptions=MagicMock(return_value={}),
+            mGetBasePath=MagicMock(return_value="/tmp")
+        )
+        mock_ebox_instance = MagicMock()
+        mock_ebox_instance.mGetClusterPath.return_value = "/u01/app/19.0.0.0/grid"
+        mock_ebox_instance.mReturnDom0DomUPair.return_value = []
+        mock_ebox_instance.mGetVerbose.return_value = False
+        mock_ebox_instance.mGetNodeModel.return_value = "X10"
+        mock_ebox_instance.mCompareExadataModel.return_value = 1
+
+        mock_ebEscliUtils.return_value.mIsEFRack.return_value = False
+
+        mock_node = MagicMock()
+        mock_node.mExecuteCmd.return_value = (None, StringIO("CD_00_cell01\n"), StringIO(""))
+        mock_node.mGetCmdExitStatus.return_value = 0
+        mock_connect_to_host.return_value.__enter__.return_value = mock_node
+
+        eb_clu_manage_diskgroup = ebCluManageDiskgroup(mock_ebox_instance, MagicMock())
+        result = eb_clu_manage_diskgroup.mListCelldiskOutput("cell01", "name")
+
+        self.assertEqual(result, ["CD_00_cell01\n"])
+        mock_node.mExecuteCmd.assert_called_once_with(
+            'cellcli -e LIST CELLDISK WHERE name LIKE \\"CD_.*\\" attributes name;'
+        )
+
+    @patch('exabox.ovm.cludiskgroups.ebCluManageDiskgroup.mListCelldiskOutput')
+    @patch('exabox.ovm.cludiskgroups.ebDiskgroupOpConstants')
+    @patch('exabox.ovm.cludiskgroups.ebCluDbaas')
+    @patch('exabox.ovm.cludiskgroups.get_gcontext')
+    def test_mGetCelldisks_parses_helper_output(self, mock_get_gcontext, mock_ebCluDbaas,
+                                                mock_ebDiskgroupOpConstants, mock_mListCelldiskOutput):
+        mock_get_gcontext.return_value = MagicMock(
+            mGetConfigOptions=MagicMock(return_value={}),
+            mGetBasePath=MagicMock(return_value="/tmp")
+        )
+        mock_ebox_instance = MagicMock()
+        mock_ebox_instance.mGetClusterPath.return_value = "/u01/app/19.0.0.0/grid"
+        mock_ebox_instance.mReturnDom0DomUPair.return_value = []
+        mock_ebox_instance.mGetVerbose.return_value = False
+        mock_ebox_instance.mReturnCellNodes.return_value = {"cell01": {}}
+        mock_mListCelldiskOutput.return_value = ["CF_00_cell01\n", "CF_01_cell01\n"]
+
+        eb_clu_manage_diskgroup = ebCluManageDiskgroup(mock_ebox_instance, MagicMock())
+        result = eb_clu_manage_diskgroup.mGetCelldisks()
+
+        self.assertEqual(result, ["CF_00_cell01", "CF_01_cell01"])
+        mock_mListCelldiskOutput.assert_called_once_with("cell01", "name")
+
+    @patch('exabox.ovm.cludiskgroups.ebCluManageDiskgroup.mListCelldiskOutput')
+    @patch('exabox.ovm.cludiskgroups.ebDiskgroupOpConstants')
+    @patch('exabox.ovm.cludiskgroups.ebCluDbaas')
+    @patch('exabox.ovm.cludiskgroups.get_gcontext')
+    def test_mCalculateFreeSpaceCelldisk_parses_helper_output(self, mock_get_gcontext, mock_ebCluDbaas,
+                                                              mock_ebDiskgroupOpConstants,
+                                                              mock_mListCelldiskOutput):
+        mock_get_gcontext.return_value = MagicMock(
+            mGetConfigOptions=MagicMock(return_value={}),
+            mGetBasePath=MagicMock(return_value="/tmp")
+        )
+        mock_ebox_instance = MagicMock()
+        mock_ebox_instance.mGetClusterPath.return_value = "/u01/app/19.0.0.0/grid"
+        mock_ebox_instance.mReturnDom0DomUPair.return_value = []
+        mock_ebox_instance.mGetVerbose.return_value = False
+        mock_ebox_instance.mReturnCellNodes.return_value = {"cell01": {}}
+        mock_mListCelldiskOutput.return_value = ["CF_00_cell01 12G 3.5G\n"]
+
+        eb_clu_manage_diskgroup = ebCluManageDiskgroup(mock_ebox_instance, MagicMock())
+        result = eb_clu_manage_diskgroup.mCalculateFreeSpaceCelldisk()
+
+        self.assertEqual(result, 3584.0)
+        mock_mListCelldiskOutput.assert_called_once_with("cell01", "name,size,freespace")
 
 
 if __name__ == "__main__":

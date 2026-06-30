@@ -4,7 +4,7 @@
 #
 # soputils.py
 #
-# Copyright (c) 2023, 2024, Oracle and/or its affiliates.
+# Copyright (c) 2023, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      soputils.py - public APIs for sop tasks.
@@ -16,6 +16,11 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    ririgoye    04/27/26 - Updated OCI exception import for urllib3 vendor
+#                           libraries
+#    ririgoye    03/23/26 - Bug 39041362 - EXACLOUD SOP REMOTE EXECUTION
+#                           METADATA SHOULD PROVIDE AN EASY WAY TO USE EXACLOUD
+#                           PYTHON+MODULES
 #    ririgoye    05/24/24 - Bug 36400562 - Added checks for corrupted or poorly
 #                           formatted metadata files
 #    aypaul      06/13/23 - Enh#35470717 Ilom connection support via
@@ -27,13 +32,13 @@ import json
 from exabox.core.Context import get_gcontext
 from exabox.core.Error import ExacloudRuntimeError
 from exabox.log.LogMgr import ebLogInfo, ebLogError, ebLogTrace, ebLogWarn
-from exabox.sop.sopscripts import SOPScript, SOPScriptsRepo
+from exabox.sop.sopscripts import SOPScriptsRepo
 from exabox.sop.sopexecutescripts import SOPExecution
 from oci.key_management.models import DecryptDataDetails
 from exabox.exaoci.ExaOCIFactory import ExaOCIFactory
 from exabox.kms.crypt import cryptographyAES
 from exabox.ovm.clumisc import ebMiscFx
-from oci._vendor.urllib3.exceptions import SSLError
+from urllib3.exceptions import SSLError
 
 
 # Public API
@@ -164,7 +169,6 @@ def sop_list_scripts(aPayloadJSON: dict) -> dict:
 
     ebLogInfo("Fetching SOP scripts information.")
     _scripts_repo = SOPScriptsRepo()
-
     # Before retrieving scripts metadata, check if repo contains corrupt files
     _corrupt_files = _scripts_repo.mGetCorruptFiles()
 

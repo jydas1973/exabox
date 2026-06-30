@@ -15,6 +15,8 @@ NOTE:
 History:
 
     MODIFIED   (MM/DD/YY)
+    aypaul      06/15/26 - SecBug#39384318 Raise openssl issues during
+                           encryption
     prsshukl    03/05/26 - Bug 38900258 - EXACLOUD: ISSUES FOUND BY VOXIO CODEV
                            AGENT IN DIR EXABOX/KMS
     ndesanto    04/12/22 - OCI region to come on all ECRA call and be stored on
@@ -156,11 +158,17 @@ class ebKmsVmbObjectStore(object):
         _plainTextDEK = self.mDecryptData(_cipherTextDEK)
 
         startTime = datetime.now()
-        _p = Popen(
-            ['/usr/bin/openssl', 'enc', '-aes-256-cbc', '-md', 'sha256', '-in', aFile, '-out', aFile + '.enc', '-pass',
-             'env:PASS', '-a'], shell=False,
-            env={'PASS': _plainTextDEK}, stdin=PIPE, stdout=PIPE)
-        _p.communicate()
+        try:
+            _p = Popen(
+                ['/usr/bin/openssl', 'enc', '-aes-256-cbc', '-md', 'sha256', '-in', aFile, '-out', aFile + '.enc',
+                 '-pass', 'env:PASS', '-a'], shell=False,
+                env={'PASS': _plainTextDEK}, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+            _p.communicate()
+        except Exception:
+            raise Exception('Failed to encrypt backup file using openssl')
+
+        if _p.returncode:
+            raise Exception('Failed to encrypt backup file using openssl')
 
         ebLogInfo('Encryption time : ' + str(datetime.now() - startTime))
 

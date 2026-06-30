@@ -16,6 +16,9 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    scoral      06/22/26 - Bug 39589421: Skip default ACFS cleanup without
+#                           Exascale controller
+#    nelango     05/21/26 - Bug 39348637: Handle legacy acfs vol deletion
 #    siyarlag    04/02/26 - Add mValidateGuest connectivity tests
 #    pbellary    02/24/26 - Bug 38972840 - DELETE-SERVICE WF FAILED TO VERIFY ACL USER ID
 #    pbellary    02/24/26 - Bug 38858318 - IF CHACL COMMAND FAILS CREATE SERVICE FLOW SHOULD FAIL
@@ -502,6 +505,22 @@ EXASCALE_PAYLOAD = """
    ],
    "acfs_op": "create",
    "exadataInfraId": "etf_infra_230603_111"
+}
+"""
+
+ASM_ACFS_PAYLOAD = """
+{
+   "rack": {
+      "name": "clu261infra",
+      "xsVmImage": "false"
+   },
+   "acfs": [
+      {
+         "name": "acfsvol01",
+         "mount_path": "acfs01",
+         "gb_size": 100
+      }
+   ]
 }
 """
 
@@ -1001,7 +1020,8 @@ class ebTestExascaleUtils(ebTestClucontrol):
     @patch('exabox.ovm.csstep.exascale.exascaleutils.get_gcontext', return_value=mock.Mock(mGetConfigOptions=mock.Mock(return_value={})))
     @patch('exabox.ovm.csstep.exascale.exascaleutils.csUtil')
     @patch('exabox.ovm.csstep.exascale.exascaleutils.ebCluCmdCheckOptions', return_value=True)
-    def test_mConfigureExascale_success(self, mock_cmd_check, mock_cs_util, _mock_ctx, mock_mIsEFRack):
+    @patch('exabox.ovm.csstep.exascale.exascaleutils.ebExascaleUtils.mDisableNormalRedundancy')
+    def test_mConfigureExascale_success(self, mock_mDisableNormalRedundancy, mock_cmd_check, mock_cs_util, _mock_ctx, mock_mIsEFRack):
         _ebox = self.mGetClubox()
         _utils = ebExascaleUtils(_ebox)
         _options = copy.deepcopy(_ebox.mGetArgsOptions())
@@ -1063,6 +1083,7 @@ class ebTestExascaleUtils(ebTestClucontrol):
              patch.object(_utils, 'mSetupRoCEIPs') as mock_setup_roce, \
              patch.object(_utils, 'mValidateGuest', return_value=0) as mock_validate_guest, \
              patch.object(_utils, 'mUpdateStorageVlan'), \
+             patch.object(_utils, 'mDisableNormalRedundancy'), \
              patch.object(_utils, 'mEnableAutoFileEncryption', return_value=0), \
              patch.object(_ebox, 'mReturnCellNodes', return_value={'cell1': object()}), \
              patch.object(_ebox, 'mGetNodeModel', return_value='X9M'), \
@@ -1111,7 +1132,8 @@ class ebTestExascaleUtils(ebTestClucontrol):
     @patch('exabox.ovm.csstep.exascale.exascaleutils.get_gcontext', return_value=mock.Mock(mGetConfigOptions=mock.Mock(return_value={})))
     @patch('exabox.ovm.csstep.exascale.exascaleutils.csUtil')
     @patch('exabox.ovm.csstep.exascale.exascaleutils.ebCluCmdCheckOptions', return_value=True)
-    def test_mConfigureExascale_auto_file_encryption_failure(self, mock_cmd_check, mock_cs_util, _mock_ctx):
+    @patch('exabox.ovm.csstep.exascale.exascaleutils.ebExascaleUtils.mDisableNormalRedundancy')
+    def test_mConfigureExascale_auto_file_encryption_failure(self, mock_mDisableNormalRedundancy, mock_cmd_check, mock_cs_util, _mock_ctx):
         _ebox = self.mGetClubox()
         _utils = ebExascaleUtils(_ebox)
         _options = copy.deepcopy(_ebox.mGetArgsOptions())
@@ -1457,7 +1479,18 @@ class ebTestExascaleUtils(ebTestClucontrol):
         mock_cs_util.return_value.mExecuteOEDAStep = mock.Mock()
 
         _utils = ebExascaleUtils(_ebox)
-        _utils._ebExascaleUtils__escli = mock.Mock(mIsEFRack=mock.Mock(return_value=False))
+        _utils._ebExascaleUtils__escli = mock.Mock(
+            mIsEFRack=mock.Mock(return_value=False),
+            mCheckWalletExists=mock.Mock(return_value=0),
+            mListExascaleServices=mock.Mock(return_value=[{"name": "EXASCALE_dom0a", "status": "ONLINE"}]),
+            mGetClusterAttribute=mock.Mock(return_value=(0, [{
+                "controlServicesState": "ONLINE",
+                "storageVolumeWorkersState": "ONLINE",
+                "systemVaultManagersState": "ONLINE",
+                "userVaultManagersState": "ONLINE",
+                "volumeManagersState": "ONLINE"
+            }], ""))
+        )
 
         with patch.object(_utils, 'mEnableXSService') as mock_enable, \
              patch.object(_utils, 'mRemoveVmMachines') as mock_remove, \
@@ -1468,6 +1501,7 @@ class ebTestExascaleUtils(ebTestClucontrol):
              patch.object(_utils, 'mSetupRoCEIPs') as mock_setup_roce, \
              patch.object(_utils, 'mValidateGuest') as mock_validate_guest, \
              patch.object(_utils, 'mUpdateStorageVlan') as mock_update_vlan, \
+             patch.object(_utils, 'mDisableNormalRedundancy', return_value=0), \
              patch.object(_utils, 'mEnableAutoFileEncryption', return_value=0), \
              patch.object(_ebox, 'mReturnCellNodes', return_value={'cell1': object()}), \
              patch.object(_ebox, 'mGetNodeModel', return_value='X9M'), \
@@ -1502,7 +1536,18 @@ class ebTestExascaleUtils(ebTestClucontrol):
         mock_cs_util.return_value.mExecuteOEDAStep = mock.Mock()
 
         _utils = ebExascaleUtils(_ebox)
-        _utils._ebExascaleUtils__escli = mock.Mock(mIsEFRack=mock.Mock(return_value=False))
+        _utils._ebExascaleUtils__escli = mock.Mock(
+            mIsEFRack=mock.Mock(return_value=False),
+            mCheckWalletExists=mock.Mock(return_value=0),
+            mListExascaleServices=mock.Mock(return_value=[{"name": "EXASCALE_dom0a", "status": "ONLINE"}]),
+            mGetClusterAttribute=mock.Mock(return_value=(0, [{
+                "controlServicesState": "ONLINE",
+                "storageVolumeWorkersState": "ONLINE",
+                "systemVaultManagersState": "ONLINE",
+                "userVaultManagersState": "ONLINE",
+                "volumeManagersState": "ONLINE"
+            }], ""))
+        )
 
         with patch.object(_utils, 'mEnableXSService'), \
              patch.object(_utils, 'mRemoveVmMachines'), \
@@ -1513,6 +1558,7 @@ class ebTestExascaleUtils(ebTestClucontrol):
              patch.object(_utils, 'mSetupRoCEIPs') as mock_setup_roce, \
              patch.object(_utils, 'mValidateGuest', return_value=0) as mock_validate_guest, \
              patch.object(_utils, 'mUpdateStorageVlan'), \
+             patch.object(_utils, 'mDisableNormalRedundancy', return_value=0), \
              patch.object(_utils, 'mEnableAutoFileEncryption', return_value=0), \
              patch.object(_ebox, 'mReturnCellNodes', return_value={'cell1': object()}), \
              patch.object(_ebox, 'mGetNodeModel', return_value='X9M'), \
@@ -1604,14 +1650,77 @@ class ebTestExascaleUtils(ebTestClucontrol):
        self.assertEqual(_status, True)
 
     def test_mIsEDVBackupSupported(self):
-       _ebox = self.mGetClubox()
-       _options = copy.deepcopy(self.mGetClubox().mGetArgsOptions())
-       _options.jsonconf = json.loads(CREATE_SERVICE_PAYLOAD)
-       _ebox.mSetEnableKVM(True)
+        _ebox = self.mGetClubox()
+        _options = copy.deepcopy(self.mGetClubox().mGetArgsOptions())
+        _options.jsonconf = json.loads(CREATE_SERVICE_PAYLOAD)
+        _ebox.mSetEnableKVM(True)
 
-       _utils = ebExascaleUtils(_ebox)
-       _status = _utils.mIsEDVBackupSupported(_options)
-       self.assertEqual(_status, True)
+        _utils = ebExascaleUtils(_ebox)
+        _status = _utils.mIsEDVBackupSupported(_options)
+        self.assertEqual(_status, True)
+
+    @patch('exabox.ovm.csstep.exascale.escli_util.ebEscliUtils.mGetClusterAttribute', return_value=(0, [{'controlServicesState': 'ONLINE'}], ''))
+    @patch('exabox.ovm.csstep.exascale.escli_util.ebEscliUtils.mListExascaleServices', return_value=[{'name': 'svc_node', 'status': 'ONLINE'}])
+    def test_mValidateExascaleConfiguration_wallet_missing_dom0(self, mock_mListExascaleServices, mock_mGetClusterAttribute):
+        _ebox = self.mGetClubox()
+        _utils = ebExascaleUtils(_ebox)
+        _options = copy.deepcopy(self.mGetClubox().mGetArgsOptions())
+        _options.jsonconf = json.loads(EXASCALE_PAYLOAD)
+
+        _mock_escli = mock.Mock()
+        _mock_escli.mCheckWalletExists.side_effect = [1]
+        _utils.mSetEscliUtils(_mock_escli)
+
+        with patch.object(_ebox, 'mUpdateErrorObject') as mock_update_error:
+            with self.assertRaises(ExacloudRuntimeError):
+                _utils.mValidateExascaleConfiguration(_options)
+
+        mock_update_error.assert_called_once_with(gExascaleError["WALLET_NOT_FOUND"], mock.ANY)
+        mock_mListExascaleServices.assert_not_called()
+
+    @patch('exabox.ovm.csstep.exascale.escli_util.ebEscliUtils.mGetClusterAttribute', return_value=(0, [{'controlServicesState': 'ONLINE'}], ''))
+    @patch('exabox.ovm.csstep.exascale.escli_util.ebEscliUtils.mListExascaleServices', return_value=[{'name': 'svc_node', 'status': 'ONLINE'}])
+    def test_mValidateExascaleConfiguration_wallet_missing_cell(self, mock_mListExascaleServices, mock_mGetClusterAttribute):
+        _ebox = self.mGetClubox()
+        _utils = ebExascaleUtils(_ebox)
+        _options = copy.deepcopy(self.mGetClubox().mGetArgsOptions())
+        _options.jsonconf = json.loads(EXASCALE_PAYLOAD)
+
+        _mock_escli = mock.Mock()
+        _mock_escli.mCheckWalletExists.side_effect = [0, 1]
+        _utils.mSetEscliUtils(_mock_escli)
+
+        with patch.object(_ebox, 'mUpdateErrorObject') as mock_update_error:
+            with self.assertRaises(ExacloudRuntimeError):
+                _utils.mValidateExascaleConfiguration(_options)
+
+        mock_update_error.assert_called_once_with(gExascaleError["WALLET_NOT_FOUND"], mock.ANY)
+        mock_mListExascaleServices.assert_not_called()
+
+    @patch('exabox.ovm.csstep.exascale.escli_util.ebEscliUtils.mGetClusterAttribute')
+    def test_mValidateExascaleConfiguration_cluster_attribute_reduced(self, mock_mGetClusterAttribute):
+        _ebox = self.mGetClubox()
+        _utils = ebExascaleUtils(_ebox)
+        _options = copy.deepcopy(self.mGetClubox().mGetArgsOptions())
+        _options.jsonconf = json.loads(EXASCALE_PAYLOAD)
+
+        _mock_escli = mock.Mock()
+        _mock_escli.mCheckWalletExists.return_value = 0
+        _mock_escli.mListExascaleServices.return_value = [{'name': 'svc_cell1', 'status': 'ONLINE'}]
+        _mock_escli.mGetClusterAttribute.return_value = (
+            0,
+            [{'controlServicesState': 'ONLINE - reduced redundancy'}],
+            ''
+        )
+        _utils.mSetEscliUtils(_mock_escli)
+
+        mock_mGetClusterAttribute.return_value = (0, [{'controlServicesState': 'ONLINE - reduced redundancy'}], '')
+
+        with patch.object(_ebox, 'mUpdateErrorObject') as mock_update_error:
+            with self.assertRaises(ExacloudRuntimeError):
+                _utils.mValidateExascaleConfiguration(_options)
+
+        mock_update_error.assert_called_once_with(gExascaleError["EXASCALE_DEPLOY_ERROR"], mock.ANY)
 
     def test_mCreateVMbackupJson(self):
        _ebox = self.mGetClubox()
@@ -2089,6 +2198,25 @@ class ebTestExascaleUtils(ebTestClucontrol):
         _utils = ebExascaleUtils(_ebox)
         _utils.mRemoveDefaultAcfsVolume(_options)
 
+    @patch('exabox.ovm.csstep.exascale.escli_util.ebEscliUtils.mGetVolumeID')
+    @patch('exabox.ovm.csstep.exascale.escli_util.ebEscliUtils.mGetCtrlIP', return_value=("", ""))
+    def test_mRemoveDefaultAcfsVolume_skips_without_exascale_controller(self, mock_mGetCtrlIP, mock_mGetVolumeID):
+        _ebox = self.mGetClubox()
+        _options = copy.deepcopy(self.mGetClubox().mGetArgsOptions())
+        _options.jsonconf = json.loads(ASM_ACFS_PAYLOAD)
+
+        _utils = ebExascaleUtils(_ebox)
+        with patch.object(_utils, 'mUnRegisterACFS') as mock_mUnRegisterACFS, \
+             patch.object(_utils, 'mDetachAcfsVolume') as mock_mDetachAcfsVolume, \
+             patch.object(_utils, 'mRemoveAcfsDir') as mock_mRemoveAcfsDir:
+            _utils.mRemoveDefaultAcfsVolume(_options)
+
+        mock_mGetCtrlIP.assert_called_once()
+        mock_mGetVolumeID.assert_not_called()
+        mock_mUnRegisterACFS.assert_not_called()
+        mock_mDetachAcfsVolume.assert_not_called()
+        mock_mRemoveAcfsDir.assert_not_called()
+
     @patch('exabox.ovm.csstep.exascale.escli_util.ebEscliUtils.mRemoveACFSFileSystem')
     @patch('exabox.ovm.csstep.exascale.escli_util.ebEscliUtils.mUnMountACFSFileSystem')
     @patch('exabox.ovm.csstep.exascale.escli_util.ebEscliUtils.mGetACFSFileSystem', return_value=("1:6cafd8310b3d49a2becd17e9c08f7919", "", "", ""))
@@ -2104,6 +2232,58 @@ class ebTestExascaleUtils(ebTestClucontrol):
 
         _utils = ebExascaleUtils(_ebox)
         _utils.mUnRegisterACFS(_options)
+
+    @patch('exabox.ovm.csstep.exascale.escli_util.ebEscliUtils.mRemoveACFSFileSystem')
+    @patch('exabox.ovm.csstep.exascale.escli_util.ebEscliUtils.mUnMountACFSFileSystem')
+    @patch('exabox.ovm.csstep.exascale.escli_util.ebEscliUtils.mGetACFSFileSystem', return_value=("acfsid", '/var/opt/oracle/dbaas_acfs', '100G', '90G'))
+    @patch('exabox.ovm.csstep.exascale.escli_util.ebEscliUtils.mGetVolumeID')
+    @patch('exabox.ovm.csstep.exascale.escli_util.ebEscliUtils.mGetClusterID', return_value=("gridclub086e35-128", "9e827518-8a9f-5fd9-ffbe-c2ae1c46734c"))
+    def test_mUnRegisterACFS_legacy(self, mock_mGetClusterID, mock_mGetVolumeID, mock_mGetACFSFileSystem, mock_mUnMountACFSFileSystem, mock_mRemoveACFSFileSystem):
+        mock_mGetVolumeID.side_effect = [(None, None), ("2:b4d00303b12f46d6a31b4a5339395cd3", "admin")]
+
+        _ebox = self.mGetClubox()
+        _options = copy.deepcopy(self.mGetClubox().mGetArgsOptions())
+        _options.jsonconf = json.loads(EXASCALE_PAYLOAD)
+
+        _utils = ebExascaleUtils(_ebox)
+        _utils.mUnRegisterACFS(_options)
+
+        self.assertEqual(mock_mGetVolumeID.call_count, 2)
+
+    @patch('exabox.ovm.csstep.exascale.escli_util.ebEscliUtils.mGetACFSFileSystem', return_value=("acfsid", '/var/opt/oracle/dbaas_acfs', '100G', '90G'))
+    @patch('exabox.ovm.csstep.exascale.escli_util.ebEscliUtils.mGetVolumeAttachments', return_value=("3:175ebf661f8e49c09d03f8214f6c5b39", "2:b4d00303b12f46d6a31b4a5339395cd3", "dev_additional_acfs"))
+    @patch('exabox.ovm.csstep.exascale.escli_util.ebEscliUtils.mRemoveEDVVolume')
+    @patch('exabox.ovm.csstep.exascale.escli_util.ebEscliUtils.mRemoveEDVAttachment')
+    @patch('exabox.ovm.csstep.exascale.escli_util.ebEscliUtils.mRemoveACFSFileSystem')
+    @patch('exabox.ovm.csstep.exascale.escli_util.ebEscliUtils.mUnMountACFSFileSystem')
+    @patch('exabox.ovm.csstep.exascale.escli_util.ebEscliUtils.mGetVolumeID', return_value=("volid", 'admin'))
+    def test_mRemoveACFSFileSystem(self, mock_mGetVolumeID, mock_mUnMountACFSFileSystem, mock_mRemoveACFSFileSystem, mock_mRemoveEDVAttachment, mock_mRemoveEDVVolume, mock_mGetVolumeAttachments, mock_mGetACFSFileSystem):
+        _ebox = self.mGetClubox()
+        _options = copy.deepcopy(self.mGetClubox().mGetArgsOptions())
+        _options.jsonconf = json.loads(EXASCALE_PAYLOAD)
+
+        _utils = ebExascaleUtils(_ebox)
+        _utils.mRemoveACFSFileSystem('scaqab10celadm01.us.oracle.com', 'acfs_gridclub086e35-128', _options)
+        mock_mGetVolumeID.assert_called_once()
+
+    @patch('exabox.ovm.csstep.exascale.escli_util.ebEscliUtils.mGetACFSFileSystem', return_value=("acfsid", '/var/opt/oracle/dbaas_acfs', '100G', '90G'))
+    @patch('exabox.ovm.csstep.exascale.escli_util.ebEscliUtils.mGetVolumeAttachments', return_value=("3:175ebf661f8e49c09d03f8214f6c5b39", "2:b4d00303b12f46d6a31b4a5339395cd3", "dev_additional_acfs"))
+    @patch('exabox.ovm.csstep.exascale.escli_util.ebEscliUtils.mRemoveEDVVolume')
+    @patch('exabox.ovm.csstep.exascale.escli_util.ebEscliUtils.mRemoveEDVAttachment')
+    @patch('exabox.ovm.csstep.exascale.escli_util.ebEscliUtils.mRemoveACFSFileSystem')
+    @patch('exabox.ovm.csstep.exascale.escli_util.ebEscliUtils.mUnMountACFSFileSystem')
+    @patch('exabox.ovm.csstep.exascale.escli_util.ebEscliUtils.mGetVolumeID')
+    def test_mRemoveACFSFileSystem_legacy(self, mock_mGetVolumeID, mock_mUnMountACFSFileSystem, mock_mRemoveACFSFileSystem, mock_mRemoveEDVAttachment, mock_mRemoveEDVVolume, mock_mGetVolumeAttachments, mock_mGetACFSFileSystem):
+        mock_mGetVolumeID.side_effect = [(None, None), ("volid", 'admin')]
+
+        _ebox = self.mGetClubox()
+        _options = copy.deepcopy(self.mGetClubox().mGetArgsOptions())
+        _options.jsonconf = json.loads(EXASCALE_PAYLOAD)
+
+        _utils = ebExascaleUtils(_ebox)
+        _utils.mRemoveACFSFileSystem('scaqab10celadm01.us.oracle.com', 'acfs_gridclub086e35-128', _options)
+
+        self.assertEqual(mock_mGetVolumeID.call_count, 2)
 
     @patch('time.sleep', return_value=None)
     @patch('exabox.ovm.csstep.exascale.escli_util.ebEscliUtils.mRemoveEDVVolume')
@@ -2122,6 +2302,25 @@ class ebTestExascaleUtils(ebTestClucontrol):
 
         _utils = ebExascaleUtils(_ebox)
         _utils.mDetachAcfsVolume(_options)
+
+    @patch('time.sleep', return_value=None)
+    @patch('exabox.ovm.csstep.exascale.escli_util.ebEscliUtils.mRemoveEDVVolume')
+    @patch('exabox.ovm.csstep.exascale.escli_util.ebEscliUtils.mRemoveEDVAttachment')
+    @patch('exabox.ovm.csstep.exascale.escli_util.ebEscliUtils.mGetVolumeAttachments', return_value=("3:175ebf661f8e49c09d03f8214f6c5b39", "2:b4d00303b12f46d6a31b4a5339395cd3", "dev_additional_acfs"))
+    @patch('exabox.ovm.csstep.exascale.escli_util.ebEscliUtils.mGetVolumeID')
+    @patch('exabox.ovm.csstep.exascale.escli_util.ebEscliUtils.mGetUser', return_value="gridiad1046clu040a1")
+    @patch('exabox.ovm.csstep.exascale.escli_util.ebEscliUtils.mGetClusterID', return_value=("gridiad1046clu040a1", "9e827518-8a9f-5fd9-ffbe-c2ae1c46734c"))
+    def test_mDetachAcfsVolume_legacy(self, mock_mGetClusterID, mock_mGetUser, mock_mGetVolumeID, mock_mGetVolumeAttachments, mock_mRemoveEDVAttachment, mock_mRemoveEDVVolume, mock_sleep):
+        mock_mGetVolumeID.side_effect = [(None, None), ("2:b4d00303b12f46d6a31b4a5339395cd3", "admin")]
+
+        _ebox = self.mGetClubox()
+        _options = copy.deepcopy(self.mGetClubox().mGetArgsOptions())
+        _options.jsonconf = json.loads(EXASCALE_PAYLOAD)
+
+        _utils = ebExascaleUtils(_ebox)
+        _utils.mDetachAcfsVolume(_options)
+
+        self.assertEqual(mock_mGetVolumeID.call_count, 2)
 
     @patch('exabox.ovm.csstep.exascale.escli_util.ebEscliUtils.mListFiles')
     @patch('exabox.ovm.csstep.exascale.escli_util.ebEscliUtils.mRemoveFile')
@@ -3993,7 +4192,108 @@ class ebTestExascaleUtils(ebTestClucontrol):
 
         _self_msg = str(_ctx.exception)
         self.assertIn("Storage vlanID", _self_msg)
-        self.assertIn("not matching", _self_msg)
+
+    def test_mRemoveClusterUserPrivilege_cluster_name(self):
+        _ebox = self.mGetClubox()
+        _utils = ebExascaleUtils(_ebox)
+
+        _options = copy.deepcopy(self.mGetClubox().mGetArgsOptions())
+        _options.jsonconf = json.loads(EXASCALE_PAYLOAD)
+
+        _escli = mock.Mock()
+        _utils._ebExascaleUtils__escli = _escli
+
+        _utils.mRemoveClusterUserPrivilege(_options, aClusterName="iad123")
+
+        self.assertEqual(_escli.mRemoveVMUserPrivilege.call_count, 2)
+        _escli.mRemoveVMUserPrivilege.assert_has_calls([
+            mock.call(_options.jsonconf['exascale']['cell_list'][0], "gridiad123", _options),
+            mock.call(_options.jsonconf['exascale']['cell_list'][0], "oracleiad123", _options)
+        ])
+
+    def test_mRemoveClusterUserPrivilege_all_clusters(self):
+        _ebox = self.mGetClubox()
+        _utils = ebExascaleUtils(_ebox)
+
+        _options = copy.deepcopy(self.mGetClubox().mGetArgsOptions())
+        _options.jsonconf = json.loads(EXASCALE_PAYLOAD)
+
+        _escli = mock.Mock()
+        _escli.mGetUserDetails.return_value = [{"id": "gridcluster1"}, {"id": "oraclecluster2"}]
+        _utils._ebExascaleUtils__escli = _escli
+
+        _utils.mRemoveClusterUserPrivilege(_options)
+
+        _escli.mGetUserDetails.assert_called_once()
+        self.assertEqual(_escli.mRemoveVMUserPrivilege.call_count, 2)
+        _escli.mRemoveVMUserPrivilege.assert_has_calls([
+            mock.call(_options.jsonconf['exascale']['cell_list'][0], "gridcluster1", _options),
+            mock.call(_options.jsonconf['exascale']['cell_list'][0], "oraclecluster2", _options)
+        ])
+
+    def test_mDisableNormalRedundancy_success(self):
+        _ebox = self.mGetClubox()
+        _utils = ebExascaleUtils(_ebox)
+
+        _options = copy.deepcopy(self.mGetClubox().mGetArgsOptions())
+        _options.jsonconf = json.loads(EXASCALE_PAYLOAD)
+
+        _escli = mock.Mock()
+        _escli.mGetClusterAttribute.return_value = (0, [{NORMAL_REDUNDANCY: True}], "")
+        _escli.mListFiles.side_effect = [[{"name": "vault1"}], []]
+        _escli.mChangeClusterAtributes.return_value = 0
+        _utils._ebExascaleUtils__escli = _escli
+
+        with patch.object(_ebox, 'mUpdateErrorObject') as mock_update_error:
+            _rc = _utils.mDisableNormalRedundancy(_options)
+
+        self.assertEqual(_rc, 0)
+        _escli.mListFiles.assert_called()
+        _escli.mChangeClusterAtributes.assert_called_once_with(
+            _options.jsonconf['exascale']['cell_list'][0],
+            _options,
+            aAttribute={"normalRedundancy": "false"}
+        )
+        mock_update_error.assert_not_called()
+
+    def test_mDisableNormalRedundancy_already_disabled(self):
+        _ebox = self.mGetClubox()
+        _utils = ebExascaleUtils(_ebox)
+
+        _options = copy.deepcopy(self.mGetClubox().mGetArgsOptions())
+        _options.jsonconf = json.loads(EXASCALE_PAYLOAD)
+
+        _escli = mock.Mock()
+        _escli.mGetClusterAttribute.return_value = (0, [{NORMAL_REDUNDANCY: False}], "")
+        _utils._ebExascaleUtils__escli = _escli
+
+        with patch.object(_ebox, 'mUpdateErrorObject') as mock_update_error:
+            _rc = _utils.mDisableNormalRedundancy(_options)
+
+        self.assertEqual(_rc, 0)
+        _escli.mListFiles.assert_not_called()
+        _escli.mChangeClusterAtributes.assert_not_called()
+        mock_update_error.assert_not_called()
+
+    def test_mDisableNormalRedundancy_detects_normal_files(self):
+        _ebox = self.mGetClubox()
+        _utils = ebExascaleUtils(_ebox)
+
+        _options = copy.deepcopy(self.mGetClubox().mGetArgsOptions())
+        _options.jsonconf = json.loads(EXASCALE_PAYLOAD)
+
+        _escli = mock.Mock()
+        _escli.mGetClusterAttribute.return_value = (0, [{NORMAL_REDUNDANCY: True}], "")
+        _escli.mListFiles.side_effect = [[{"name": "vault1"}], [{"name": "file1", "redundancy": "normal"}]]
+        _utils._ebExascaleUtils__escli = _escli
+
+        with patch.object(_ebox, 'mUpdateErrorObject') as mock_update_error:
+            with self.assertRaises(ExacloudRuntimeError) as _ctx:
+                _utils.mDisableNormalRedundancy(_options)
+
+        mock_update_error.assert_called_once()
+        _escli.mChangeClusterAtributes.assert_not_called()
+        self.assertIn("NORMAL redundancy", str(_ctx.exception))
 
  
     def test_mGetComputeDetails(self):

@@ -4,7 +4,7 @@
 #
 # tests_handler_giconfig.py
 #
-# Copyright (c) 2025, Oracle and/or its affiliates.
+# Copyright (c) 2025, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_handler_giconfig.py - <one-line expansion of the name>
@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    joysjose    03/25/26 - Bug 38900232 : FIX FOR ISSUES FOUND BY VOXIO CODEV
+#                           AGENT IN DIR EXABOX/JSONDISPATCH
 #    shapatna    11/11/25 - Enh 38574081: Add unit tests to improve the
 #                           coverage using Cline
 #    shapatna    11/11/25 - Creation
@@ -159,6 +161,30 @@ class ebTestGIconfig(ebTestClucontrol):
             _gi_mgr.mExecute.assert_called_once_with(_payload)
             # mGetGIResponseData is called in both else and finally blocks; at least once is guaranteed
             self.assertTrue(_gi_mgr.mGetGIResponseData.called)
+
+    @patch("exabox.jsondispatch.handler_giconfig.exaBoxCluCtrl")
+    def test_mExecute_from_payload_exception_does_not_raise_unboundlocal(self, aMagicCluCtrl):
+        _options = self.mGetContext().mGetArgsOptions()
+        _payload = {
+            "system_type": "EXADATA",
+            "image_type": "GI",
+            "version": "19.21.0.0.0",
+            "location": "/repo/gi/images",
+            "type": "ADD",
+        }
+        _options.jsonconf = _payload
+
+        aMagicCluCtrl.return_value.mIsOciEXACC.return_value = False
+
+        with patch("exabox.jsondispatch.handler_giconfig.get_gcontext") as aMagicGetCtx, \
+             patch("exabox.jsondispatch.handler_giconfig.ebCluGiRepoUpdate") as aMagicGiRepo:
+            _ctx = Mock()
+            _ctx.mGetConfigOptions.return_value = {"repository_root": "/repo/root"}
+            aMagicGetCtx.return_value = _ctx
+            aMagicGiRepo._from_payload.side_effect = RuntimeError("boom")
+
+            _handler = GIConfigHandler(_options)
+            self.assertEqual((GIConfigHandler.ERR_EXECUTE_GICONFIG, {}), _handler.mExecute())
 
 
 if __name__ == "__main__":

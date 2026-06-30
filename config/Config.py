@@ -1,5 +1,5 @@
 """
- Copyright (c) 2014, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     Config - Configuration File Management
@@ -11,6 +11,7 @@ NOTE:
     None
 
 History:
+    abysebas     04/15/2026 - Bug 38915551 - Add low profile region config overlay
     aypaul      04/23/2026 - Bug#37535214 Use consistent backup before copying file.
     ririgoye    06/18/2024 - Bug 36746656 - PYTHON 3.11 - EXACLOUD NEEDS TO UPDATE 
                              DEPRECATED/OLDER IMPORTS DYNAMICALLY
@@ -74,6 +75,23 @@ __all__ = ['exaBoxProcessArgs', 'exaBoxConfigFileReader', 'ebJsonConfigFileReade
 
 SENSITIVE_PARAMS = 'oeda_pwd', 'default_pwd', 'root_spwd', 'db_connstr'
 
+
+def _apply_low_profile_overlay(dictConfig):
+    """Overlay low profile values onto the top-level config when enabled."""
+    if str(dictConfig.get('low_profile_region', 'False')).upper() != 'TRUE':
+        return dictConfig
+
+    low_profile_config = dictConfig.get('low_profile_config')
+    if not isinstance(low_profile_config, dict):
+        return dictConfig
+
+    ebLogInfo('Applying low profile region config overlay')
+    for key, value in low_profile_config.items():
+        ebLogDebug(f'low_profile_config[{key}]={value}')
+
+    dictConfig.update(low_profile_config)
+    return dictConfig
+
 def _load_cfgfile(cfgpath, aOptions):
     '''This function load the config file and umask.
 
@@ -115,6 +133,8 @@ def _load_cfgfile(cfgpath, aOptions):
         if os.access(cfgpath, os.W_OK):
             with open(cfgpath, 'w') as fd:
                 json.dump(maskedConfig, fd, indent=4)
+
+    dictConfig = _apply_low_profile_overlay(dictConfig)
 
     return dictConfig
 

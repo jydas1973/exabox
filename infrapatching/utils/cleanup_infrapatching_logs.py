@@ -2,7 +2,7 @@
 #
 # cleanup_infrapatching_logs.py
 #
-# Copyright (c) 2024, Oracle and/or its affiliates.
+# Copyright (c) 2024, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      cleanup_infrapatching_logs.py
@@ -14,6 +14,8 @@
 #      
 #
 #    MODIFIED   (MM/DD/YY)
+#    kdas        04/15/26 - ENH 39145020 - ADDRESS VOXIO CODEV AGENT SCAN
+#                           ISSUES OBSERVED IN INFRAPATCHING LOGS UTIL 
 #    emekala     03/14/24 - ENH 35804535 - EXACS: Cleanup of logs and
 #                           patchpayloads on the Management Host (launch node)
 #                           for EXACS
@@ -118,17 +120,22 @@ class CleanupInfrapatchingLogs():
             _std_output = _process.stdout.decode('utf-8').strip()
             return _std_output
         except subprocess.CalledProcessError as _e:
+            # Capture exit code/message to confirm the marker file is absent
+            # before purging payload.
             _std_out = _e.stdout.decode('utf-8').strip()
+            _exit_code = _e.returncode or 1
             if "Key not found" in _std_out:
                 self.logger.error(_std_out)
-                raise SystemExit
+                raise SystemExit((_exit_code, _std_out))
             else:
                 _std_error = _e.stderr.decode('utf-8').strip()
                 # rm cmd doesn't return anything but with | grep -v WARNING added to exclude some banner msgs 
                 # while executing the exassh cmd, subprocess assumes cmd execution failed 
                 if _std_error:
                     self.logger.error(_std_error)
-                    raise SystemExit
+                if _std_out:
+                    self.logger.error(_std_out)
+                raise SystemExit((_exit_code, _std_error or _std_out or str(_e)))
          
 
     def mGetUserName(self, **kwargs):
@@ -208,12 +215,32 @@ class CleanupInfrapatchingLogs():
             _cmd = f"ls -1 {_folderToPurge}/{_marker_file}"
             self.mRunCmd(aCmd=_cmd, aUserName=_userName, **kwargs)
             self.logger.info(f"Marker file: {_marker_file} found under: '{_folderToPurge}'. Patch is in progress hence skipping purging of folder!")
-        except:
-            # no marker file found hence purge the folder
-            self.logger.info(f"Marker file: {_marker_file} not found under: '{_folderToPurge}'. Proceeding to purge the folder: '{_folderToPurge}'...")
-            _cmd = f"rm -rf {_folderToPurge}"
-            self.mRunCmd(aCmd=_cmd, aUserName=_userName, **kwargs)
-            self.logger.info(f"Folder: '{_folderToPurge}' purged!")
+        except SystemExit as _exc:
+            _exit_code = getattr(_exc, "code", None)
+            _exc_msg = str(_exc)
+
+            if isinstance(_exit_code, tuple):
+                _exit_tuple = tuple(_exit_code)
+                if len(_exit_tuple) >= 2:
+                    _exit_code, _exc_msg = _exit_tuple[0], _exit_tuple[1]
+                elif len(_exit_tuple) == 1:
+                    _exit_code = _exit_tuple[0]
+                else:
+                    _exit_code = None
+            elif not isinstance(_exit_code, int):
+                _exit_code = None
+
+            self.logger.info(f"Marker probe failed with exit code {_exit_code}: {_exc_msg}")
+
+            if _exit_code == 2 or "No such file or directory" in _exc_msg:
+                # no marker file found hence purge the folder
+                self.logger.info(f"Marker file: {_marker_file} not found under: '{_folderToPurge}'. Proceeding to purge the folder: '{_folderToPurge}'...")
+                _cmd = f"rm -rf {_folderToPurge}"
+                self.mRunCmd(aCmd=_cmd, aUserName=_userName, **kwargs)
+                self.logger.info(f"Folder: '{_folderToPurge}' purged!")
+            else:
+                self.logger.info(f"Failed to verify marker file under '{_folderToPurge}': {_exc_msg}")
+                self.logger.info("Skipping purge for this folder and continuing.")
         return 0
 
     def mExecute(self):

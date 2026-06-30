@@ -3,7 +3,7 @@
 #
 # clupatchmetadata.py
 #
-# Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      clupatchmetadata.py - This module contains updating idempotent patch states
@@ -15,6 +15,12 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    jyotdas     05/13/26 - Bug 39368079 - single Node domu Patch Failing With
+#                           Permission Denied Occurred While Trying to Read the
+#                           Patch States Json File:
+#                           /var/odo/infrapatchbase/dbserver.patch.zip_exadata
+#    jyotdas     04/28/26 - Bug 39263019 - Security Scan Findings in
+#                           clupatchmetadata.py
 #    araghave    03/04/25 - Bug 37417431 - EXACS | DOMU | UNWANTED SSH
 #                           CONNECTION FROM 169.254.200.1 LOCKING OPC USER
 #    avimonda    10/15/24 - Bug 37156068 - EXCEPTION IN
@@ -37,7 +43,7 @@
 #
 
 """
- Copyright (c) 2014, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     Patch Metadata - Store and operate patching states via json object.
@@ -91,7 +97,17 @@ FUNCTION:
 """
 
 import json
+import os
+import re
+import shlex
+import uuid
 from exabox.infrapatching.utils.utility import runInfraPatchCommandsLocally, mGetInfraPatchingConfigParam
+from exabox.infrapatching.utils.constants import (
+    EXAVMIMAGES,
+    CPS_LAUNCH_NODE_PATCH_BASE,
+    MANAGEMENT_HOST_LAUNCH_NODE_PATCH_BASE,
+    DOMU_LAUNCH_NODE_PATCH_BASE,
+)
 from json import JSONEncoder
 
 from exabox.infrapatching.handlers.loghandler import LogHandler
@@ -103,6 +119,37 @@ try:
     from types import SimpleNamespace as Namespace
 except ImportError:
     from argparse import Namespace
+
+_ALLOWED_PATCH_METADATA_BASES = (
+    EXAVMIMAGES,
+    CPS_LAUNCH_NODE_PATCH_BASE,
+    MANAGEMENT_HOST_LAUNCH_NODE_PATCH_BASE,
+    DOMU_LAUNCH_NODE_PATCH_BASE,
+)
+
+_PATCH_METADATA_RE = re.compile(
+    r'^(?:' + '|'.join(re.escape(b) for b in _ALLOWED_PATCH_METADATA_BASES) + r')'
+    r'.+/patch_states_data/[0-9a-f-]+_patch_progress_report\.json$'
+)
+
+
+def _mValidatePatchMetadataPath(aFilePath):
+    """
+    Validates aFilePath against the known patch-metadata file structure.
+    Raises ValueError if the path contains path traversal sequences, is outside
+    permitted locations, or does not match the expected filename pattern.
+    """
+    if not aFilePath:
+        raise ValueError("Patch metadata file path must not be empty.")
+    if '..' in aFilePath.split('/'):
+        raise ValueError(
+            f"Patch metadata file path '{aFilePath}' contains path traversal sequences.")
+    _resolved = os.path.normpath(aFilePath)
+    if not _PATCH_METADATA_RE.match(_resolved):
+        raise ValueError(
+            f"Patch metadata file path '{aFilePath}' does not match the expected "
+            f"pattern (<base>/patch_states_data/<reqid>_patch_progress_report.json).")
+
 
 class ebCluPatchStateInfo(LogHandler):
     def __init__(self, patchStates, afilePath=None, aTargetNode=None):
@@ -144,6 +191,7 @@ class ebCluPatchStateInfo(LogHandler):
         _node = None
         _node_list = []
         try:
+            _mValidatePatchMetadataPath(aFilePath)
             ebLogInfo(f"Reading patch state JSON file: {aFilePath}")
             if aTargetNode == 'localhost':
                 _cmd_list = [['cat', aFilePath]]
@@ -158,8 +206,19 @@ class ebCluPatchStateInfo(LogHandler):
                 _max_number_of_ssh_retries = mGetInfraPatchingConfigParam('max_number_of_ssh_retries')
                 _node.mSetMaxRetries(int(_max_number_of_ssh_retries))
                 _node.mConnect(aHost=aTargetNode)
-                _i, _o, _e = _node.mExecuteCmd(f'cat {aFilePath}')
-                _node_list = _o.readlines()
+                if aUser == 'root':
+                    _raw = _node.mReadFile(aFilePath)
+                    if _raw:
+                        _node_list = _raw.decode('utf-8').split('\n')
+                    else:
+                        _node_list = []
+                else:
+                    _i, _o, _e = _node.mExecuteCmd(f"sudo -n cat {shlex.quote(aFilePath)}")
+                    _exit_status = _node.mGetCmdExitStatus()
+                    if _exit_status:
+                        raise RuntimeError(
+                            f"sudo cat of {aFilePath!r} failed with exit status {_exit_status}")
+                    _node_list = _o.readlines() if _o else []
 
             output = []
             if _node_list:
@@ -195,6 +254,7 @@ class ebCluPatchStateInfo(LogHandler):
         _node = None
         patchStateJsonData = json.dumps(self, indent=4, cls=ebCluPatchStatesEncoder)
         try:
+            _mValidatePatchMetadataPath(self.filePath)
             self.mPatchLogInfo(f"Writing patch states JSON to file : {self.filePath}")
             if self.targetNode == 'localhost':
                 _cmd_list = []
@@ -207,12 +267,27 @@ class ebCluPatchStateInfo(LogHandler):
                 _max_number_of_ssh_retries = mGetInfraPatchingConfigParam('max_number_of_ssh_retries')
                 _node.mSetMaxRetries(int(_max_number_of_ssh_retries))
                 _node.mConnect(aHost=self.targetNode)
-                _cmd = None
                 if aUser == 'root':
-                    _cmd = f"printf '{patchStateJsonData}' > {self.filePath}"
+                    _node.mWriteFile(self.filePath, patchStateJsonData.encode('utf-8'))
                 else:
-                    _cmd = f"printf '{patchStateJsonData}' | sudo tee {self.filePath}"
-                _node.mExecuteCmdLog(_cmd)
+                    _tmp_path = f"/tmp/patchstate_{uuid.uuid4().hex}.json"
+                    try:
+                        _node.mWriteFile(_tmp_path, patchStateJsonData.encode('utf-8'))
+                        _node.mExecuteCmd(
+                            f"sudo -n mv {shlex.quote(_tmp_path)} {shlex.quote(self.filePath)}"
+                        )
+                        _exit_status = _node.mGetCmdExitStatus()
+                        if _exit_status:
+                            raise RuntimeError(
+                                f"sudo mv from {_tmp_path!r} to {self.filePath!r} "
+                                f"failed with exit status {_exit_status}."
+                            )
+                    except Exception:
+                        try:
+                            _node.mExecuteCmd(f"rm -f {shlex.quote(_tmp_path)}")
+                        except Exception:
+                            pass
+                        raise
         except Exception as e:
             self.mPatchLogError(f"Error in Writing patch states to file : {self.filePath}")
             raise Exception(

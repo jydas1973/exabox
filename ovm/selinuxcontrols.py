@@ -16,6 +16,10 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    aypaul      06/09/26 - Bug#39439673 Rectify set selinux logs when state
+#                           change is not required.
+#    aypaul      05/25/26 - Bug#39432939 Updated string domU to domu for
+#                           selinux operations
 #    aypaul      04/23/26 - Bug#39225305 Remove reboot from infra nodes for SELinux
 #                           update
 #    aypaul      03/16/26 - ER#38277507 Add selinux operation response to ec
@@ -86,6 +90,7 @@ class ebSelinuxControls(object):
 
                 newMode = component["mode"]
                 componentType = component["component"]
+                componentType = componentType.lower()
                 if componentType == "domu" and not isElastic:
                     ebLogWarn("SE Linux update operations for domUs are supported only during provisioning and elastic scale compute.")
                     continue
@@ -128,8 +133,6 @@ class ebSelinuxControls(object):
                             ebLogInfo(f"SELinux configuration was successful on {thisNode}")
                             if componentType == "domu":
                                 _reboot_set.add(thisNode)
-                        else:
-                            ebLogError(f"Failed to apply selinux configuration on {thisNode}")
 
                         if operationStatus["modeUpdate"] == "Failure":
                             _hasModeUpdateFailed = True
@@ -202,10 +205,12 @@ class ebSelinuxControls(object):
         """
 
         if aNode is None:
+            ebLogError("Node object cannot be None")
             return False
         aStatus = str(aStatus).lower()
         _permissible_vals = ["enforcing", "permissive", "disabled"]
         _ctx = get_gcontext()
+        anodeType = anodeType.lower()
         if aStatus not in _permissible_vals:
             ebLogError("*** Invalid SE_LINUX mode. Value: {0}".format(aStatus))
             if operationStatusDict is None:
@@ -267,7 +272,7 @@ class ebSelinuxControls(object):
                     _rv = True
                     ebLogInfo("SELinux will be {0}".format(aStatus))
         else:
-            ebLogWarn("*** SE Linux value already at: {0}".format(aStatus))
+            ebLogInfo("*** SE Linux value already at: {0}".format(aStatus))
 
         #Update policies on the node in case se linux status is set to enforcing.
         if aStatus == "enforcing" or aStatus == "permissive":

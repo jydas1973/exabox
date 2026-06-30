@@ -11,6 +11,7 @@ NOTE:
     None
 
 History:
+    gvalderr    05/08/26   - Bug 39166742 - Add VM resume support
     bhpati      09/09/24 - EXACS: PROVISIONING FAILED WITH EXACLOUD ERROR CODE:
                            16 HYPERVISOR STOPPED ON DOM0.
     pbellary    02/02/24   - Bug 36253784 - NODE RECOVERY : /U02 ON VM RESTORED FROM VM BACKUP 
@@ -746,6 +747,21 @@ class ebKvmVmMgr(HVMgr):
                 ebLogError('*** KVM START O_LOG: %s' % (_line))
             for _line in _e.readlines():
                 ebLogError('*** KVM START E_LOG: %s' % (_line))
+        return _rc
+
+    # TODO: For the moment this change is fine, but in the future once
+    # vm_maker has support for VM resume, we should migrate to it.
+    def mResumeVM(self, aVMId):
+        _vmid = aVMId
+        _host_cmd = 'virsh resume ' + _vmid
+        _i, _o, _e = self.mExecuteCmd(_host_cmd)
+        _rc = self.mGetCmdExitStatus()
+        if _rc:
+            ebLogError(f'*** KVM RESUME failed for : {_rc} / {_vmid}')
+            for _line in _o.readlines():
+                ebLogError(f'*** KVM RESUME O_LOG: {_line}')
+            for _line in _e.readlines():
+                ebLogError(f'*** KVM RESUME E_LOG: {_line}')
         return _rc
     
     def mRunCmd(self, _cmd):

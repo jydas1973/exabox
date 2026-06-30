@@ -17,9 +17,15 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    araghave    05/22/26 - Bug 39424884 - EXACS:26.1.1:BB:DOMU:LIVE
+#                           UPDATE:ALLCVSS ROLLBACK FAILING
+#    kdas        04/15/26 - Bug 39206972 - CLUSTERLESS:SMR:DOM0 PRECHECK 
+#                           FAILING WITH ZIPPED ISO IMAGE FILE DOES NOT EXIST
 #    remamid     02/19/26 - Revert 38671388
 #    remamid     12/16/25 - Add error message when domu nohup patchmgr
 #                           execution fails bug 38671388
+#    mirrodri    10/12/25 - Enh 38521465 PROVIDE OPTIONS TO MOCK PATCHMGR
+#                           COMMAND ON AUTOMATION ENVIRONMENTS
 #    araghave    09/11/25 - Enh 38173247 - EXACLOUD CHANGES TO SUPPORT DOMU ELU
 #                           INFRA PATCH OPERATIONS
 #    araghave    06/24/25 - Enhancement Request 38082882 - HANDLING EXACLOUD
@@ -184,7 +190,7 @@ class InfraPatchManager(PatchManager):
         return _patchmgr_target
 
 
-    def __mGetPatchMgrBaseCmd(self, aPrepareRoceVerifyCfgCmd=False):
+    def __mGetPatchMgrBaseCmd(self, aPrepareRoceVerifyCfgCmd=False, aResetLiveUpdateScheduleOutstandingWork=False):
         """
          private method to get patchmgr minimal base cmd
         """
@@ -214,6 +220,16 @@ class InfraPatchManager(PatchManager):
              not be run in nohup or in background.
             '''
             _patchmgr_base_command += f"./patchmgr"
+        elif self.mGetTarget() in [ PATCH_DOMU ] and aResetLiveUpdateScheduleOutstandingWork:
+            '''
+             Run the patchmgr ELU outstanding work items reset
+             command in the foreground without nohup.
+            '''
+            if self.mGetHandler().mGetInfrapatchExecutionValidator().mCheckCondition('mIsCpsLaunchNodeForDomU'):
+                _patchmgr_base_command = f"sudo {self.mGetPatchBaseAfterUnzip()}/patchmgr"
+                _nodes_to_be_patched_file_name = _nodes_to_be_patched_file
+            else:
+                _patchmgr_base_command += f"./patchmgr"
         else:
             _patchmgr_base_command += f" nohup ./patchmgr"
 
@@ -231,18 +247,35 @@ class InfraPatchManager(PatchManager):
         
         return _patchmgr_base_command
 
-    def mGetPatchMgrCmd(self, aPrepareRoceVerifyCfgCmd=False):
+    def mGetPatchMgrCmd(self, aPrepareRoceVerifyCfgCmd=False, aResetLiveUpdateScheduleOutstandingWork=False):
         """
          one consolidated api exposed to get patchmgr cmd for 
          various targets and its corresponding operations
         """
         _patchmgr_command = None
         _target = self.mGetTarget()
-        _patchmgr_base_command = self.__mGetPatchMgrBaseCmd(aPrepareRoceVerifyCfgCmd=aPrepareRoceVerifyCfgCmd)
+        _reset_live_update_schedule_outstanding_work = (
+            aResetLiveUpdateScheduleOutstandingWork or
+            self.mGetResetLiveUpdateScheduleOutstandingWorkPatchFlag())
+        _patchmgr_base_command = self.__mGetPatchMgrBaseCmd(aPrepareRoceVerifyCfgCmd=aPrepareRoceVerifyCfgCmd, aResetLiveUpdateScheduleOutstandingWork=_reset_live_update_schedule_outstanding_work)
 
         if _target in [PATCH_DOM0, PATCH_DOMU]:
-            if self.mGetHandler().mIsElu() and self.mGetApplyOutstandingWorkDuringEluPatchFlag():
+            if self.mGetHandler().mIsElu() and _reset_live_update_schedule_outstanding_work:
+                _patchmgr_command = self.__mResetLiveUpdateScheduleOutstandingWorkDuringElu(aPatchMgrBaseCommand=_patchmgr_base_command)
+                # Choose _patchmgr_tee_cmd command for display and logging only; execution uses _patchmgr_command.
+                _patchmgr_tee_cmd = _patchmgr_command
+                if (_target == PATCH_DOMU and self.mGetHandler().mGetInfrapatchExecutionValidator().mCheckCondition('mIsCpsLaunchNodeForDomU')):
+                    _patchmgr_tee_cmd = f"{_patchmgr_command} </dev/null | sudo tee {self.mGetPatchMgrConsoleOutputFile()} &"
+                self.mPatchLogInfo(f"For rack={self.mGetHandler().mGetRackName()} target={_target} op={self.mGetOperation()} patchmgr command prepared for execution is: {_patchmgr_tee_cmd}")
+                return _patchmgr_command
+            elif self.mGetHandler().mIsElu() and self.mGetApplyOutstandingWorkDuringEluPatchFlag():
                 _patchmgr_command = self.__mRebootApplyOutstandingWorkDuringElu(aPatchMgrBaseCommand=_patchmgr_base_command)
+                # Choose _patchmgr_tee_cmd command for display and logging only; execution uses _patchmgr_command.
+                _patchmgr_tee_cmd = _patchmgr_command
+                if (_target == PATCH_DOMU and self.mGetHandler().mGetInfrapatchExecutionValidator().mCheckCondition('mIsCpsLaunchNodeForDomU')):
+                    _patchmgr_tee_cmd = f"{_patchmgr_command} </dev/null | sudo tee {self.mGetPatchMgrConsoleOutputFile()} &"
+                self.mPatchLogInfo(f"For rack={self.mGetHandler().mGetRackName()} target={_target} op={self.mGetOperation()} patchmgr command prepared for execution is: {_patchmgr_tee_cmd}")
+                return _patchmgr_command
             else:
                 _patchmgr_command = self.__mGetDom0DomUPatchMgrCmd(aPatchMgrBaseCommand=_patchmgr_base_command)
         elif _target == PATCH_CELL:
@@ -284,15 +317,19 @@ class InfraPatchManager(PatchManager):
 
         if _operation in [TASK_PREREQ_CHECK, TASK_PATCH]:
             if self.mGetTarget() in [ PATCH_DOM0, PATCH_DOMU ] and self.mIsExaSpliceEnabled():
+                _full_iso_repo_path = self.mGetIsoRepo()
+                if (self.mGetHandler().mGetInfrapatchExecutionValidator().mCheckCondition('mIsSingleDomUVMCluster') or
+                        self.mGetHandler().mGetInfrapatchExecutionValidator().mCheckCondition('mIsManagementHostLaunchNodeForDomuOrClusterless')):
+                    _full_iso_repo_path = f"{self.mGetPatchBaseAfterUnzip()}{_full_iso_repo_path}"
                 if mExaspliceVersionPatternMatch(self.mGetTargetVersion()):
-                    _patchmgr_command += f" --exasplice_repo {self.mGetIsoRepo()}"
+                    _patchmgr_command += f" --exasplice_repo {_full_iso_repo_path}"
                 else:
-                    _patchmgr_command += f" --repo {self.mGetIsoRepo()}"
+                    _patchmgr_command += f" --repo {_full_iso_repo_path}"
                     _patchmgr_command += f" --target_version {self.mGetTargetVersion()}"
+                    if _operation in [TASK_PATCH]:
+                        _patchmgr_command += f" --live-update-schedule-outstanding-work never"
                     if self.mGetTarget() == PATCH_DOM0:
                         _patchmgr_command += f" --live-update-target allcvss"
-                        if _operation in [TASK_PATCH]:
-                            _patchmgr_command += f" --live-update-schedule-outstanding-work never"
                     elif self.mGetTarget() == PATCH_DOMU:
                         '''
                          In case of Domu patching, valid cases are
@@ -366,6 +403,20 @@ class InfraPatchManager(PatchManager):
                 _patchmgr_command += f" </dev/null | sudo tee {self.mGetPatchMgrConsoleOutputFile()} &"
             else:
                 _patchmgr_command += f" </dev/null &> {self.mGetPatchMgrConsoleOutputFile()} &"
+
+        return _patchmgr_command
+
+    def __mResetLiveUpdateScheduleOutstandingWorkDuringElu(self, aPatchMgrBaseCommand):
+        """
+         private method to set domU patchmgr cmd to set
+         --live-update-schedule-outstanding-work to reset.
+        """
+        _patchmgr_command = aPatchMgrBaseCommand
+        _log_path_on_launch_node = self.mGetLogPathOnLaunchNode()
+        _currenttime = (datetime.datetime.now()).strftime("%Y-%m-%d_%H_%M_%S")
+
+        _patchmgr_command += f" --live-update-schedule-outstanding-work reset"
+        _patchmgr_command += f" --log_dir {_log_path_on_launch_node}_{_currenttime}"
 
         return _patchmgr_command
 
@@ -523,7 +574,9 @@ class InfraPatchManager(PatchManager):
 
         return _patchmgr_command
 
-    def mExecutePatchMgrCmd(self, aPatchMgrCmd, aPrepareRoceVerifyCfgCmd=False):
+    def mExecutePatchMgrCmd(self, aPatchMgrCmd, aPrepareRoceVerifyCfgCmd=False,
+                            aForegroundNoNotificationCheck=False,
+                            aResetOutstandingWorkItemsSchedule=False):
         """
           This method helps create a log directory prior to running a patchmgr
             and starts the command in nohup mode
@@ -537,10 +590,24 @@ class InfraPatchManager(PatchManager):
            PATCHMGR_COMMAND_FAILED - otherwise(In case of Dom0, Cell and Switches)
         """
 
-        if self.mGetTarget() == PATCH_DOMU and self.mGetHandler().mGetInfrapatchExecutionValidator().mCheckCondition('mIsCpsLaunchNodeForDomU'):
-            self.__mExecuteLocalNodePatchMgrCmd(aPatchMgrCmd=aPatchMgrCmd)
-            return
+        if self.mGetHandler().mIsMockEnabledByEcra():
+            self.mPatchLogInfo("Mock mode: skipping patchmgr command execution.")
+            self.mSetStatusCode(aStatusCode=PATCH_SUCCESS_EXIT_CODE)
+            self.mSetPatchFailedNodeList(aPatchFailedNodeList=[])
+            self.mPatchLogInfo("Mock mode: patchmgr command treated as success.")
+            return PATCH_SUCCESS_EXIT_CODE
 
+        if aResetOutstandingWorkItemsSchedule:
+            aForegroundNoNotificationCheck = True
+
+        _ret_local = None
+        if self.mGetTarget() == PATCH_DOMU and self.mGetHandler().mGetInfrapatchExecutionValidator().mCheckCondition('mIsCpsLaunchNodeForDomU'):
+            _ret_local = self.__mExecuteLocalNodePatchMgrCmd(
+                aPatchMgrCmd=aPatchMgrCmd,
+                aForegroundNoNotificationCheck=aForegroundNoNotificationCheck)
+            if _ret_local is None:
+                _ret_local = DOMU_PATCHMGR_COMMAND_FAILED
+            return _ret_local
 
         _rack_name = self.mGetHandler().mGetRackName()
         _target = self.mGetTarget()
@@ -594,10 +661,22 @@ class InfraPatchManager(PatchManager):
                     return PATCHMGR_COMMAND_FAILED
                 else:
                     self.mPatchLogInfo("Verify config command successful after the tags were added to switch list file and re-run.")
-                
+               
+            if aForegroundNoNotificationCheck:
+                _cmd_exit_status = int(_node.mGetCmdExitStatus())
+                if _cmd_exit_status != 0:
+                    self.mPatchLogError(
+                        f"ELU patchmgr foreground command failed with exit code {_cmd_exit_status}.")
+                    self.mSetStatusCode(aStatusCode=PATCHMGR_COMMAND_FAILED)
+                    return PATCHMGR_COMMAND_FAILED
+
+                self.mPatchLogInfo("ELU patchmgr foreground command successful.")
+                self.mSetStatusCode(aStatusCode=PATCH_SUCCESS_EXIT_CODE)
+                return PATCH_SUCCESS_EXIT_CODE
+
             # Notifications files are not generated in case of a
             # patchmgr verify config option specified.
-            if aPrepareRoceVerifyCfgCmd:
+            if aForegroundNoNotificationCheck or aPrepareRoceVerifyCfgCmd:
                 self.mSetStatusCode(aStatusCode=_exit_code)
                 return _exit_code
 
@@ -677,6 +756,10 @@ class InfraPatchManager(PatchManager):
         Updates the patchmgr node progress data to exacloud database
         """
 
+        if self.mGetHandler().mIsMockEnabledByEcra():
+            # Mock implementation
+            return
+
         # get the patchmgr node progress data from notification xml file
         _patchmgr_notification_xml_data = None
 
@@ -743,7 +826,7 @@ class InfraPatchManager(PatchManager):
 
     def mWaitForPatchMgrCmdExecutionToComplete(self, aInputListFile=None, aPatchStates=None):
         """
-         Here we connect to the launch node and try to check for progress reading
+         Here we connect to the launch node and try to check for progress reading 
           Patchmgr Console out file. It returns:
 
              zero     --> when patchmgr end with success
@@ -753,6 +836,10 @@ class InfraPatchManager(PatchManager):
            of code monitors the log file for completion and returns the exit status of the
           patchmgr command.
         """
+
+        if self.mGetHandler().mIsMockEnabledByEcra():
+            # Mock implementation
+            return
 
         if self.mGetTarget() == PATCH_DOMU and self.mGetHandler().mGetInfrapatchExecutionValidator().mCheckCondition('mIsCpsLaunchNodeForDomU'):
             self.__mWaitForLocalPatchMgrCmdExecutionToComplete(aInputListFile=aInputListFile, aPatchStates=aPatchStates)
@@ -942,7 +1029,7 @@ class InfraPatchManager(PatchManager):
             _node.mDisconnect()
 
 
-    def __mExecuteLocalNodePatchMgrCmd(self, aPatchMgrCmd):
+    def __mExecuteLocalNodePatchMgrCmd(self, aPatchMgrCmd, aForegroundNoNotificationCheck=False):
         """
           This method helps create a log directory prior to running a patchmgr
             and starts the command in nohup mode
@@ -968,8 +1055,26 @@ class InfraPatchManager(PatchManager):
             _cmd_list.append(_patch_mgr_cmd_list)
             _cmd_list.append(['tee', self.mGetPatchMgrConsoleOutputFile()])
             self.mPatchLogInfo(f"Patchmgr command {str(_cmd_list)}")
-            _cmd_exec_first = subprocess.Popen(_cmd_list[0], stdout=subprocess.PIPE)
-            subprocess.Popen(_cmd_list[1], stdin=_cmd_exec_first.stdout, stdout=subprocess.PIPE)
+            _cmd_exec_first = subprocess.Popen(
+                _cmd_list[0],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT)
+            _tee_stdout = subprocess.DEVNULL if aForegroundNoNotificationCheck else subprocess.PIPE
+            _cmd_exec_second = subprocess.Popen(_cmd_list[1], stdin=_cmd_exec_first.stdout, stdout=_tee_stdout)
+            if _cmd_exec_first.stdout:
+                _cmd_exec_first.stdout.close()
+
+            if aForegroundNoNotificationCheck:
+                _patchmgr_exit_code = _cmd_exec_first.wait()
+                _tee_exit_code = _cmd_exec_second.wait()
+                if _patchmgr_exit_code != 0 or _tee_exit_code != 0:
+                    self.mPatchLogError(
+                        f"Foreground patchmgr command failed with patchmgr exit code "
+                        f"{_patchmgr_exit_code} and tee exit code {_tee_exit_code}.")
+                    self.mSetStatusCode(aStatusCode=DOMU_PATCHMGR_COMMAND_FAILED)
+                    return DOMU_PATCHMGR_COMMAND_FAILED
+                self.mSetStatusCode(aStatusCode=PATCH_SUCCESS_EXIT_CODE)
+                return PATCH_SUCCESS_EXIT_CODE
             
             '''
               In case of Exacc environments, it is observed that there has been slight delays
@@ -982,7 +1087,7 @@ class InfraPatchManager(PatchManager):
             while _retry_check_for_folder_counter > 0:
                 if os.path.exists(_notifications_dir):
                     _cmd_list =[]
-                    _cmd_list.append(['ls', '-l', _notifications_dir])
+                    _cmd_list.append(['ls', _notifications_dir])
                     _cmd_list.append(['wc', '-l'])
                     _rc, _output = runInfraPatchCommandsLocally(_cmd_list)
                     if int(_output) > 0:
@@ -992,11 +1097,40 @@ class InfraPatchManager(PatchManager):
                     self.mPatchLogWarn(
                         f"Patch notification log location : '{_notifications_dir}' does not exist. Checking again after {WAIT_PATCH_NOTIFICATION_DIRECTORY_TIMEOUT_IN_SECONDS} seconds")
                     time.sleep(WAIT_PATCH_NOTIFICATION_DIRECTORY_TIMEOUT_IN_SECONDS)
-                    _retry_check_for_folder_counter -= 1
+                _retry_check_for_folder_counter -= 1
+
+            # Determine and return local execution status based on notifications directory
+            _exit_code = PATCH_SUCCESS_EXIT_CODE
+            _has_files = False
+            if os.path.exists(_notifications_dir):
+                _cmd_list = []
+                _cmd_list.append(["ls", _notifications_dir])
+                _cmd_list.append(["wc", "-l"])
+                _rc, _output = runInfraPatchCommandsLocally(_cmd_list)
+                try:
+                    _has_files = int(str(_output).strip()) > 0
+                except Exception:
+                    _has_files = False
+            if _has_files:
+                self.mPatchLogInfo(f"Patch notification log location : '{_notifications_dir}' found.")
+            else:
+                if self.mGetTarget() == PATCH_DOMU:
+                    _exit_code = NO_PATCHMGR_RESPONSE_DETECTED_ON_DOMU
+                else:
+                    _exit_code = NO_PATCHMGR_RESPONSE_DETECTED
+                _suggestion_msg = f"Patch notification log location : {_notifications_dir} was not found on Node : {_launch_node} even after the timeout was reached. Infra patch request will be terminated."
+                self.mGetHandler().mAddError(_exit_code, _suggestion_msg)
+            self.mSetStatusCode(aStatusCode=_exit_code)
+            return _exit_code
+
         except Exception as e:
             self.mPatchLogError(f"Error while executing patchmgr commands. \n\n {str(e)}")
             self.mPatchLogError(traceback.format_exc())
-
+            if self.mGetTarget() == PATCH_DOMU:
+                _exit_code = NO_PATCHMGR_RESPONSE_DETECTED_ON_DOMU
+            else:
+                _exit_code = NO_PATCHMGR_RESPONSE_DETECTED
+            return _exit_code
 
     def __mWaitForLocalPatchMgrCmdExecutionToComplete(self, aInputListFile=None, aPatchStates=None):
         """

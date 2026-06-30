@@ -4,7 +4,7 @@
 #
 # clunetworkvalidations.py
 #
-# Copyright (c) 2021, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      clunetworkvalidations.py - <one-line expansion of the name>
@@ -16,6 +16,9 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    bhpati      06/01/26 - Bug 39404491 - OCIEXACC: EXACLOUD: PREVMCHECKS:
+#                           EXACLOUD TRYING TO ALWAYS SET 100GB SPEED,
+#                           REGARDLESS OF ACTUAL LINK SPEED
 #    jfsaldan    02/12/25 - Bug 37570873 - EXADB-D|XS -- EXACLOUD |
 #                           PROVISIONING | REVIEW AND ORGANIZE PREVM_CHECKS AND
 #                           PREVM_SETUP STEPS
@@ -247,9 +250,37 @@ class ebNetworkValidations():
                         ebLogInfo(f"{_dom0}: {_ethx} link speed is {_current_speed}")
 
                         if _base_speed != _current_speed:
-                            if _dom0 not in interfaces_to_update:
-                                interfaces_to_update[_dom0] = {}
-                            interfaces_to_update[_dom0][_ethx] = (_base_speed, True)  # Use autoneg on
+                            _, _o, _ = _node.mExecuteCmd(f"/usr/sbin/ethtool {_ethx} ")
+                            _advertise_modes, _supported_modes = self._ethConfig.mGetSupportedSpeeds(_o.readlines())
+                            _link_modes = []
+                            if 'Not reported' in _advertise_modes:
+                                _link_modes.extend(_supported_modes)
+                                ebLogTrace(f"Supported link modes {_link_modes}")
+                            else:
+                                _link_modes.extend(_advertise_modes)
+                                ebLogTrace(f"Advertised link modes:{_link_modes}")
+
+                            _link_speeds = sorted(list(set(self._ethConfig.mSplitLinkMode(_link_modes))), reverse=True)
+                            _supported_speeds = sorted(list(set(self._ethConfig.mSplitLinkMode(_supported_modes))), reverse=True)
+                            _valid_speeds = [speed for speed in _link_speeds if speed in _supported_speeds]
+                            ebLogInfo(f"{_dom0}: {_ethx} advertised link speeds {_link_speeds}")
+                            ebLogInfo(f"{_dom0}: {_ethx} supported link speeds {_supported_speeds}")
+
+                            if _base_speed in _valid_speeds:
+                                _target_speed = _base_speed
+                            # If the base_speed is unsupported, fall back to the highest supported speed only when interface is not already at that speed.
+                            elif _valid_speeds and _current_speed != _valid_speeds[0]:
+                                _target_speed = _valid_speeds[0]
+                                ebLogInfo(f"{_dom0}: {_ethx} current speed is: {_current_speed}  will be updated to supported link speed {_target_speed}")
+                            else:
+                                _target_speed = None
+                                ebLogInfo(f"{_dom0}: {_ethx} already at supported link speed {_current_speed}")
+
+                            # Only queue an update when the interface needs to move to a supported speed.
+                            if _target_speed:                                              
+                                if _dom0 not in interfaces_to_update:
+                                    interfaces_to_update[_dom0] = {}
+                                interfaces_to_update[_dom0][_ethx] = (_target_speed, True)  # Use autoneg on
                     else:
                         _cmd = f"/bin/cat /etc/sysconfig/network-scripts/ifcfg-{_ethx} | /bin/grep ETHTOOL_OPTS |  /bin/cut -d '=' -f 2"
                         _, _o, _ = _node.mExecuteCmd(_cmd)

@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    dekuckre    05/12/26 - add unit coverage for cpu-resize lock flow
 #    remamid     09/24/25 - Add unittest for bugs 38347575,38390358
 #    avimonda    09/06/25 - Bug 38205634 - OCI: EXACC: SOFTRESETEXACCVMNODE
 #                           FAILS ON EXACLOUD WITH "ERROR WHILE
@@ -37,7 +38,7 @@ from exabox.log.LogMgr import ebLogInfo
 from exabox.ovm.vmcontrol import exaBoxOVMCtrl, ebVgLifeCycle
 from exabox.ovm.clucontrol import exaBoxCluCtrl
 import warnings
-from unittest.mock import patch, MagicMock, PropertyMock, mock_open
+from unittest.mock import patch, MagicMock, PropertyMock, mock_open, Mock, ANY
 from ast import literal_eval
 import time
  
@@ -294,6 +295,48 @@ class ebTestexaBoxOVMCtrl(ebTestClucontrol):
         print(_stop_time-_start_time)
         self.assertLessEqual(_stop_time-_start_time, 400)
         currentNode.mDisconnect()
+
+    def test_mShutdownVM_request_lock_skips_dom0_relock(self):
+        ebLogInfo("")
+        ebLogInfo("Running unit test on ebVgLifeCycle.mDispatchEvent shutdown request lock reuse.")
+
+        vm_handle = ebVgLifeCycle()
+        vmctrl = Mock()
+        vmctrl.mCheckVMId.return_value = ("guestvm1", True)
+        vmctrl.mGetDom0.return_value = "dom0"
+        vmctrl.mAutoStartVM.return_value = 0
+        vmctrl.mShutdownVM.return_value = 0
+        vm_handle._ebVgLifeCycle__vmctrl = vmctrl
+
+        request_lock = Mock()
+        request_lock.get_request_state.return_value = 1
+        cluctrl = Mock()
+        cluctrl.mGetRemoteLock.return_value = request_lock
+
+        node = Mock()
+        node.mFileExists.return_value = True
+
+        class DummyCtx(object):
+            def __enter__(self_inner):
+                return node
+            def __exit__(self_inner, exc_type, exc, tb):
+                return False
+
+        with patch("exabox.ovm.vmcontrol.connect_to_host", return_value=DummyCtx()), \
+             patch("exabox.ovm.vmcontrol.RemoteLock") as remote_lock_cls, \
+             patch.object(vm_handle, "mCheckCMDAndReboot", return_value=False):
+            rc = vm_handle.mDispatchEvent(
+                aCmd='shutdown',
+                aOptions=MagicMock(),
+                aVMId="guestvm1",
+                aCluCtrlObj=cluctrl
+            )
+
+        self.assertEqual(rc, 0)
+        remote_lock_cls.assert_not_called()
+        request_lock.get_request_state.assert_called_once_with()
+        vmctrl.mShutdownVM.assert_called_once_with("guestvm1", aOptions=ANY)
+        node.mExecuteCmdLog.assert_called_once()
 
     def test_mRebootVM(self):
 

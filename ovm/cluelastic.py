@@ -15,6 +15,8 @@ NOTE:
 History:
 
     MODIFIED   (MM/DD/YY)
+    rajsag      05/29/26 - Bug 39283211 - support X11 no-XRMEM cell types
+    pbellary    04/23/26 - Bug 39238514 - EXACS:26.1.0:X11M:ADD CELL SUPPORT FOR EXASCALE WITH EF MEDIA TYPE
     pbellary    11/24/25 - Enh 38685113 - EXASCALE: POST CONFIGURE EXASCALE EXACLOUD SHOULD FETCH STRE0/STE1 FROM DOM0
     aypaul      05/28/25 - Bug#37903672 Use existing patch config path to save
                            latest xml configuration.
@@ -71,6 +73,7 @@ from exabox.ovm.bmc import XMLProcessor
 from exabox.ovm.clumisc import ebMiscFx, mPatchPrivNetworks
 from exabox.ovm.cluencryption import isEncryptionRequested, patchXMLForEncryption
 from exabox.ovm.utils.clu_utils import ebCluUtils
+from exabox.ovm.utils.cellcli_utils import ebCellCliUtils
 from exabox.utils.node import connect_to_host,node_exec_cmd_check
 import json
 import hashlib
@@ -400,6 +403,7 @@ def patchOedaXmlForElastic(
     xmlv1reinjector = V1OedaXMLRebuilder()
     xmlv1reinjector.SavePropertiesInitialXML(aXmlPath)
     _clu_utils = ebCluUtils(_ebox)
+    _cellcli_utils = ebCellCliUtils(_ebox)
     _options = _ebox.mGetArgsOptions()
     _xs_cell_attach = False
     if _options is not None and _ebox.mGetCmd() in ['elastic_info']:
@@ -474,11 +478,21 @@ def patchOedaXmlForElastic(
                      f'new_cells={new_cell_names}; '
                      f'curr_cells={aCurrentCells}'))
 
-            ebLogVerbose("Source cell: %s" % (src_cell_name))
+            ebLogTrace("Source cell: %s" % (src_cell_name))
+
+            _cells_json = {'cells': []}
+            for cell in add_cells:
+                _cell_entry = dict(cell)
+                _rack_info = cell.get('rack_info', {})
+                _cell_entry['type'] = _cellcli_utils.mGetMachineType(
+                    cell['hostname'],
+                    aRackItemDescription=_rack_info.get('description'),
+                    aCellType=cell.get('model'))
+                _cells_json['cells'].append(_cell_entry)
 
             oedacli_mgr.mAddCell(
                 src_cell_name, aSrcXml=aXmlPath, aDestXml=aXmlPath,
-                aJson={'cells': add_cells}, aDeploy=False, aKVM=aIsKvm,
+                aJson=_cells_json, aDeploy=False, aKVM=aIsKvm,
                 aCluName=aClusterName, aWait="false", aStep="CONFIG_CELL")
             for cell in add_cells:
                 _dns_servers, _ntp_servers = _clu_utils.mExtractNtpDnsPayload(cell)
@@ -507,7 +521,7 @@ def patchOedaXmlForElastic(
 
         # delete cells
         cell_names = [c['hostname'] for c in aReshapeConf['DELETE_CELLS']]
-        ebLogInfo(f"CellList from input payload: {cell_names}")
+        ebLogInfo(f"DeleteCell CellList from input payload: {cell_names}")
         if _ociexacc and _xs_cell_attach:
             #For exacc:
             #elastic_info should remove new cell from the inputXML, when infra is in attached state
@@ -946,4 +960,3 @@ class V1OedaXMLRebuilder(object):
                     _outxml.remove_element('guestMemory',_outdomu)
                     _outxml.remove_element('guestLocalDiskSize',_outdomu)
                     _outxml.writeXml(_outxml_filename)
-

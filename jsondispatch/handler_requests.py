@@ -4,7 +4,7 @@
 #
 # SLA.py
 #
-# Copyright (c) 2022, 2023, Oracle and/or its affiliates.
+# Copyright (c) 2022, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      requests.py - requests jsondispatch endpoint
@@ -52,6 +52,7 @@ class RequestsHandler(JDHandler):
     def mExecute(self):
 
         _requests = []
+        _args = None
 
         if self.mGetOptions().jsonconf is None:
             _requests = self.mGetDB().mFilterRequests()

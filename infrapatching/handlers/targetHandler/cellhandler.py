@@ -17,8 +17,13 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    sdevasek    05/26/26 - Bug 39438587 - NON-ROLLING CELL GMR VMS ARE  
+#                           NOT BROUGHT UP POST CELL NON-ROLLING GMR PATCHING
+#    mirrodri    05/05/26 - Bug 39149806 - EXACC GEN 2  PATCHING  OPTIMIZE 
+#                           THE NUMBER OF PATCHMGR CLEANUPS  
 #    sdevasek    04/08/26 - Enh 39143076 - ADDRESS VOXIO CODEV AGENT SCAN
 #                           ISSUES OBSERVED IN TARGETHANLDER FILES
+#    sdevasek    03/23/26 - Enh 38521465 Skip cleanup patchmgr in mock
 #    nelango     02/19/26 - Bug 38930043 : ssh key removal in cells during ecra
 #                           switchover
 #    nelango     02/01/26 - Bug 38901967: No ilom service state disabling
@@ -28,6 +33,8 @@
 #                           EXASCALE IS ENABLE IN THE INFRA.
 #    jyotdas     10/31/25 - Bug 38575316 - Parallelise the dom0 shutdown across
 #                           all nodes while non-rolling qmr patching.
+#    mirrodri    10/12/25 - Enh 38521465 PROVIDE OPTIONS TO MOCK PATCHMGR
+#                           COMMAND ON AUTOMATION ENVIRONMENTS
 #    mirrodri    10/28/25 - Bug 38513100 - CHECK EDV AND ESNP STATUS BEFORE
 #                           SHUTDOWN OF EDV AND ESNP SERVICE ON DOM0 DURING
 #                           CELL NON-ROLLING UPGRADE.
@@ -687,6 +694,9 @@ class CellHandler(TargetHandler):
         _dom0 = exaBoxNode(get_gcontext())
         self.mSetConnectionUser(_dom0)
         try:
+            if self.mIsMockEnabledByEcra():
+                self.mPatchLogInfo("Mock mode: skipping patchmgr cleanup execution.")
+                return PATCH_SUCCESS_EXIT_CODE
             _dom0.mConnect(aHost=self.mGetDom0ToPatchcellSwitches())
             # Execute cleanup
             _dom0.mExecuteCmdAsync(_cell_cleanup_cmd, aCallbacks)
@@ -704,10 +714,12 @@ class CellHandler(TargetHandler):
                         f"Performing Patchmgr cleanup for {_counter_to_display_iteration_count:d} iteration(s), maximum number of retries = {_max_retry_check_for_folder_counter:d}")
                     if _exit_code != 0:
                         # Retry cleanup. See bug 23341346
-                        self.mPatchLogError(
-                            f"Cleanup failed with exit_code={_exit_code:d}. Waiting for {SLEEP_CELL_PATCHMGR_CLEANUP_IN_SECONDS:d} seconds before retry.")
-                        sleep(SLEEP_CELL_PATCHMGR_CLEANUP_IN_SECONDS)
+                        # Decrement first so we only sleep when another retry is still pending.
                         _retry_check_for_folder_counter -= 1
+                        if _retry_check_for_folder_counter > 0:
+                            self.mPatchLogError(
+                                f"Cleanup failed with exit_code={_exit_code:d}. Waiting for {SLEEP_CELL_PATCHMGR_CLEANUP_IN_SECONDS:d} seconds before retry.")
+                            sleep(SLEEP_CELL_PATCHMGR_CLEANUP_IN_SECONDS)
                     else:
                         self.mPatchLogInfo(
                             f"Patchmgr cleanup succeeded after {_counter_to_display_iteration_count:d} retries")
@@ -744,6 +756,7 @@ class CellHandler(TargetHandler):
             _dom0domuListMap = {}
             for _dom0 in self.mGetCustomizedDom0List():
                 _domUs_within_dom0 = self.mGetDomUListFromXml(_dom0, aFromXmList=True)
+                self.__dom0s_list[_dom0] = _domUs_within_dom0
                 _dom0domuListMap[_dom0] = _domUs_within_dom0
                 for _domu in _domUs_within_dom0:
                     _dom0domU.append([_dom0,_domu])
@@ -765,7 +778,6 @@ class CellHandler(TargetHandler):
             _process = None
             for _dom0 in self.mGetCustomizedDom0List():
                 self.mUpdatePatchStatus(True, STEP_START_VMS, _dom0)
-                self.__dom0s_list[_dom0] = self.mGetDomUListFromXml(_dom0, aFromXmList=True)
                 self.mPatchLogInfo(f"Dom0 = {_dom0}, DomUs within dom0 = {self.__dom0s_list[_dom0]}")
                 _process = ProcessStructure(self.mGetCluPatchCheck().mManageVMs,
                                             [_dom0, self.__dom0s_list[_dom0], aAction, _rc_status], _dom0)
@@ -1339,6 +1351,9 @@ class CellHandler(TargetHandler):
                 _ret = CELL_PING_FAILED
                 self.mAddError(_ret, _suggestion_msg)
                 return False, _ret
+
+            if self.mIsMockEnabledByEcra(): 
+                return True, ""
 
             # Check target version
             _rc = self.mGetCluPatchCheck().mCheckTargetVersion(aCell, PATCH_CELL, aData['version'])

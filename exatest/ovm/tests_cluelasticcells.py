@@ -16,6 +16,13 @@
 #      NA
 #
 #    MODIFIED   (MM/DD/YY)
+#    rajsag      05/29/26 - Bug 39283211 - support X11 no-XRMEM cell types
+#    rajsag      05/28/26 - Fix storage precision XML tests
+#    bhpati      05/04/26 - Bug 39122149 - OCI: EXACS:Get GIHOME from
+#                           /etc/oracle/olr.loc
+#    nelango     04/22/26 - Bug 39229861: Implement unittestcase for cellip
+#                           permission
+#    rajsag      04/15/26 - Add unit tests for storage precision
 #    rajsag      04/01/26 - er 38717477 - exacs:25.2.2.2: delete storage with
 #                           exascale configure infrastructure fails at
 #                           deleteexascalecelltask: "keyerror: 'operation'
@@ -66,6 +73,7 @@ import io
 import json
 import unittest
 import contextlib
+import itertools
 from unittest import mock
 from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
 
@@ -75,7 +83,7 @@ from exabox.core.Node import exaBoxNode
 
 from exabox.log.LogMgr import ebLogInfo
 
-from exabox.ovm.cluelasticcells import ebCluElasticCellManager, MAX_RETRY, RETRY_WAIT_TIME
+from exabox.ovm.cluelasticcells import ebCluElasticCellManager, MAX_RETRY, RETRY_WAIT_TIME, CELLIP_PATH
 
 from unittest.mock import patch, MagicMock, PropertyMock, mock_open
 import warnings
@@ -112,6 +120,25 @@ REMOVED_CELLS_PAYLOAD = {
         ]
     }
 }
+
+
+def _make_connect_host_context(mode="644"):
+    _node = MagicMock()
+
+    def _execute(cmd, *args, **kwargs):
+        if "/bin/stat" in cmd:
+            return (0, io.StringIO(f"{mode}\n"), None)
+        if "/bin/chmod" in cmd:
+            return (0, io.StringIO(""), None)
+        return (0, io.StringIO(""), None)
+
+    _node.mExecuteCmd.side_effect = _execute
+    _node.mGetCmdExitStatus.return_value = 0
+
+    _ctx = MagicMock()
+    _ctx.__enter__.return_value = _node
+    _ctx.__exit__.return_value = False
+    return _ctx
 
 REMOVED_CELLS_PAYLOAD_XS = {
     "exascale": {
@@ -337,12 +364,113 @@ CHECK_CELL_DISKS = """
 
 class testOptions(object): pass
 
+from exabox.ovm.utils.cellcli_utils import ebCellCliUtils
+
+class ebTestCellCliUtils(unittest.TestCase):
+
+    def setUp(self):
+        self._mock_cluctrl = MagicMock()
+        self._utils = ebCellCliUtils(self._mock_cluctrl)
+
+    def test_mGetNoXrmemMachineTypeFromDescription_detects_x11_hc_and_ef(self):
+        self.assertEqual(
+            self._utils.mGetNoXrmemMachineTypeFromDescription("Exadata X11-HC Cell Node 22TB"),
+            "X11MHCNOXRMEM")
+        self.assertEqual(
+            self._utils.mGetNoXrmemMachineTypeFromDescription("Exadata X11-EF Cell Node 36TB"),
+            "X11MEFNOXRMEM")
+        self.assertEqual(
+            self._utils.mGetNoXrmemMachineTypeFromDescription("Exadata X11M-EF Cell Node 36TB"),
+            "")
+
+    def test_mGetMachineType_returns_noxrmem_type_from_rack_item_description(self):
+        with mock.patch.object(self._utils, 'mGetCellRackItemDescription',
+                               return_value="Exadata X11-HC Cell Node 22TB"), \
+             mock.patch.object(self._utils, 'mValidateX11NoXrmemMemory') as mock_validate, \
+             mock.patch.object(self._utils, 'mIsEFRack') as mock_is_ef:
+            mock_validate.return_value = True
+            _machine_type = self._utils.mGetMachineType("cell01")
+
+        self.assertEqual(_machine_type, "X11MHCNOXRMEM")
+        mock_validate.assert_called_once_with("cell01")
+        mock_is_ef.assert_not_called()
+
+    def test_mGetMachineType_returns_noxrmem_type_from_payload_hint(self):
+        with mock.patch.object(self._utils, 'mGetCellRackItemDescription') as mock_desc, \
+             mock.patch.object(self._utils, 'mValidateX11NoXrmemMemory') as mock_validate:
+            mock_validate.return_value = True
+            _machine_type = self._utils.mGetMachineType("cell01", aCellType="X11-EF")
+
+        self.assertEqual(_machine_type, "X11MEFNOXRMEM")
+        mock_validate.assert_called_once_with("cell01")
+        mock_desc.assert_not_called()
+
+    def test_mGetMachineType_preserves_xrmem_ef_mapping(self):
+        self._mock_cluctrl.mGetExadataDom0Model.return_value = "X11"
+        with mock.patch.object(self._utils, 'mGetCellRackItemDescription',
+                               return_value="Exadata X11M-EF Cell Node 36TB"), \
+             mock.patch.object(self._utils, 'mValidateX11NoXrmemMemory') as mock_validate, \
+             mock.patch.object(self._utils, 'mIsEFRack', return_value=True):
+            _machine_type = self._utils.mGetMachineType("cell01")
+
+        self.assertEqual(_machine_type, "X11MEF")
+        mock_validate.assert_not_called()
+
+    def test_mParseOnlineMemoryGb_handles_lsmem_bytes_and_units(self):
+        self.assertAlmostEqual(
+            self._utils.mParseOnlineMemoryGb("Total online memory: 274877906944"),
+            256.0)
+        self.assertAlmostEqual(
+            self._utils.mParseOnlineMemoryGb("Total online memory: 252.5G"),
+            252.5)
+        self.assertAlmostEqual(
+            self._utils.mParseOnlineMemoryGb("Total online memory: 1T"),
+            1024.0)
+
+    def test_mValidateX11NoXrmemMemory_returns_false_for_large_memory(self):
+        with mock.patch.object(self._utils, 'mGetCellOnlineMemoryGb', return_value=512):
+            self.assertFalse(self._utils.mValidateX11NoXrmemMemory("cell01"))
+
+        self._mock_cluctrl.mUpdateErrorObject.assert_not_called()
+
+
 class ebTestCluElasticCells(ebTestClucontrol):
 
     @classmethod
     def setUpClass(self):
         super(ebTestCluElasticCells, self).setUpClass(aUseOeda = True, aGenerateDatabase = True, isElasticOperation="add_storage")
         warnings.filterwarnings("ignore")
+        self._connect_patcher = patch(
+            'exabox.ovm.cluelasticcells.connect_to_host',
+            side_effect=lambda *args, **kwargs: _make_connect_host_context()
+        )
+        self._connect_patcher.start()
+        self._escli_connect_patcher = patch(
+            'exabox.ovm.cluelasticcells.connect_to_host',
+            side_effect=lambda *args, **kwargs: _make_connect_host_context()
+        )
+        self._escli_connect_patcher.start()
+        self._cellcli_patcher = patch('exabox.ovm.cluelasticcells.ebCellCliUtils')
+        self._mock_cellcli_cls = self._cellcli_patcher.start()
+        self._mock_cellcli_instance = MagicMock()
+        self._mock_cellcli_instance.mIsEFRack.return_value = False
+        self._mock_cellcli_cls.return_value = self._mock_cellcli_instance
+        self._cellcli_method_patcher = patch(
+            'exabox.ovm.cluelasticcells.ebCluElasticCellManager.mGetCellCliUtils',
+            return_value=self._mock_cellcli_instance
+        )
+        self._cellcli_method_patcher.start()
+        self._dom0_model_patcher = patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetExadataDom0Model', return_value='X10')
+        self._dom0_model_patcher.start()
+
+    @classmethod
+    def tearDownClass(self):
+        self._dom0_model_patcher.stop()
+        self._cellcli_method_patcher.stop()
+        self._cellcli_patcher.stop()
+        self._escli_connect_patcher.stop()
+        self._connect_patcher.stop()
+        super(ebTestCluElasticCells, self).tearDownClass()
 
     def _setup_execute_cell_clone_context(self, *, is_adbs=False, is_xs=False, is_kvm=False, is_zdlra=False):
         stack = contextlib.ExitStack()
@@ -376,12 +504,13 @@ class ebTestCluElasticCells(ebTestClucontrol):
 
         return stack, storage_mock, clusters_mock, clubox
 
+    @mock.patch('exabox.ovm.cluelasticcells.ebCellCliUtils.mGetMachineType', return_value='X11MEF')
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mUpdateClusterName')
     @patch('exabox.ovm.clucontrol.node_cmd_abs_path_check')
     @patch('exabox.utils.node.exaBoxNode.mGetCmdExitStatus', return_value=0)
     @patch('exabox.utils.node.exaBoxNode.mExecuteCmdLog')
     @patch('exabox.utils.node.exaBoxNode.mExecuteCmd', side_effect = iter([(0,io.StringIO(""),None),(0,io.StringIO("+ASM1"),None),(0,io.StringIO("/u01/app/19.0.0.0/grid"),None),(0,io.StringIO(KFOD_CMD_OP),None)]))
-    def test_validateKfodCmd(self,mock_pathcheck1,mock_exitstatus,mock_executelog,mock_execute, mock_clusterName):
+    def test_validateKfodCmd(self, mock_machine_type, mock_pathcheck1, mock_exitstatus, mock_executelog, mock_execute, mock_clusterName):
         ebLogInfo("")
         ebLogInfo("Running unit test on cluelasticcells.validateKfodCmd")
         _cmds = {
@@ -400,11 +529,13 @@ class ebTestCluElasticCells(ebTestClucontrol):
         _elastic_cell_manager = ebCluElasticCellManager(self.mGetClubox(), fullOptions)
         _elastic_cell_manager.validateKfodCmd()
 
+    @mock.patch('exabox.ovm.cluelasticcells.ebCellCliUtils.mGetMachineType', return_value='X11MEF')
+    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetGridHome', return_value=("/u01/app/19.0.0.0/grid", "+ASM1"))
     @patch('exabox.ovm.clucontrol.node_cmd_abs_path_check')
     @patch('exabox.utils.node.exaBoxNode.mGetCmdExitStatus', return_value=0)
     @patch('exabox.utils.node.exaBoxNode.mExecuteCmdLog')
-    @patch('exabox.utils.node.exaBoxNode.mExecuteCmd', side_effect = iter([(0,io.StringIO(""),None),(0,io.StringIO("ASM1"),None),(0,io.StringIO("/u01/app/19.0.0.0/grid"),None),(0,io.StringIO(""),None),(0,io.StringIO("ASM1"),None),(0,io.StringIO("/u01/app/19.0.0.0/grid"),None),(0,io.StringIO(""),None)]))
-    def test_mCellOperationCheck(self,mock_pathcheck1,mock_exitstatus,mock_executelog,mock_execute):
+    @patch('exabox.utils.node.exaBoxNode.mExecuteCmd')
+    def test_mCellOperationCheck(self, mock_execute, mock_executelog, mock_exitstatus, mock_pathcheck1, mock_get_grid_home, mock_machine_type):
         ebLogInfo("")
         ebLogInfo("Running unit test on cluelasticcells.mCellOperationCheck")
         _cmds = {
@@ -441,7 +572,15 @@ class ebTestCluElasticCells(ebTestClucontrol):
         }
         self.mPrepareMockCommands(_cmds)
         fullOptions = copy.deepcopy(self.mGetClubox().mGetArgsOptions())
-        mock_exitstatus.side_effect=iter([None,None,None,None,None,None,ExacloudRuntimeError(0x0802, 0xA, "ADD_CELL")])
+        mock_exitstatus.side_effect = iter([None] * 12 + [ExacloudRuntimeError(0x0802, 0xA, "ADD_CELL"), ExacloudRuntimeError(0x0802, 0xA, "ADD_CELL")])
+        mock_pathcheck1.side_effect = lambda *args, **kwargs: '/usr/bin/srvctl'
+        mock_get_grid_home.side_effect = [
+            ("/u01/app/19.0.0.0/grid", "+ASM1"),
+            ("/u01/app/19.0.0.0/grid", "+ASM1"),
+            ExacloudRuntimeError(0x0802, 0xA, "ADD_CELL")
+        ]
+        mock_execute.return_value = (0, io.StringIO(""), None)
+        mock_executelog.return_value = None
         _elastic_cell_manager = ebCluElasticCellManager(self.mGetClubox(), fullOptions)
         _elastic_cell_manager.mCellOperationCheck("iad103712exdcl05.iad103712exd.adminiad1.oraclevcn.com", "ADD_CELL")
         #DELETE_CELL check fail
@@ -449,7 +588,8 @@ class ebTestCluElasticCells(ebTestClucontrol):
         #ADD_CELL check fail
         self.assertRaises(ExacloudRuntimeError, _elastic_cell_manager.mCellOperationCheck, "iad103712exdcl05.iad103712exd.adminiad1.oraclevcn.com", "ADD_CELL")
 
-    def test_mPreAddCellSetup(self):
+    @mock.patch('exabox.ovm.cluelasticcells.ebCellCliUtils.mGetMachineType', return_value='X11MEF')
+    def test_mPreAddCellSetup(self, mock_machine_type):
         ebLogInfo("")
         ebLogInfo("Running unit test on cluelasticcells.mPreAddCellSetup")
         _cmds = {
@@ -467,7 +607,8 @@ class ebTestCluElasticCells(ebTestClucontrol):
         _elastic_cell_manager = ebCluElasticCellManager(self.mGetClubox(), fullOptions)
         _elastic_cell_manager.mPreAddCellSetup(["iad103706exdcl05.iad103712exd.adminiad1.oraclevcn.com"])
 
-    def test_mPreAddCellSetup_multiple_cells(self):
+    @mock.patch('exabox.ovm.cluelasticcells.ebCellCliUtils.mGetMachineType', return_value='X11MEF')
+    def test_mPreAddCellSetup_multiple_cells(self, mock_machine_type):
         ebLogInfo("")
         ebLogInfo("Running unit test on cluelasticcells.mPreAddCellSetup for multiple cells")
         _cmds = {
@@ -493,7 +634,8 @@ class ebTestCluElasticCells(ebTestClucontrol):
         _elastic_cell_manager = ebCluElasticCellManager(self.mGetClubox(), fullOptions)
         _elastic_cell_manager.mPreAddCellSetup(["iad103706exdcl05.iad103712exd.adminiad1.oraclevcn.com", "iad103706exdcl06.iad103712exd.adminiad1.oraclevcn.com"])
 
-    def test_mSyncupCells(self):
+    @mock.patch('exabox.ovm.cluelasticcells.ebCellCliUtils.mGetMachineType', return_value='X11MEF')
+    def test_mSyncupCells(self, mock_machine_type):
         ebLogInfo("")
         ebLogInfo("Running unit test on cluelasticcells.mSyncupCells")
         _cmds = {
@@ -504,6 +646,7 @@ class ebTestCluElasticCells(ebTestClucontrol):
                     ],
                     [
                         exaMockCommand("cat /etc/oratab", aRc=0, aStdout= "/u01/app/19.0.0.0/grid", aPersist=True),
+                        exaMockCommand(re.escape("cat /etc/oracle/olr.loc | grep 'crs_home' | cut -f 2 -d '='"), aStdout="/u01/app/19.0.0.0/grid"),
                         exaMockCommand(re.escape("export ORACLE_HOME=/u01/app/19.0.0.0/grid; $ORACLE_HOME/bin/oraversion -baseVersion"), aRc=0, aStdout="19.0.0.0.0" ,aPersist=True),
                         exaMockCommand(re.escape("export ORACLE_HOME=/u01/app/19.0.0.0/grid; $ORACLE_HOME/bin/orabase"), aRc=0, aStdout="/u01/app/grid" ,aPersist=True),
                     ],
@@ -557,14 +700,17 @@ class ebTestCluElasticCells(ebTestClucontrol):
         fullOptions = copy.deepcopy(self.mGetClubox().mGetArgsOptions())
         fullOptions.steplist = "POST_ADDCELL_CHECK"
         _elastic_cell_manager = ebCluElasticCellManager(self.mGetClubox(), fullOptions)
+        connect_ctx = _make_connect_host_context()
         with patch ('exabox.ovm.cluelasticcells.ebSelinuxControls.mGetSELinuxMode', return_value=True),\
              patch ('exabox.ovm.cluelasticcells.ebSelinuxControls.mProcessSELinuxUpdate', return_value=0),\
-             patch ('exabox.ovm.clucontrol.exaBoxCluCtrl.IsZdlraProv', return_value=True):
+             patch ('exabox.ovm.clucontrol.exaBoxCluCtrl.IsZdlraProv', return_value=True),\
+             patch('exabox.ovm.cluelasticcells.connect_to_host', return_value=connect_ctx):
                 _return_code = _elastic_cell_manager.mCloneCell(fullOptions)
                 self.assertEqual(_return_code, 0)
         with patch ('exabox.ovm.cluelasticcells.ebSelinuxControls.mGetSELinuxMode', return_value=True),\
              patch ('exabox.ovm.cluelasticcells.ebSelinuxControls.mProcessSELinuxUpdate', side_effect=ExacloudRuntimeError(0x0121, 0xA, "Failed to process SELinux update.")),\
-             patch ('exabox.ovm.clucontrol.exaBoxCluCtrl.IsZdlraProv', return_value=True):
+             patch ('exabox.ovm.clucontrol.exaBoxCluCtrl.IsZdlraProv', return_value=True),\
+             patch('exabox.ovm.cluelasticcells.connect_to_host', return_value=connect_ctx):
                 _return_code = _elastic_cell_manager.mCloneCell(fullOptions)
                 self.assertEqual(_return_code, 0)
 
@@ -573,27 +719,32 @@ class ebTestCluElasticCells(ebTestClucontrol):
     @patch('exabox.ovm.clucontrol.node_cmd_abs_path_check')
     @patch('exabox.utils.node.exaBoxNode.mGetCmdExitStatus', return_value=0)
     @patch('exabox.utils.node.exaBoxNode.mExecuteCmdLog')
-    @patch('exabox.utils.node.exaBoxNode.mExecuteCmd', side_effect = iter([(0,io.StringIO(""),None),(0,io.StringIO("ASM1"),None),(0,io.StringIO("/u01/app/19.0.0.0/grid"),None),(0,io.StringIO(""),None),(0,io.StringIO(""),None),(0,io.StringIO("no rows selected\n"),None)]))
-    def test_mCloneCell1(self, mock_mAddCell,mock_pathcheck1,mock_exitstatus,mock_executelog,mock_execute,mock_clusterName):
+    def test_mCloneCell1(self, mock_mAddCell,mock_pathcheck1,mock_exitstatus,mock_executelog,mock_clusterName):
 
         ebLogInfo("Running unit test on cluelasticcells.mCloneCell, step: WAIT_IF_REBALANCING")
-        _cmds = {
-            self.mGetRegexVm():
-                [
-                    [
-                        exaMockCommand("cat /var/opt/oracle/creg/grid/grid.ini | grep \"^sid\"", aRc=0, aStdout= "ASM1", aPersist=True),
-                        exaMockCommand("cat /var/opt/oracle/creg/grid/grid.ini | grep \"^oracle_home\"", aRc=0, aStdout= "/u01/app/19.0.0.0/grid", aPersist=True)
-                    ],
-                    [
-                        exaMockCommand("su - grid -c", aRc=0, aStdout= "no rows selected\n", aPersist=True)
-                    ]
-                ]
-        }
-        self.mPrepareMockCommands(_cmds)
-        fullOptions = copy.deepcopy(self.mGetClubox().mGetArgsOptions())
-        fullOptions.steplist = "WAIT_IF_REBALANCING"
-        _elastic_cell_manager = ebCluElasticCellManager(self.mGetClubox(), fullOptions)
-        _elastic_cell_manager.mCloneCell(fullOptions)
+        mock_pathcheck1.return_value = "/bin/ls"
+        exa_node_mock = MagicMock()
+        def _exec_side_effect(cmd, *args, **kwargs):
+            if "cat /var/opt/oracle/creg/grid/grid.ini" in cmd:
+                if "^sid" in cmd:
+                    return (0, io.StringIO("ASM1"), None)
+                if "^oracle_home" in cmd:
+                    return (0, io.StringIO("/u01/app/19.0.0.0/grid"), None)
+            if "sqlplus -s / as sysasm" in cmd:
+                return (0, io.StringIO("no rows selected\n"), None)
+            return (0, io.StringIO(""), None)
+
+        exa_node_mock.mExecuteCmd.side_effect = _exec_side_effect
+        exa_node_mock.mGetCmdExitStatus.return_value = 0
+        connect_ctx = _make_connect_host_context()
+        with patch('exabox.core.Node.exaBoxNode', return_value=exa_node_mock), \
+             patch('exabox.ovm.cluelasticcells.connect_to_host', return_value=connect_ctx), \
+             patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mGetGridHome', return_value=("/u01/app/19.0.0.0/grid", "+ASM1")), \
+             patch('exabox.ovm.cluelasticcells.exaBoxNode', return_value=exa_node_mock):
+            fullOptions = copy.deepcopy(self.mGetClubox().mGetArgsOptions())
+            fullOptions.steplist = "WAIT_IF_REBALANCING"
+            _elastic_cell_manager = ebCluElasticCellManager(self.mGetClubox(), fullOptions)
+            _elastic_cell_manager.mCloneCell(fullOptions)
 
     @mock.patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mUpdateClusterName')
     @mock.patch("exabox.tools.oedacli.OedacliCmdMgr.mAddCell")
@@ -688,7 +839,9 @@ class ebTestCluElasticCells(ebTestClucontrol):
         fullOptions = copy.deepcopy(self.mGetClubox().mGetArgsOptions())
         fullOptions.steplist = "SAVE_DG_SIZES"
         _elastic_cell_manager = ebCluElasticCellManager(self.mGetClubox(), fullOptions)
-        _elastic_cell_manager.mCloneCell(fullOptions)
+        connect_ctx = _make_connect_host_context()
+        with patch('exabox.ovm.cluelasticcells.connect_to_host', return_value=connect_ctx):
+            _elastic_cell_manager.mCloneCell(fullOptions)
 
     @mock.patch("exabox.ovm.cluelasticcells.ebCluElasticCellManager.mElasticAddNtpCellStatus")
     @mock.patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mUpdateClusterName')
@@ -780,7 +933,9 @@ class ebTestCluElasticCells(ebTestClucontrol):
         fullOptions.jsonconf['workflow_step'] = "RESIZE_DGS"
         self.mGetClubox().mSetPatchConfig(self.mGetClubox().mGetConfigPath())
         _elastic_cell_manager = ebCluElasticCellManager(self.mGetClubox(), fullOptions)
-        _elastic_cell_manager.mCloneCell(fullOptions)
+        connect_ctx = _make_connect_host_context()
+        with patch('exabox.ovm.cluelasticcells.connect_to_host', return_value=connect_ctx):
+            _elastic_cell_manager.mCloneCell(fullOptions)
 
     @mock.patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mUpdateClusterName')
     @mock.patch("exabox.tools.oedacli.OedacliCmdMgr.mDropCell")
@@ -925,7 +1080,9 @@ class ebTestCluElasticCells(ebTestClucontrol):
         fullOptions.jsonconf['workflow_step'] = "RESIZE_DGS"
         self.mGetClubox().mSetPatchConfig(self.mGetClubox().mGetConfigPath())
         _elastic_cell_manager = ebCluElasticCellManager(self.mGetClubox(), fullOptions)
-        _elastic_cell_manager.mCloneCell(fullOptions)
+        connect_ctx = _make_connect_host_context()
+        with patch('exabox.ovm.cluelasticcells.connect_to_host', return_value=connect_ctx):
+            _elastic_cell_manager.mCloneCell(fullOptions)
 
     @mock.patch("exabox.ovm.clucontrol.exaBoxCluCtrl.mUpdateErrorObject")
     def test_mClusterCellInfo(self, mock_mUpdateErrorObject):
@@ -1019,15 +1176,13 @@ class ebTestCluElasticCells(ebTestClucontrol):
         mock_oeda.mAddCell.assert_called_once()
         mock_db.import_file.assert_called_once_with('/tmp/patch.xml')
 
-    @mock.patch('exabox.ovm.cluelasticcells.ebCluUtils')
     @mock.patch('exabox.ovm.cluelasticcells.ebGetDefaultDB')
     @mock.patch('exabox.ovm.cluelasticcells.OedacliCmdMgr')
-    def test_mExecuteCellCloneAndSaveXml_workflow_data(self, mock_OedacliCmdMgr, mock_ebGetDefaultDB, mock_ebCluUtils):
+    def test_mExecuteCellCloneAndSaveXml_workflow_data(self, mock_OedacliCmdMgr, mock_ebGetDefaultDB):
         # Auto-generated test for mExecuteCellCloneAndSaveXml
         ebLogInfo("")
         mock_oeda = MagicMock()
         mock_OedacliCmdMgr.return_value = mock_oeda
-        mock_ebCluUtils.return_value = MagicMock()
         mock_db = MagicMock()
         mock_ebGetDefaultDB.return_value = mock_db
 
@@ -1065,8 +1220,72 @@ class ebTestCluElasticCells(ebTestClucontrol):
         kwargs = storage_mock.mPatchClusterDiskgroup.call_args[1]
         self.assertTrue(kwargs['aCreateSparse'])
         self.assertFalse(kwargs['aBackupDisk'])
-        self.assertEqual(kwargs['aTotalDGSize'], int((300 + 200 + 150) / 3))
+        self.assertEqual(kwargs['aTotalDGSize'], round((300 + 200 + 150) / 3, 2))
         self.assertNotIn('workflow_step', fullOptions.jsonconf['Workflow_data'])
+
+    @mock.patch('exabox.ovm.cluelasticcells.ebCellCliUtils')
+    @mock.patch('exabox.ovm.cluelasticcells.ebGetDefaultDB')
+    @mock.patch('exabox.ovm.cluelasticcells.OedacliCmdMgr')
+    def test_mExecuteCellCloneAndSaveXml_sets_machine_type_for_ef_rack(self, mock_OedacliCmdMgr, mock_ebGetDefaultDB, mock_ebCellCliUtils):
+        ebLogInfo("")
+        mock_oeda = MagicMock()
+        mock_OedacliCmdMgr.return_value = mock_oeda
+        mock_db = MagicMock()
+        mock_ebGetDefaultDB.return_value = mock_db
+        mock_escli = mock_ebCellCliUtils.return_value
+        mock_escli.mIsEFRack.return_value = True
+
+        fullOptions = copy.deepcopy(self.mGetClubox().mGetArgsOptions())
+        fullOptions.steplist = None
+        fullOptions.jsonconf = {}
+
+        _elastic_cell_manager = ebCluElasticCellManager(self.mGetClubox(), fullOptions, True)
+        _elastic_cell_manager._ebCluElasticCellManager__update_conf = {
+            'operation': 'ADD_CELL',
+            'cells': [{'hostname': 'iad1-cell1'}]
+        }
+
+        stack, _, _, clubox = self._setup_execute_cell_clone_context(is_kvm=True)
+        stack.enter_context(patch.object(clubox, 'mGetExadataDom0Model', return_value='X11'))
+
+        with stack:
+            rc = _elastic_cell_manager.mExecuteCellCloneAndSaveXml('CONFIG_CELL')
+
+        self.assertEqual(rc, 0)
+        mock_escli.mIsEFRack.assert_not_called()
+        self.assertNotIn('aMachineType', mock_oeda.mAddCell.call_args.kwargs)
+
+    @mock.patch('exabox.ovm.cluelasticcells.ebCellCliUtils')
+    @mock.patch('exabox.ovm.cluelasticcells.ebGetDefaultDB')
+    @mock.patch('exabox.ovm.cluelasticcells.OedacliCmdMgr')
+    def test_mExecuteCellCloneAndSaveXml_sets_machine_type_for_hc_rack(self, mock_OedacliCmdMgr, mock_ebGetDefaultDB, mock_ebCellCliUtils):
+        ebLogInfo("")
+        mock_oeda = MagicMock()
+        mock_OedacliCmdMgr.return_value = mock_oeda
+        mock_db = MagicMock()
+        mock_ebGetDefaultDB.return_value = mock_db
+        mock_escli = mock_ebCellCliUtils.return_value
+        mock_escli.mIsEFRack.return_value = False
+
+        fullOptions = copy.deepcopy(self.mGetClubox().mGetArgsOptions())
+        fullOptions.steplist = None
+        fullOptions.jsonconf = {}
+
+        _elastic_cell_manager = ebCluElasticCellManager(self.mGetClubox(), fullOptions, True)
+        _elastic_cell_manager._ebCluElasticCellManager__update_conf = {
+            'operation': 'ADD_CELL',
+            'cells': [{'hostname': 'iad1-cell1'}]
+        }
+
+        stack, _, _, clubox = self._setup_execute_cell_clone_context(is_kvm=True)
+        stack.enter_context(patch.object(clubox, 'mGetExadataDom0Model', return_value='X11'))
+
+        with stack:
+            rc = _elastic_cell_manager.mExecuteCellCloneAndSaveXml('CONFIG_CELL')
+
+        self.assertEqual(rc, 0)
+        mock_escli.mIsEFRack.assert_not_called()
+        self.assertNotIn('aMachineType', mock_oeda.mAddCell.call_args.kwargs)
 
     @mock.patch('exabox.ovm.cluelasticcells.ebCluUtils')
     @mock.patch('exabox.ovm.cluelasticcells.ebGetDefaultDB')
@@ -1471,7 +1690,9 @@ class ebTestCluElasticCells(ebTestClucontrol):
         }
         self.mPrepareMockCommands(_cmds)
         mock_mCheckGridDisks.return_value = 0
-        _elastic_cell_manager.mClusterCellUpdate(self.mGetClubox().mGetArgsOptions())
+        connect_ctx = _make_connect_host_context()
+        with patch('exabox.ovm.cluelasticcells.connect_to_host', return_value=connect_ctx):
+            _elastic_cell_manager.mClusterCellUpdate(self.mGetClubox().mGetArgsOptions())
 
         fullOptions = copy.deepcopy(self.mGetClubox().mGetArgsOptions())
         fullOptions.jsonconf = REMOVED_CELLS_PAYLOAD
@@ -1762,7 +1983,8 @@ class ebTestCluElasticCells(ebTestClucontrol):
         mock_update_error.assert_not_called()
 
     # Auto-generated test for initElasticCellConf
-    def test_initElasticCellConf_prefers_actual_rack_num(self):
+    @mock.patch('exabox.ovm.cluelasticcells.ebCellCliUtils.mGetMachineType', return_value='X11MEF')
+    def test_initElasticCellConf_prefers_actual_rack_num(self, mock_machine_type):
         ebLogInfo("")
         ebLogInfo("Running unit test on cluelasticcells.initElasticCellConf for rack_num preference")
         fullOptions = copy.deepcopy(self.mGetClubox().mGetArgsOptions())
@@ -1776,7 +1998,8 @@ class ebTestCluElasticCells(ebTestClucontrol):
         )
 
     # Auto-generated test for initElasticCellConf
-    def test_initElasticCellConf_falls_back_to_uheight(self):
+    @mock.patch('exabox.ovm.cluelasticcells.ebCellCliUtils.mGetMachineType', return_value='X11MEF')
+    def test_initElasticCellConf_falls_back_to_uheight(self, mock_machine_type):
         ebLogInfo("")
         ebLogInfo("Running unit test on cluelasticcells.initElasticCellConf for rack_num fallback")
         fullOptions = copy.deepcopy(self.mGetClubox().mGetArgsOptions())
@@ -1873,7 +2096,9 @@ class ebTestCluElasticCells(ebTestClucontrol):
         fullOptions = copy.deepcopy(self.mGetClubox().mGetArgsOptions())
         fullOptions.steplist = "RESIZE_DGS"
         _elastic_cell_manager = ebCluElasticCellManager(self.mGetClubox(), fullOptions)
-        with patch ('exabox.ovm.clucontrol.exaBoxCluCtrl.IsZdlraProv', return_value=True):
+        connect_ctx = _make_connect_host_context()
+        with patch ('exabox.ovm.clucontrol.exaBoxCluCtrl.IsZdlraProv', return_value=True), \
+             patch('exabox.ovm.cluelasticcells.connect_to_host', return_value=connect_ctx):
             _elastic_cell_manager.mCloneCell(fullOptions)
             _elastic_cell_manager.mDeleteCell(fullOptions)
 
@@ -2402,6 +2627,96 @@ class ebTestCluElasticCells(ebTestClucontrol):
         # Non-zero rc expected due to mapped error via mRecordError
         self.assertNotEqual(rc, 0)
         self.assertTrue(mock_update_err.called)
+
+    def test_initElasticCellConf_handles_removed_cells_without_storage_type(self):
+        fullOptions = copy.deepcopy(self.mGetClubox().mGetArgsOptions())
+        fullOptions.jsonconf = copy.deepcopy(REMOVED_CELLS_PAYLOAD_XS)
+        fullOptions.jsonconf.pop('storageType', None)
+
+        manager = ebCluElasticCellManager(self.mGetClubox(), fullOptions)
+        update_conf = manager.mGetUpdateConf()
+
+        self.assertEqual(update_conf.get('operation'), 'DELETE_CELL')
+        self.assertEqual(len(update_conf.get('cells', [])), 1)
+        self.assertEqual(update_conf['cells'][0]['hostname'],
+                         'sea202225exdcl07.sea2xx2xx0111qf.adminsea2.oraclevcn.com')
+
+class ebTestEnsureCellIpPermissions(unittest.TestCase):
+
+    @patch('exabox.ovm.cluelasticcells.connect_to_host')
+    @patch('exabox.ovm.cluelasticcells.get_gcontext')
+    def test_mEnsureCellIpPermissions_updates_missing_read_bit(self, mock_get_gcontext, mock_connect_to_host):
+        mock_get_gcontext.return_value = MagicMock()
+
+        node_fix = MagicMock()
+        node_fix.mExecuteCmd.side_effect = [
+            (None, io.StringIO("600\n"), io.StringIO("")),
+            (None, io.StringIO(""), io.StringIO(""))
+        ]
+        node_fix.mGetCmdExitStatus.side_effect = [0, 0]
+
+        node_ok = MagicMock()
+        node_ok.mExecuteCmd.return_value = (None, io.StringIO("644\n"), io.StringIO(""))
+        node_ok.mGetCmdExitStatus.return_value = 0
+
+        context_fix = MagicMock()
+        context_fix.__enter__.return_value = node_fix
+        context_fix.__exit__.return_value = None
+
+        context_ok = MagicMock()
+        context_ok.__enter__.return_value = node_ok
+        context_ok.__exit__.return_value = None
+
+        mock_connect_to_host.side_effect = [context_fix, context_ok]
+
+        manager = ebCluElasticCellManager.__new__(ebCluElasticCellManager)
+        manager.mEnsureCellIpPermissions(['host-fix', 'host-ok'])
+
+        node_fix.mExecuteCmd.assert_has_calls([
+            mock.call(f"/bin/stat -c '%a' {CELLIP_PATH}"),
+            mock.call(f"/bin/chmod 644 {CELLIP_PATH}")
+        ])
+        self.assertEqual(node_fix.mGetCmdExitStatus.call_count, 2)
+
+        node_ok.mExecuteCmd.assert_called_once_with(f"/bin/stat -c '%a' {CELLIP_PATH}")
+        node_ok.mGetCmdExitStatus.assert_called_once()
+
+        self.assertEqual(mock_connect_to_host.call_count, 2)
+
+    @patch('exabox.ovm.cluelasticcells.connect_to_host')
+    @patch('exabox.ovm.cluelasticcells.get_gcontext')
+    def test_mEnsureCellIpPermissions_no_hosts_skips_connections(self, mock_get_gcontext, mock_connect_to_host):
+        mock_get_gcontext.return_value = MagicMock()
+
+        manager = ebCluElasticCellManager.__new__(ebCluElasticCellManager)
+        manager.mEnsureCellIpPermissions([])
+
+        mock_connect_to_host.assert_not_called()
+
+    @patch('exabox.ovm.cluelasticcells.connect_to_host')
+    @patch('exabox.ovm.cluelasticcells.get_gcontext')
+    def test_mEnsureCellIpPermissions_raises_on_stat_failure(self, mock_get_gcontext, mock_connect_to_host):
+        mock_get_gcontext.return_value = MagicMock()
+
+        err_stream = io.StringIO("permission denied")
+        node = MagicMock()
+        node.mExecuteCmd.return_value = (None, None, err_stream)
+        node.mGetCmdExitStatus.return_value = 1
+
+        context = MagicMock()
+        context.__enter__.return_value = node
+        context.__exit__.return_value = None
+
+        mock_connect_to_host.return_value = context
+
+        manager = ebCluElasticCellManager.__new__(ebCluElasticCellManager)
+
+        with self.assertRaises(ExacloudRuntimeError) as ctx:
+            manager.mEnsureCellIpPermissions(['host-fail'])
+
+        self.assertIn('host-fail', str(ctx.exception))
+        node.mExecuteCmd.assert_called_once_with(f"/bin/stat -c '%a' {CELLIP_PATH}")
+        node.mGetCmdExitStatus.assert_called_once()
 
 if __name__ == "__main__":
     unittest.main()

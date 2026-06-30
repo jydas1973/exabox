@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    pbellary    05/05/26 - Bug 39271326 - AUTHENTICATED COMMAND INJECTION IN UPDATEVAULTACCESSDETAILS VIA ATTACKER-CONTROLLED EXAROOTUSER AND EXAROOTURL
 #    siyarlag    02/19/26 - Enable exaComputeHost only on 26.1+
 #    siyarlag    02/19/26 - Modify handler for bug 38939248
 #    rbhandar    09/09/25 - Bug 38338607 - OCI: EXADB-XS: EXACLOUD DOESN'T
@@ -32,6 +33,8 @@ from multiprocessing import Pool, TimeoutError
 import time
 import os
 import re
+import shlex
+from urllib.parse import urlparse
 
 from exabox.core.Context import get_gcontext
 from exabox.core.Node import exaBoxNode
@@ -43,6 +46,26 @@ from exabox.utils.node import (connect_to_host, node_cmd_abs_path_check, node_ex
 from exabox.jsondispatch.jsonhandler import JDHandler
 from exabox.core.Error import ExacloudRuntimeError
 
+_FORBIDDEN_URL_CHARS = {'\r', '\n', '`', '\'', '"', '|', ';', '<', '>'}
+
+def _quote_cmd(*parts):
+    """Return a shell-safe command string for remote execution."""
+    return ' '.join(shlex.quote(str(part)) for part in parts)
+
+def _validate_exarootuser(value: str) -> str:
+    if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,62}", value):
+        raise ExacloudRuntimeError(0x0817, 0x0A, 'Invalid exaRoot user value supplied')
+    return value
+
+def _validate_exarooturl(value: str) -> str:
+    if not isinstance(value, str):
+        raise ExacloudRuntimeError(0x0817, 0x0A, 'Invalid exaRoot URL value supplied')
+    if any(ch in value for ch in _FORBIDDEN_URL_CHARS):
+        raise ExacloudRuntimeError(0x0817, 0x0A, 'exaRoot URL contains forbidden characters')
+    parsed = urlparse(value)
+    if parsed.scheme.lower() not in ("http", "https") or not parsed.netloc:
+        raise ExacloudRuntimeError(0x0817, 0x0A, 'exaRoot URL must include http(s) scheme and host')
+    return value
 
 class ExaComputeVaultDetails(JDHandler):
 
@@ -120,8 +143,8 @@ class ExaComputeVaultDetails(JDHandler):
         _response = {}
 
         _hostname = self.mGetOptions().jsonconf.get("fqdn")
-        _exarootuser = self.mGetOptions().jsonconf.get("exarootuser")
-        _exarooturl = self.mGetOptions().jsonconf.get("exarooturl")
+        _exarootuser = _validate_exarootuser(self.mGetOptions().jsonconf.get("exarootuser"))
+        _exarooturl = _validate_exarooturl(self.mGetOptions().jsonconf.get("exarooturl"))
         _vaultaccess = self.mGetOptions().jsonconf.get("vaultaccess")
         _vaultid = self.mGetOptions().jsonconf.get("vaultid")
         _trustcertificates = self.mGetOptions().jsonconf.get("trustcertificates")
@@ -160,22 +183,51 @@ class ExaComputeVaultDetails(JDHandler):
             node_write_text_file(_node, "/root/wallet/certs.pem", _cert_str)
 
             # Continue with normal commands
-            _cmd = f"/opt/oracle/dbserver/dbms/bin/escli mkwallet --wallet /opt/oracle/dbserver/dbms/deploy/config/eswallet"
-            node_exec_cmd_check(_node, _cmd, log_stdout_on_error=True)
+            _escli_path = "/opt/oracle/dbserver/dbms/bin/escli"
+            _wallet_path = "/opt/oracle/dbserver/dbms/deploy/config/eswallet"
 
-            _cmd = f'/bin/echo "chwallet --wallet /opt/oracle/dbserver/dbms/deploy/config/eswallet'
-            _cmd = f'{_cmd} --attributes exaRootUrl=\\"{_exarooturl}\\"" | /opt/oracle/dbserver/dbms/bin/escli'
-            node_exec_cmd_check(_node, _cmd, log_stdout_on_error=True)
+            node_exec_cmd_check(
+                _node,
+                _quote_cmd(_escli_path, "mkwallet", "--wallet", _wallet_path),
+                log_stdout_on_error=True
+            )
 
-            _addWalletCmd = "/opt/oracle/dbserver/dbms/bin/escli chwallet --wallet /opt/oracle/dbserver/dbms/deploy/config/eswallet"
-            _cmd = f"{_addWalletCmd} --private-key-file /root/wallet/private.key.pem"
-            node_exec_cmd_check(_node, _cmd, log_stdout_on_error=True)
+            node_exec_cmd_check(
+                _node,
+                _quote_cmd(
+                    _escli_path,
+                    "chwallet",
+                    "--wallet",
+                    _wallet_path,
+                    "--attributes",
+                    f"exaRootUrl={_exarooturl}"
+                ),
+                log_stdout_on_error=True
+            )
 
-            _cmd = f"{_addWalletCmd} --attributes user={_exarootuser}"
-            node_exec_cmd_check(_node, _cmd, log_stdout_on_error=True)
+            _add_wallet_args = (_escli_path, "chwallet", "--wallet", _wallet_path)
+            node_exec_cmd_check(
+                _node,
+                _quote_cmd(*_add_wallet_args, "--private-key-file", "/root/wallet/private.key.pem"),
+                log_stdout_on_error=True
+            )
 
-            _cmd = f"{_addWalletCmd} --trusted-cert-file /root/wallet/certs.pem --clear-old-trusted-certs"
-            node_exec_cmd_check(_node, _cmd, log_stdout_on_error=True)
+            node_exec_cmd_check(
+                _node,
+                _quote_cmd(*_add_wallet_args, "--attributes", f"user={_exarootuser}"),
+                log_stdout_on_error=True
+            )
+
+            node_exec_cmd_check(
+                _node,
+                _quote_cmd(
+                    *_add_wallet_args,
+                    "--trusted-cert-file",
+                    "/root/wallet/certs.pem",
+                    "--clear-old-trusted-certs"
+                ),
+                log_stdout_on_error=True
+            )
 
             _cmd = f"/bin/chown dbmsvc:dbmusers  /opt/oracle/dbserver/dbms/deploy/config/eswallet"
             node_exec_cmd_check(_node, _cmd, log_stdout_on_error=True)

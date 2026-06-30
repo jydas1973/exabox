@@ -16,13 +16,13 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    mpedapro    05/11/26 - Enh::39115674 Ignore model validation in tests
 #    mpedapro    02/10/26 - Enh::38914367 UT coverage for code changes
 #    mpedapro    11/24/25 - Enh::38602758 Cover changes with unit tests
 #    mpedapro    11/14/25 - Unit tests for ebCluAcceleratedNetwork class
 #                           methods
 #    mpedapro    11/14/25 - Creation
 #
-
 import os
 import unittest
 from unittest.mock import patch, MagicMock
@@ -72,13 +72,13 @@ class ebTestCluacceleratedNetwork(ebTestClucontrol):
         dom0Name = 'test-dom0'
         self.assertTrue(ebCluAcceleratedNetwork.isacceleratedNetworkCapableDom0(_cluctrl, dom0Name))
 
-    def test_isacceleratedNetworkCapableDom0_not_capable_model(self):
-        """Test isacceleratedNetworkCapableDom0 for incapable model"""
+    def test_isacceleratedNetworkCapableDom0_model_not_restricted_anymore(self):
+        """Test isacceleratedNetworkCapableDom0 ignores model and relies on version"""
         _cluctrl = self.mGetClubox()
         _cluctrl.mGetExadataDom0Model = MagicMock(return_value='X10')
         _cluctrl.mGetImageVersion = MagicMock(return_value='26.1.0')
         dom0Name = 'test-dom0'
-        self.assertFalse(ebCluAcceleratedNetwork.isacceleratedNetworkCapableDom0(_cluctrl, dom0Name))
+        self.assertTrue(ebCluAcceleratedNetwork.isacceleratedNetworkCapableDom0(_cluctrl, dom0Name))
 
     def test_isacceleratedNetworkCapableDom0_not_capable_version(self):
         """Test isacceleratedNetworkCapableDom0 for incapable version"""
@@ -115,7 +115,7 @@ class ebTestCluacceleratedNetwork(ebTestClucontrol):
         _cluctrl.mIsExabm = MagicMock(return_value=True)
         _cluctrl.mCheckConfigOption = MagicMock(return_value=True)
         _cluctrl.mGetExadataDom0Model = MagicMock(return_value='X10')
-        _cluctrl.mGetImageVersion = MagicMock(return_value='26.1.0')
+        _cluctrl.mGetImageVersion = MagicMock(return_value='25.1.0')
         _cluctrl.mUpdateErrorObject = MagicMock(return_value=None)
         dom0Name = 'test-dom0'
         with self.assertRaises(ExacloudRuntimeError):
@@ -678,4 +678,3 @@ NM_CONTROLLED=no
 
 if __name__ == '__main__':
     unittest.main()
-

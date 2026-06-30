@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    kanmanic    05/14/26 - Bug 39255231 - Add ping retry delay for oedakeys
 #    naps        01/23/26 - Bug 38881811 - UT Updation.
 #    ririgoye    08/20/25 - Bug 38299487 - ECS_MAIN -> ETF -> NSLOOKUP COMMAND
 #                           IS SENDING RETURN STATUS 1 , CAUSING
@@ -275,6 +276,36 @@ class TestXmlGen(ebTestClucontrol):
         self.mGetClubox().mSetCmd("patch")
         self.mGetClubox().mRemoveUnreachableNodes(_payload)
         self.mGetClubox().mSetCmd("info")
+
+    @patch("exabox.ovm.clucontrol.time.sleep")
+    def test_mPingHost_retries_with_timeout_and_delay(self, mock_sleep):
+
+        _host = "testhost.example.com"
+        _ping_cmd = re.escape("/bin/ping -c 1 -W 300 {0} ".format(_host))
+        _cmds = {
+            self.mGetRegexLocal(): [
+                [
+                    exaMockCommand(_ping_cmd, aRc=2, aStderr="ping: {0}: Name or service not known".format(_host)),
+                    exaMockCommand(_ping_cmd, aRc=0),
+                ]
+            ]
+        }
+
+        self.mPrepareMockCommands(_cmds)
+
+        self.assertTrue(self.mGetClubox().mPingHost(_host, aCount=2, aTimeout=300, aRetryDelay=10))
+        mock_sleep.assert_called_once_with(10)
+
+    def test_mGetOedaKeyPingRetryArgs_oedakeys_only(self):
+
+        self.mGetClubox().mSetCmd("oedakeys")
+        self.assertEqual(
+            {'aTimeout': 300, 'aRetryDelay': 10},
+            self.mGetClubox().mGetOedaKeyPingRetryArgs())
+
+        for _cmd in ["injectkeys", "rotatekeys", "validate_keys", "info"]:
+            self.mGetClubox().mSetCmd(_cmd)
+            self.assertEqual({}, self.mGetClubox().mGetOedaKeyPingRetryArgs())
 
 
 if __name__ == '__main__':

@@ -4,7 +4,7 @@
 #
 # common.py
 #
-# Copyright (c) 2021, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      common.py - Common utilities with no particular business logic.
@@ -18,6 +18,9 @@
 #      None.
 #
 #    MODIFIED   (MM/DD/YY)
+#    kanmanic    06/15/26 - 39560339 - Fix ECRA DB connection close guards
+#    aypaul      05/11/26 - Bug#39276269 Common module to validate FQDN
+#    kanmanic    03/17/26 - 37764703 AQ Status Tracker Support
 #    aypaul      11/10/25 - ER#37732654 Update vault credentials for ecra
 #                           connection.
 #    aypaul      08/08/25 - Enh#37732728 Add common methods for generating ECRA
@@ -43,6 +46,7 @@ import os
 import json
 import base64
 import binascii
+import re
 import shutil
 import traceback
 import sys
@@ -53,6 +57,13 @@ from contextlib import contextmanager
 from exabox.log.LogMgr import ebLogError, ebLogInfo, ebLogWarn, ebLogDebug, ebLogTrace
 from exabox.core.Context import get_gcontext
 
+"""
+> Ensures overall length ≤253 characters, each label 1 - 63, labels start/end alphanumeric.
+> Allows hyphens inside labels, enforces trailing TLD of 2 - 63 letters.
+> Allows short hostname as well without fqdn.
+"""
+FQDN_REGEX = re.compile(r"(?=.{1,253}$)(?:(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}|[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)")
+
 ECRADBDETAILSREGISTRY = "ecradbdetails"
 
 A = TypeVar('A')
@@ -61,6 +72,8 @@ A = TypeVar('A')
 def connect_to_ecradb():
     #Initialise a thick connection handle for executing queries against the ECRA database.
     #Returns a contextmanager with the connected ecra database. The connection handle will be automatically closed.
+    oraconn = None
+    _ecradb_details = {}
     try:
         _ecradb_details = get_ecradb_details()
         import oracledb
@@ -70,14 +83,27 @@ def connect_to_ecradb():
                                    host =         _ecradb_details.get('host'), \
                                    port =         _ecradb_details.get('port'), \
                                    service_name = _ecradb_details.get('service_name'))
+    except ImportError as ie:
+        ebLogWarn(f"Failed to import python library: {ie}")
+        raise
+    except Exception as ex:
+        ebLogWarn("Failed to connect to ECRA database "
+                  f"host={_ecradb_details.get('host')} port={_ecradb_details.get('port')} "
+                  f"service={_ecradb_details.get('service_name')} user={_ecradb_details.get('user')}: {ex}")
+        raise
+
+    try:
         yield oraconn
     except StopIteration as e:
         ebLogError(f"Error during node connection yielding: {e}")
-    except ImportError as ie:
-        ebLogWarn(f"Failed to import python library: {ie}")
+        raise
     finally:
-        if 'connection' in locals() and oraconn:
+        try:
             oraconn.close()
+        except Exception as ex:
+            ebLogWarn("Failed to close ECRA database connection "
+                      f"host={_ecradb_details.get('host')} port={_ecradb_details.get('port')} "
+                      f"service={_ecradb_details.get('service_name')} user={_ecradb_details.get('user')}: {ex}")
 
 def get_ecradb_details():
     ECRADBDETAILSFILE = get_gcontext().mCheckConfigOption("ecrad_db_secrets").get("db_conn_details")
@@ -93,7 +119,7 @@ def get_ecradb_details():
     _vault_id = get_gcontext().mCheckConfigOption("ecra_vault_id")
     _retries = 5
     _attempts = 1
-    if _vault_id is not None:
+    if _vault_id is not None and _vault_id != "":
         from exabox.exaoci.ExaOCIFactory import ExaOCIFactory
         _ecra_secrets = [ECRADBDETAILSFILE, ECRADBAPPUSERCRED]
         for _secret in _ecra_secrets:
@@ -401,3 +427,69 @@ def exception_handler_decorator(func):
                 ebLogError(f'Exception :{str_exception}, Current stack: {str_currstack}')
             ebLogError(f"Traceback: {traceback.format_exc()}")
     return inner_function
+
+
+def remove_algorithms(sshd_config_text: str, algorithms_to_remove: List[str]) -> str:
+    """
+    Removes specific algorithms from sshd_config directives.
+
+    :param sshd_config_text: full content of the sshd_config file
+    :param algorithms_to_remove: list of algorithms to remove
+    :return: cleaned sshd_config text
+    """
+
+    # Directives where algorithms are commonly defined
+    target_directives = {
+        "macs",
+        "hostkeyalgorithms",
+        "pubkeyacceptedkeytypes",
+        "pubkeyacceptedalgorithms",
+        "ciphers",
+        "kexalgorithms"
+    }
+
+    result_lines = []
+
+    for line in sshd_config_text.splitlines():
+        stripped = line.strip()
+
+        # Preserve empty lines and comments as-is
+        if not stripped or stripped.startswith("#"):
+            result_lines.append(line)
+            continue
+
+        # Split directive and value
+        match = re.match(r"^(\S+)\s+(.*)$", line)
+        if not match:
+            result_lines.append(line)
+            continue
+
+        directive, value = match.groups()
+        directive_lower = directive.lower()
+
+        if directive_lower in target_directives:
+            # Split algorithms by comma
+            algos = [a.strip() for a in value.split(",")]
+
+            # Keep only algorithms that are NOT in the removal list
+            filtered_algos = [
+                a for a in algos
+                if a not in algorithms_to_remove
+            ]
+
+            # If no algorithms remain, decide how to handle it:
+            # Option 1: leave an empty directive
+            # Option 2: comment it out (chosen here)
+            if filtered_algos:
+                new_line = f"{directive} {','.join(filtered_algos)}"
+            else:
+                new_line = f"# {directive} (all algorithms removed)"
+
+            result_lines.append(new_line)
+        else:
+            result_lines.append(line)
+
+    return "\n".join(result_lines)
+
+def is_valid_fqdn(aHostName: str) -> bool:
+    return aHostName is not None and bool(FQDN_REGEX.fullmatch(aHostName))

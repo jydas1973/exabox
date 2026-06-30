@@ -2,7 +2,7 @@
 
  $Header: 
 
- Copyright (c) 2018, 2024, Oracle and/or its affiliates.
+ Copyright (c) 2018, 2026, Oracle and/or its affiliates.
 
  NAME:
       tests_ebNode.py - Unitest for ebNode on clucontrol
@@ -61,6 +61,7 @@ class ebTestNode(ebTestClucontrol):
                     #CRS Check
                     exaMockCommand("tac /etc/oratab | grep -v ASM", aStdout="dborc19_unique:/u02/app/oracle/product/19.0.0.0/dbhome_2:Y"),
                     exaMockCommand(re.escape("/bin/cat /etc/oratab | /bin/grep '^+ASM.*' | /bin/cut -f 2 -d ':'"), aStdout=GRID_PATH, aPersist=True),
+                    exaMockCommand(re.escape("cat /etc/oracle/olr.loc | grep 'crs_home' | cut -f 2 -d '='"), aStdout=GRID_PATH, aPersist=True),
                     exaMockCommand(re.escape("export ORACLE_HOME=/u01/app/18.1.0.0/grid; $ORACLE_HOME/bin/oraversion -baseVersion"), aRc=0, aStdout="19.0.0.0.0" ,aPersist=True),
                     exaMockCommand(re.escape("export ORACLE_HOME=/u01/app/18.1.0.0/grid; $ORACLE_HOME/bin/orabase"), aRc=0, aStdout="/u01/app/grid" ,aPersist=True),
                     exaMockCommand("check cluster -all | grep -c online", aRc=0),
@@ -70,6 +71,7 @@ class ebTestNode(ebTestClucontrol):
                     #ASM Check
                     exaMockCommand('/u01/app/18.1.0.0/grid/bin/crsctl query css votedisk | grep "Located 5 voting disk"', aRc=0, aStdout="", aPersist=True),
                     exaMockCommand(re.escape("cat /etc/oratab | grep '^+ASM.*' | cut -f 2 -d ':'"), aStdout=GRID_PATH),
+                    exaMockCommand(re.escape("cat /etc/oracle/olr.loc | grep 'crs_home' | cut -f 2 -d '='"), aStdout=GRID_PATH),
                     exaMockCommand("/bin/srvctl status asm | grep 'ASM is running on'", aStdout="ASM is running on x,y"),
                     exaMockCommand("/bin/srvctl status filesystem | grep 'is mounted on nodes'", aStdout="is mounted on nodes on x,y"),
                     exaMockCommand("/bin/crsctl check cluster | grep -c online ", aRc=0, aStdout="", aPersist=True)
@@ -78,11 +80,13 @@ class ebTestNode(ebTestClucontrol):
                     #DB Check
                     exaMockCommand("tac /etc/oratab | grep -v ASM", aStdout="dborc19_unique:/u02/app/oracle/product/19.0.0.0/dbhome_2:Y"),
                     exaMockCommand(re.escape("cat /etc/oratab | grep '^+ASM.*' | cut -f 2 -d ':'"), aStdout=GRID_PATH, aPersist=True),
+                    exaMockCommand(re.escape("cat /etc/oracle/olr.loc | grep 'crs_home' | cut -f 2 -d '='"), aStdout=GRID_PATH, aPersist=True),
                     exaMockCommand("check cluster | grep -c online", aRc=0),
                     exaMockCommand("status database -d .*  | grep -c \"is running\"", aRc=0),
                 ],
                 [
                     exaMockCommand(re.escape("cat /etc/oratab | grep '^+ASM.*' | cut -f 2 -d ':'"), aStdout=GRID_PATH),
+                    exaMockCommand(re.escape("cat /etc/oracle/olr.loc | grep 'crs_home' | cut -f 2 -d '='"), aStdout=GRID_PATH, aPersist=True),
                     exaMockCommand(GRID_PATH+"/bin/srvctl  status asm", aRc=0, aStdout="ASM is running on scaqab10client01vm08,scaqab10client02vm08", aPersist=True),
                     exaMockCommand(GRID_PATH+"/bin/srvctl status asm | grep 'ASM is running on'", aRc=0, aStdout="ASM is running on scaqab10client01vm08,scaqab10client02vm08", aPersist=True),
                     exaMockCommand(GRID_PATH+"/bin/srvctl  status filesystem", aRc=0, aStdout="is mounted on nodes on scaqab10client01vm08,scaqab10client02vm08", aPersist=True),
@@ -110,6 +114,7 @@ class ebTestNode(ebTestClucontrol):
                     #CRS Check
                     exaMockCommand("tac /etc/oratab | grep -v ASM", aStdout="dborc19_unique:/u02/app/oracle/product/19.0.0.0/dbhome_2:Y"),
                     exaMockCommand(re.escape("/bin/cat /etc/oratab | /bin/grep '^+ASM.*' | /bin/cut -f 2 -d ':'"), aStdout=GRID_PATH, aPersist=True),
+                    exaMockCommand(re.escape("cat /etc/oracle/olr.loc | grep 'crs_home' | cut -f 2 -d '='"), aStdout=GRID_PATH, aPersist=True),
                     exaMockCommand(re.escape("export ORACLE_HOME=/u01/app/18.1.0.0/grid; $ORACLE_HOME/bin/oraversion -baseVersion"), aRc=0, aStdout="19.0.0.0.0" ,aPersist=True),
                     exaMockCommand(re.escape("export ORACLE_HOME=/u01/app/18.1.0.0/grid; $ORACLE_HOME/bin/orabase"), aRc=0, aStdout="/u01/app/grid" ,aPersist=True),
                     exaMockCommand("check cluster -all | grep -c online", aRc=0),
@@ -118,6 +123,7 @@ class ebTestNode(ebTestClucontrol):
                     #ASM Check
                     exaMockCommand('/u01/app/18.1.0.0/grid/bin/crsctl query css votedisk | grep "Located 5 voting disk"', aRc=0, aStdout="", aPersist=True),
                     exaMockCommand(re.escape("cat /etc/oratab | grep '^+ASM.*' | cut -f 2 -d ':'"), aStdout=GRID_PATH),
+                    exaMockCommand(re.escape("cat /etc/oracle/olr.loc | grep 'crs_home' | cut -f 2 -d '='"), aStdout=GRID_PATH, aPersist=True),
                     exaMockCommand("/bin/srvctl status asm | grep 'ASM is running on'", aStdout="ASM is running on x,y"),
                     exaMockCommand("/bin/srvctl status filesystem | grep 'is mounted on nodes'", aStdout="is mounted on nodes on x,y"),
                     exaMockCommand("crsctl check cluster | grep -c online ", aRc=0, aStdout="", aPersist=True)
@@ -127,6 +133,7 @@ class ebTestNode(ebTestClucontrol):
                     #DB Check
                     exaMockCommand("tac /etc/oratab | grep -v ASM", aStdout="dborc19_unique:/u02/app/oracle/product/19.0.0.0/dbhome_2:Y"),
                     exaMockCommand(re.escape("cat /etc/oratab | grep '^+ASM.*' | cut -f 2 -d ':'"), aStdout=GRID_PATH),
+                    exaMockCommand(re.escape("cat /etc/oracle/olr.loc | grep 'crs_home' | cut -f 2 -d '='"), aStdout=GRID_PATH, aPersist=True),
                     exaMockCommand("check cluster -all | grep -c online", aRc=1),
                     exaMockCommand("check cluster -all | grep -c online", aRc=0),
                     exaMockCommand(re.escape("cat /etc/oratab | grep '^+ASM.*' | cut -f 2 -d ':'"), aStdout="/u01/app/18.1.0.0/dbAnastasia"),

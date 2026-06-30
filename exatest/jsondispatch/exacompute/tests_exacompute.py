@@ -4,7 +4,7 @@
 #
 # tests_exacompute.py
 #
-# Copyright (c) 2023, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2023, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_exacompute.py - <one-line expansion of the name>
@@ -26,7 +26,7 @@
 #
 # tests_SLA.py
 #
-# Copyright (c) 2022, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2022, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_SLA.py - Unit test for SLA measurements
@@ -38,12 +38,14 @@
 #      None
 #
 #    MODIFIED   (MM/DD/YY)
+#    pbellary    05/05/26 - Bug 39271326 - AUTHENTICATED COMMAND INJECTION IN UPDATEVAULTACCESSDETAILS VIA ATTACKER-CONTROLLED EXAROOTUSER AND EXAROOTURL
 #    aararora    11/29/24 - Bug 37025316: Fix nft rules during vault access creation
 #    jesandov    06/28/23 - 35529335: Update endpoint of exacompute_vault_details
 #    alsepulv    03/23/22 - Enh 33889398: Parallelism control addition
 #    alsepulv    02/02/22 - Creation
 #
 
+import copy
 import json
 import os
 import unittest
@@ -133,9 +135,37 @@ EDV Driver Online Patch Version Info:
             "driver_version": "23.1.90.0.0.230531.1"
         })
 
+    @patch("exabox.jsondispatch.handler_exacompute_vault_details.connect_to_host")
+    def test_003_vault_details_rejects_invalid_user(self, mock_connect):
+
+        _options = self.mGetContext().mGetArgsOptions()
+        _invalid_payload = copy.deepcopy(self.mGetResourcesJsonFile("payload_Vault_Details.json"))
+        _invalid_payload["exarootuser"] = "bad user; touch /tmp/poc"
+        _options.jsonconf = _invalid_payload
+
+        _handler = ExaComputeVaultDetails(_options)
+        with self.assertRaisesRegex(ExacloudRuntimeError, "Invalid exaRoot user"):
+            _handler.mExecute()
+
+        mock_connect.assert_not_called()
+
+    @patch("exabox.jsondispatch.handler_exacompute_vault_details.connect_to_host")
+    def test_004_vault_details_rejects_invalid_url(self, mock_connect):
+
+        _options = self.mGetContext().mGetArgsOptions()
+        _invalid_payload = copy.deepcopy(self.mGetResourcesJsonFile("payload_Vault_Details.json"))
+        _invalid_payload["exarooturl"] = "https://exa.com""; touch /tmp/poc"
+        _options.jsonconf = _invalid_payload
+
+        _handler = ExaComputeVaultDetails(_options)
+        with self.assertRaisesRegex(ExacloudRuntimeError, "exaRoot URL"):
+            _handler.mExecute()
+
+        mock_connect.assert_not_called()
+
     @patch("exabox.exakms.ExaKmsFileSystem.ExaKmsFileSystem.mSearchExaKmsEntries", return_value=["x"])
     @patch("exabox.exakms.ExaKmsFileSystem.ExaKmsFileSystem.mDeleteExaKmsEntry", return_value=0)
-    def test_003_delete_vault(self, mock_search, mock_delete):
+    def test_005_delete_vault(self, mock_search, mock_delete):
 
         _options = self.mGetContext().mGetArgsOptions()
         _options.jsonconf = self.mGetResourcesJsonFile("payload_SSH_Generation.json")
@@ -156,7 +186,7 @@ EDV Driver Online Patch Version Info:
         _rc, _result = _handler.mExecute()
         self.assertEqual(_rc, 0)
 
-    def test_004_mAddRule(self):
+    def test_006_mAddRule(self):
 
         _options = self.mGetContext().mGetArgsOptions()
 
@@ -177,7 +207,7 @@ EDV Driver Online Patch Version Info:
         _handler = ExaComputeVaultDetails(_options)
         _handler.mAddRule(_ssh_conn, 'stre0')
 
-    def test_005_deconfigure_dom0roce(self):
+    def test_007_deconfigure_dom0roce(self):
 
         _options = self.mGetContext().mGetArgsOptions()
         _options.jsonconf = self.mGetResourcesJsonFile("payload_deconfigure.json")

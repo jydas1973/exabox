@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    pbellary    05/08/26 - Bug 39293289 - CREATE CONSOLE HISTORY SUPPORT FOR ONSR REGIONS
 #    prsshukl    03/12/26 - Bug 38900158 - EXACLOUD: ISSUES FOUND BY VOXIO
 #                           CODEV AGENT IN DIR EXABOX/EXAOCI
 #    asrigiri    07/15/25 - Bug 38156507 - OCI: CREATEEXACCCONSOLEHIS FAILED AS PROXY IS SET TO NULL.
@@ -60,6 +61,11 @@ class ResourceConnector(OCIConnector):
         self.__auth_endpoint = self.mSetEndpoint(self.__auth_service)
         self.__casper_endpoint = self.mSetEndpoint(self.__object_service)
 
+    def mIsFedramp(self):
+        _realm = self.__realm
+        _fedramp_realms = ["oc5", "oc6", "oc11"]
+        return _realm and _realm in _fedramp_realms
+
     def mObtainRealm(self):
         _realm = None
 
@@ -101,6 +107,7 @@ class ResourceConnector(OCIConnector):
 
     def mSetEndpoint(self, service):
         _region = self.__region
+        _dns_suffix = self.__dns_suffix
         _endpoint_service = service
 
         if _region == "r1":
@@ -115,6 +122,9 @@ class ResourceConnector(OCIConnector):
                 region=_region,
                 endpoint=None,
                 endpoint_service_name=service)
+        elif self.mIsFedramp():
+            _prefix = "objectstorage" if _endpoint_service == "object_storage" else _endpoint_service
+            _endpoint = f"https://{_prefix}.{_dns_suffix}"
         else:
             _endpoint = regions.endpoint_for(
                 _endpoint_service,
@@ -131,6 +141,9 @@ class ResourceConnector(OCIConnector):
                         _endpoint = "https://" + _databaseUrl
                     else:
                         _endpoint = _databaseUrl
+                else:
+                    _endpoint = _databaseUrl
+        ebLogTrace(f"Service: {service}, Endpoint: {_endpoint}")
         return _endpoint
 
     def mGetConfigOption(self, aOption):
@@ -161,6 +174,7 @@ class ResourceConnector(OCIConnector):
 
         _key = self.mGetRPKey()
         _ca_path = os.path.join(self.__basepath, "exabox/kms/combined_r1.crt")
+        _ca_path_fedramp = "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem"
 
         os.environ["OCI_RESOURCE_PRINCIPAL_VERSION"] = self.mGetConfigOption("resource_principals_version")
         os.environ["OCI_RESOURCE_PRINCIPAL_RPT_ENDPOINT"] = self.__dbaas_endpoint
@@ -172,6 +186,9 @@ class ResourceConnector(OCIConnector):
         os.environ["OCI_RESOURCE_PRINCIPAL_REGION"] = self.__region
         if self.__realm == "r1":
             os.environ["REQUESTS_CA_BUNDLE"] = _ca_path
+        if self.mIsFedramp():
+            os.environ["REQUESTS_CA_BUNDLE"] = _ca_path_fedramp
+            _ca_path = _ca_path_fedramp
 
         _config = {
             "tenancy": _tenancy,
@@ -180,8 +197,8 @@ class ResourceConnector(OCIConnector):
             "realm": self.__realm
         }
         self.__config_file = _config
+        ebLogTrace(f"Config:{str(_config)}")
 
-        ebLogInfo("Getting signer V2.1.1")
         return get_resource_principals_signer()
 
     def mObtainOxpaFile(self):

@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    jfsaldan    06/22/26 - Migrate Exacloud IMDSv1 references to IMDSv2
 #    jfsaldan    03/11/26 - Bug 39070236 - EXADB-D VMBACKUP | EXACLOUD SHOULD
 #                           USE HOME REGION WHEN MAKING OCI REQUEST TO CREATE A
 #                           NEW VMBACKUP COMPARTMENT
@@ -430,7 +431,9 @@ class ebVMBackupOCI(object):
             _err = ("Exacloud could not call the IMDS endpoint to get the "
                 "Instance Tenancy OCID, Please verify the Instance is healthy"
                 f"and you can curl the IMDS endpoint, e.g. try: "
-                "'curl http://169.254.169.254/opc/v1/instance/', error: '{e}'")
+                "'curl -H \"Authorization: Bearer Oracle\" "
+                "http://169.254.169.254/opc/v2/instance/', error: "
+                f"'{e}'")
             ebLogError(_err)
             raise ExacloudRuntimeError(0x095, 0xA, _err) from e
 
@@ -2395,4 +2398,3 @@ class ebVMBackupOCI(object):
 
             ebLogInfo("VMBackup bucket deletion finished ok for the bucket: "
                     f"'{_customer_details.bucket_name}'")
-

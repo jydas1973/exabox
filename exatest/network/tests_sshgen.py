@@ -4,7 +4,7 @@
 #
 # tests_sshgen.py
 #
-# Copyright (c) 2021, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_sshgen.py - Unit tests for exabox/network/osds/sshgen.py
@@ -41,6 +41,7 @@ from exabox.core.Error import ExacloudRuntimeError
 from exabox.core.MockCommand import exaMockCommand
 from exabox.core.Error import ExacloudRuntimeError
 from unittest.mock import patch, MagicMock, PropertyMock, mock_open
+from exabox.core.Context import get_gcontext
 from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
 from exabox.network.osds.sshgen import sshconn, execute_local, validate_hostname, validate_user, ping_host, setup_ssh_key, setup_remote_host
 
@@ -64,6 +65,9 @@ class MockSSHClient(object):
     
     def exec_command(self, command):
         return (self.__buffer, self.__buffer, self.__buffer)
+
+    def load_host_keys(self, know_host):
+        return
 
     def get_transport(self):
         return self.__transport
@@ -221,6 +225,7 @@ class ebTestSshConn(ebTestClucontrol):
     @classmethod
     def setUpClass(self):
         super(ebTestSshConn, self).setUpClass(aUseOeda = True, aGenerateDatabase = True)
+        get_gcontext().mSetConfigOption('ssh_connect_max_retries', '1')
         warnings.filterwarnings("ignore")
 
     def test_mConnect(self):

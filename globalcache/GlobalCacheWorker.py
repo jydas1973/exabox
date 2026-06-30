@@ -4,7 +4,7 @@
 #
 # GlobalCacheWorker.py
 #
-# Copyright (c) 2021, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      GlobalCacheWorker.py - <one-line expansion of the name>
@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    joysjose    06/22/26 - Bug 39588664 replay OEDA reflink under worker lock
+#    joysjose    05/12/26 - Bug 39354509 Add multigi OEDA requiredfile alias fallback
 #    joysjose    12/05/25 - Bug 38728514 To copy reflink even if original
 #                           file is present
 #    joysjose    11/04/25 - Bug 38599605 modify GI bits naming for n-3
@@ -49,9 +51,11 @@ from exabox.core.Error import ExacloudRuntimeError
 from exabox.agent.ExaLock import ExaLock
 _26AIREFERENCE = "232600251021"
 _26AIMAJORMINORREF = "2326"
+_GRID_KLONE_IMAGE_RE = re.compile(r"^grid-klone-Linux-x86-64-[0-9]+\.zip$")
+
 class GlobalCacheWorker:
 
-    def __init__(self, aImageLocalPath, aImageHash, aDom0List):
+    def __init__(self, aImageLocalPath, aImageHash, aDom0List, aAdditionalAliases=None):
 
         self.__globalCacheFolder = get_gcontext().mGetConfigOptions()['global_cache_dom0_folder']
         _remotePath = os.path.basename(aImageLocalPath)
@@ -64,11 +68,12 @@ class GlobalCacheWorker:
         self.__dom0List = aDom0List
         self.__localCopyDom0s = []
         self.__connections = {}
+        self.__additionalAliases = aAdditionalAliases or []
 
         self.__imageName = os.path.basename(aImageLocalPath)
         #Lets have json file per image And acquire lock wrt this json file.
         #i.e, We will have a separate lock for every image copy across dom0s.
-        #This will give us greater control and keep each image updation clean. 
+        #This will give us greater control and keep each image updation clean.
         self.__imageInfoFile = os.path.join(self.__globalCacheFolder, f"ImagesInformation{self.__imageName}.json")
     #######################
     # Getters and Setters #
@@ -110,16 +115,25 @@ class GlobalCacheWorker:
     def mSetConnections(self, aDict):
         self.__connections = aDict
 
+    def mGetAdditionalAliases(self):
+        return self.__additionalAliases
+
     def mGetGlobalCacheFolder(self):
         return self.__globalCacheFolder
 
     def mGetImageInfoFile(self):
         return self.__imageInfoFile
 
+    def mValidateGridKloneBasename(self, aImageName):
+        if not isinstance(aImageName, str) or not _GRID_KLONE_IMAGE_RE.match(aImageName):
+            _msg = f"Invalid grid klone image basename: {aImageName}"
+            ebLogError(_msg)
+            raise ExacloudRuntimeError(0x0754, 0x0A, _msg)
+
     #################
     # CLASS METHODS #
     #################
-    
+
     def mDoImageCopy(self):
 
         try:
@@ -139,16 +153,16 @@ class GlobalCacheWorker:
 
             ebLogInfo(f'Waiting for lock dom0_global_cache_{self.__imageName}')
             with ExaLock(f"dom0_global_cache_{self.__imageName}"):
-                ebLogInfo(f'Got   the   lock dom0_global_cache_{self.__imageName}')        
+                ebLogInfo(f'Got   the   lock dom0_global_cache_{self.__imageName}')
                 while _currentRetry < _maxRetries:
 
                     _missingDom0s = self.mCalculateMissingDom0s()
 
                     # All images present in Dom0 GlobalCache
                     if not _missingDom0s:
-                        #Adding this fix to make sure GI images 
-                        # are copied to /EXAVMIMAGES wihtout fail when 
-                        # original file is present in the dom0 GlobalCache. 
+                        #Adding this fix to make sure GI images
+                        # are copied to /EXAVMIMAGES wihtout fail when
+                        # original file is present in the dom0 GlobalCache.
                         _dom0List = self.mGetDom0List()
                         for _dom0 in _dom0List:
                             self.mCreateSymbolicLink(_dom0)
@@ -216,7 +230,7 @@ class GlobalCacheWorker:
         _content['path'] = aImagePath
 
 
-        _maxRetries = 10                                                                                                                                                                                        
+        _maxRetries = 10
         _currentRetry = 0
 
         while _currentRetry < _maxRetries:
@@ -261,7 +275,7 @@ class GlobalCacheWorker:
 
         if _node.mGetCmdExitStatus() == 0:
             _out = _o.read()
-            ebLogTrace(f'mGetRemoteImageState: Read from {aDom0}  : {_out}')                                                                                           
+            ebLogTrace(f'mGetRemoteImageState: Read from {aDom0}  : {_out}')
             try:
                 _content = json.loads(_out)
 
@@ -425,12 +439,12 @@ class GlobalCacheWorker:
         ebLogWarn(f"Deleting {aImagePath} on {aDom0}")
         _imageDict = {'path': aImagePath}
         self.mUpdateRemoteImageState(aDom0, _imageDict, aDelete=True)
-        
+
     def mRemoveImageMetaData(self, aDom0, aImagePath):
         """Delete .img and sha256sum files of corrupted images
 
         Arguments:
-            aDom0 -- dom0 node 
+            aDom0 -- dom0 node
             aImagePath -- globalcache path of corrupted image
 
         Raises:
@@ -479,7 +493,7 @@ class GlobalCacheWorker:
             return "complete"
 
         return "corrupted"
-    
+
     def mReturnVersionName(self,aVersion):
         _version = aVersion
         _major_version = _version[:2] # "23"
@@ -492,7 +506,7 @@ class GlobalCacheWorker:
         else:
             _version = _major_version + "000" + _ru_date_zip # "23000240716.zip"
         return _version
-        
+
 
     def mCreateSymbolicLink(self, aDom0):
 
@@ -501,15 +515,20 @@ class GlobalCacheWorker:
         if "grid-klone" in self.mGetImageRemotePath():
 
             _image = os.path.basename(self.mGetImageRemotePath())
+            self.mValidateGridKloneBasename(_image)
+            for _alias in self.mGetAdditionalAliases():
+                self.mValidateGridKloneBasename(_alias)
+
             _link = f"/EXAVMIMAGES/{_image}"
             _remote = self.mGetImageRemotePath()
+            _major_version_image = None
 
             _cmd = f"/bin/rm -f {_link}"
             _node.mExecuteCmd(_cmd)
 
             _cmd = f"/bin/cp --reflink {_remote} {_link}"
             _node.mExecuteCmd(_cmd)
-            
+
             # workaround till oeda fix
             # Create reflink with major version only for oeda compatibility
             try:
@@ -526,6 +545,53 @@ class GlobalCacheWorker:
             except Exception as e:
                 ebLogError(f'Error during major version reflink creation : {e}')
 
+            for _alias in self.mGetAdditionalAliases():
+                if _alias in [_image, _major_version_image]:
+                    continue
+                _alias_link = f"/EXAVMIMAGES/{_alias}"
+                _node.mExecuteCmd(f"/bin/rm -f {_alias_link}")
+                _node.mExecuteCmd(f"/bin/cp --reflink {_remote} {_alias_link}")
+
+
+    def mCreateOedaRequiredReflink(self, aDom0, aRequiredBasename):
+
+        self.mValidateGridKloneBasename(self.__imageName)
+        self.mValidateGridKloneBasename(aRequiredBasename)
+
+        _node = self.mGetConnections()[aDom0]
+        _remote = os.path.join(self.__globalCacheFolder, self.__imageName)
+        _alias_link = f"/EXAVMIMAGES/{aRequiredBasename}"
+
+        if not _node.mFileExists(_remote):
+            _msg = f"Staged image {_remote} is missing on {aDom0}"
+            ebLogError(_msg)
+            raise ExacloudRuntimeError(0x0754, 0x0A, _msg)
+
+        _node.mExecuteCmd(f"/bin/rm -f {_alias_link}")
+        _node.mExecuteCmd(f"/bin/cp --reflink {_remote} {_alias_link}")
+        if _node.mGetCmdExitStatus() != 0:
+            _msg = (f"Failed to create OEDA required reflink on {aDom0}: "
+                    f"source {_remote}, alias {_alias_link}")
+            ebLogError(_msg)
+            raise ExacloudRuntimeError(0x0754, 0x0A, _msg)
+
+
+    def mReplayOedaRequiredReflink(self, aRequiredBasename):
+
+        if not aRequiredBasename or aRequiredBasename == self.__imageName:
+            return
+
+        self.mValidateGridKloneBasename(self.__imageName)
+        self.mValidateGridKloneBasename(aRequiredBasename)
+
+        try:
+            self.mCreateConnections()
+            ebLogInfo(f"Replaying OEDA required reflink {aRequiredBasename} on dom0")
+            with ExaLock(f"dom0_global_cache_{self.__imageName}"):
+                for _dom0 in self.mGetDom0List():
+                    self.mCreateOedaRequiredReflink(_dom0, aRequiredBasename)
+        finally:
+            self.mCloseConnections()
 
 
     def mCopyExacloudToDom0(self, aDom0):
@@ -547,7 +613,7 @@ class GlobalCacheWorker:
         _info = self.mCalculateImageInfoState(aDom0, self.mGetImageRemotePath(), aCalculateHash=True)
         self.mUpdateRemoteImageState(aDom0, _info, aDelete=False)
         ebLogInfo(f"Local Copy {self.mGetImageRemotePath()} complete in {aDom0}")
-        
+
         return _ok
 
     def mCopyDom0ToDom0(self, aFromDom0, aToDom0):
@@ -560,9 +626,19 @@ class GlobalCacheWorker:
 
         ebLogInfo(f"Copy image {aFromDom0}#{self.mGetImageRemotePath()} to {aToDom0}#{self.mGetImageRemotePath()}")
 
+        _cmd = f"/usr/bin/ssh-keygen -R {aToDom0.split('.')[0]}"
+        _nodeFrom.mExecuteCmdLog(_cmd)
+        _cmd = f"/usr/bin/ssh-keygen -R {aToDom0}"
+        _nodeFrom.mExecuteCmdLog(_cmd)
+
+        _baseCmd = "/bin/ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=accept-new"
+        _cmd = f"{_baseCmd} root@{aToDom0.split('.')[0]} '/bin/echo new'"
+        _nodeFrom.mExecuteCmdLog(_cmd)
+        _cmd = f"{_baseCmd} root@{aToDom0} '/bin/echo new'"
+        _nodeFrom.mExecuteCmdLog(_cmd)
+
         _cmd = f"/usr/bin/scp"
         _cmd = f"{_cmd} -i /root/.ssh/global_cache_key"
-        _cmd = f"{_cmd} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
         _cmd = f"{_cmd} {self.mGetImageRemotePath()}"
         _cmd = f"{_cmd} root@{aToDom0}:{self.mGetImageRemotePath()}"
         _nodeFrom.mExecuteCmdLog(_cmd)

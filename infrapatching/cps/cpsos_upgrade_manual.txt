@@ -3,7 +3,7 @@
 /
 / cpsos_upgrade_manual.txt
 /
-/ Copyright (c) 2019, 2021, Oracle and/or its affiliates. 
+/ Copyright (c) 2019, 2026, Oracle and/or its affiliates. 
 /
 /   NAME
 /     cpsos_upgrade_manual.txt - <one-line expansion of the name>
@@ -15,6 +15,8 @@
 /     <other useful comments, qualifications, etc.>
 /
 /   MODIFIED   (MM/DD/YY)
+/   kdas     05/04/26 - ER 39146797 - PHASE I SUPPORT FOR CPS SMR 
+/                        :EXACLOUD LAYER
 /   araghave 03/06/21 - ER 32489351 - Refactor cps os patching code inline with
 /                       Infra patching
 /   nmallego    07/31/19 - ER BugX64_190718 - User document for CPS OS Upgrade
@@ -191,6 +193,7 @@ INFO : Patch Precheck for the standby CPS node completed successfully.
 
 * ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
+
 9) Run the rollback on the standby node:
 ecra {scaqak01cps01.us.oracle.com}> remoteec cps upgrade type="cpsos" bundle="/u01/downloads/cpsos/19.2.4.0.0.190709_190709" args="rollback"
 ....
@@ -317,3 +320,21 @@ INFO : Backup completed for the standby CPS node successfully.
 
 17) Similarly, we can also upgrade cps node without taking backup:
 ecra {scaqak01cps01.us.oracle.com}> remoteec cps upgrade type="cpsos" bundle="/u01/downloads/cpsos/19.2.4.0.0.190709_190709" args="patch BACKUP_MODE=no"
+
+
+18) Apply CPS ELU image:
+    The cps-os-upgrader script will apply Exadata live update when the target version is a quarterly image and the isELU flag is set to yes.
+    Before triggering the command, make sure the quarterly payload is staged under /u01/downloads/cpsos/<TargetVersion>  (e.g. /u01/downloads/cpsos/25.2.9.0.0_260425)
+
+    To run a CPS ELU prereq check:
+    /opt/oci/exacc/exacloud/exabox/infrapatching/cps/cps-os-upgrader patch_prereq_check isELU=yes --remote_cps_host=scaqan15cps02 TargetVersion=25.2.9.0.0_260425
+    
+    To run a CPS ELU patch:
+    /opt/oci/exacc/exacloud/exabox/infrapatching/cps/cps-os-upgrader patch isELU=yes --remote_cps_host=scaqan15cps02 TargetVersion=25.2.9.0.0_260425
+
+    To run a CPS ELU rollback:
+    /opt/oci/exacc/exacloud/exabox/infrapatching/cps/cps-os-upgrader rollback isELU=yes --remote_cps_host=scaqan15cps02 TargetVersion=25.2.8.0.0_260415 
+    
+    Notes:
+      * The upgrader automatically injects --live-update-target allcvss for ELU runs.
+      * Always pass the quarterly ELU TargetVersion explicitly for Phase I CPS ELU, and ensure it matches the staged payload directory.

@@ -4,7 +4,7 @@
 #
 # tests_help.py
 #
-# Copyright (c) 2021, 2022, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_help.py - <one-line expansion of the name>
@@ -16,6 +16,9 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    hgaldame    04/23/26 - exacc:security: authenticated whitelist bypass in
+#                           remoteec editor endpoint allows arbitrary file read
+#                           outside approved paths
 #    hgaldame    11/01/22 - 33995798 - exacc remoteec enhancements exaccops-hot
 #    jesandov    04/05/21 - Creation
 #
@@ -74,46 +77,25 @@ class ebTestRemoteManagmentEditor(ebTestClucontrol):
         _endpoint.mListFiles("/fdsaf/fdsaf/")
         self.assertEqual(_endpoint.mGetResponse()['status'], 500)
 
-    def test_001_file_content(self):
+    def test_001_dir_list(self):
 
         # Init Args for endpoint call
         _shared = self.mGetUtil().mGetRemoteEC().mGetShared()
-
-        # Execute endpoint
-        _args = {
-            "folder": self.mGetUtil().mGetExacloudPath(),
-            "regex": ".*",
-            "file": "exabox"
-        }
-
-        _response = {}
-        _endpoint = EditorEndpoint(_args, None, _response, _shared)
-        _endpoint.mGet()
-
-        self.assertTrue("files" in _response['text'])
-        self.assertTrue(len(_response['text']['files']) > 0)
-
         # Execute endpoint
         _args = {
             "folder": self.mGetUtil().mGetExacloudPath(),
             "regex": ".*",
             "offset": 5,
-            "limit": 1,
-            "file": "README"
+            "limit": 1
         }
-
         _response = {}
+        list_file=["file1", "file2"]
         _endpoint = EditorEndpoint(_args, None, _response, _shared)
-        _endpoint.mGet()
-
-        self.assertTrue("filecontent" in _response['text'])
-        self.assertEqual(len(_response['text']['filecontent']), 1)
-        self.assertTrue("05" in _response['text']['filecontent'])
-
-        self.assertEqual(_endpoint.mGetFileContent(aFile="/fdsaf/fdsa"), None)
-        _endpoint.mGetFileContent(aFile="README", aOffset=0, aRegex="[0-9]{1,}")
-        _endpoint.mGetFileContent(aFile="README", aLimit=3)
-
+        with patch.object(_endpoint, "mListFiles", return_value=list_file):
+            _endpoint.mGet()
+        self.assertEqual(_endpoint.mGetResponse()['status'], 200)
+        self.assertEqual(_endpoint.mGetResponse()['text']['files'], list_file)
+       
 
     def test_002_mGet_errors(self):
 
@@ -181,41 +163,25 @@ class ebTestRemoteManagmentEditor(ebTestClucontrol):
 
         # Invalid Folder
         _body = {
-            "file": "/etc/ssh/sshd_config",
+            "file": "/opt/exacloudness/",
             "type": "file"
         }
         _endpoint = EditorEndpoint(None, _body, {}, _shared)
         _endpoint.mPost()
         self.assertEqual(_endpoint.mGetResponse()['status'], 404)
 
-        # Invalid Folder
-        _body = {
-            "folder": "/etc/ssh/",
-            "file": "sshd_config",
-            "type": "file"
-        }
-        _endpoint = EditorEndpoint(None, _body, {}, _shared)
-        _endpoint.mPost()
-        self.assertEqual(_endpoint.mGetResponse()['status'], 500)
-
         # File already exists
         _body = {
             "file": "README",
-            "folder": self.mGetUtil().mGetExacloudPath() + "/../",
+            "folder": self.mGetUtil().mGetExacloudPath(),
             "type": "file"
         }
         _endpoint = EditorEndpoint(None, _body, {}, _shared)
-        _endpoint.mPost()
-        self.assertEqual(_endpoint.mGetResponse()['status'], 500)
+        with patch.object(_endpoint, "mGetPath", return_value=f"{self.mGetUtil().mGetExacloudPath()}/README"):
+            _endpoint.mPost()
+            self.assertEqual(_endpoint.mGetResponse()['status'], 500)
+            self.assertEqual(_endpoint.mGetResponse()['error'], "Error, File already on the Filesystem")
 
-        # File already exists
-        _body = {
-            "file": "README",
-            "type": "file"
-        }
-        _endpoint = EditorEndpoint(None, _body, {}, _shared)
-        _endpoint.mPost()
-        self.assertEqual(_endpoint.mGetResponse()['status'], 500)
 
     def test_005_change_files(self):
 
@@ -498,6 +464,48 @@ class ebTestRemoteManagmentEditor(ebTestClucontrol):
             with self.subTest(" Comparing orderer files at index: {0}".format(_index), _index=_index):
                 self.assertEqual(_endpoint.mGetResponse()['text']['files'][_index]["name"], 
                 os.path.join(self.mGetUtil().mGetExacloudPath(),_order_list[_index]))
+    
+    def test_013_dir_list_not_valid_path(self):
+        # Init Args for endpoint call
+        _shared = self.mGetUtil().mGetRemoteEC().mGetShared()
+        # Execute endpoint
+        invalid_path="/opt/oci/exacc/exacloudness/"
+        _args = {
+            "folder": f'{invalid_path}',
+            "regex": ".*",
+            "offset": 5,
+            "limit": 1
+        }
+        _response = {}
+        list_file=["file1", "file2"]
+        _endpoint = EditorEndpoint(_args, None, _response, _shared)
+        with patch.object(_endpoint, "mListFiles", return_value=list_file):
+            _endpoint.mGet()
+        self.assertEqual(_endpoint.mGetResponse()['status'], 500)
+        self.assertEqual(_endpoint.mGetResponse()['text'], f'Invalid folder location: {invalid_path}')
+    
+    def test_014_list_files_empty_blacklist(self):
+
+        # Init Args for endpoint call
+        _shared = self.mGetUtil().mGetRemoteEC().mGetShared()
+
+        # Execute endpoint
+        _args = {
+            "folder": "log/threads/0000-0000-0000-0000"
+        }
+        _response1 = {}
+        _endpoint = EditorEndpoint(_args, None, _response1, _shared)
+        _list_of_files = ["cluctrl.rack_info.log","cluctrl.vm_cmd.ping.log","cluctrl.info.log"]
+        with patch.object(_endpoint,"_EditorEndpoint__exacloudLogsBlackList",return_value=[]):
+            with patch("os.listdir", return_value=_list_of_files):
+                with patch("os.path.exists", return_value=True):
+                    with patch.object(_endpoint, "mBuildDictFromFile",side_effect=lambda aPath, aFile: {"name":  str(Path(aPath).joinpath(aFile)),"type":"file"}):
+                            with patch("os.path.getmtime") as mock_mtime:
+                                mock_mtime.side_effect = lambda path: 200 if path.endswith("a.log") else 100
+                                list_files = _endpoint.mListFiles(self.mGetUtil().mGetExacloudPath(), ".*")
+                                self.assertEqual(len(list_files), len(_list_of_files))
+                                self.assertEqual(_endpoint.mGetResponse()['status'], 200)
+
 
 if __name__ == '__main__':
     unittest.main(warnings='ignore')

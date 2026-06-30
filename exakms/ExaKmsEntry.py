@@ -4,7 +4,7 @@
 #
 # ExaKmsEntry.py
 #
-# Copyright (c) 2021, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      ExaKmsEntry.py - <one-line expansion of the name>
@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    jesandov    04/28/26 - Bug#39263025 Fix security issues found using IA
 #    jesandov    01/06/25 - Add PKCS8 and TraditionalOpenSSL Format export
 #    ybansod     11/15/24 - Enh 35973125 - EXACS:EXACLOUD:EXAKMS:ADD HASH TO
 #                           PUBLIC KEY COMMENT
@@ -237,10 +238,13 @@ class ExaKmsEntry:
     def mSetHash(self, aValue):
         self.__hash = aValue
 
-    def mGetPublicKey(self, aComment=""):
+    def mGetPublicKey(self, aComment="", aRaw=False):
 
         if not self.__publicKey:
             self.__publicKey = self.mCalculatePublicKey()
+
+        if aRaw:
+            return f"{self.__publicKey}".strip()
 
         if self.mGetHostType() in [ExaKmsHostType.SWITCH, ExaKmsHostType.UNKNOWN]:
             if aComment:

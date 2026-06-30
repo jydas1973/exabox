@@ -333,10 +333,7 @@ def build_opener(aHost: str, aPort: int, aUrl: str, \
             getattr(ssl, _https_protocol))
         # The below is in client context, so certificate will always be required
         # Whether it is TLS or MTLS mode.
-        if not use_oci_certificates():  
-            _context.verify_mode = ssl.CERT_REQUIRED
-        else:
-            _context.verify_mode = ssl.CERT_NONE
+        _context.verify_mode = ssl.CERT_REQUIRED
 
         if not is_exacs():
             # For exacc, ca cert will be a different file than in case of ExaCS

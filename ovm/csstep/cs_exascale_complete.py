@@ -17,6 +17,9 @@ INTERNAL CLASSES:
 
 History:
        MODIFIED (MM/DD/YY)
+       prsshukl  05/22/26 - Bug 39416987 - EXACC: SSL INSPECTION: PHASE1:
+                            EXACLOUD ISN'T COPYING CUSTOMER ROOT CA AS UNABLE
+                            TO LOGIN TO THE CPS WALLET
        aararora  03/20/26 - 39106054: Install Falcon agent during postginid
        jfsaldan  03/10/26 - Bug 39002144 - EXADB-XS-PP: VMC PROVISION GOT STUCK
                             AT THE STEP OF AWAIT_ADD_SSH_KEYS
@@ -103,6 +106,7 @@ class csExaScaleComplete(CSBase):
         ebox.mUpdateStatus('createservice step '+self.step)
         imageBom = ImageBOM(ebox)
         _csu = csUtil()
+        _clu_utils = ebCluUtils(ebox)
 
         ################################
         ### STEPS BEFORE BOOT THE VM ###
@@ -282,7 +286,7 @@ class csExaScaleComplete(CSBase):
                 _nosql.mRunInstall()
                 ebox.mLogStepElapsedTime(_step_time, 'nosql install')
 
-            ebox.mCopySAPfile()
+        ebox.mCopySAPfile()
 
         #
         # POSTGI - Disable TFA if grid_tfa_enabled is not True( Dev Env )
@@ -315,6 +319,8 @@ class csExaScaleComplete(CSBase):
                 #
                 # ER 32161016: Copy DBCS/CPS agent wallets
                 ebox.mAddAgentWallet()
+
+                _clu_utils.mSetupCustomerRootCACertificates()
 
         #
         # ER 27371691: Install DBCS agent rpm
@@ -417,7 +423,6 @@ class csExaScaleComplete(CSBase):
                 except Exception as e: 
                     ebLogWarn(f"*** mInstallSuricataRPM failed with Exception: {str(e)}")
 
-            _clu_utils = ebCluUtils(ebox)
 
             _falcon_domus = [domu for _, domu in ebox.mReturnDom0DomUPair()]
             _clu_utils.mInstallFalconAgentOnDomus(_falcon_domus, "Create Service")
@@ -634,6 +639,11 @@ class csExaScaleComplete(CSBase):
                 _csu.mInstallAhfonDomU(ebox, self.step, steplist, aInit=False, aWait=True)
                 ebox.mUpdateStatusCS(True, self.step, steplist, aComment='Install AHF on Exascale')
                 ebox.mLogStepElapsedTime(_step_time, 'Install AHF on Exascale')
+
+        # Ensure deprecated SSH algorithms are removed on the provisioned DomUs
+        _domus = [domu for _, domu in ebox.mReturnDom0DomUPair()]
+        _algorithms = ebox.mCheckConfigOption('deprecated_ssh_algorithms')
+        _csu.mRemoveDeprecatedSshAlgorithms(_domus, _algorithms)
 
         ebLogInfo('*** Exacloud Operation Successful : POST GI Install')
         ebLogInfo('csExaScaleComplete: Completed doExecute Successfully')

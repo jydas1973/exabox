@@ -17,6 +17,9 @@ EXTERNAL INTERFACES:
 INTERNAL CLASSES:
 
 History:
+    scoral      05/27/2026 - Bug 39443833 - split CONFIGURE_BONDING
+                             into CONFIGURE_BONDING_MONITOR &
+                             CONFIGURE_BONDING_BRIDGE
     bhpati      04/09/2026 - Bug 39083181 - CREATEVM UNDO TRIES TO DELETE WRONG
                              BRIDGE VMETH200
     remamid     03/30/2025 - Bug 39088724 - Enforce cell lock during OEDA step2
@@ -1153,6 +1156,14 @@ class CSBase(metaclass=abc.ABCMeta):
                 else:
                     ebLogInfo('*** enable_2t_memory_support flag is False. 2T memory not supported')
 
+        #
+        # Configure bondmonitor.
+        #
+        if not imageBom.mIsSubStepExecuted(self.step, "CONFIGURE_BONDING_MONITOR") and not _ebox.isExacomputeVM():
+            clubonding.configure_bonding_if_enabled(
+                _ebox, payload=aOptions.jsonconf, configure_bridge=False,
+                configure_monitor=True)
+
         if not imageBom.mIsSubStepExecuted(self.step, "OEDA_STEP"):
             #
             # OEDA CREATE VM
@@ -1243,8 +1254,10 @@ class CSBase(metaclass=abc.ABCMeta):
             _utils.mConfigureEDVbackup(aOptions)
 
         #
-        # Configure bridge only if static monitoring bridge is not supported.
-        if not imageBom.mIsSubStepExecuted(self.step, "CONFIGURE_BONDING") and not _ebox.isExacomputeVM():
+        # Configure bonding bridge.
+        #
+        if not imageBom.mIsSubStepExecuted(self.step, "CONFIGURE_BONDING_BRIDGE") and not _ebox.isExacomputeVM():
+            # Configure bridge only if static monitoring bridge is not supported.
             conf_bridge = \
                 not clubonding.is_static_monitoring_bridge_supported(
                     _ebox, payload=aOptions.jsonconf)

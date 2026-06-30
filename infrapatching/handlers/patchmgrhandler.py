@@ -3,7 +3,7 @@
 #
 # patchmgrhandler.py
 #
-# Copyright (c) 2024, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2024, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      patchmgrhandler.py - base patchmanager class 
@@ -78,6 +78,7 @@ class PatchManager(LogHandler):
         self.__is_cps_launch_node_for_domu = False
         self.__is_management_host_launch_node_for_domu = False
         self.__apply_outstanding_work_items = False
+        self.__reset_live_schedule_outstanding_work_items = False
 
         # patchmanager related status
         self.__status_code = None
@@ -129,9 +130,19 @@ class PatchManager(LogHandler):
 
     def mSetApplyOutstandingWorkDuringEluPatchFlag(self, aApplyOutstandingWorkDuringEluPatch):
         self.__apply_outstanding_work_items = aApplyOutstandingWorkDuringEluPatch
+        if aApplyOutstandingWorkDuringEluPatch:
+            self.__reset_live_schedule_outstanding_work_items = False
 
     def mGetApplyOutstandingWorkDuringEluPatchFlag(self):
         return self.__apply_outstanding_work_items
+
+    def mSetResetLiveUpdateScheduleOutstandingWorkPatchFlag(self, aResetLiveUpdateScheduleOutstandingWork):
+        self.__reset_live_schedule_outstanding_work_items = aResetLiveUpdateScheduleOutstandingWork
+        if aResetLiveUpdateScheduleOutstandingWork:
+            self.__apply_outstanding_work_items = False
+
+    def mGetResetLiveUpdateScheduleOutstandingWorkPatchFlag(self):
+        return self.__reset_live_schedule_outstanding_work_items
 
     def mSetTimeoutInSeconds(self, aTimeoutInSeconds):
         self.__timeout_in_seconds = aTimeoutInSeconds

@@ -16,6 +16,11 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    jfsaldan    05/27/26 - Bug 39448570 - EXACC:CS:NEWR1:CREATE EXACC
+#                           VMCLUSTER FAILED AT
+#                           ESTP_PREVM_CHECKS:/ETC/SYSCONFIG/NETWORK-SCRIPTS/IFCFG-VMETH0:207:IPADDR=10.106.68.26
+#                           BUT IT'S INCORRECT, AS IT CAN PICK UP AN IP THAT IS
+#                           ONLY A PARTIAL MATCH
 #    kanmanic    03/24/26 - 39082361 Update tests for dbmcli
 #    jfsaldan    01/14/26 - Bug 38844619 - EXADBXS CREATE SERVICE | IF A STALE
 #                           ADMIN INTERFACE EXISTS FOR THE SAME ADMIN IP, NEW
@@ -901,6 +906,7 @@ class ebTestClumisc(ebTestClucontrol):
             self.mGetRegexVm(): [
                 [
                    exaMockCommand("cat /etc/oratab *", aRc=0, aStdout="/u02/app/19.13.0.0/gridHome2", aPersist=True),
+                   exaMockCommand(re.escape("cat /etc/oracle/olr.loc | grep 'crs_home' | cut -f 2 -d '='"), aStdout="/u02/app/19.13.0.0/gridHome2"),
                    exaMockCommand(re.escape("export ORACLE_HOME=/u02/app/19.13.0.0/gridHome2; $ORACLE_HOME/bin/oraversion -baseVersion"), aRc=0, aStdout="19.0.0.0.0" ,aPersist=True),
                    exaMockCommand(re.escape("export ORACLE_HOME=/u02/app/19.13.0.0/gridHome2; $ORACLE_HOME/bin/orabase"), aRc=0, aStdout="/u01/app/grid" ,aPersist=True),
                    
@@ -1471,8 +1477,8 @@ class ebTestClumisc(ebTestClucontrol):
             self.mGetRegexDom0(): [
                 [
                     exaMockCommand(f"test.*grep", aRc=0),
-                    exaMockCommand(f"/sbin/grep -RiI 10.31.112.34 /etc/sysconfig/network-scripts/ifcfg-vm.*", aRc=1),
-                    exaMockCommand(f"/sbin/grep -RiI 10.31.112.42 /etc/sysconfig/network-scripts/ifcfg-vm.*", aRc=1),
+                    exaMockCommand(re.escape("/sbin/grep -RiIE '^[[:space:]]*IPADDR[0-9]*=\"?10\\.31\\.112\\.34\"?[[:space:]]*$' /etc/sysconfig/network-scripts/ifcfg-vm*eth*"), aRc=1),
+                    exaMockCommand(re.escape("/sbin/grep -RiIE '^[[:space:]]*IPADDR[0-9]*=\"?10\\.31\\.112\\.42\"?[[:space:]]*$' /etc/sysconfig/network-scripts/ifcfg-vm*eth*"), aRc=1),
                 ],
             ]
         }

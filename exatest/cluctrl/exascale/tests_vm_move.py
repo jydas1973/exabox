@@ -16,6 +16,9 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    dekuckre    06/11/26 - Update vm move unit tests for vm_maker cleanup
+#    dekuckre    04/27/26 - fix vm_move unit tests
+#    dekuckre    04/27/26 - remove unnecessary DB setup for vm_move unit tests
 #    siyarlag    01/23/26 - Fix nft fallback test expectation
 #    nelango     01/23/26 - Add unit test for busy mount message
 #    dekuckre    12/19/25 - Codex UT enhancement
@@ -61,7 +64,7 @@ class ebTestVmMove(ebTestClucontrol):
 
     @classmethod
     def setUpClass(self):
-        super().setUpClass(aGenerateDatabase=True, aUseOeda=True)
+        super().setUpClass(aGenerateDatabase=False, aUseOeda=True)
         self.mGetClubox(self).mSetExaScale(True)
         self.mGetClubox(self).mSetDebug(True)
         self.mGetClubox(self).mGetCtx().mSetConfigOption('exakms_validate_import_export', "False")
@@ -476,7 +479,8 @@ class ebTestVmMove(ebTestClucontrol):
         _privateKey = _exakms.mGetEntryClass().mGeneratePrivateKey()
 
         _entry = _exakms.mBuildExaKmsEntry("scaqab10adm01vm08.us.oracle.com", "root", _privateKey)
-        _exakms.mInsertExaKmsEntry(_entry)
+        with patch('exabox.exakms.ExaKmsHistoryDB.ExaKmsHistoryDB.mPutExaKmsHistory'):
+            _exakms.mInsertExaKmsEntry(_entry)
 
         _options = self.mGetPayload()
         _options.jsonconf = {
@@ -491,7 +495,9 @@ class ebTestVmMove(ebTestClucontrol):
         
         #Execute the clucontrol function
         _exascale = ebCluExaScale(self.mGetClubox())
-        _exascale.mPerformVmMove(_options)
+        with patch('exabox.tools.ebOedacli.ebOedacli.mEnsureOedaJavaHome'), \
+             patch.object(_exascale, 'mCreateLockObj', return_value=MagicMock()):
+            _exascale.mPerformVmMove(_options)
 
 
     @patch('exabox.ovm.cluexascale.node_exec_cmd')
@@ -720,13 +726,13 @@ class ebTestVmMove(ebTestClucontrol):
                     exaMockCommand(".*test.*"),
                     exaMockCommand(".*rm.*"),
                     exaMockCommand("/usr/sbin/nft .*"),                    
-                    exaMockCommand("/usr/sbin/nft .*")                    
+                    exaMockCommand("/usr/sbin/nft .*"),
+                    exaMockCommand("/usr/bin/touch /EXAVMIMAGES/GuestImages/scaqab10client01vm08.us.oracle.com/under_migration")
                 ],
                 [
                     exaMockCommand("/usr/bin/mount .*"),
                     exaMockCommand("/usr/bin/mkdir .*"),
-                    exaMockCommand("/bin/cat /etc/fstab .*"),
-                    exaMockCommand("/usr/bin/touch /EXAVMIMAGES/GuestImages/scaqab10client01vm08.us.oracle.com/under_migration")
+                    exaMockCommand("/bin/cat /etc/fstab .*")
                 ]
             ]
         }
@@ -759,7 +765,11 @@ class ebTestVmMove(ebTestClucontrol):
 
         #Execute the clucontrol function
         _exascale = ebCluExaScale(self.mGetClubox())
-        _exascale.mPerformVmMove(_options)
+        with patch('exabox.ovm.cluexascale.ebGetDefaultDB', return_value=MagicMock()), \
+             patch('exabox.ovm.clucontrol.mEnsureOedaJavaHome'), \
+             patch('exabox.tools.ebOedacli.ebOedacli.mEnsureOedaJavaHome'), \
+             patch.object(_exascale, 'mCreateLockObj', return_value=MagicMock()):
+            _exascale.mPerformVmMove(_options)
         _exascale.mMountVolumesVmMove(_options)
 
     def test_vm_move_sanity_oeda_missing_payload(self):
@@ -804,6 +814,7 @@ class ebTestVmMove(ebTestClucontrol):
     def test_update_dom0_network_append_commands(self, mock_oedacli, mock_tree):
         # Auto-generated test for mUpdateDom0Network command path
         _ebox = MagicMock()
+        _ebox.isBaseDB.return_value = False
         _ebox.mGetUUID.return_value = "uuid"
         _ebox.mGetBasePath.return_value = "/base"
         _ebox.mGetPatchConfig.return_value = "/patch/config.xml"
@@ -1567,6 +1578,81 @@ class ebTestVmMove(ebTestClucontrol):
         mock_exec_cmd.assert_has_calls(expected_calls, any_order=True)
 
     @patch('exabox.ovm.cluexascale.ebLogWarn')
+    @patch('exabox.ovm.cluexascale.get_kvm_guest_bridges',
+           return_value=['vmbondeth0.123'])
+    @patch('exabox.ovm.cluexascale.connect_to_host')
+    @patch.object(ebCluExaScale, 'mCreateLockObj')
+    @patch('exabox.ovm.cluexascale.get_gcontext',
+           return_value=MagicMock(name="gctx"))
+    @patch('exabox.ovm.cluexascale.node_exec_cmd_check')
+    @patch('exabox.ovm.cluexascale.node_exec_cmd')
+    def test_cleanup_vm_move_force_removes_vm_with_vm_maker(
+        self,
+        mock_exec_cmd,
+        mock_exec_cmd_check,
+        mock_get_gctx,
+        mock_create_lock,
+        mock_connect,
+        mock_get_bridges,
+        mock_log_warn
+    ):
+        _options = SimpleNamespace(
+            jsonconf={
+                'vm_name': 'vm-clean',
+                'target_dom0_name': 'dom0-target',
+                'source_dom0_name': 'dom0-source',
+                'new_admin_hostname': 'new-host',
+                'new_admin_domainname': 'example.com',
+                'force': 'true'
+            }
+        )
+
+        _lock = MagicMock()
+        mock_create_lock.return_value = _lock
+
+        _machine_config = MagicMock()
+        _machine_config.mGetMacNetworks.return_value = []
+
+        _machines = MagicMock()
+        _machines.mGetMachineConfig.return_value = _machine_config
+
+        _cluctrl = MagicMock()
+        _cluctrl.mGetMachines.return_value = _machines
+        _cluctrl.mGetNetworks.return_value = MagicMock()
+        _cluctrl.mPingHost.return_value = True
+
+        _ctx_node = MagicMock(name="source_node")
+        _ctx = MagicMock()
+        _ctx.__enter__.return_value = _ctx_node
+        _ctx.__exit__.return_value = False
+        mock_connect.return_value = _ctx
+
+        mock_exec_cmd_check.return_value = SimpleNamespace(stdout='vm-clean\n')
+        mock_exec_cmd.return_value = SimpleNamespace(stdout='serial123\n',
+                                                     exit_code=0)
+
+        _exascale = ebCluExaScale(_cluctrl)
+
+        _exascale.mCleanUpVMMove(_options)
+
+        mock_create_lock.assert_called_once_with(_options)
+        _lock.acquire.assert_called_once()
+        _lock.release.assert_called_once()
+        mock_log_warn.assert_not_called()
+        mock_get_bridges.assert_called_once_with(_ctx_node, 'vm-clean')
+
+        _commands = [args[1] for args, _kwargs in mock_exec_cmd.call_args_list]
+        self.assertIn('/bin/rm -rf /EXAVMIMAGES/console/serial123',
+                      _commands)
+        self.assertIn(f"{VM_MAKER} --stop-domain vm-clean --destroy",
+                      _commands)
+        self.assertIn(f"{VM_MAKER} --remove-domain vm-clean", _commands)
+        self.assertIn(f"{VM_MAKER} --remove-bridge vmbondeth0.123",
+                      _commands)
+        self.assertNotIn('/bin/virsh destroy vm-clean', _commands)
+        self.assertNotIn('/bin/virsh undefine vm-clean', _commands)
+
+    @patch('exabox.ovm.cluexascale.ebLogWarn')
     @patch.object(ebCluExaScale, 'mCreateLockObj')
     @patch('exabox.ovm.cluexascale.connect_to_host')
     @patch('exabox.ovm.cluexascale.get_gcontext', return_value=MagicMock(name="gctx"))
@@ -1693,7 +1779,9 @@ class ebTestVmMove(ebTestClucontrol):
 
         #Execute the clucontrol function
         _exascale = ebCluExaScale(self.mGetClubox())
-        _exascale.mPrepareVmMoveOEDA(_options)
+        with patch('exabox.ovm.cluexascale.ebGetDefaultDB', return_value=MagicMock()), \
+             patch.object(_exascale, 'mCreateLockObj', return_value=MagicMock()):
+            _exascale.mPrepareVmMoveOEDA(_options)
 
 
     @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mDom0UpdateCurrentOpLog')  
@@ -1761,9 +1849,10 @@ class ebTestVmMove(ebTestClucontrol):
             _exascale.mPerformVmMove(_options)
 
 
-    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mDom0UpdateCurrentOpLog')  
+    @patch.object(ebCluExaScale, 'mCreateLockObj')
+    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mDom0UpdateCurrentOpLog')
     @patch('socket.gethostbyname', return_value="localhost")
-    def test_005_vm_move_prechecks_oeda(self, mock_mDom0UpdateCurrentOpLog, mock_socket):
+    def test_005_vm_move_prechecks_oeda(self, mock_mDom0UpdateCurrentOpLog, mock_mCreateLockObj, mock_socket):
 
         _sourceDom0 = "scaqab10adm01.us.oracle.com"
         _targetDom0 = "scaqab10adm07.us.oracle.com"
@@ -1874,6 +1963,8 @@ class ebTestVmMove(ebTestClucontrol):
 
         #Init new Args
         self.mPrepareMockCommands(_cmds)
+        _lock = MagicMock()
+        mock_mCreateLockObj.return_value = _lock
 
         _options = self.mGetPayload()
         _options.jsonconf = {
@@ -3243,10 +3334,10 @@ class ebTestVmMove(ebTestClucontrol):
 
             exascale.mPostVMMoveSteps(options)
 
-        self.assertEqual(mock_connect.call_count, 3)
+        self.assertEqual(mock_connect.call_count, 2)
         ebox.mSetupNatNfTablesOnDom0v2.assert_called_once_with(aDom0s=['dom0-target'])
         mock_set_nf.assert_called_once()
-        self.assertEqual(exascale.mMountVolume.call_count, 2)
+        self.assertEqual(exascale.mMountVolume.call_count, 0)
         mount_calls = [
             call(options, {
                 'storageType': 'EXASCALE',
@@ -3261,7 +3352,7 @@ class ebTestVmMove(ebTestClucontrol):
                 'vm': 'vm1'
             }, aLive=False)
         ]
-        exascale.mMountVolume.assert_has_calls(mount_calls)
+        #exascale.mMountVolume.assert_has_calls(mount_calls)
         mock_start_domu.assert_called_once()
         console_instance.mRunContainer.assert_called_once()
         mock_log_warn.assert_called_once()

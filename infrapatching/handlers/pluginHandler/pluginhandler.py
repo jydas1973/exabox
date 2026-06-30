@@ -3,7 +3,7 @@
 #
 # pluginhandler.py
 #
-# Copyright (c) 2020, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2020, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      pluginhandler.py - This module contains common methods to support DBNU and Exacloud plugins.
@@ -15,6 +15,14 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    jyotdas     06/16/26 - Enh 39523473 - Track Plugin Progress Status in
+#                           Infrapatching Tooling
+#    araghave    06/08/26 - Bug 39483306 - QMR PATCHING FAILING DUE TO "BAD
+#                           AUTHENTICATION TYPE; ALLOWED TYPES: [PUBLICKEY] ON
+#                           DOMU TARGET
+#    sdevasek    06/03/26 - Bug 39483306 - QMR PATCHING FAILING FOR
+#                           DOM0DOMU PLUGIN FAILURE
+#    avimonda    05/15/26 - Bug 39189788 use plugin-specific console timeout
 #    araghave    08/13/25 - Enh 38228272 - EXACC GEN2 | PATCHING | SWITCH BACK
 #                           TO OPC USER FOR ALL INFRA PATCH USE CASES IN CASE
 #                           OF ROOT KEY INJECTION FAILS
@@ -84,9 +92,11 @@
 
 import os
 import json
+import time
 import traceback
 from time import sleep
 from exabox.infrapatching.handlers.generichandler import GenericHandler
+from exabox.core.DBStore import ebGetDefaultDB
 from exabox.core.Node import exaBoxNode
 from exabox.core.Context import get_gcontext
 from exabox.infrapatching.utils.constants import PATCH_DOM0, PATCH_DOMU, PLUGIN_DBNU, POST_PATCH, OP_STYLE_NON_ROLLING, TASK_ONEOFF, TASK_ONEOFFV2
@@ -264,6 +274,184 @@ class PluginHandler(GenericHandler):
     def mSetPluginTarget(self, aTarget):
         self.__plugin_target = aTarget
 
+    def mResolvePluginComponent(self, aPluginsToRun):
+        """
+        Map the executed plugin script name to its plugin_component (the role/script
+        that actually ran). This distinguishes the dom0.sh-on-dom0 step from the
+        dom0_domu.sh-on-domu step within a single dom0+dom0domu request. 
+
+           dom0.sh / dom0_exasplice.sh  -> PLUGIN_COMPONENT_DOM0
+           domu.sh                      -> PLUGIN_COMPONENT_DOMU
+           dom0_domu.sh                 -> PLUGIN_COMPONENT_DOM0DOMU
+        """
+        _script = os.path.basename(aPluginsToRun) if aPluginsToRun else ""
+        if _script == "dom0_domu.sh":
+            return PLUGIN_COMPONENT_DOM0DOMU
+        if _script in ("dom0.sh", "dom0_exasplice.sh"):
+            return PLUGIN_COMPONENT_DOM0
+        if _script == "domu.sh":
+            return PLUGIN_COMPONENT_DOMU
+        # Defensive fallback so an unexpected script name still maps to a valid
+        # component instead of producing an empty upsert key.
+        if "dom0_domu" in _script:
+            return PLUGIN_COMPONENT_DOM0DOMU
+        if "domu" in _script:
+            return PLUGIN_COMPONENT_DOMU
+        return PLUGIN_COMPONENT_DOM0
+
+    def mGetPluginProgressTimestamp(self):
+        """
+        Return the current time formatted the same way as node_progressing_status
+        timestamps (infra_patch_start_time / patchmgr_start_time). 
+        """
+        return time.strftime("%Y-%m-%d %H:%M:%S%z")
+
+    def mUpsertPluginProgress(self, aNode, aPluginType, aPluginComponent, aStage, aStatus,
+                              aStartTime=None, aEndTime=None, aAssociatedDom0=None,
+                              aScriptAlias=None, aIsMetadataPlugin=False):
+        """
+        Upsert one plugin progress entry into data[plugin_progressing_status]. Records are
+        keyed by (node_name, plugin_component, is_metadata_plugin); pre_patch/post_patch are
+        always lists of per-script entries keyed by script_alias. A dom0+dom0domu run yields a
+        separate dom0 record (on the dom0 node, no associated_dom0) and one dom0domu record per
+        domU (on the domU node, associated_dom0 = parent dom0). Normal records hold a single
+        entry (parent script name); metadata (V2) records hold one entry per registered script.
+
+        Normal plugin execution (dom0 + dom0domu):
+            "plugin_progressing_status": {
+                "plugin_type": "dom0+dom0domu",
+                "plugin_progress_data": [
+                    {
+                        "node_name": "scaqak01adm01",
+                        "plugin_component": "dom0",
+                        "is_metadata_plugin": false,
+                        "pre_patch": [{"script_alias": "dom0.sh", "status": "SUCCESS",
+                                       "start_time": "...", "end_time": "..."}],
+                        "post_patch": [{"script_alias": "dom0.sh", "status": "RUNNING",
+                                        "start_time": "...", "end_time": null}]
+                    },
+                    {
+                        "node_name": "scaqak01dv0101",
+                        "plugin_component": "dom0domu",
+                        "is_metadata_plugin": false,
+                        "associated_dom0": "scaqak01adm01",
+                        "pre_patch": [{"script_alias": "dom0_domu.sh", "status": "SUCCESS",
+                                       "start_time": "...", "end_time": "..."}],
+                        "post_patch": [{"script_alias": "dom0_domu.sh", "status": "RUNNING",
+                                        "start_time": "...", "end_time": null}]
+                    }
+                ]
+            }
+
+        Metadata (V2) plugin execution (dom0 + dom0domu, one entry per registered script):
+            "plugin_progressing_status": {
+                "plugin_type": "dom0+dom0domu",
+                "plugin_progress_data": [
+                    {
+                        "node_name": "scaqak01adm01",
+                        "plugin_component": "dom0",
+                        "is_metadata_plugin": true,
+                        "pre_patch": [
+                            {"script_alias": "validate_net", "status": "SUCCESS",
+                             "start_time": "...", "end_time": "..."},
+                            {"script_alias": "stop_services", "status": "SUCCESS",
+                             "start_time": "...", "end_time": "..."}
+                        ],
+                        "post_patch": [
+                            {"script_alias": "start_services", "status": "RUNNING",
+                             "start_time": "...", "end_time": null}
+                        ]
+                    },
+                    {
+                        "node_name": "scaqak01dv0101",
+                        "plugin_component": "dom0domu",
+                        "is_metadata_plugin": true,
+                        "associated_dom0": "scaqak01adm01",
+                        "pre_patch": [
+                            {"script_alias": "vm_precheck", "status": "SUCCESS",
+                             "start_time": "...", "end_time": "..."}
+                        ],
+                        "post_patch": [
+                            {"script_alias": "vm_postcheck", "status": "RUNNING",
+                             "start_time": "...", "end_time": null}
+                        ]
+                    }
+                ]
+            }
+
+        """
+
+        try:
+            _reqobj = self.mGetCluControl().mGetRequestObj()
+            if not _reqobj:
+                return
+            _child_uuid = _reqobj.mGetUUID()
+            _db = ebGetDefaultDB()
+            _row = _db.mGetPatchChildRequest(_child_uuid)
+            _report = {}
+            if _row and _row[1]:
+                try:
+                    _report = json.loads(_row[1])
+                except Exception:
+                    _report = {}
+            if "data" not in _report or not _report["data"]:
+                _report["data"] = self.mAddPatchreport()
+            _data = _report["data"]
+            _pps = _data.setdefault(PLUGIN_PROGRESSING_STATUS, {})
+            _pps[PLUGIN_PROGRESS_PLUGIN_TYPE] = aPluginType          # hoisted, constant per run
+            _list = _pps.setdefault(PLUGIN_PROGRESS_DATA, [])
+            # Record key includes is_metadata_plugin so a parent and a metadata record on the
+            # same (node, plugin_component) do not collide.
+            _record = next((e for e in _list
+                            if e.get(PLUGIN_PROGRESS_NODE_NAME) == aNode
+                            and e.get(PLUGIN_PROGRESS_PLUGIN_COMPONENT) == aPluginComponent
+                            and bool(e.get(PLUGIN_PROGRESS_IS_METADATA_PLUGIN)) == bool(aIsMetadataPlugin)), None)
+            if _record is None:
+                _record = {
+                    PLUGIN_PROGRESS_NODE_NAME: aNode,
+                    PLUGIN_PROGRESS_PLUGIN_COMPONENT: aPluginComponent,
+                    PLUGIN_PROGRESS_IS_METADATA_PLUGIN: bool(aIsMetadataPlugin),
+                }
+                # associated_dom0 only on dom0domu records
+                if aPluginComponent == PLUGIN_COMPONENT_DOM0DOMU and aAssociatedDom0:
+                    _record[PLUGIN_PROGRESS_ASSOCIATED_DOM0] = aAssociatedDom0
+                _list.append(_record)
+            # pre_patch / post_patch are always a list of per-script entries; upsert the
+            # entry for this script_alias.
+            _stage_key = (PLUGIN_PROGRESS_PRE_PATCH if aStage == PRE_PATCH
+                          else PLUGIN_PROGRESS_POST_PATCH)
+            _stage_list = _record.setdefault(_stage_key, [])
+            _entry = next((s for s in _stage_list
+                           if s.get(PLUGIN_PROGRESS_SCRIPT_ALIAS) == aScriptAlias), None)
+            _first_insert = _entry is None
+            if _first_insert:
+                _entry = {PLUGIN_PROGRESS_SCRIPT_ALIAS: aScriptAlias}
+                _stage_list.append(_entry)
+            _entry[PLUGIN_PROGRESS_STATUS_KEY] = aStatus
+            if aStartTime is not None:
+                _entry[PLUGIN_PROGRESS_START_TIME] = aStartTime
+                _entry[PLUGIN_PROGRESS_END_TIME] = None   # reset on (re)start
+            if aEndTime is not None:
+                _entry[PLUGIN_PROGRESS_END_TIME] = aEndTime
+            # Plugin progress is only ever merged into the existing report (read-merge-write);
+            # a stage entry is created once and thereafter status-updated in place, so existing
+            # progress is never overwritten/dropped.
+            if _first_insert:
+                self.mPatchLogInfo(
+                    "Inserting plugin progress (first update): node=%s component=%s "
+                    "metadata=%s stage=%s script=%s status=%s"
+                    % (aNode, aPluginComponent, bool(aIsMetadataPlugin), _stage_key,
+                       aScriptAlias, aStatus))
+            else:
+                self.mPatchLogInfo(
+                    "Updating plugin progress: node=%s component=%s metadata=%s stage=%s "
+                    "script=%s status=%s"
+                    % (aNode, aPluginComponent, bool(aIsMetadataPlugin), _stage_key,
+                       aScriptAlias, aStatus))
+            _db.mUpdateJsonPatchReport(_child_uuid, json.dumps(_report, indent=4))
+        except Exception as e:
+            self.mPatchLogWarn(f"mUpsertPluginProgress best-effort update failed: {str(e)}")
+
     # equivalent to mUpdatePluginsMetadata in old code
     def initializePluginMetadata(self):
         """
@@ -329,13 +517,21 @@ class PluginHandler(GenericHandler):
             if self.mGetOpStyle() == OP_STYLE_NON_ROLLING:
                 self.mTruncatedom0domuPlugins()
 
-    def mExecutePrePostExacloudPlugins(self, aNode, aNodeType, aRemotePluginDir, aPluginsToRun, aStage, aRollback):
+    def mExecutePrePostExacloudPlugins(self, aNode, aNodeType, aRemotePluginDir, aPluginsToRun, aStage, aRollback, aAssociatedDom0=None):
         """
           # Connect to a node (dom0 and domU) and run require plugins.
             PATCH_SUCCESS_EXIT_CODE : when successful
             Hexadecimal error code other than PATCH_SUCCESS_EXIT_CODE : when fails
         """
         _domUCustomerName = None
+
+        _component = self.mResolvePluginComponent(aPluginsToRun)
+
+        # For the parent path the stage entry's script_alias is the parent script name
+        # (e.g. dom0.sh / domu.sh / dom0_domu.sh), uniform with the metadata path.
+        _script_alias = os.path.basename(aPluginsToRun) if aPluginsToRun else None
+        _start_time = self.mGetPluginProgressTimestamp()
+
         try:
             ret = PATCH_SUCCESS_EXIT_CODE
             _connected_as_non_root_user = False
@@ -350,8 +546,11 @@ class PluginHandler(GenericHandler):
                     self.mSetLastNodePatched(_domUCustomerName)
 
             _node = exaBoxNode(get_gcontext())
-            # Connect as opc for domU if exist, otherwise, as root user
-            _user_to_connect_with = self.mGetUserDetailsBasedOnDomUhostnameToRunPlugins(aNode)
+            _user_to_connect_with = None
+            if aNodeType == PATCH_DOMU and self.mGetTargetTypes()[0].lower() in [PATCH_DOM0]:
+                # Connect as opc for domU if exist, otherwise, as root user
+                _user_to_connect_with = self.mGetUserDetailsBasedOnDomUhostnameToRunPlugins(aNode)
+
             if aNodeType == PATCH_DOMU and _user_to_connect_with:
                 _username = _user_to_connect_with
                 self.mPatchLogInfo(
@@ -422,6 +621,13 @@ class PluginHandler(GenericHandler):
                 else:
                     self.mPatchLogInfo(f"Plugin session is still active: {_plugin_log_file}")
 
+                # Record that the plugin run is in progress 
+                self.mUpsertPluginProgress(aNode, self.mGetPluginTypes(), _component, aStage,
+                                           PLUGIN_STATUS_PROGRESSING,
+                                           aStartTime=_start_time,
+                                           aAssociatedDom0=aAssociatedDom0,
+                                           aScriptAlias=_script_alias)
+
                 # Read plugins console log output.
                 ret = self.mReadPluginScriptConsoleOut(aNode, _plugin_log_file, aNodeType)
 
@@ -440,6 +646,16 @@ class PluginHandler(GenericHandler):
                 self.mAddError(ret, _suggestion_msg)
 
         finally:
+            # Single point covering Exit status:0 success, Exit status:2 /
+            # other failures, the exception branch and the timeout branch.
+            _term_status = (PLUGIN_STATUS_SUCCESS if ret == PATCH_SUCCESS_EXIT_CODE
+                            else PLUGIN_STATUS_FAILED)
+            self.mUpsertPluginProgress(aNode, self.mGetPluginTypes(), _component, aStage,
+                                       _term_status,
+                                       aStartTime=_start_time,
+                                       aEndTime=self.mGetPluginProgressTimestamp(),
+                                       aAssociatedDom0=aAssociatedDom0,
+                                       aScriptAlias=_script_alias)
             return ret
 
     def mCleanupPluginsfromTargetNode(self, aDom0UNode, aNodeType, aPluginsDir, aStage):
@@ -458,12 +674,14 @@ class PluginHandler(GenericHandler):
         self.mPatchLogInfo(f"Cleaning up plugins from {_node_type_name} '{aDom0UNode}'")
         try:
             _node = exaBoxNode(get_gcontext())
-            # Connect as opc for domU if exist, otherwise, as root user
-            _user_to_connect_with = self.mGetUserDetailsBasedOnDomUhostnameToRunPlugins(aDom0UNode)
+            _user_to_connect_with = None
+            if aNodeType == PATCH_DOMU and self.mGetTargetTypes()[0].lower() in [PATCH_DOM0]:
+                # Connect as opc for domU if exist, otherwise, as root user
+                _user_to_connect_with = self.mGetUserDetailsBasedOnDomUhostnameToRunPlugins(aDom0UNode)
             if aNodeType == PATCH_DOMU and _user_to_connect_with:
                 _username = _user_to_connect_with
 
-            if _username != 'root':
+            if _username and _username != 'root':
                 _connected_as_non_root_user = True
 
             with connect_to_host(aDom0UNode, get_gcontext(), username=_username) as _dom0U:
@@ -509,12 +727,15 @@ class PluginHandler(GenericHandler):
         self.mPatchLogInfo(f"Copying plugin logs to ecra node from {_node_type_name} '{aDom0UNode}'")
         try:
             _node = exaBoxNode(get_gcontext())
-            # Connect as opc for domU if exist, otherwise, as root user
-            _user_to_connect_with = self.mGetUserDetailsBasedOnDomUhostnameToRunPlugins(aDom0UNode)
+            _user_to_connect_with = None
+            if aNodeType == PATCH_DOMU and self.mGetTargetTypes()[0].lower() in [PATCH_DOM0]:
+                # Connect as opc for domU if exist, otherwise, as root user
+                _user_to_connect_with = self.mGetUserDetailsBasedOnDomUhostnameToRunPlugins(aDom0UNode)
+
             if aNodeType == PATCH_DOMU and _user_to_connect_with:
                 _username = _user_to_connect_with
 
-            if _username != 'root':
+            if _username and _username != 'root':
                 _connected_as_non_root_user = True
 
             with connect_to_host(aDom0UNode, get_gcontext(), username=_username) as _dom0U_local:
@@ -577,11 +798,14 @@ class PluginHandler(GenericHandler):
                 f"Read plugin console from {aNodeType} node = {aNode} and log loc = {aPluginLogPathLaunchNode}")
 
             _current_time_in_sec = 0
-            # For ADB CC domu plugin, plugin console time out is set to 60 mins and for the other cases it is 23hrs
-            _plugin_console_wait_time = self.mGetExadataPatchmgrConsoleReadTimeoutSec()
+            # Default plugin console timeout is 23 hours; ADB CC DOMU plugin,
+            # plugin console time out is set to 60 mins.
+            _plugin_console_wait_time = self.mGetExacloudPluginConsoleExecutionTimeoutInSeconds()
 
             _node = exaBoxNode(get_gcontext())
-            _user_to_connect_with = self.mGetUserDetailsBasedOnDomUhostnameToRunPlugins(aNode)
+            _user_to_connect_with = None
+            if aNodeType == PATCH_DOMU and self.mGetTargetTypes()[0].lower() in [PATCH_DOM0]:
+                _user_to_connect_with = self.mGetUserDetailsBasedOnDomUhostnameToRunPlugins(aNode)
             if aNodeType == PATCH_DOMU and _user_to_connect_with:
                 _username = _user_to_connect_with
 

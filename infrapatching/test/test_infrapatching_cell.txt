@@ -15,6 +15,13 @@
 #      Unit test case script for all cell operations.
 #
 #    MODIFIED   (MM/DD/YY)
+#    sdevasek    05/11/26 - Bug 39206007 - ADD SYNCIMAGEVERSIONS API TESTS
+#                           WITH NODENAME AND RACKNAME STATUS OUTPUT CHECKS
+#    sdevasek    05/08/26 - Bug 39336703 - INFRAPATCHING TEST AUTOMATION -
+#                           UPDATE PLUGIN VALIDATIONS TESTS TO VALIDATE WITH
+#                           CORRECT ERROR CODE FOR INVALID TARGETTYPE
+#    araghave    04/23/26 - Enh 39152619 - MODIFY ALL SMR/ELU OPERATIONS TO
+#                           ROLLING OPERATIONS STYLE IN INFRA PATCHING CODE
 #    mirrodri    03/27/26 - Bug 39121841 CELL_PATCH_PREREQ_CHECK_EXACLOUD
 #                           _THREAD_LOG_SPACE_CHECK TEST FAILED WITH 
 #                           KeyError: 'errorCode'
@@ -159,7 +166,7 @@ class Test_cell_class(unittest.TestCase):
     def __init__(self, *initial_data, **kwargs):
         super(Test_cell_class, self).__init__(*initial_data, **kwargs)
         self.__operation = ""
-        self.__operation_style = OP_STYLE_AUTO
+        self.__operation_style = OP_STYLE_ROLLING
         self.__required_nodes_in_node_progress_status = []
         self.__non_required_nodes_in_node_progress_status = []
         self.__patch_node_list = []
@@ -192,7 +199,7 @@ class Test_cell_class(unittest.TestCase):
     @pytest.mark.cell_one_off
     def test_cell_one_off(self):
         self.__operation = TASK_ONEOFF
-        self.__operation_style = OP_STYLE_AUTO
+        self.__operation_style = OP_STYLE_ROLLING
         self.mValidatePatchOperationWithIncludeNodeList()
 
     @pytest.mark.cell_software_version_list_validator
@@ -284,11 +291,110 @@ class Test_cell_class(unittest.TestCase):
             _swversions_json = json.loads(_output)
             self.assertTrue(len(_swversions_json["softwareVersions"]) == 0, "Software version list is not empty")
 
+    @pytest.mark.cell_sync_image_versions_api
+    def test_cell_sync_image_versions_api(self):
+        """
+        Validate syncInfraImageVersions API for a cell node.
+        """
+        if mGetInfraPatchingTestConfigParam("is_r1_env") == "True":
+            _ecra_url = mGetInfraPatchingTestConfigParam("ecraurl")
+            _username = base64.b64decode(
+                mGetInfraPatchingTestConfigParam("ecrausername")
+            ).decode("utf-8")
+            _password = base64.b64decode(
+                mGetInfraPatchingTestConfigParam("ecrapassword")
+            ).decode("utf-8")
+            _cell_node = Test_cell_class.__cells[0]
+            _payload = '{"nodeName":"%s","targetType":"cell"}' % _cell_node
+            _curl_cmd = (
+                "curl --silent -u %s:%s -i -k -X POST "
+                "--header 'Content-Type: application/json' "
+                "--header 'Accept: application/json' "
+                "-d '%s' '%s/infrapatch/syncInfraImageVersions'"
+            ) % (_username, _password, _payload, _ecra_url)
+
+            #mPatchLogInfo("syncInfraImageVersions cell nodeName curl cmd: %s" % _curl_cmd)
+            _response = mExecuteCmd(aCmd=_curl_cmd)
+            mPatchLogInfo("syncInfraImageVersions cell nodeName response: %s" % _response)
+            self.assertTrue(
+                _response.startswith(HTTP_202_RESPONSE_CODE),
+                "syncInfraImageVersions request did not return HTTP 202 for cell.",
+            )
+
+            _status_url = mGetHTTPHeaderValueFromHTTPResponse(_response, STATUS_URI).strip()
+            self.assertTrue(_status_url, "status_uri header is missing for cell syncInfraImageVersions request.")
+
+            _ret, _status_output = mCheckPatchOperationStatus(_status_url)
+            self.assertTrue(_ret, "syncInfraImageVersions operation failed for cell: %s" % _status_output)
+            _status_json = json.loads(_status_output)
+            _ec_details = json.loads(_status_json.get("ec_details", "{}"))
+            _cell_list = _ec_details.get("cells", [])
+            _cell_short = _cell_node.split(".", 1)[0]
+            self.assertTrue(
+                any(("hostname" in _d and "imageversion" in _d) for _d in _cell_list),
+                "syncInfraImageVersions status output missing hostname/imageversion attributes for cell.",
+            )
+            self.assertTrue(
+                any((_d.get("hostname", "") == _cell_node) or (_d.get("hostname", "").split(".", 1)[0] == _cell_short)
+                    for _d in _cell_list),
+                "Expected nodeName is missing in syncInfraImageVersions status output for cell nodeName test.",
+            )
+
+    @pytest.mark.cell_sync_image_versions_api_with_rackname
+    def test_cell_sync_image_versions_api_with_rackname(self):
+        """
+        Validate syncInfraImageVersions API for a rackName with cell targetType.
+        """
+        if mGetInfraPatchingTestConfigParam("is_r1_env") == "True":
+            _ecra_url = mGetInfraPatchingTestConfigParam("ecraurl")
+            _username = base64.b64decode(
+                mGetInfraPatchingTestConfigParam("ecrausername")
+            ).decode("utf-8")
+            _password = base64.b64decode(
+                mGetInfraPatchingTestConfigParam("ecrapassword")
+            ).decode("utf-8")
+            _rack_name = mGetInfraPatchingTestConfigParam("cluster")
+            _payload = '{"rackName":"%s","targetType":"cell"}' % _rack_name
+            _curl_cmd = (
+                "curl --silent -u %s:%s -i -k -X POST "
+                "--header 'Content-Type: application/json' "
+                "--header 'Accept: application/json' "
+                "-d '%s' '%s/infrapatch/syncInfraImageVersions'"
+            ) % (_username, _password, _payload, _ecra_url)
+
+            mPatchLogInfo("syncInfraImageVersions cell rackName curl cmd: %s" % _curl_cmd)
+            _response = mExecuteCmd(aCmd=_curl_cmd)
+            mPatchLogInfo("syncInfraImageVersions cell rackName response: %s" % _response)
+            self.assertTrue(
+                _response.startswith(HTTP_202_RESPONSE_CODE),
+                "syncInfraImageVersions request did not return HTTP 202 for rackName cell target.",
+            )
+
+            _status_url = mGetHTTPHeaderValueFromHTTPResponse(_response, STATUS_URI).strip()
+            self.assertTrue(_status_url, "status_uri header is missing for rackName cell syncInfraImageVersions request.")
+
+            _ret, _status_output = mCheckPatchOperationStatus(_status_url)
+            self.assertTrue(_ret, "syncInfraImageVersions operation failed for rackName cell target: %s" % _status_output)
+            _status_json = json.loads(_status_output)
+            _ec_details = json.loads(_status_json.get("ec_details", "{}"))
+            _cell_list = _ec_details.get("cells", [])
+            _cell_node = Test_cell_class.__cells[0]
+            _cell_short = _cell_node.split(".", 1)[0]
+            self.assertTrue(
+                any(("hostname" in _d and "imageversion" in _d) for _d in _cell_list),
+                "syncInfraImageVersions status output missing hostname/imageversion attributes for rackName cell target.",
+            )
+            self.assertTrue(
+                any((_d.get("hostname", "") == _cell_node) or (_d.get("hostname", "").split(".", 1)[0] == _cell_short)
+                    for _d in _cell_list),
+                "Expected first cell node is missing in syncInfraImageVersions status output for cell rackName test.",
+            )
+
     @pytest.mark.cell_one_off_v2
     def test_cell_one_off_v2(self):
         # step1: Validate plugin is executed and plugin files are present
         self.__operation = TASK_ONEOFFV2
-        self.__operation_style = OP_STYLE_AUTO
+        self.__operation_style = OP_STYLE_ROLLING
 
         mUpdateParamInPayload("OneoffScriptAlias", "script_%s_%s" % (PATCH_CELL, ONEOFF_PLUGIN))
         self.mValidatePatchOperationWithIncludeNodeList()
@@ -349,7 +455,7 @@ class Test_cell_class(unittest.TestCase):
         _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
 
         _response = json.loads(_out)
-        self.assertEqual(_response["errorCode"], "0x030E0011", "Even though an invalid PluginType is specified, "
+        self.assertEqual(_response["errorCode"], "0x030E0012", "Even though an invalid Plugin Target is specified, "
                                                                "the expected error has not occurred.")
 
         # 3. Validate for exacloud plugin type for cell
@@ -432,7 +538,7 @@ class Test_cell_class(unittest.TestCase):
         _data = '{ "ScriptAlias": "ScriptAlias", "PluginType": "oneoff", "PluginTarget": "dom0,cell"}'
         _ret, _out = plugin_meta_data_handler.mRegisterInfrapatchPluginMetadataScriptsWithJsonInput(_data)
         _response = json.loads(_out)
-        self.assertEqual(_response["errorCode"], "0x030E0011",
+        self.assertEqual(_response["errorCode"], "0x030E0012",
                          "PluginTarget can not have dom0,cell  as value for plugin metadata registration.")
 
         # 15. ScriptName can not be empty

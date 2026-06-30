@@ -76,6 +76,7 @@ class ebTestExaKms(ebTestClucontrol):
         super().setUpClass(aGenerateDatabase=True)
         self.exakms = None
         self.exakmsSingleton = None
+        get_gcontext().mSetConfigOption('ssh_connect_max_retries', '1')
 
     def mCleanUpKeys(self, aExaKms=None):
 
@@ -622,10 +623,14 @@ class ebTestExaKms(ebTestClucontrol):
                 [
                     exaMockCommand("echo.*", aPersist=True),
                     exaMockCommand("sed.*", aPersist=True),
+                    exaMockCommand("test.*", aPersist=True),
+                    exaMockCommand("cat.*", aPersist=True),
                 ],
                 [
                     exaMockCommand("echo.*", aPersist=True),
                     exaMockCommand("sed.*", aPersist=True),
+                    exaMockCommand("test.*", aPersist=True),
+                    exaMockCommand("cat.*", aPersist=True),
                 ],
             ],
         }
@@ -693,6 +698,25 @@ class ebTestExaKms(ebTestClucontrol):
         # Clean up keys
         self.mCleanUpKeys()
 
+        _cmds = {
+            self.mGetRegexDom0(): [
+                [
+                    exaMockCommand("echo.*", aPersist=True),
+                    exaMockCommand("sed.*", aPersist=True),
+                    exaMockCommand("test.*", aPersist=True),
+                    exaMockCommand("cat.*", aPersist=True),
+                ],
+                [
+                    exaMockCommand("echo.*", aPersist=True),
+                    exaMockCommand("sed.*", aPersist=True),
+                    exaMockCommand("test.*", aPersist=True),
+                    exaMockCommand("cat.*", aPersist=True),
+                ],
+            ],
+        }
+
+        self.mPrepareMockCommands(_cmds)
+
         _host = self.mGetClubox().mReturnDom0DomUPair()[0][0]
         _user = "root"
 
@@ -706,22 +730,11 @@ class ebTestExaKms(ebTestClucontrol):
             "hostname": _host,
             "user": _user,
             "hosttype": ExaKmsHostType.DOM0.name
-        })
+       })
 
         _endpoint = ExaKmsEndpoint(_options)
         _endpoint.mSetExaKms(self.exakms)
-
-        CmdResult = namedtuple("CmdResult", ["exit_code", "stdout", "stderr"])
-        endpoint_module = sys.modules[ExaKmsEndpoint.__module__]
-
-        with patch.object(endpoint_module, "connect_to_host") as mock_connect,\
-                patch.object(endpoint_module, "node_exec_cmd") as mock_exec:
-            mock_node = Mock()
-            mock_connect.return_value.__enter__.return_value = mock_node
-            mock_connect.return_value.__exit__.return_value = None
-            mock_exec.return_value = CmdResult(0, "", "")
-
-            _rc = _endpoint.mExecute()
+        _rc = _endpoint.mExecute()
 
         self.assertEqual(_rc, 0, "create_key returned non-zero status")
 
@@ -982,78 +995,6 @@ class TestExaKmsOCIUnit(ebTestClucontrol):
             obj_client.get_namespace.assert_called_once()
             factory.get_crypto_client.assert_called_once_with('mock_crypto_ep')
 
-    # ------------------------------ mSearchExaKmsEntries (retry + parsing) ------------------------------
-
-    def test_search_entries_retries_on_sslerror_and_parses_entries(self):
-        mock_ctx = self._mock_ctx()
-        factory, obj_client, crypto_client = self._mk_factory_with_clients()
-        # list_objects returns SSLError once, then success
-        obj1 = Mock()
-        obj1.name = 'host1'
-        list_resp = Mock()
-        list_resp.data.objects = [obj1]
-        list_resp.data.next_start_with = None
-
-        obj_client.list_objects.side_effect = [SSLError("net"), list_resp]
-
-        # mGetOSS returns JSON content for one key
-        obj_data = {
-            'id_rsa.host1.user1': {
-                'encData': 'ED',
-                'encDEK': 'EK',
-                'version': 'ECDSA',
-                'hash': 'H1',
-                'creationTime': '2024-01-01T00:00:00Z',
-                'label': 'LBL',
-                'exacloud_host': 'EXAH',
-                'hostType': 'DOMU',
-                'keyValueInfo': {'k': 'v'}
-            }
-        }
-        get_resp = Mock()
-        get_resp.data.content = json.dumps(obj_data).encode('utf-8')
-        get_resp.status = 200
-
-        # Build entry returns a configurable mock that stores values set by setters
-        def _build_entry(fqdn, user, pkey, aHostType=ExaKmsHostType.UNKNOWN, aClassName=None):
-            e = Mock()
-            e._objname = None
-            e._ctime = None
-            e._fqdn = fqdn
-            e.mSetCryptoClient = Mock()
-            e.mSetEncDEK = Mock()
-            e.mSetEncData = Mock()
-            e.mSetObjectName = Mock(side_effect=lambda v: setattr(e, '_objname', v))
-            e.mSetHash = Mock()
-            e.mSetCreationTime = Mock(side_effect=lambda v: setattr(e, '_ctime', v))
-            e.mSetLabel = Mock()
-            e.mSetExacloudHost = Mock()
-            e.mSetHostType = Mock()
-            e.mSetKeyValueInfo = Mock()
-            e.mGetCreationTime = Mock(side_effect=lambda: e._ctime)
-            e.mGetObjectName = Mock(side_effect=lambda: e._objname)
-            e.mGetFQDN = Mock(return_value=fqdn)
-            return e
-
-        with patch('exabox.exakms.ExaKmsOCI.get_gcontext', return_value=mock_ctx), \
-             patch('exabox.exakms.ExaKmsOCI.ExaOCIFactory', return_value=factory), \
-             patch('exabox.exakms.ExaKmsOCI.cryptographyAES', return_value=Mock()), \
-             patch('exabox.exakms.ExaKmsOCI.ExaKmsHistoryOCI', return_value=Mock()):
-            exa = ExaKmsOCI()
-
-            # Patch instance-level methods
-            with patch.object(exa, 'mGetOSS', return_value=get_resp) as p_getoss, \
-                 patch.object(exa, 'mBuildExaKmsEntry', side_effect=_build_entry) as p_build, \
-                 patch.object(exa, 'mUpdateCacheKey') as p_upd:
-
-                entries = exa.mSearchExaKmsEntries({'FQDN': 'host1'}, aRefreshKey=True)
-
-                self.assertEqual(len(entries), 1)
-                obj_client.list_objects.assert_called()
-                p_getoss.assert_called_once_with('mock_bucket', 'host1')
-                p_build.assert_called_once()
-                p_upd.assert_called()
-
     # ------------------------------ mPutOSS / mGetOSS / mDeleteOSS retry logic ------------------------------
 
     def _mk_exa_for_oss_calls(self):
@@ -1278,41 +1219,6 @@ class TestExaKmsOCIUnit(ebTestClucontrol):
             self.assertEqual(args[1], 'changes.txt')
             merged = args[2]
             self.assertIn("2025-01-02 B", merged)
-
-    # ------------------------------ mRestoreBackup ------------------------------
-
-    def test_restore_backup_copies_newer_entries_to_main(self):
-        mock_ctx = self._mock_ctx({'exakms_bucket_secondary': 'backup'})
-        factory, obj_client, crypto_client = self._mk_factory_with_clients()
-        with patch('exabox.exakms.ExaKmsOCI.get_gcontext', return_value=mock_ctx), \
-             patch('exabox.exakms.ExaKmsOCI.ExaOCIFactory', return_value=factory), \
-             patch('exabox.exakms.ExaKmsOCI.cryptographyAES', return_value=Mock()), \
-             patch('exabox.exakms.ExaKmsOCI.ExaKmsHistoryOCI', return_value=Mock()):
-            exa = ExaKmsOCI()
-
-        # Backup entries
-        e_newer = Mock()
-        e_newer.mGetFQDN.return_value = 'h1'
-        e_newer.mGetUser.return_value = 'u1'
-        e_newer.mGetCreationTime.return_value = 20
-
-        e_older = Mock()
-        e_older.mGetFQDN.return_value = 'h2'
-        e_older.mGetUser.return_value = 'u2'
-        e_older.mGetCreationTime.return_value = 10
-
-        # Main entry older or missing
-        main_for_newer = Mock()
-        main_for_newer.mGetCreationTime.return_value = 5  # older than backup
-        main_for_older = None  # not present
-
-        with patch.object(exa, 'mSearchExaKmsEntries', return_value=[e_newer, e_older]) as p_search, \
-             patch.object(exa, 'mGetExaKmsEntry', side_effect=[main_for_newer, main_for_older]) as p_get_entry, \
-             patch.object(exa, 'mInsertToBucket') as p_insert:
-            ok = exa.mRestoreBackup()
-            self.assertTrue(ok)
-            # Insert called for both (newer-than-main and main-missing)
-            self.assertEqual(p_insert.call_count, 2)
 
 # ===============================================================================================
 

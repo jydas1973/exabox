@@ -15,6 +15,10 @@ NOTE:
 History:
 
     MODIFIED   (MM/DD/YY)
+    jfsaldan   05/07/26 - Set Java home for OEDA execution
+    oespinos   04/28/26 - Bug 39236220 - Reset actions before calling deconfigure kvm host
+    pbellary   04/23/26 - Bug 39238514 - EXACS:26.1.0:X11M:ADD CELL SUPPORT FOR EXASCALE WITH EF MEDIA TYPE
+    oespinos   03/09/26 - Bug 39128891 Deconfigure exascale on deleted cell
     oespinos   03/09/26 - Bug 39001455 Deconfigure exascale kvm host
     pbellary   03/04/26 - Bug 39037277 - CLUSTER XMLS GET BONDETH4 SET FOR BACKUP NETWORK CONFIGURATION INSTEAD OF BONDETH1
     mpedapro   02/03/26 - Enh::38914367 support for oeda bonding options for
@@ -90,6 +94,7 @@ from exabox.core.Context import get_gcontext
 from exabox.log.LogMgr import ebLogError, ebLogInfo, ebLogWarn, ebLogDebug, ebLogVerbose
 from exabox.core.Error import ExacloudRuntimeError
 from exabox.ovm.cluacceleratednetwork import ebCluAcceleratedNetwork
+from exabox.tools.ebOedacli.ebOedacli import mEnsureOedaJavaHome
 import shlex
 
 from exabox.network.NetworkUtils import NetworkUtils
@@ -105,12 +110,11 @@ class ebOedacli(object):
     def __init__(self, oedaclipath=None, save_dir='/tmp'):
         if oedaclipath and os.path.isfile(oedaclipath):
             self.OEDACLI_PATH = oedaclipath
-        elif os.path.isfile('/scratch/jopatino/tmp/linux-x64/oedacli'):
-            self.OEDACLI_PATH = '/scratch/jopatino/tmp/linux-x64/oedacli'
         elif os.path.isfile(os.getcwd() + '/oeda/oedacli'):
             self.OEDACLI_PATH = os.getcwd() + '/oeda/oedacli'
         else:
             raise ExacloudRuntimeError(1,2,"Invalid oedacli path:{}".format(oedaclipath))
+        mEnsureOedaJavaHome(os.path.dirname(self.OEDACLI_PATH))
         self._oedacli_script = []
         self._no_actions = True
         self.save_dir = save_dir
@@ -179,6 +183,10 @@ class ebOedacli(object):
         else:
             self._oedacli_script.append('MERGE ACTIONS')
 
+    def reset_actions(self):
+        self._no_actions = False
+        self._oedacli_script.append('RESET ACTIONS')
+
     def run_oedacli(self, source=None, save_path=None, script_path=None, deploy=False, resetActions=True):
         self._oedacli_script.insert(0, 'LOAD FILE NAME=%s' % (os.path.abspath(source)))
 
@@ -216,7 +224,12 @@ class ebOedacli(object):
         #occmds = [exp for exp in occmds if not exp.startswith('#')]
         script = '\n'.join(occmds) + '\n'
         out = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        stdo, stde = wrapStrBytesFunctions(out).communicate(input=script.encode('utf8'))
+        try:
+            stdo, stde = wrapStrBytesFunctions(out).communicate(input=script.encode('utf8'), timeout=60*60)
+        except subprocess.TimeoutExpired:
+            out.kill()
+            stdo, stde = wrapStrBytesFunctions(out).communicate(input=script.encode('utf8'))
+
         # FIXME: oedacli does not report returncode if errors during merge
         if 'ERROR:' in stdo or 'ERROR :' in stdo or out.returncode !=0 :
             if not os.path.exists(self.save_dir):
@@ -483,7 +496,7 @@ class OedacliCmdMgr(object):
             self.oxm.oc_cmd(command='SET INTERCONNECT NAME2=%s, IP2=%s' % (_json['domU']['interconnect2']['fqdn'], _json['domU']['interconnect2']['ipaddr']))
         self.mSetNetwork(_json, aNetType='vip')
 
-    def mBuildCloneCell(self, aSrcCell, aJson, aKVM=False):
+    def mBuildCloneCell(self, aSrcCell, aJson, aKVM=False, aMachineType=None):
         """
         Add CELL TO XML
         :param aSrcCell: cell
@@ -491,11 +504,15 @@ class OedacliCmdMgr(object):
         """
         _srccell = aSrcCell
         _json = aJson
+        _machine_type = aMachineType
 
         #CELL COMMANDS
         if aKVM:
             # User clone newcell cmd in KVM env.
-            self.oxm.oc_cmd(command=f"CLONE NEWCELL SRCNAME='{_srccell}' TGTNAME='{_json['admin']['fqdn']}'")
+            if _machine_type:
+                self.oxm.oc_cmd(command=f"CLONE NEWCELL SRCNAME='{_srccell}' TGTNAME='{_json['admin']['fqdn']}' TYPE='{_machine_type}'")
+            else:
+                self.oxm.oc_cmd(command=f"CLONE NEWCELL SRCNAME='{_srccell}' TGTNAME='{_json['admin']['fqdn']}'")
             # Set gateway and netmask for Admin network in KVM env.
             self.oxm.oc_cmd(command=f"SET ADMINNET NAME='{_json['admin']['fqdn']}', IP='{_json['admin']['ipaddr']}' gateway='{_json['admin']['gateway']}' netmask='{_json['admin']['netmask']}'")
         else:
@@ -932,9 +949,10 @@ class OedacliCmdMgr(object):
         _celllist = []
         for _cellinfo in _json['cells']:
             _celllist.append(_cellinfo['hostname'])
-               
+            _machine_type = _cellinfo['type']
+
             if _step == "CONFIG_CELL":
-                self.mBuildCloneCell(_srccell, _cellinfo, _kvm)
+                self.mBuildCloneCell(_srccell, _cellinfo, _kvm, _machine_type)
                 self.oxm.save_action()
                 self.oxm.run_oedacli(aSrcXml, aDestXml, None, deploy=False)
                 aSrcXml = aDestXml
@@ -1012,6 +1030,14 @@ class OedacliCmdMgr(object):
         self.oxm.save_action()
         self.oxm.run_oedacli(aSrcXml, aDestXml, None, False)
 
+    def mAlterExascaleClusterDropCells(self, aSrcXml, aDestXml, aCellList, aName):
+        _celllist = ' '.join(aCellList)
+
+        self.oxm.reset_actions()
+        self.oxm.oc_cmd(command=f"ALTER EXASCALECLUSTER DROPCELLS='{_celllist}' WHERE NAME={aName}")
+        self.oxm.save_action()
+        self.oxm.run_oedacli(aSrcXml, aDestXml, None, True)
+
     def mUndoConfigureKVMHosts(self, aSrcXml, aDestXml, aComputeList):
         self.mDeployExascaleAction(aSrcXml, aDestXml, "UNDOCONFIGUREKVMHOSTS", aComputeList)
 
@@ -1021,6 +1047,7 @@ class OedacliCmdMgr(object):
             _hostnamelist = ' '.join(aHostnames)
             _command = _command + f" WHERE HOSTNAMES='{_hostnamelist}'"
         ebLogInfo(f"Running oedacli command : {_command}")
+        self.oxm.reset_actions()
         self.oxm.oc_cmd(command=_command)
         self.oxm.save_action()
         self.oxm.run_oedacli(aSrcXml, aDestXml, None, True)

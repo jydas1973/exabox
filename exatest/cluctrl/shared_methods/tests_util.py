@@ -4,7 +4,7 @@
 #
 # tests_util.py
 #
-# Copyright (c) 2021, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      tests_util.py - <one-line expansion of the name>
@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    jfsaldan    06/22/26 - Migrate Exacloud IMDSv1 references to IMDSv2
 #    bhpati      09/11/25 - Bug 38276080 - delete-service is not removing vm's
 #                           from the host if hypervisor service is down
 #    abflores    05/01/25 - Bug 37862473: EXACLOUD SECRET CLEANER ISSUE |
@@ -187,12 +188,14 @@ class ebTestClucontrolUtil(ebTestClucontrol):
                         exaMockCommand(f"cp -f {_sqlnetfile} {_sqlnetfile}.orig", aRc=0, aStdout="", aPersist=True)                                                          
                     ],                                                                                                                                                       
                     [             
-                        exaMockCommand(re.escape("cat /etc/oratab | grep '^+ASM.*' | cut -f 2 -d ':'"), aRc=0, aStdout="/u01/app/19.0.0.0/grid" ,aPersist=True),                                                                                                                                        
+                        exaMockCommand(re.escape("cat /etc/oratab | grep '^+ASM.*' | cut -f 2 -d ':'"), aRc=0, aStdout="/u01/app/19.0.0.0/grid" ,aPersist=True),  
+                        exaMockCommand(re.escape("cat /etc/oracle/olr.loc | grep 'crs_home' | cut -f 2 -d '='"), aStdout="/u01/app/19.0.0.0/grid"),                                                                                                                                      
                         exaMockCommand(f"cp -f {_sqlnetfile} {_sqlnetfile}.orig", aRc=0, aStdout="", aPersist=True),
                         exaMockCommand("/u01/app/19.0.0.0/grid/bin/crsctl check cluster | grep -c online | grep -w 3", aRc=0, aStdout="", aPersist=True),
                     ],
                     [
                         exaMockCommand(re.escape("/bin/cat /etc/oratab | /bin/grep '^+ASM.*' | /bin/cut -f 2 -d ':'"), aRc=0, aStdout="/u01/app/19.0.0.0/grid" ,aPersist=True),
+                        exaMockCommand(re.escape("cat /etc/oracle/olr.loc | grep 'crs_home' | cut -f 2 -d '='"), aStdout="/u01/app/19.0.0.0/grid"),
                         exaMockCommand(re.escape("export ORACLE_HOME=/u01/app/19.0.0.0/grid; $ORACLE_HOME/bin/oraversion -baseVersion"), aRc=0, aStdout="19.0.0.0.0" ,aPersist=True),
                         exaMockCommand(re.escape("export ORACLE_HOME=/u01/app/19.0.0.0/grid; $ORACLE_HOME/bin/orabase"), aRc=0, aStdout="/u01/app/grid" ,aPersist=True),
                         exaMockCommand("/u01/app/19.0.0.0/grid/bin/crsctl check cluster | grep -c online | grep -w 3", aRc=0, aStdout="", aPersist=True),
@@ -201,6 +204,7 @@ class ebTestClucontrolUtil(ebTestClucontrol):
                     [
                         exaMockCommand('/u01/app/19.0.0.0/grid/bin/crsctl query css votedisk | grep "Located 5 voting disk"', aRc=0, aStdout="", aPersist=True),
                         exaMockCommand(re.escape("cat /etc/oratab | grep '^+ASM.*' | cut -f 2 -d ':'"),  aRc=0, aStdout="/u01/app/19.0.0.0/grid", aPersist=True),
+                        exaMockCommand(re.escape("cat /etc/oracle/olr.loc | grep 'crs_home' | cut -f 2 -d '='"), aStdout="/u01/app/19.0.0.0/grid"),
                         exaMockCommand("/u01/app/19.0.0.0/grid/bin/crsctl check cluster | grep -c online | grep -w 3", aRc=0, aStdout="", aPersist=True),
                         exaMockCommand("/u01/app/19.0.0.0/grid/bin/srvctl status asm | grep 'ASM is running on'", aRc=0, aStdout="ASM is running on c3709n10c2,c3716n2c2", aPersist=True),
                         exaMockCommand("/u01/app/19.0.0.0/grid/bin/srvctl status filesystem | grep 'is mounted on nodes'", aRc=0, aStdout="ACFS file system /acfs01 is mounted on nodes c3709n10c2,c3709n5c2", aPersist=True)
@@ -511,7 +515,7 @@ class ebTestClucontrolUtil(ebTestClucontrol):
                 self.mGetRegexVm():
                 [
                     [
-                        exaMockCommand("http://169.254.169.254/opc/v1/instance/canonicalRegionName", aRc=0, aStdout="", aPersist=True),
+                        exaMockCommand("curl -H .*Authorization: Bearer Oracle.*http://169.254.169.254/opc/v2/instance/canonicalRegionName", aRc=0, aStdout="", aPersist=True),
                         exaMockCommand("cat /etc/passwd", aRc=0, aStdout="", aPersist=True),
                         exaMockCommand("cat /etc/group", aRc=0, aStdout="", aPersist=True),
                         exaMockCommand("test ! -f /etc/ssh/sshd_config.bkbyHostUpdater && cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bkbyHostUpdater", aRc=0, aStdout="", aPersist=True),

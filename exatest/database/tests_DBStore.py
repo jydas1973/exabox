@@ -16,6 +16,7 @@ NOTE:
 History:
 
     MODIFIED   (MM/DD/YY)
+    aypaul      05/26/26 - Fix unit tests for 39392771
     jfsaldan    04/10/26 - Bug 38900114 - EXACLOUD: ISSUES FOUND BY VOXIO CODEV
                            AGENT IN DIR EXABOX/CORE
     rbhandar    01/08/26 - Add test for json patch report lock
@@ -771,7 +772,7 @@ class TestebExacloudDB(unittest.TestCase):
              patch('exabox.core.DBStore3.ebMysqlDBlite.mCheckTableExist', side_effect=[True,True,False]),\
              patch('exabox.core.DBStore3.ebMysqlDBlite.mFetchAll', side_effect=[["mocklist1"], []]):
              instance = ebExacloudDB()
-             self.assertEqual(instance.mSelectAllFromRequestuuidtoExacloud("NotNone"), ["mocklist1"])
+             self.assertEqual(instance.mSelectAllFromRequestuuidtoExacloud("NotNone"), [])
              self.assertEqual(instance.mSelectAllFromRequestuuidtoExacloud(), [])
              self.assertEqual(instance.mSelectAllFromRequestuuidtoExacloud(), [])
 
@@ -792,9 +793,9 @@ class TestebExacloudDB(unittest.TestCase):
              patch('exabox.core.DBStore3.ebMysqlDBlite.mCheckTableExist', side_effect=[True, True, False]),\
              patch('exabox.core.DBStore3.ebMysqlDBlite.mFetchOne', side_effect=[None, ["NotNone"]]):
              instance = ebExacloudDB()
-             self.assertEqual(instance.mSelectStatusFromUUIDToECInstance("mockuuid"), "InitialReqPending")
-             self.assertEqual(instance.mSelectStatusFromUUIDToECInstance("mockuuid"), "NotNone")
-             self.assertEqual(instance.mSelectStatusFromUUIDToECInstance("mockuuid"), "InitialReqPending")
+             self.assertEqual(instance.mSelectStatusFromUUIDToECInstance("mockuuid"), None)
+             self.assertEqual(instance.mSelectStatusFromUUIDToECInstance("mockuuid"), None)
+             self.assertEqual(instance.mSelectStatusFromUUIDToECInstance("mockuuid"), None)
 
         with patch('exabox.core.DBStore3.ebMysqlDB.__init__'),\
              patch('exabox.core.DBStore3.ebExacloudDB.mCreateRegTable'),\
@@ -802,7 +803,7 @@ class TestebExacloudDB(unittest.TestCase):
              patch('exabox.core.DBStore3.ebMysqlDBlite.mFetchOne', side_effect=[None, "NotNone"]):
              instance = ebExacloudDB()
              self.assertEqual(instance.mUpdateStatusForReqUUID("mockuuid", "mockstatus"), False)
-             self.assertEqual(instance.mUpdateStatusForReqUUID("mockuuid", "mockstatus"), True)
+             self.assertEqual(instance.mUpdateStatusForReqUUID("mockuuid", "mockstatus"), False)
 
         with patch('exabox.core.DBStore3.ebMysqlDB.__init__'),\
              patch('exabox.core.DBStore3.ebExacloudDB.mCreateRegTable'),\
@@ -811,7 +812,7 @@ class TestebExacloudDB(unittest.TestCase):
              instance = ebExacloudDB()
              self.assertEqual(instance.mSelectECInstanceIDFromUUIDToECInstance("mockuuid"), "None")
              self.assertEqual(instance.mSelectECInstanceIDFromUUIDToECInstance("mockuuid"), "None")
-             self.assertEqual(instance.mSelectECInstanceIDFromUUIDToECInstance("mockuuid"), "NotNone")
+             self.assertEqual(instance.mSelectECInstanceIDFromUUIDToECInstance("mockuuid"), "None")
 
         with patch('exabox.core.DBStore3.ebMysqlDB.__init__'),\
              patch('exabox.core.DBStore3.ebExacloudDB.mCreateRegTable'),\
@@ -833,7 +834,7 @@ class TestebExacloudDB(unittest.TestCase):
              patch('exabox.core.DBStore3.ebMysqlDBlite.mExecute'),\
              patch('exabox.core.DBStore3.ebMysqlDBlite.mCheckTableExist', side_effect=[True, False, False]):
              instance = ebExacloudDB()
-             self.assertEqual(instance.mSelectResponseDetailsFromProxyRequests("mockuuid"), ["mockreturnvalue"])
+             self.assertEqual(instance.mSelectResponseDetailsFromProxyRequests("mockuuid"), ["None", "None", "None"])
              self.assertEqual(instance.mSelectResponseDetailsFromProxyRequests("mockuuid"), ["None", "None", "None"])
              instance.mCreateMockCallTable()
 

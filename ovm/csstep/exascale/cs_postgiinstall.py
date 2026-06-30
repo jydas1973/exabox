@@ -4,7 +4,7 @@
 #
 # cs_exascale_complete.py
 #
-# Copyright (c) 2021, 2025, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      cs_postgiinstall.py - XS Create Service POST GI INSTALL
@@ -42,6 +42,7 @@ class csPostGIInstall(CSBase):
         ebLogTrace('csPostGIInstall: Entering doExecute')
         _ebox = aCluCtrlObj
         _steplist = aStepList
+        _csu = csUtil()
 
         _ebox.mUpdateStatus('createservice step ' +self.step)
 
@@ -135,6 +136,13 @@ class csPostGIInstall(CSBase):
             _ebox.mUpdateStatusCS(True, self.step, _steplist, aComment='Restarting dnsmasq service on CPS')
             _ebox.mRestartDnsmasq()
             _ebox.mLogStepElapsedTime(_step_time, 'Restarting dnsmasq service on CPS')
+
+        #
+        # Ensure deprecated SSH algorithms are removed on the provisioned DomUs
+        #
+        _domus = [domu for _, domu in _ebox.mReturnDom0DomUPair()]
+        _algorithms = _ebox.mCheckConfigOption('deprecated_ssh_algorithms')
+        _csu.mRemoveDeprecatedSshAlgorithms(_domus, _algorithms)
 
 
         ebLogInfo('*** Exacloud Operation Successful : POST GI Install')

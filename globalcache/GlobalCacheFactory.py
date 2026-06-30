@@ -4,7 +4,7 @@
 #
 # GlobalCacheFactory.py
 #
-# Copyright (c) 2021, 2024, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      GlobalCacheFactory.py - <one-line expansion of the name>
@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    joysjose    06/19/26 - Bug 39588664 update OEDA required reflink replay
+#    joysjose    05/13/26 - Bug 39354509 Add multigi OEDA required reflink on dom0
 #    pbellary    05/09/24 - Bug 36553223 - EXADBXS:23.4.1.2.2:ZURICH: DOM0 TO DOM0 
 #                           IMAGE COPY FAILING DUE TO IMPROPER PASSWORDLESS SETUP
 #    ririgoye    02/20/24 - Bug 36315154 - Switched from checking skippable
@@ -40,12 +42,14 @@ from exabox.core.Error import ExacloudRuntimeError
 from exabox.log.LogMgr import ebLogError, ebLogInfo, ebLogWarn, ebLogTrace
 from exabox.utils.node import (connect_to_host, node_cmd_abs_path_check,
                                node_exec_cmd, node_write_text_file)
+from exabox.ovm.clumisc import mGetMultiGIOedaSelection
 
 from exabox.BaseServer.AsyncProcessing import ProcessManager, ProcessStructure
 
-def mStartWorker(aImagePath, aImageHash, aDom0s):
+def mStartWorker(aImagePath, aImageHash, aDom0s, aAdditionalAliases=None):
 
-    _worker = GlobalCacheWorker(aImagePath, aImageHash, aDom0s)
+    _worker = GlobalCacheWorker(aImagePath, aImageHash, aDom0s,
+                                aAdditionalAliases=aAdditionalAliases)
     _rc = _worker.mDoImageCopy()
 
     return _rc
@@ -220,13 +224,24 @@ class GlobalCacheFactory:
             ebLogWarn('*** Image configuration not found - skipping images/bits update and copy')
             return
 
+        _multi_gi_selection = mGetMultiGIOedaSelection(self.mGetClubox())
+        _staged_basename = _multi_gi_selection.get("staged_basename")
+        _required_basename = _multi_gi_selection.get("required_basename")
+        _selected_image = None
+
         _plist = ProcessManager()
         for _image in _fileList:
             _poolArgs = []
             _hash = None
+            _additional_aliases = []
             if "sha256sum" in _image:
                 _hash = _image['sha256sum']
-            _poolArgs = [_image['local'], _hash, _dom0s]
+            if _staged_basename and _required_basename:
+                _image_basename = os.path.basename(_image['local'])
+                if _image_basename == _staged_basename and _required_basename != _staged_basename:
+                    _additional_aliases.append(_required_basename)
+                    _selected_image = _image
+            _poolArgs = [_image['local'], _hash, _dom0s, _additional_aliases]
             _p = ProcessStructure(mStartWorker, _poolArgs)
             _p.mSetMaxExecutionTime(120*60) # 120 minutes timeout should be enough to copy for each file.
             _p.mSetJoinTimeout(60)
@@ -234,6 +249,13 @@ class GlobalCacheFactory:
             _plist.mStartAppend(_p)
 
         _plist.mJoinProcess()
+
+        if _selected_image:
+            _worker = GlobalCacheWorker(_selected_image["local"],
+                                        _selected_image.get("sha256sum"),
+                                        _dom0s)
+            _worker.mReplayOedaRequiredReflink(_required_basename)
+
 
 
 # end of file

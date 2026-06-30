@@ -11,6 +11,7 @@ NOTE:
     None
 
 History:
+    jfsaldan    05/07/2026 - Enh 39120682 - Add Java home from config or package
     llmartin  12/12/25 - Enh 38754528 - provide RPMs info on /Version endpoint
     ririgoye    11/06/2024 - Bug 37229020 - EXACS EXACLOUD - OEDA_BUILD IS 
                              UPDATED ONLY WHEN EXACLOUD IS RESTARTED
@@ -114,6 +115,7 @@ class exaBoxContext(object):
         self.__exachk_path = None
         self.__cps_sync = False
         self.__oeda_build_version = None
+        self.__java_home = None
 
         # Compute base path
         if aBasePath is None:
@@ -188,6 +190,38 @@ class exaBoxContext(object):
 
     def mGetBasePath(self):
         return self.__basepath
+
+    def mGetJavaHome(self):
+        """
+        Return the configured or packaged Java home used by Exacloud runtime tools.
+        """
+        if self.__java_home is not None:
+            return self.__java_home
+
+        # exabox.conf overrides $EC_HOME/java
+        _java_home = self.mCheckConfigOption("java_home")
+        if _java_home is not None:
+            _java_home = str(_java_home).strip()
+
+            if _java_home:
+                if _java_home[0] == '/':
+                    self.__java_home = _java_home
+                else:
+                    self.__java_home = os.path.join(self.__basepath, _java_home)
+
+        # Fallback to $EC_HOME/java/
+        if self.__java_home is None:
+            self.__java_home = os.path.join(self.__basepath, "java")
+
+        _java = os.path.join(self.__java_home, "bin", "java")
+        if not os.path.isfile(_java):
+            _msg = 'JAVA bin not found in "{0}"'.format(self.__java_home)
+            ebLogError(_msg)
+            self.__java_home = None
+            raise RuntimeError(_msg)
+
+        ebLogInfo('JAVA home found in "{0}"'.format(self.__java_home))
+        return self.__java_home
 
     def mGetOEDAHostname(self):
         return self.__oedahost
@@ -416,4 +450,3 @@ def set_gcontext(aContext):
 
 def get_gcontext():
     return GlobalContext
-

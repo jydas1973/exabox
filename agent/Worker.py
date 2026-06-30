@@ -1771,7 +1771,7 @@ class ebWorkerDaemon(object):
 
                                 vmhandle = exaBoxCluCtrl(aCtx=get_gcontext(), aNode=_node,aOptions=_job.mGetOptions())
                                 vmhandle.mSetRequestObj(_job)
-                                if _job.mGetCmd() in ['validate_elastic_shapes', 'xsvault', 'infra_vm_states', 'xsput', 'xsget', 'enable_qinq']:
+                                if _job.mGetCmd() in ['validate_elastic_shapes', 'xsvault', 'infra_vm_states', 'xsput', 'xsget', 'enable_qinq', 'exascale_disable_normal_redundancy', 'exascale_remove_user_privilege']:
                                     _rc  = vmhandle.mDispatchNonXMLCluster(_job.mGetCmd(), _job.mGetOptions(), aJob=_job)
                                 else:
                                     _rc  = vmhandle.mDispatchCluster(_job.mGetCmd(), _job.mGetOptions(), aJob=_job)

@@ -4,7 +4,7 @@
 #
 # ExaKmsEntry.py
 #
-# Copyright (c) 2021, 2023, Oracle and/or its affiliates.
+# Copyright (c) 2021, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      ExaKmsEntry.py - <one-line expansion of the name>
@@ -16,6 +16,7 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    jesandov    04/28/26 - Bug#39263025 Fix security issues found using IA
 #    jesandov    04/27/23 - 35141575: Add support of ECDSA key type
 #    jesandov    04/27/21 - Creation
 #
@@ -140,13 +141,13 @@ class ExaKmsEntryKeysDB(ExaKmsEntry):
             self.mSetPublicKey(self.mCalculatePublicKey())
             self.mSetHash(self.mCalculateHash())
 
-    def mGetPublicKey(self, aComment=""):
+    def mGetPublicKey(self, aComment="", aRaw=False):
 
         # Generate private key and public key pair
         self.mGetPrivateKey()
 
         # Return public key
-        return super().mGetPublicKey(aComment)
+        return super().mGetPublicKey(aComment, aRaw=aRaw)
 
     def mCreatePrivateKeyFromEncData(self):
 

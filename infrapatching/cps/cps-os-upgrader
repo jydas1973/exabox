@@ -1,7 +1,7 @@
 #!/opt/oci/exacc/exacloud/bin/python
 
 """
- Copyright (c) 2014, 2025, Oracle and/or its affiliates.
+ Copyright (c) 2014, 2026, Oracle and/or its affiliates.
 
 NAME:
     CPS nodes patch management - Basic Functionality
@@ -19,6 +19,16 @@ NOTE:
 
 History:
     MODIFIED (MM/DD/YY)
+    sdevasek 06/23/26 - Bug 39599081 - Support full-version dbserver
+                        patch selection 
+    kdas     06/03/26 - ER 39489082 - WE NEED TO PASS --LIVE-UPDATE-SCHEDULE-
+                        OUTSTANDING-WORK NEVER FOR CPS ELU
+    kdas     05/04/26 - ER 39146797 - PHASE I SUPPORT FOR CPS SMR 
+                        :EXACLOUD LAYER
+    sdevasek 04/23/26 - Bug 39244223 - EXACC:WAVE2:CPS OS: PATCH_PREREQ_CHECK
+                        FAILS IN PATCHMGR WITH ERROR - UNKNOWN OPTIONS FOR
+                        THIS OPERATION: ALLOW_ACTIVE_NETWORK_MOUNTS,
+                        IGNORE_ALERTS
     kdas     11/22/25 - ER 38674811 - EXACC GEN2 | CPS-OS PATCHING | USE THE
                         LATEST DBNU FOR CPS-OS PATCHING
     sdevasek 11/19/25 - Enh 38662063 -SKIP BACKUP IN CASE OF SYSTEM
@@ -106,6 +116,8 @@ sys.path.append(EXACLOUD_ROOT_PATH)
 from exabox.infrapatching.utils.constants import *
 from exabox.infrapatching.core.infrapatcherror import *
 from exabox.tools.AttributeWrapper import wrapStrBytesFunctions
+from exabox.infrapatching.utils.utility import mQuarterlyVersionPatternMatch, mExaspliceVersionPatternMatch
+from exabox.ovm.clumisc import OracleVersion
 from exabox.utils.common import version_compare
 
 # The next constant are used to identify if the CPS is a Virtual Machine
@@ -123,7 +135,7 @@ class CpsosPatch:
     backup
     """
 
-    def __init__( self, aPatchmgr, aTargetVersion , aExasplice, aNodeListFile, aBundleDir, aStandbyNode, aBackupMode, aPatchOption, aPatchLog ,aAdditionalOptions):
+    def __init__( self, aPatchmgr, aTargetVersion , aExasplice, aNodeListFile, aBundleDir, aStandbyNode, aBackupMode, aPatchOption, aPatchLog ,aAdditionalOptions, aIsELU):
         self.__patchmgr = aPatchmgr
         self.__targetversion = aTargetVersion
         self.__exasplice = aExasplice
@@ -134,6 +146,7 @@ class CpsosPatch:
         self.__patchoption = aPatchOption
         self.__patchlog = aPatchLog
         self.__additionaloptions = aAdditionalOptions
+        self.__isELU = aIsELU
 
         if self.__patchoption not in [ TASK_POSTCHECK, TASK_SWITCHOVER, TASK_SWITCHOVER_STATUS ]:
             mPatchLogInfo(f"Patchmgr log location: {self.__patchlog}\n")
@@ -145,6 +158,8 @@ class CpsosPatch:
         if self.__patchoption in [ TASK_PATCH ]:
             if self.__exasplice == "yes":
                 mPatchLogInfo("Monthly patching will be executed")
+            if self.__isELU == "yes":
+                mPatchLogInfo("Live Update patching will be executed")
             if self.__backupmode == "no":
                 mPatchLogInfo("Backup mode is disabled")
 
@@ -248,6 +263,9 @@ class CpsosPatch:
             _repo_param = "--exasplice_repo"
         _patch_cmd = f"nohup {self.__patchmgr} --dbnodes {self.__nodelistfile} --upgrade --log_dir {self.__patchlog} --target_version {self.__targetversion} {_repo_param} {self.__bundledir}"
 
+        if self.__isELU == "yes":
+             _patch_cmd += " --live-update-target allcvss --live-update-schedule-outstanding-work never"
+            
         # Disable backup if backup mode is 'no' or when system_consistency_check fails
         if self.__backupmode == "no" or not _is_system_valid_state :
             _patch_cmd += " --nobackup"
@@ -264,7 +282,7 @@ class CpsosPatch:
             if mPatchAddHyphen([ "-ignore_alerts", "-force_remove_custom_rpms", "-allow_active_network_mounts",
                                  "-modify_at_prereq" ], _additional_options_list):
                 # if the list has to be rebuilt to keep compatibility
-                _tmp_add_options = ','.join(_additional_options_list)
+                _tmp_add_options = ' '.join(_additional_options_list)
             else:
                 _tmp_add_options = self.__additionaloptions
 
@@ -424,6 +442,9 @@ class CpsosPatch:
         if self.__exasplice == "yes":
             _repo_param = "--exasplice_repo"
         _precheck_cmd = f"nohup {self.__patchmgr} --dbnodes {self.__nodelistfile} --precheck --log_dir {self.__patchlog} --target_version {self.__targetversion} {_repo_param} {self.__bundledir}"
+
+        if self.__isELU == "yes":
+            _precheck_cmd += " --live-update-target allcvss"
 
         if self.__additionaloptions is not None:
             _precheck_cmd += " "+self.__additionaloptions
@@ -699,11 +720,12 @@ class CpsosPatch:
                     return _exit_code, _ret
 
                 if self.__current_image_version == self.__inactive_imageversion:
-                    _exit_code = ACTIVE_INACTIVE_PARTITION_VERSION_MATCH
-                    mPatchLogError(f" Both Active image version : {self.__current_image_version} and Inactive image version : {self.__inactive_imageversion} are same, Rollback cannot be performed. Error Code - {_exit_code}\n")
-                    _err_msg = f"ERROR - Both Active image version : {self.__current_image_version} and Inactive image version : {self.__inactive_imageversion} are same, Rollback cannot be performed"
-                    _ret = mAddCpsInformation(self.__standbynode, _exit_code, _err_msg)
-                    return _exit_code, _ret
+                    if self.__isELU != "yes":
+                        _exit_code = ACTIVE_INACTIVE_PARTITION_VERSION_MATCH
+                        mPatchLogError(f" Both Active image version : {self.__current_image_version} and Inactive image version : {self.__inactive_imageversion} are same, Rollback cannot be performed. Error Code - {_exit_code}\n")
+                        _err_msg = f"ERROR - Both Active image version : {self.__current_image_version} and Inactive image version : {self.__inactive_imageversion} are same, Rollback cannot be performed"
+                        _ret = mAddCpsInformation(self.__standbynode, _exit_code, _err_msg)
+                        return _exit_code, _ret
             else:
                 _cmd = 'imageinfo -verexasplice'
                 _o, _e = mExecuteRemoteCmd(_cmd, self.__standbynode)
@@ -1036,7 +1058,7 @@ class CpsosPatch:
         mPatchLogPrint(f"{'Critical Hardware' if (aCheckCriticalHwAlert) else 'Known'} Alert verification completed.\n")
         return _alert_found
 
-def mUnzipToBaseLocation(aPatchRepo, aDBPatchFileDir, aPatchBasePatch, aPatchLog, aPatchOption, aExasplice):
+def mUnzipToBaseLocation(aPatchRepo, aDBPatchFileDir, aPatchBasePatch, aPatchLog, aPatchOption, aExasplice, aIsELU):
     """
      Method to extract all of the tar files and stage
      patches and configuration files at relevant location
@@ -1113,6 +1135,7 @@ def mParseInputValues():
     _standby_node = None
     _target_version = None
     _exasplice = "no"
+    _isELU = "no"
 
     # Fetching operation type
     for _patch_option in [ "patch_prereq_check", "rollback", "patch", "backup", "switchoverstatus", "switchover", "postcheck" ]:
@@ -1197,14 +1220,20 @@ def mParseInputValues():
             _target_version = (_other_options_list[_other_options_index]).split("=")[1].split(" ")[0].replace("['", "").replace("',","").replace("']", "")
             break
 
-    # Fetching exasplice option.
+    # Fetching isELU / exasplice options.
     for _other_options_index in range(1, len(_other_options_list)):
 
-        if "exasplice" in (_other_options_list[_other_options_index]):
-            _exasplice = (_other_options_list[_other_options_index]).split("=")[1].split(" ")[0].replace("['","").replace("',", "").replace("']", "")
-            break
+        if "isELU" in (_other_options_list[_other_options_index]) and _isELU == "no":
+            _isELU = (_other_options_list[_other_options_index]).split("=")[1].split(" ")[0].replace("['","" ).replace("',", "").replace("]", "").strip().lower()
+            if _isELU == "yes":
+                break
+        elif "exasplice" in (_other_options_list[_other_options_index]) and _exasplice == "no":
+            _exasplice = (_other_options_list[_other_options_index]).split("=")[1].split(" ")[0].replace("['","" ).replace("',", "").replace("]", "")
 
-    # Fetching backup_mode and Additional Options if applicable.
+    if _isELU == "yes" and _exasplice.lower() == "yes":
+        _exasplice = "no"
+
+# Fetching backup_mode and Additional Options if applicable.
     if _patch_option not in [ "postcheck", "switchover", "switchoverstatus" ]:
         for _other_options_index in range(1, len(_other_options_list)):
 
@@ -1219,7 +1248,7 @@ def mParseInputValues():
             if "options" in (_other_options_list[_other_options_index]):
                 _additional_options  = str(_other_options_list[_other_options_index]).split("=")[1].split(" ")[0].replace("['", "").replace("',","").replace("']", "")
 
-    return _patch_option, _standby_node, _backup_mode, _additional_options, _target_version, _exasplice
+    return _patch_option, _standby_node, _backup_mode, _additional_options, _target_version, _exasplice, _isELU
 
 
 def mIsMasterNode():
@@ -1544,50 +1573,8 @@ def mCompareDbserverPatchFilesInBaseDir(dbPatchFileBaseDirFromTargetVersion, dbP
     else:
         return dbPatchFileBaseDirFromTargetVersion
 
-def mCompareDbserverPatchFiles(aOldDbPatchFile, aNewDbPatchFile):
-        
-        _old_db_patch_file_date_format = None
-        _new_db_patch_file_date_format = None
-        try:
-
-            _old_db_patch_file_date_format = mExtractDbserverPatchDateFromZip(aOldDbPatchFile)
-            _new_db_patch_file_date_format = mExtractDbserverPatchDateFromZip(aNewDbPatchFile)
-
-            if _old_db_patch_file_date_format and _new_db_patch_file_date_format:
-                if int(_old_db_patch_file_date_format) > int(_new_db_patch_file_date_format):
-                    mPatchLogInfo(f"{aOldDbPatchFile} is the LATEST dbserver patch file available based on the date.")
-                    return aOldDbPatchFile
-                elif int(_old_db_patch_file_date_format) < int(_new_db_patch_file_date_format):
-                    mPatchLogInfo(f"{aNewDbPatchFile} is the LATEST dbserver patch file available based on the date.")
-                    return aNewDbPatchFile
-                else:
-                    mPatchLogInfo(f"Both the dbserver patch files have the same date: {_new_db_patch_file_date_format} and either of them can be used for patching Using {aNewDbPatchFile}.")
-                    return aNewDbPatchFile
-            else:
-               
-                if _old_db_patch_file_date_format is not None:
-                   mPatchLogInfo(f"DBPatch file details not found for {aNewDbPatchFile}. Returning {aOldDbPatchFile}")
-                   return aOldDbPatchFile
-                elif _new_db_patch_file_date_format is not None:
-                   mPatchLogInfo(f"DBPatch file details not found for {aOldDbPatchFile}. Returning {aNewDbPatchFile}")
-                   return aNewDbPatchFile
-                else:
-                    mPatchLogInfo(f"DBPatch file not found in neither of the Patch Stage locations.")
-                    return None
-        except Exception as e:
-            mPatchLogWarn("Error in  extracting date from dbserver patch version file. Error: %s" % str(e))
-            return None
-
-def mExtractDbserverPatchDateFromZip(zip_path):
-    """unzip -l dbserver.patch.zip 
-    Archive:  dbserver.patch.zip
-      Length      Date    Time    Name
-    ---------  ---------- -----   ----
-        0  10-23-2025 18:13   dbserver_patch_251020/
-        50247  10-21-2025 02:27   dbserver_patch_251020/imageLogger
-    ...
-    This method returns the associated date, in this case 251020
-    """
+def mExtractDbserverPatchVersionFromZip(zip_path):
+    """Return the dbserver_patch directory suffix from dbserver.patch.zip."""
 
     if not os.path.exists(zip_path):
         mPatchLogWarn(f"File does not exist: {zip_path}")
@@ -1595,16 +1582,125 @@ def mExtractDbserverPatchDateFromZip(zip_path):
     try:
         with zipfile.ZipFile(zip_path, 'r') as zf:
             for name in zf.namelist():
-                match = re.match(r'dbserver_patch_(\d{6,})/?', name)
+                match = re.match(r"dbserver_patch_([^/]+)/?", name)
                 if match:
-                    mPatchLogInfo(f"Date for  {zip_path} : {match.group(1)}")
+                    mPatchLogInfo(f"Dbserver patch version for {zip_path} : {match.group(1)}")
                     return match.group(1)
-        mPatchLogInfo(f"Unable to fetch date for {zip_path}")
+        mPatchLogInfo(f"Unable to fetch dbserver patch version for {zip_path}")
         return None
     except Exception as e:
         mPatchLogWarn(f"Unexpected error with {zip_path}: {e}")
         return None
 
+def mParseDbserverPatchVersionDetails(db_patch_version):
+    if not db_patch_version:
+        return None
+
+    db_patch_version = db_patch_version.strip().strip("/")
+    if mQuarterlyVersionPatternMatch(db_patch_version):
+        return {
+            "format": "fullPatchVersion",
+            "db_patch_version": db_patch_version,
+        }
+
+    if mExaspliceVersionPatternMatch(db_patch_version):
+        return {
+            "format": "legacyExapsliceSixDigitVersion",
+            "db_patch_version": db_patch_version,
+        }
+
+    return None
+
+def mCompareDbserverPatchVersionDetails(versioned_loc_dbserver_patch_info,
+                                        common_loc_dbserver_patch_info):
+    """
+    Return 1 if first patch version is newer, -1 if second patch version
+    is newer, and 0 if both versions compare the same or cannot be compared.
+
+    Full vs legacy:
+      26.1.0.0.0.260531 > 260515.1 because full-version format has
+      precedence over legacy date-code format.
+
+    Full vs full, higher Exadata release:
+      26.2.0.0.0.260520 > 26.1.0.0.0.260531 because OracleVersion compares
+      26.2 higher than 26.1 before considering the build date.
+
+    Full vs full, same Exadata release:
+      26.1.0.0.0.260615 > 26.1.0.0.0.260531 because the later build date is
+      higher when release components are the same.
+
+    Full vs full, same build date with suffix:
+      26.1.0.0.0.260615.2 > 26.1.0.0.0.260615.1 because the optional trailing
+      suffix participates in OracleVersion comparison.
+
+    Legacy vs legacy:
+      260615.2 > 260615.1, and 260615.1 > 260531.2, using the same
+      OracleVersion comparison for date-code versions.
+
+    Equal or uncomparable versions:
+      26.1.0.0.0.260615.1 == 26.1.0.0.0.260615.1 returns 0. If
+      OracleVersion cannot compare parsed versions, this helper also returns
+      0 and lets the caller use its tie handling.
+    """
+    if versioned_loc_dbserver_patch_info["format"] == "fullPatchVersion" and common_loc_dbserver_patch_info["format"] != "fullPatchVersion":
+        return 1
+    if versioned_loc_dbserver_patch_info["format"] != "fullPatchVersion" and common_loc_dbserver_patch_info["format"] == "fullPatchVersion":
+        return -1
+
+    verobj = OracleVersion()
+    comparison_result = verobj.mCompareVersions(versioned_loc_dbserver_patch_info["db_patch_version"],
+                                               common_loc_dbserver_patch_info["db_patch_version"])
+    if comparison_result is None:
+        return 0
+    return comparison_result
+
+def mCompareDbserverPatchFiles(aVersionedLocDbPatchFile, aCommonLocDbPatchFile):
+    versioned_loc_dbserver_version = None
+    common_loc_dbserver_version = None
+    try:
+        versioned_loc_dbserver_version = mExtractDbserverPatchVersionFromZip(aVersionedLocDbPatchFile)
+        common_loc_dbserver_version = mExtractDbserverPatchVersionFromZip(aCommonLocDbPatchFile)
+        versioned_loc_dbserver_info = mParseDbserverPatchVersionDetails(versioned_loc_dbserver_version)
+        common_loc_dbserver_info = mParseDbserverPatchVersionDetails(common_loc_dbserver_version)
+
+        if versioned_loc_dbserver_info and common_loc_dbserver_info:
+            comparison_result = mCompareDbserverPatchVersionDetails(versioned_loc_dbserver_info, common_loc_dbserver_info)
+            if comparison_result > 0:
+                mPatchLogInfo(f"{aVersionedLocDbPatchFile} is the LATEST dbserver patch file available based on version {versioned_loc_dbserver_version}.")
+                return aVersionedLocDbPatchFile
+            elif comparison_result < 0:
+                mPatchLogInfo(f"{aCommonLocDbPatchFile} is the LATEST dbserver patch file available based on version {common_loc_dbserver_version}.")
+                return aCommonLocDbPatchFile
+            else:
+                mPatchLogInfo(f"Both the dbserver patch files have the same version details: {common_loc_dbserver_version} and either of them can be used for patching Using {aCommonLocDbPatchFile}.")
+                return aCommonLocDbPatchFile
+
+        if versioned_loc_dbserver_info is not None:
+            mPatchLogInfo(f"DBPatch file details not found for {aCommonLocDbPatchFile}. Returning {aVersionedLocDbPatchFile}")
+            return aVersionedLocDbPatchFile
+        elif common_loc_dbserver_info is not None:
+            mPatchLogInfo(f"DBPatch file details not found for {aVersionedLocDbPatchFile}. Returning {aCommonLocDbPatchFile}")
+            return aCommonLocDbPatchFile
+        else:
+            mPatchLogInfo("DBPatch file not found in neither of the Patch Stage locations.")
+            return None
+    except Exception as e:
+        mPatchLogWarn("Error in extracting version from dbserver patch version file. Error: %s" % str(e))
+        return None
+
+def mExtractDbserverPatchDateFromZip(zip_path):
+    """Return the build date component from dbserver.patch.zip for compatibility."""
+
+    db_patch_version = mExtractDbserverPatchVersionFromZip(zip_path)
+    if not db_patch_version:
+        return None
+
+    db_patch_version = db_patch_version.strip().strip("/")
+    if mQuarterlyVersionPatternMatch(db_patch_version):
+        return db_patch_version.split(".")[5]
+    if mExaspliceVersionPatternMatch(db_patch_version):
+        return db_patch_version.split(".")[0]
+    return None
 
 def main():
     global interactive
@@ -1649,7 +1745,7 @@ def main():
             mPatchLogInfo(" Error Json details are as follows : \n")
             exit_and_clean(_ret_code=_ret_code)
 
-        _patch_option, _standby_node, _backup_mode, _additional_options, _target_version, _exasplice = mParseInputValues()
+        _patch_option, _standby_node, _backup_mode, _additional_options, _target_version, _exasplice, _isELU = mParseInputValues()
 
         if _patch_option and _patch_option in [ "patch", "rollback" ]:
             mCreateCPSOSUpgradeRunningFile(_standby_node)
@@ -1663,7 +1759,7 @@ def main():
             if mPatchAddHyphen([ "-ignore_alerts", "-force_remove_custom_rpms", "-allow_active_network_mounts", "-allow_selinux_enforcing" ],
                                _additional_options_list):
                 # if the list has to be rebuilt to keep compatibility
-                _additional_options = ','.join(_additional_options_list)
+                _additional_options = ' '.join(_additional_options_list)
 
             for add_list_value in _additional_options_list:
                 if add_list_value not in [ "--ignore_alerts", "--force_remove_custom_rpms",
@@ -1718,7 +1814,7 @@ def main():
         else:
           _db_patchfile_dir = _exadata_db_patchfile_base_dir_for_version + _dbPatchFileDirName
         
-        _patchmgr, _exadata_ovs_file = mUnzipToBaseLocation(_patch_repo, _db_patchfile_dir, _db_patch_base_patch, _patch_log_dir, _patch_option, _exasplice)
+        _patchmgr, _exadata_ovs_file = mUnzipToBaseLocation(_patch_repo, _db_patchfile_dir, _db_patch_base_patch, _patch_log_dir, _patch_option, _exasplice, _isELU)
         if _patch_option not in [ "postcheck", "switchover", "switchoverstatus" ] and (_patchmgr is None or _exadata_ovs_file is None):
             _exit_code = INSUFFICIENT_SPACE_ON_PRIMARY_NODE
             _err_msg = "ERROR - Unable to extract patch binaries."
@@ -1782,7 +1878,7 @@ def main():
         elif _patch_option in [ "patch_prereq_check", "patch", "rollback", "backup"]:
             cpsIgnoreAlertChk = CpsosPatch(_patchmgr, _target_version, _exasplice, _node_list, _exadata_ovs_file,
                                            _standby_node, _backup_mode, _patch_option, _patch_log_dir,
-                                           _additional_options)
+                                           _additional_options, _isELU)
 
             # check of critical alert, if found, stop the patching request.
             _real_hw_alert_found = False
@@ -1814,7 +1910,7 @@ def main():
             if _exit_code != PATCH_SUCCESS_EXIT_CODE:
                 exit_and_clean(_ret_code, _patch_option, _standby_node)
 
-        cpsospatch = CpsosPatch(_patchmgr, _target_version, _exasplice, _node_list, _exadata_ovs_file, _standby_node, _backup_mode, _patch_option, _patch_log_dir, _additional_options)
+        cpsospatch = CpsosPatch(_patchmgr, _target_version, _exasplice, _node_list, _exadata_ovs_file, _standby_node, _backup_mode, _patch_option, _patch_log_dir, _additional_options, _isELU)
         if _patch_option in [ "patch_prereq_check" ]:
             _ret_code = cpsospatch.mPrecheck()
         elif _patch_option == "patch":

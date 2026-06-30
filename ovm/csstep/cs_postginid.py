@@ -17,6 +17,10 @@ INTERNAL CLASSES:
 
 History:
        MODIFIED (MM/DD/YY)
+       jesandov  06/18/26 - Bug#39540098 Carry over cert for R1 to ADBD DomUs
+       prsshukl  05/22/26 - Bug 39416987 - EXACC: SSL INSPECTION: PHASE1:
+                            EXACLOUD ISN'T COPYING CUSTOMER ROOT CA AS UNABLE
+                            TO LOGIN TO THE CPS WALLET
        aararora  04/13/26 - 39200237: Issues observed for ca signed certs being
                             copied to domus for exacc
        aararora  03/20/26 - 39106054: Install Falcon agent during postginid
@@ -203,6 +207,7 @@ from exabox.ovm.adbs_elastic_service import mCreateADBSSiteGroupConfig
 
 from exabox.ovm.cludbaas import mUpdateListenerPort
 from exabox.ovm.configmgmt import ebConfigCollector
+from exabox.utils.ExaRegion import is_r1_region, get_r1_certificate_path
 
 # This class implements doExecute and undoExecute functions
 # for the ESTP_POSTGI_NID step of create service
@@ -449,6 +454,9 @@ class csPostGINID(CSBase):
                         ebox.mReturnDom0DomUPair(), aOptions)
             ebox.mLogStepElapsedTime(_step_time, 'DBAASAPI Cloud Properties script')
 
+        # Replicate exacloud certificate
+        _clu_utils.mCarryoverCertR1()
+
         # Bug32312482: ADB configuration.
         # Install ADB init RPM and run adb_init script 
         if ebox.isATP():
@@ -537,7 +545,7 @@ class csPostGINID(CSBase):
             # ER 32161016: Copy DBCS/CPS agent wallets
             ebox.mAddAgentWallet()
 
-            _clu_utils.mSetupCustomerRootCACertificates(aOptions)
+            _clu_utils.mSetupCustomerRootCACertificates()
 
         #
         # ER 27371691: Install DBCS agent rpm

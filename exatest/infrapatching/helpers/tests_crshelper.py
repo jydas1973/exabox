@@ -140,6 +140,7 @@ class ebTestCluPatchHealthCheck(ebTestClucontrol):
         ebLogInfo("Executing test for mValidateDomUHeartbeat()")
         _mock_instance = MagicMock()
         _mock_GetHandlerInstance.return_value = _mock_instance
+        _mock_instance.mIsMockEnabledByEcra.return_value = False
         _mock_instance.mGetExadataPatchGridHeartBeatTimeoutSec.return_value = -1
         _mock_instance.mGetDomUCustomerNameforDomuNatHostName.return_value.strip.return_value = "jed143898exdd002nat01.oraclecloud.internal"
         _mock_instance.mGetCluPatchCheck.return_value.mVerifyCellsInUseByASM.return_value = (["jed143898exdcl01.oraclecloud.internal"],[])
@@ -162,6 +163,7 @@ class ebTestCluPatchHealthCheck(ebTestClucontrol):
         ebLogInfo("Executing test for mValidateDomUHeartbeat()")
         _mock_instance = MagicMock()
         _mock_GetHandlerInstance.return_value = _mock_instance
+        _mock_instance.mIsMockEnabledByEcra.return_value = False
         _mock_instance.mGetExadataPatchGridHeartBeatTimeoutSec.return_value = -1
         _mock_instance.mGetDomUCustomerNameforDomuNatHostName.return_value.strip.return_value = "jed143898exdd002nat01.oraclecloud.internal"
         _mock_instance.mGetCluPatchCheck.return_value.mVerifyCellsInUseByASM.return_value = (["jed143898exdcl01.oraclecloud.internal"],[])

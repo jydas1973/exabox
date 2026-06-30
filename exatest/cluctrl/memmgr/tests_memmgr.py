@@ -96,11 +96,13 @@ class TestMemMgr(ebTestClucontrol):
                 [
                     exaMockCommand("nohup /var/opt/oracle/dbaasapi/dbaasapi -i /var/opt/oracle/log/grid/get_exatest.json.*", aRc=0),
                     exaMockCommand("/bin/cat /etc/oratab .*", aStdout="/u01/app/19.0.0.0/grid"),
+                    exaMockCommand(re.escape("cat /etc/oracle/olr.loc | grep 'crs_home' | cut -f 2 -d '='"), aStdout="/u01/app/19.0.0.0/grid"),
                     exaMockCommand(".*crsctl check crs")
                 ],
                 [
                     exaMockCommand("cat /var/opt/oracle/log/.*", aStdout=DB_INFO, aRc=0),
                     exaMockCommand("/bin/cat /etc/oratab .*", aStdout="/u01/app/19.0.0.0/grid"),
+                    exaMockCommand(re.escape("cat /etc/oracle/olr.loc | grep 'crs_home' | cut -f 2 -d '='"), aStdout="/u01/app/19.0.0.0/grid"),
                     exaMockCommand(".*crsctl check crs"),
                     exaMockCommand(".*ls -la /var/opt/oracle/creg/grid | head -2 | grep ...x..x..."),
                     exaMockCommand(".*cat /var/opt/oracle/creg/grid/grid.ini.*sid.*", aStdout="ASM+"),
@@ -118,6 +120,7 @@ class TestMemMgr(ebTestClucontrol):
                 [
                     exaMockCommand(".*crsctl check crs"),
                     exaMockCommand("/bin/cat /etc/oratab .*", aStdout="/u01/app/19.0.0.0/grid"),
+                    exaMockCommand(re.escape("cat /etc/oracle/olr.loc | grep 'crs_home' | cut -f 2 -d '='"), aStdout="/u01/app/19.0.0.0/grid"),
                     exaMockCommand(".*Hugepagesize.*", aStdout="2"),
                     exaMockCommand("sysctl -n.*", aStdout="1"),
                     exaMockCommand("cp /etc/sysctl.conf /etc/sysctl.conf.bkup"),
@@ -138,6 +141,7 @@ class TestMemMgr(ebTestClucontrol):
                 ],
                 [
                     exaMockCommand("/bin/cat /etc/oratab .*", aStdout="/u01/app/19.0.0.0/grid"),
+                    exaMockCommand(re.escape("cat /etc/oracle/olr.loc | grep 'crs_home' | cut -f 2 -d '='"), aStdout="/u01/app/19.0.0.0/grid"),
                     exaMockCommand(".*crsctl check crs")
                 ],
                 [
@@ -227,6 +231,7 @@ class TestMemMgr(ebTestClucontrol):
                 ],
                 [
                     exaMockCommand("/bin/cat /etc/oratab .*", aStdout="/u01/app/19.0.0.0/grid"),
+                    exaMockCommand(re.escape("cat /etc/oracle/olr.loc | grep 'crs_home' | cut -f 2 -d '='"), aStdout="/u01/app/19.0.0.0/grid"),
                     exaMockCommand(".*crsctl check crs"),
                     exaMockCommand("imageinfo | grep 'Node type:'", aStdout="DOM0 DOM0 DOM0")
 
@@ -274,11 +279,13 @@ class TestMemMgr(ebTestClucontrol):
 		        [
                     exaMockCommand("nohup /var/opt/oracle/dbaasapi/dbaasapi -i /var/opt/oracle/log/grid/get_exatest.json.*", aRc=0),
                     exaMockCommand("/bin/cat /etc/oratab .*", aStdout="/u01/app/19.0.0.0/grid"),
+                    exaMockCommand(re.escape("cat /etc/oracle/olr.loc | grep 'crs_home' | cut -f 2 -d '='"), aStdout="/u01/app/19.0.0.0/grid"),
                     exaMockCommand(".*crsctl check crs")
 		        ],
                 [
                     exaMockCommand("cat /var/opt/oracle/log/.*", aStdout=DB_INFO, aRc=0),
                     exaMockCommand("/bin/cat /etc/oratab .*", aStdout="/u01/app/19.0.0.0/grid"),
+                    exaMockCommand(re.escape("cat /etc/oracle/olr.loc | grep 'crs_home' | cut -f 2 -d '='"), aStdout="/u01/app/19.0.0.0/grid"),
                     exaMockCommand(".*crsctl check crs"),
                     exaMockCommand(".*ls -la /var/opt/oracle/creg/grid | head -2 | grep ...x..x..."),
                     exaMockCommand(".*cat /var/opt/oracle/creg/grid/grid.ini.*sid.*", aStdout="ASM+"),
@@ -295,6 +302,7 @@ class TestMemMgr(ebTestClucontrol):
 		        ],
                 [
                     exaMockCommand("/bin/cat /etc/oratab .*", aStdout="/u01/app/19.0.0.0/grid"),
+                    exaMockCommand(re.escape("cat /etc/oracle/olr.loc | grep 'crs_home' | cut -f 2 -d '='"), aStdout="/u01/app/19.0.0.0/grid"),
                     exaMockCommand(".*crsctl check crs"),
                     exaMockCommand("sysctl -n.*", aStdout="1"),
                     exaMockCommand("cp /etc/sysctl.conf /etc/sysctl.conf.bkup"),
@@ -344,6 +352,7 @@ class TestMemMgr(ebTestClucontrol):
 		        ],
                 [
                     exaMockCommand("/bin/cat /etc/oratab .*", aStdout="/u01/app/19.0.0.0/grid"),
+                    exaMockCommand(re.escape("cat /etc/oracle/olr.loc | grep 'crs_home' | cut -f 2 -d '='"), aStdout="/u01/app/19.0.0.0/grid"),
                     exaMockCommand(".*ls -la /var/opt/oracle/creg/grid | head -2 | grep ...x..x..."),
                     exaMockCommand(".*cat /var/opt/oracle/creg/grid/grid.ini.*sid.*", aStdout="ASM+"),
                     exaMockCommand(".*cat /var/opt/oracle/creg/grid/grid.ini.*oracle_home.*", aStdout="/u01/app/19.0.0.0/grid"),
@@ -433,6 +442,7 @@ class TestMemMgr(ebTestClucontrol):
 		],
 		[
                     exaMockCommand("/bin/cat /etc/oratab .*", aStdout="/u01/app/19.0.0.0/grid"),
+                    exaMockCommand(re.escape("cat /etc/oracle/olr.loc | grep 'crs_home' | cut -f 2 -d '='"), aStdout="/u01/app/19.0.0.0/grid"),
                     exaMockCommand(".*crsctl check crs"),
                     exaMockCommand("imageinfo | grep 'Node type:'", aStdout="DOM0 DOM0 DOM0")
 

@@ -87,8 +87,6 @@ class ManagmentServer(BaseServer):
                 if not is_exacs():
                     _rootca_certificate = get_ca_cert_path_exacc(app_cfg=app_cfg)
                 ssl_cert_config = ssl.CERT_REQUIRED
-                if use_oci_certificates():
-                    ssl_cert_config = ssl.CERT_NONE
                 context.load_verify_locations(_rootca_certificate)
                 context.load_cert_chain(_client_certificate, _client_privatekey)
                 context.verify_mode = ssl_cert_config

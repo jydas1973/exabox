@@ -11,7 +11,8 @@ NOTE:
     None
 
 History:
-    zpallare  12/19/25 - Bug 38955623 - Fix issue with diskgroupop in exacloud cli
+    shapatna    06/17/2025 - Enh 39467666: Enhance ETF Addons Operations flow for file-resize operations
+    zpallare    12/19/2025 - Bug 38955623 - Fix issue with diskgroupop in exacloud cli
     pbellary    12/09/2025 - Bug 38740441 - EXACLOUD: ADD COMPUTE WF DID NOT ENABLE QINQ IN ELASTIC NODE
     abflores    06/30/2025 - Bug 38027811 - Add SOP testing
     avimonda    03/19/2024 - Bug 36405321 - Adding retry mechanism in
@@ -516,6 +517,12 @@ class ebExaClient(object):
 
         #Sample execution: bin/exacloud -jd requests -jc sample.json -al localhost -as
         if options.jsondispatch:
+            if options.jsondispatch is not None and options.jsondispatch == "imagebase_copy_volumes":
+                self.mBuildErrorResponse('100', f"JSONDispatch command {options.jsondispatch} is restricted for security reasons", 'None')
+                self.__jsonresponse = self.__response.mToJson()
+                ebLogError(self.__jsonresponse)
+                return
+
             _form = dict()
             _jc = dict()
 
@@ -813,6 +820,24 @@ class ebExaClient(object):
                 _form['enablegilatest'] = 'False'
             # _path = _path + '?patchcluinterface=False'
             _form['patchcluinterface'] = 'False'
+
+            if self.__cmdtype == 'partition':
+                _supported_operations = ['resize', 'info']
+                _operation = options.partitionOp
+
+                if not _operation or _operation not in _supported_operations:
+                    self.mBuildErrorResponse('100', 'Invalid or unsupported PARTITION operation: ' + str(_operation), 'None')
+                    self.__jsonresponse = self.__response.mToJson()
+                    ebLogError(self.__jsonresponse)
+                    return
+
+                if not options.jsonconf:
+                    self.mBuildErrorResponse('4051', 'Missing input JSON', 'None')
+                    self.__jsonresponse = self.__response.mToJson()
+                    ebLogError(self.__jsonresponse)
+                    return
+
+                _form['partitionOp'] = _operation
 
             if self.__cmdtype == 'diskgroup':
                 if options.diskgroupOp:

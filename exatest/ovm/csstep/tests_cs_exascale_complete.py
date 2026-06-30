@@ -16,6 +16,8 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    prsshukl    05/23/26 - Bug 39416987 - EXACC: SSL INSPECTION: PHASE1: EXACLOUD ISN'T
+#                           COPYING CUSTOMER ROOT CA AS UNABLE TO LOGIN TO THE CPS WALLET
 #    naps        01/05/26 - Bug 38779989 - UT Updation.
 #    naps        07/03/25 - Bug 38116390 - copy weblogic cert for R1 env.
 #    gparada     08/30/23 - Creation
@@ -86,6 +88,12 @@ class ebTestCsExascaleComplete(ebTestClucontrol):
     @classmethod
     def setUpClass(self):
         super().setUpClass()
+
+    def setUp(self):
+        super().setUp()
+        remove_alg_patch = patch('exabox.ovm.csstep.cs_exascale_complete.csUtil.mRemoveDeprecatedSshAlgorithms', autospec=True)
+        self.addCleanup(remove_alg_patch.stop)
+        remove_alg_patch.start()
 
     def test_updDomUsToJdk11(self):
         ebLogInfo("")
@@ -338,12 +346,15 @@ class ebTestCsExascaleComplete(ebTestClucontrol):
 
         _ebox.mUpdateRpm.assert_any_call('dbcs-agent-exacc.OL7.x86_64.rpm')
 
+    @patch('exabox.ovm.csstep.cs_exascale_complete.ebCluUtils')
     @patch('exabox.ovm.csstep.cs_exascale_complete.ebCluExaScale')
     @patch('exabox.ovm.csstep.cs_exascale_complete.ImageBOM')
-    def test_doExecute_secures_dbcs_agent_for_exacc(self, aImageBom, aCluExaScale):
+    def test_doExecute_secures_dbcs_agent_for_exacc(self, aImageBom, aCluExaScale, aCluUtils):
         # Auto-generated test for doExecute
         aImageBom.return_value = _FakeImageBom('ESTP_EXASCALE_COMPLETE', ['SECURE_DBCSAGENT'])
         aCluExaScale.return_value = MagicMock()
+        _clu_utils = MagicMock()
+        aCluUtils.return_value = _clu_utils
 
         config_map = {
             ('grid_tfa_enabled', 'True'): True,
@@ -378,6 +389,79 @@ class ebTestCsExascaleComplete(ebTestClucontrol):
 
         _ebox.mSetupDomUsForSecureDBCSCommunication.assert_called_once_with()
         _ebox.mAddAgentWallet.assert_called_once_with()
+        _clu_utils.mSetupCustomerRootCACertificates.assert_called_once_with()
+
+    @patch('exabox.ovm.csstep.cs_exascale_complete.csUtil')
+    @patch('exabox.ovm.csstep.cs_exascale_complete.ebCluUtils')
+    @patch('exabox.ovm.csstep.cs_exascale_complete.ebCluExaScale')
+    @patch('exabox.ovm.csstep.cs_exascale_complete.expand_domu_filesystem')
+    @patch('exabox.ovm.csstep.cs_exascale_complete.ImageBOM')
+    def test_doExecute_handles_pre_boot_sequence(self, aImageBom, aExpandFs, aCluExaScale, aCluUtils, aCsUtil):
+        # Auto-generated test for doExecute
+        pending_steps = [
+            'MAKE_FIPS_COMPLIANCE',
+            'MANAGE_OPC_KEY',
+            'PATCH_VM_BEFORE_BOOT',
+            'PATCH_VM_CFG'
+        ]
+        aImageBom.return_value = _FakeImageBom('ESTP_EXASCALE_COMPLETE', pending_steps)
+
+        _exascale = MagicMock()
+        aExpandFs.return_value = None
+        aCluExaScale.return_value = _exascale
+        _clu_utils = MagicMock()
+        aCluUtils.return_value = _clu_utils
+        _csu = MagicMock()
+        aCsUtil.return_value = _csu
+
+        _options = SimpleNamespace(jsonconf=None)
+        _ebox = MagicMock()
+        _ebox.mReturnDom0DomUPair.return_value = [('dom0a', 'domuA')]
+
+        _lock = MagicMock()
+        _lock.__enter__.return_value = None
+        _lock.__exit__.return_value = False
+        _ebox.remote_lock.return_value = _lock
+
+        _ebox.mCheckConfigOption.side_effect = lambda *args, **kwargs: False
+        _ebox.IsZdlraProv.return_value = False
+        _ebox.mUpdateStatus.return_value = None
+        _ebox.mUpdateStatusCS.return_value = None
+        _ebox.mLogStepElapsedTime.return_value = None
+        _ebox.mUpdateVmetrics.return_value = None
+        _ebox.mPatchVMCfgBeforeBoot.return_value = None
+        _ebox.mCopyVmexacsRpm.return_value = None
+        _ebox.mConfigureShmAll.return_value = None
+        _ebox.mParallelDomUShutdown.return_value = None
+        _ebox.mPatchVMCfgOnShutdown.return_value = None
+        _ebox.mStartVMExacsServiceOnShutdown.return_value = None
+        _ebox.mParallelDomUStart.return_value = None
+        _ebox.mPatchVMCfgAfterBoot.return_value = None
+        _ebox.mCheckCaviumInstanceDomUs.return_value = None
+        _ebox.mStartVMExacsServiceAfterBoot.return_value = None
+        _ebox.mCopySAPfile.return_value = None
+        _ebox.mReturnAllClusterHosts.return_value = ([], [], [], [])
+        _ebox.mDropPmemlogs.return_value = None
+        _ebox.mATPUnlockListeners.return_value = None
+
+        csExaScaleComplete().doExecute(_ebox, _options, [])
+
+        _ebox.mMakeFipsCompliant.assert_called_once_with(_options, aHost='domuA')
+        _ebox.mAddUserPubKey.assert_called_once_with('opc')
+        _ebox.mPatchVMCfgBeforeBoot.assert_called_once_with(_options)
+        _exascale.mConfigureHugePage.assert_called_once_with(_options)
+        _ebox.mConfigureShmAll.assert_called_once()
+        _ebox.mParallelDomUShutdown.assert_called_once()
+        _ebox.mPatchVMCfgOnShutdown.assert_called_once_with(_options)
+        _ebox.mStartVMExacsServiceOnShutdown.assert_called_once_with(_options)
+        _ebox.mParallelDomUStart.assert_called_once()
+        _ebox.mPatchVMCfgAfterBoot.assert_called_once_with(_options)
+        aExpandFs.assert_called_once_with(
+            _ebox,
+            perform_dom0_resize=True,
+            domu_reboot=False
+        )
+        _ebox.mStartVMExacsServiceAfterBoot.assert_called_once_with(_options)
 
     @patch('exabox.ovm.csstep.cs_exascale_complete.ebLogInfo')
     @patch('exabox.ovm.csstep.cs_exascale_complete.get_gcontext')
@@ -1106,16 +1190,19 @@ class ebTestCsExascaleComplete(ebTestClucontrol):
         aUpdJdk.assert_not_called()
 
     @patch('exabox.ovm.csstep.cs_exascale_complete.expand_domu_filesystem')
+    @patch('exabox.ovm.csstep.cs_exascale_complete.ebCluUtils')
     @patch('exabox.ovm.csstep.cs_exascale_complete.ebCluExaScale')
     @patch('exabox.ovm.csstep.cs_exascale_complete.ImageBOM')
     @patch('exabox.ovm.csstep.cs_exascale_complete.ebLogWarn')
-    def test_doExecute_cavium_success_path(self, aLogWarn, aImageBom, aCluExaScale, aExpandFs):
+    def test_doExecute_cavium_success_path(self, aLogWarn, aImageBom, aCluExaScale, aCluUtils, aExpandFs):
         # Auto-generated test for doExecute
         aImageBom.return_value = _FakeImageBom('ESTP_EXASCALE_COMPLETE', ['PATCH_VM_CFG'])
         _exascale = MagicMock()
         aCluExaScale.return_value = _exascale
+        _clu_utils = MagicMock()
+        aCluUtils.return_value = _clu_utils
 
-        def _check_config(aKey, aValue=None):
+        def _check_config(_aKey, _aValue=None):
             return False
 
         _remote_lock = MagicMock()
@@ -1137,6 +1224,8 @@ class ebTestCsExascaleComplete(ebTestClucontrol):
         _ebox.mPatchVMCfgAfterBoot.return_value = None
         _ebox.mStartVMExacsServiceAfterBoot.return_value = None
         _ebox.mCheckCaviumInstanceDomUs.return_value = None
+        _ebox.mCopyExaDataScript.return_value = None
+        _ebox.mSaveClusterDomUList.return_value = None
         _ebox.remote_lock.return_value = _remote_lock
         _ebox.mCheckConfigOption.side_effect = _check_config
         _ebox.mReturnDom0DomUPair.return_value = [('dom0a', 'domuA')]
@@ -1150,8 +1239,63 @@ class ebTestCsExascaleComplete(ebTestClucontrol):
         _step.doExecute(_ebox, _options, [])
 
         _ebox.mCheckCaviumInstanceDomUs.assert_called_once()
+        _clu_utils.mInstallFalconAgentOnDomus.assert_not_called()
         aLogWarn.assert_not_called()
         aExpandFs.assert_called_once()
+
+    @patch('exabox.ovm.csstep.cs_exascale_complete.ebLogError')
+    @patch('exabox.ovm.csstep.cs_exascale_complete.csUtil')
+    @patch('exabox.ovm.csstep.cs_exascale_complete.ebCluUtils')
+    @patch('exabox.ovm.csstep.cs_exascale_complete.csExaScaleComplete.maxDistanceUpdate')
+    @patch('exabox.ovm.csstep.cs_exascale_complete.csExaScaleComplete.mSeedOCIDonDomU')
+    @patch('exabox.ovm.csstep.cs_exascale_complete.ImageBOM')
+    def test_doExecute_logs_seed_failure(self, aImageBom, aSeedOcid, aMaxDistance, aCluUtils, aCsUtil, aLogError):
+        # Auto-generated test for doExecute
+        aImageBom.return_value = _FakeImageBom('ESTP_EXASCALE_COMPLETE', ['ADDITIONAL_DOMU_CHECKS'])
+        aSeedOcid.side_effect = Exception('seed failure')
+        aMaxDistance.return_value = None
+        _clu_utils = MagicMock()
+        aCluUtils.return_value = _clu_utils
+        _csu = MagicMock()
+        aCsUtil.return_value = _csu
+
+        def _check_config(aKey, aValue=None):
+            return False
+
+        _ebox = MagicMock()
+        _ebox.mUpdateStatus.return_value = None
+        _ebox.mUpdateStatusCS.return_value = None
+        _ebox.mLogStepElapsedTime.return_value = None
+        _ebox.mCheckConfigOption.side_effect = _check_config
+        _ebox.mReturnDom0DomUPair.return_value = [('dom0a', 'domuA')]
+        _ebox.mAddXsPingTargets.return_value = None
+        _ebox.mStoreDomUInterconnectIps.return_value = None
+        _ebox.mRemoveDatabaseMachineXmlDomU.return_value = None
+        _ebox.mCopyExaDataScript.return_value = None
+        _ebox.mSaveClusterDomUList.return_value = None
+        _ebox.mDropPmemlogs.return_value = None
+        _ebox.mATPUnlockListeners.return_value = None
+        _ebox.isATP.return_value = False
+        _ebox.mIsExabm.return_value = False
+        _ebox.mIsOciEXACC.return_value = False
+        _ebox.mIsExacm.return_value = False
+
+        _options = SimpleNamespace(jsonconf=None)
+        _step = csExaScaleComplete()
+        _step.doExecute(_ebox, _options, [])
+
+        aSeedOcid.assert_called_once_with(_ebox, _options)
+        aMaxDistance.assert_called_once_with(_ebox)
+        _clu_utils.mInstallFalconAgentOnDomus.assert_called_once_with(['domuA'], 'Create Service')
+        _ebox.mCopyExaDataScript.assert_called_once_with()
+        _ebox.mSaveClusterDomUList.assert_called_once_with()
+        self.assertTrue(
+            any(
+                'mSeedOCIDonDomU failed with Exception' in call[0][0]
+                for call in aLogError.call_args_list
+                if call[0]
+            )
+        )
 
     @patch('exabox.ovm.csstep.cs_exascale_complete.ebLogWarn')
     @patch('exabox.ovm.csstep.cs_exascale_complete.csUtil')
@@ -2605,6 +2749,94 @@ class ebTestCsExascaleComplete(ebTestClucontrol):
         self.assertIn("sed -i '/d' /var/opt/oracle/exacc.props", _node._commands[0])
         self.assertIn("vmcluster_ocid=ocid-test", _node._commands[0])
         aLogError.assert_not_called()
+
+    @patch('exabox.ovm.csstep.cs_exascale_complete.ebCluUtils')
+    @patch('exabox.ovm.csstep.cs_exascale_complete.ebCluExaScale')
+    @patch('exabox.ovm.csstep.cs_exascale_complete.ImageBOM')
+    def test_doExecute_sets_up_customer_root_ca_for_exacc(self, aImageBom, aCluExaScale, aCluUtils):
+        # Auto-generated test for doExecute
+        aImageBom.return_value = _FakeImageBom('ESTP_EXASCALE_COMPLETE', ['SECURE_DBCSAGENT'])
+        aCluExaScale.return_value = MagicMock()
+        _clu_utils = MagicMock()
+        aCluUtils.return_value = _clu_utils
+
+        _config_map = {
+            ('grid_tfa_enabled', 'True'): True,
+            ('install_nosql', 'True'): False,
+            ('allow_23c_grid_image_download', 'True'): False,
+            ('enable_validate_volumes', 'True'): False,
+            ('ociexacc', 'True'): True,
+        }
+
+        def _check_config(aKey, aValue=None):
+            if aValue is None:
+                return False
+            return _config_map.get((aKey, aValue), False)
+
+        _ebox = MagicMock()
+        _ebox.mReturnDom0DomUPair.return_value = [('dom0a', 'domuA')]
+        _ebox.mCheckConfigOption.side_effect = _check_config
+        _ebox.mIsExabm.return_value = False
+        _ebox.mIsExacm.return_value = False
+        _ebox.mIsOciEXACC.return_value = True
+        _ebox.isATP.return_value = False
+        _ebox.mUpdateStatus.return_value = None
+        _ebox.mUpdateStatusCS.return_value = None
+        _ebox.mLogStepElapsedTime.return_value = None
+        _ebox.mSetupDomUsForSecureDBCSCommunication = MagicMock()
+        _ebox.mAddAgentWallet = MagicMock()
+        _ebox.mDropPmemlogs.return_value = None
+        _ebox.mATPUnlockListeners.return_value = None
+
+        csExaScaleComplete().doExecute(_ebox, SimpleNamespace(jsonconf=None), [])
+
+        _ebox.mSetupDomUsForSecureDBCSCommunication.assert_called_once_with()
+        _ebox.mAddAgentWallet.assert_called_once_with()
+        _clu_utils.mSetupCustomerRootCACertificates.assert_called_once_with()
+
+    @patch('exabox.ovm.csstep.cs_exascale_complete.ebCluUtils')
+    @patch('exabox.ovm.csstep.cs_exascale_complete.ebCluExaScale')
+    @patch('exabox.ovm.csstep.cs_exascale_complete.ImageBOM')
+    def test_doExecute_skips_customer_root_ca_for_non_exacc(self, aImageBom, aCluExaScale, aCluUtils):
+        # Auto-generated test for doExecute
+        aImageBom.return_value = _FakeImageBom('ESTP_EXASCALE_COMPLETE', ['SECURE_DBCSAGENT'])
+        aCluExaScale.return_value = MagicMock()
+        _clu_utils = MagicMock()
+        aCluUtils.return_value = _clu_utils
+
+        _config_map = {
+            ('grid_tfa_enabled', 'True'): True,
+            ('install_nosql', 'True'): False,
+            ('allow_23c_grid_image_download', 'True'): False,
+            ('enable_validate_volumes', 'True'): False,
+            ('ociexacc', 'True'): False,
+        }
+
+        def _check_config(aKey, aValue=None):
+            if aValue is None:
+                return False
+            return _config_map.get((aKey, aValue), False)
+
+        _ebox = MagicMock()
+        _ebox.mReturnDom0DomUPair.return_value = [('dom0a', 'domuA')]
+        _ebox.mCheckConfigOption.side_effect = _check_config
+        _ebox.mIsExabm.return_value = False
+        _ebox.mIsExacm.return_value = False
+        _ebox.mIsOciEXACC.return_value = False
+        _ebox.isATP.return_value = False
+        _ebox.mUpdateStatus.return_value = None
+        _ebox.mUpdateStatusCS.return_value = None
+        _ebox.mLogStepElapsedTime.return_value = None
+        _ebox.mSetupDomUsForSecureDBCSCommunication = MagicMock()
+        _ebox.mAddAgentWallet = MagicMock()
+        _ebox.mDropPmemlogs.return_value = None
+        _ebox.mATPUnlockListeners.return_value = None
+
+        csExaScaleComplete().doExecute(_ebox, SimpleNamespace(jsonconf=None), [])
+
+        _ebox.mSetupDomUsForSecureDBCSCommunication.assert_not_called()
+        _ebox.mAddAgentWallet.assert_not_called()
+        _clu_utils.mSetupCustomerRootCACertificates.assert_not_called()
 
 if __name__ == "__main__":
     unittest.main()

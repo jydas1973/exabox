@@ -16,6 +16,7 @@ NOTE:
     None
 
 History:
+    kkviswan 04/29/26 - Bug 39263026 - EXACS - SECURITY SCAN FINDINGS IN EXABOX/OVM/OPCTLMGR.PY
     nisrikan 12/01/25 - Bug 38705859 - EXACLOUD FIX TO HANDLE THE CAGE CREATION FAILURE IF THE INFRA NODE IS NOT REACHABLE
     nisrikan 06/23/24 - Bug 38053933 - FIX THE ISSUES FOR OPCTL SUPPORT FOR EXACS
     nisrikan 09/30/24 - Bug 37109476 - INSTALL OPCTL RPM FAILING AT EXACLOUD
@@ -38,6 +39,7 @@ import json
 import logging
 import logging.handlers
 import os
+import shlex
 import socket
 import sys
 import traceback
@@ -161,21 +163,22 @@ class ebOpctlMgr(object):
             _remoteCPS = self.__ebox.mCheckConfigOption('remote_cps_host')
             _jsonInput = json.dumps(self.options.jsonconf)
 
-            _cmd = """{sudoPath} -u ecra sh {wrapperPath}/{script} {operation} '{jsonInput}' {clusterName}""".format(
+            _cmd = """{sudoPath} -u ecra {wrapperPath}/{script} {operation} {jsonInput} {clusterName}""".format(
                 sudoPath=self.__sudoPath, wrapperPath=_opctlExacloudWrapperPath, script=_opctlExacloudScript,
-                operation=operation, jsonInput=_jsonInput, clusterName=self.__dom0domuName)
+                operation=shlex.quote(operation), jsonInput=shlex.quote(_jsonInput),
+                clusterName=shlex.quote(self.__dom0domuName))
 
             if _remoteCPS is not None:
-                _cmd += """ {remoteCPS}""".format(remoteCPS=_remoteCPS)
+                _cmd += """ {remoteCPS}""".format(remoteCPS=shlex.quote(_remoteCPS))
                 self.logInfo(f"remote CPS is {_remoteCPS}")
             else:
-                _cmd += " None "
+                _cmd += " {noneValue} ".format(noneValue=shlex.quote("None"))
                 self.logInfo("no remote CPS")
 
-            _cmd += """ {ocpsJsonPath} """.format(ocpsJsonPath=self.__ocpsJsonPath)
+            _cmd += """ {ocpsJsonPath} """.format(ocpsJsonPath=shlex.quote(self.__ocpsJsonPath))
             self.logInfo(f"ocpsJsonPath is {self.__ocpsJsonPath}")
 
-            _cmd += """{xmlPath} """.format(xmlPath=self.__patchconfig)
+            _cmd += """{xmlPath} """.format(xmlPath=shlex.quote(self.__patchconfig))
             self.logInfo(f"trying to run {_cmd}")
 
             _rc, _, _out, _err = self.__ebox.mExecuteLocal(_cmd)
@@ -393,5 +396,3 @@ class ebOpctlMgr(object):
         version = _out.strip()
         self.logError(f"returned rpm version {version}")
         return version
-
-

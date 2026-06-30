@@ -16,11 +16,18 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    remamid     06/08/26 - bug 39426998 add passwordless hostname retry
+#                           unittest
+#    remamid     06/08/26 - Bug 39426998 - add DomU hostname retry UT
+#    aypaul      06/08/26 - Adding unit test for 39377039
+#    pbellary    05/20/26 - Bug 38169883 - UNABLE TO LOGIN TO DOMU AFTER CREATE SERVICE POSTVMINSTALL STEP
 #    aypaul      04/26/26 - Fix unit tests for 39255849
+#    rajsag      04/15/26 - Add unit tests for storage precision
 #    aararora    04/14/26 - 39200237: ISSUES OBSERVED FOR EXACLOUD IN SRE
 #                           TESTING FOR CHANGES FOR CA SIGNED CERTS IN EXACC
 #    bhpati      04/09/26 - Bug 39083181 - CREATEVM UNDO TRIES TO DELETE WRONG
 #                           BRIDGE VMETH200
+#    avimonda    04/08/26 - Bug 39084339: Added unit tests
 #    aypaul      03/30/26 - Adding unit tests for aypaul_bug-38277507
 #    avimonda    03/12/26 - Add tests for OEDA log handling
 #    avimonda    03/07/26 - Adding tests for fix related to Bug 38951559 - GCP:
@@ -84,11 +91,13 @@
 #
 import datetime
 import json
+import logging
 import unittest
 import warnings
 import copy
 import os, re, shutil
 import sys
+import tempfile
 from io import StringIO
 from unittest import mock
 from exabox.infrapatching.core.infrapatcherror import PATCHING_NODE_SSH_CHECK_FAILED, PATCHING_CONNECT_FAILED
@@ -98,7 +107,7 @@ from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
 from exabox.core.Node import exaBoxNode
 from exabox.core.MockCommand import exaMockCommand
 from exabox.core.DBStore import ebGetDefaultDB
-from exabox.log.LogMgr import ebLogInfo, ebLogError
+from exabox.log.LogMgr import ebLogInfo, ebLogError, ebGetDefaultLoggerName
 from exabox.core.Context import get_gcontext
 from exabox.core.Error import ebError, ExacloudRuntimeError
 from exabox.agent.ebJobRequest import ebJobRequest
@@ -106,7 +115,7 @@ from exabox.network.Connection import exaBoxConnection
 from exabox.ovm.clucontrol import exaBoxCluCtrl
 from exabox.ovm.clucommandhandler import CommandHandler
 from exabox.ovm.clunetworkdetect import ebDiscoverOEDANetwork
-from exabox.utils.node import connect_to_host
+from exabox.utils.node import connect_to_host, CmdRet
 from exabox.exakms.ExaKmsEntry import ExaKmsEntry, ExaKmsHostType
 
 customOutput1 = """<sysinfo type='smbios'><chassis><entry name='manufacturer'>Oracle Corporation</entry><entry name='version'>ORACLE SERVER X7-2</entry><entry name='serial'>1801XC303J</entry><entry name='asset'>7338405</entry></chassis></sysinfo>"""
@@ -148,6 +157,148 @@ MOCK_SKIP_ERROR_JSON="""
    ]
 }
 """
+
+MOCK_OEDA_ERROR_JSON_SUITE = {
+    "cases": [
+        {
+            "name": "missing file returns success",
+            "missing_file": True,
+            "expected": {
+                "rc": True,
+                "skip_exception": False
+            }
+        },
+        {
+            "name": "ignorable error is skipped",
+            "payload": {
+                "exceptions": [
+                    {
+                        "errorCode": "E-IGN",
+                        "errorMsg": "/opt/oracle.SupportTools/exadataAIDE -u failed during cleanup",
+                        "cause": "sample cause",
+                        "action": "sample action"
+                    }
+                ]
+            },
+            "expected": {
+                "rc": False,
+                "skip_exception": True
+            }
+        },
+        {
+            "name": "undo install path skips known ASM cleanup errors",
+            "step": "ESTP_INSTALL_CLUSTER",
+            "undo": True,
+            "payload": {
+                "exceptions": [
+                    {
+                        "errorCode": "E-SKIP",
+                        "errorMsg": "ORA-15039: diskgroup not dropped",
+                        "cause": "sample cause",
+                        "action": "sample action"
+                    }
+                ]
+            },
+            "expected": {
+                "rc": False,
+                "skip_exception": True
+            }
+        },
+        {
+            "name": "critical error forces skip flag off",
+            "payload": {
+                "exceptions": [
+                    {
+                        "errorCode": "E-CRIT",
+                        "errorMsg": "hard failure",
+                        "cause": "sample cause",
+                        "action": "sample action"
+                    }
+                ]
+            },
+            "expected": {
+                "rc": False,
+                "skip_exception": False
+            }
+        },
+        {
+            "name": "ignorable followed by critical still fails",
+            "payload": {
+                "exceptions": [
+                    {
+                        "errorCode": "E-IGN2",
+                        "errorMsg": "/opt/oracle.SupportTools/exadataAIDE -u harmless issue",
+                        "cause": "sample cause",
+                        "action": "sample action"
+                    },
+                    {
+                        "errorCode": "E-CRIT2",
+                        "errorMsg": "subsequent critical issue",
+                        "cause": "sample cause",
+                        "action": "sample action"
+                    }
+                ]
+            },
+            "expected": {
+                "rc": False,
+                "skip_exception": False
+            }
+        },
+        {
+            "name": "customer payload with rootsh and aide exceptions still fails",
+            "payload": {
+                "exceptions": [
+                    {
+                        "errorCode": "1200",
+                        "errorMsg": ": Root.sh initialization for cluster cl-sp0sing4 failed on host exacs-sp0-bk0-single4-ps9tu1.mvmsrgsubnet.mvmsrgvcn.oraclevcn.com",
+                        "cause": "Root.sh failed to initialize cluster cl-sp0sing4 on host exacs-sp0-bk0-single4-ps9tu1.mvmsrgsubnet.mvmsrgvcn.oraclevcn.com",
+                        "action": "Check the root.sh log files and other cluster errors on host cl-sp0sing4. Send the following diagnostic output file to Oracle for assistance",
+                        "timeStamp": "14-05-2026 17:53:26 GMT"
+                    },
+                    {
+                        "errorCode": "1200",
+                        "errorMsg": ": Root.sh initialization for cluster cl-sp0sing4 failed on host exacs-sp0-bk0-single4-ps9tu1.mvmsrgsubnet.mvmsrgvcn.oraclevcn.com",
+                        "cause": "Root.sh failed to initialize cluster cl-sp0sing4 on host exacs-sp0-bk0-single4-ps9tu1.mvmsrgsubnet.mvmsrgvcn.oraclevcn.com",
+                        "action": "Check the root.sh log files and other cluster errors on host cl-sp0sing4. Send the following diagnostic output file to Oracle for assistance",
+                        "timeStamp": "14-05-2026 17:53:27 GMT"
+                    },
+                    {
+                        "errorCode": "1001",
+                        "errorMsg": ": Exception message: Errors occured.\njava.lang.reflect.InvocationTargetException",
+                        "cause": "Unspecified error",
+                        "action": "Send the following diagnostic output file to Oracle for assistance",
+                        "timeStamp": "14-05-2026 17:53:27 GMT"
+                    },
+                    {
+                        "errorCode": "1002",
+                        "errorMsg": ": KommandException error\nCommand return code: 1.\nHost: sea202228exdcl15.sea2xx2xx0111qf.adminsea2.oraclevcn.com\nUser: root\nCommand: /opt/oracle.SupportTools/exadataAIDE -u\nKommandException message: Command output:\n AIDE: database update request accepted. ",
+                        "cause": "KommandException error",
+                        "action": "Send the following diagnostic output file to Oracle for assistance",
+                        "timeStamp": "14-05-2026 17:53:36 GMT"
+                    },
+                    {
+                        "errorCode": "1002",
+                        "errorMsg": ": KommandException error\nCommand return code: 1.\nHost: sea202228exdcl14.sea2xx2xx0111qf.adminsea2.oraclevcn.com\nUser: root\nCommand: /opt/oracle.SupportTools/exadataAIDE -u\nKommandException message: Command output:\n AIDE: database update request accepted. ",
+                        "cause": "KommandException error",
+                        "action": "Send the following diagnostic output file to Oracle for assistance",
+                        "timeStamp": "14-05-2026 17:53:36 GMT"
+                    },
+                    {
+                        "errorCode": "1002",
+                        "errorMsg": ": KommandException error\nCommand return code: 1.\nHost: sea202228exdcl13.sea2xx2xx0111qf.adminsea2.oraclevcn.com\nUser: root\nCommand: /opt/oracle.SupportTools/exadataAIDE -u\nKommandException message: Command output:\n AIDE: database update request accepted.\u00fe",
+                        "cause": "KommandException error",
+                        "action": "Send the following diagnostic output file to Oracle for assistance",
+                        "timeStamp": "14-05-2026 17:53:36 GMT"
+                    }
+                ]
+            },
+            "expected": {
+                "rc": False,
+                "skip_exception": False
+            }
+        }
+    ]
+}
 
 MOCK_SELINUX_PAYLOAD={
     "se_linux":
@@ -483,6 +634,114 @@ class ebTestClucontrolClasses(ebTestClucontrol):
     def _mock_update_error(self):
         return patch("exabox.ovm.clucontrol.exaBoxCluCtrl.mUpdateErrorObject")
 
+    def test_mPatchClusterDB_handles_decimal_diskgroup_sizes_for_backup_disk(self):
+        ctrl = self.mGetClubox()
+        self.addCleanup(ctrl.mSetCmd, ctrl.mGetCmd())
+        for attr in (
+                "_exaBoxCluCtrl__clusters",
+                "_exaBoxCluCtrl__dbhomes",
+                "_exaBoxCluCtrl__databases",
+                "_exaBoxCluCtrl__storage",
+                "_exaBoxCluCtrl__storagedesc",
+                "_exaBoxCluCtrl__vmsizes",
+                "_exaBoxCluCtrl__shared_env",
+                "_exaBoxCluCtrl__debug"):
+            self.addCleanup(setattr, ctrl, attr, getattr(ctrl, attr))
+
+        ctrl.mSetCmd("createservice")
+
+        options = copy.deepcopy(ctrl.mGetArgsOptions())
+        options.jsonconf = {"rack": {}}
+        options.debug = False
+
+        data_dg = MagicMock()
+        data_dg.mGetDgName.return_value = "DATA01"
+        data_dg.mGetDiskGroupSize.return_value = "21503.81G"
+        reco_dg = MagicMock()
+        reco_dg.mGetDgName.return_value = "RECO01"
+        reco_dg.mGetDiskGroupSize.return_value = "21400.50G"
+
+        cluster = MagicMock()
+        cluster.mGetCluDiskGroups.return_value = ["DATA_ID", "RECO_ID"]
+        cluster.mGetCluAsmScopedSecurity.return_value = "false"
+
+        clusters = MagicMock()
+        clusters.mGetClusterMachines.return_value = []
+        clusters.mGetCluster.return_value = cluster
+
+        dbhomes = MagicMock()
+        dbhomes.mGetDBHomeConfigs.return_value = []
+
+        databases = MagicMock()
+        databases.mGetDBconfigs.return_value = {}
+
+        def _get_diskgroup_config(dgid):
+            if dgid == "DATA_ID":
+                return data_dg
+            return reco_dg
+
+        storage = MagicMock()
+        storage.mGetDiskGroupConfigList.return_value = ["DATA_ID", "RECO_ID"]
+        storage.mGetDiskGroupConfig.side_effect = _get_diskgroup_config
+
+        storagedesc = MagicMock()
+
+        vmsize = MagicMock()
+        vmsize.mGetVMSizeAttr.side_effect = lambda key: {
+            "cpuCount": "50",
+            "MemSize": "200GB",
+            "DiskSize": "20GB",
+        }[key]
+
+        vmsizes = MagicMock()
+        vmsizes.mGetVMSize.return_value = vmsize
+
+        setattr(ctrl, "_exaBoxCluCtrl__clusters", clusters)
+        setattr(ctrl, "_exaBoxCluCtrl__dbhomes", dbhomes)
+        setattr(ctrl, "_exaBoxCluCtrl__databases", databases)
+        setattr(ctrl, "_exaBoxCluCtrl__storage", storage)
+        setattr(ctrl, "_exaBoxCluCtrl__storagedesc", storagedesc)
+        setattr(ctrl, "_exaBoxCluCtrl__vmsizes", vmsizes)
+        setattr(ctrl, "_exaBoxCluCtrl__shared_env", True)
+        setattr(ctrl, "_exaBoxCluCtrl__debug", False)
+
+        with patch("exabox.ovm.clucontrol.ebCluCmdCheckOptions", return_value=False), \
+             patch.object(ctrl, "mUpdateCelldiskSize"), \
+             patch.object(ctrl, "mCheckConfigOption", return_value=None), \
+             patch.object(ctrl, "mIsKVM", return_value=False), \
+             patch.object(ctrl, "mGetUiOedaXml", return_value=False), \
+             patch.object(ctrl, "mReturnDom0DomUPair", return_value=[]), \
+             patch.object(ctrl, "IsZdlraProv", return_value=False), \
+             patch.object(ctrl, "mIsExaScale", return_value=False), \
+             patch.object(ctrl, "mIsXS", return_value=False), \
+             patch.object(ctrl, "mPatchClusterName"), \
+             patch.object(ctrl, "mSetEnableAsmss"), \
+             patch("exabox.ovm.clucontrol.get_max_domu_filesystem_sizes", return_value={}):
+            ctrl.mPatchClusterDB(options)
+
+        self.assertEqual(options.jsonconf["rack"]["backup_disk"], "false")
+        storage.mPatchClusterDiskgroup.assert_called_once()
+        storagedesc.mSetStorageDesc.assert_called_with("TotalStorageSize", "42904.31G")
+
+    def test_mFindEthInterfaces_accepts_pf_interfaces(self):
+        ip_link_output = [
+            "2: eth1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500\n",
+            "3: eth1pf: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500\n",
+            "4: eth2: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500\n",
+            "5: eth2pf: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500\n",
+            "139: eth1pf.100@eth1pf: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500\n",
+        ]
+        admin_interfaces = ["eth204pf\n"]
+
+        interfaces = exaBoxCluCtrl.mFindEthInterfaces(None, ip_link_output, admin_interfaces)
+
+        self.assertIn("eth1", interfaces)
+        self.assertIn("eth1pf", interfaces)
+        self.assertIn("eth2", interfaces)
+        self.assertIn("eth2pf", interfaces)
+        self.assertIn("eth1pf.100", interfaces)
+        self.assertIn("eth204pf", interfaces)
+
     @patch("exabox.ovm.csstep.exascale.exascaleutils.ebExascaleUtils.mCheckVaultTag", return_value=False)
     def test_mParseXMLForXS_raises_when_vault_missing(self, mock_check_vault):
         _ebox_local = copy.deepcopy(self.mGetClubox())
@@ -715,7 +974,8 @@ class ebTestClucontrolClasses(ebTestClucontrol):
              patch('exabox.utils.node.exaBoxNode.mConnect'),\
              patch('exabox.utils.node.exaBoxNode.mExecuteCmd', return_value=(None, mockStream(["mock_pname=some_value"]), None)),\
              patch('exabox.utils.node.exaBoxNode.mDisconnect'),\
-             patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mIsKVM', return_value=False):
+             patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mIsKVM', return_value=False),\
+             patch('builtins.print'):
              _ebox_local.mGetCommandHandler().mHandlerGetCellIBInfo()
 
         _ebox_local.mSetRequestObj(ebJobRequest("mock_cmd_type", {}))
@@ -1507,7 +1767,8 @@ class ebTestClucontrolClasses(ebTestClucontrol):
 
         get_gcontext().mSetConfigOption('skip_cells_consistency_fix', 'False')
         _options = copy.deepcopy(self.mGetClubox().mGetArgsOptions())
-        self.assertRaises(ExacloudRuntimeError, self.mGetClubox().mCheckCellsStatus, _options)
+        with patch('sys.stderr', new_callable=StringIO):
+            self.assertRaises(ExacloudRuntimeError, self.mGetClubox().mCheckCellsStatus, _options)
 
     @patch("exabox.ovm.clucontrol.exaBoxCluCtrl.mRebootNode")
     def test_mCheckCellLimits(self, mock_rebootNode):
@@ -1609,6 +1870,331 @@ class ebTestClucontrolClasses(ebTestClucontrol):
         _options.skip_serase = False
         with patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mExecuteLocal', return_value=(0, None, "", None)):
             self.mGetClubox().mCellSecureShredding(_options)
+
+    @patch("exabox.ovm.clucontrol.node_cmd_abs_path_check")
+    @patch("exabox.ovm.clucontrol.node_exec_cmd")
+    def test_mCellAssertNormalStatus_force_import_failed(
+            self, mock_node_exec, mock_node_cmd_abs_path_check):
+        mock_node_cmd_abs_path_check.return_value = "/resolved/bin/cellcli"
+        _cmds = {
+            self.mGetRegexCell():
+            [
+                [
+                    exaMockCommand("/resolved/bin/cellcli -e IMPORT CELLDISK CD_01 FORCE", aRc=1, aStdout="", aPersist=True),
+                    exaMockCommand("/resolved/bin/cellcli -e IMPORT CELLDISK CD_01 FORCE", aRc=1, aStdout="", aPersist=True),
+                ]
+            ]
+        }
+        self.mPrepareMockCommands(_cmds)
+
+        mock_node_exec.return_value = CmdRet(1, "", "")
+
+        _clubox = self.mGetClubox()
+        _storage = MagicMock()
+        _storage.mListCellDisksAttributes.side_effect = [
+            {'CD_01': {'STATUS': 'importForceRequired'}},
+            {'CD_01': {'STATUS': 'importForceRequired'}},
+            {'CD_01': {'STATUS': 'normal'}},
+        ]
+        _original_storage = _clubox.mGetStorage()
+        self.addCleanup(_clubox.mSetStorage, _original_storage)
+        _clubox.mSetStorage(_storage)
+        _options = testOptions()
+
+        with patch.object(_clubox, "mReturnCellNodes", return_value={"cell1": None}), \
+             patch("exabox.ovm.clucontrol.exaBoxNode") as mock_node_cls, \
+             patch.object(_clubox, "mCellSecureShredding") as mock_secure, \
+             patch("exabox.ovm.clucontrol.connect_to_host") as mock_connect_to_host:
+            mock_node = mock_node_cls.return_value
+            mock_node.mConnect.return_value = None
+            mock_node.mDisconnect.return_value = None
+            mock_force_node = MagicMock()
+            mock_connect_to_host.return_value.__enter__.return_value = mock_force_node
+            mock_connect_to_host.return_value.__exit__.return_value = None
+
+            _clubox.mCellAssertNormalStatus(_options)
+        mock_secure.assert_called_once_with(_options, aForce=True)
+        mock_connect_to_host.assert_called_once_with("cell1", get_gcontext())
+        self.assertEqual(mock_node_exec.call_count, 1)
+        self.assertIs(mock_node_exec.call_args[0][0], mock_force_node)
+        self.assertEqual(mock_node_exec.call_args[0][1], "/resolved/bin/cellcli -e IMPORT CELLDISK CD_01 FORCE")
+
+    @patch("exabox.ovm.clucontrol.node_cmd_abs_path_check")
+    @patch("exabox.ovm.clucontrol.node_exec_cmd")
+    def test_mCellAssertNormalStatus_force_import_restores_normal_status(
+            self, mock_node_exec, mock_node_cmd_abs_path_check):
+        mock_node_cmd_abs_path_check.return_value = "/resolved/bin/cellcli"
+        _cmds = {
+            self.mGetRegexCell():
+            [
+                [
+                    exaMockCommand("/resolved/bin/cellcli -e IMPORT CELLDISK CD_01 FORCE", aRc=0, aStdout="", aPersist=True),
+                ]
+            ]
+        }
+        self.mPrepareMockCommands(_cmds)
+
+        mock_node_exec.return_value = CmdRet(0, "", "")
+
+        _clubox = self.mGetClubox()
+        _storage = MagicMock()
+        _storage.mListCellDisksAttributes.side_effect = [
+            {'CD_01': {'STATUS': 'importForceRequired'}},
+            {'CD_01': {'STATUS': 'normal'}},
+        ]
+        _original_storage = _clubox.mGetStorage()
+        self.addCleanup(_clubox.mSetStorage, _original_storage)
+        _clubox.mSetStorage(_storage)
+
+        with patch.object(_clubox, "mReturnCellNodes", return_value={"cell1": None}), \
+             patch("exabox.ovm.clucontrol.exaBoxNode") as mock_node_cls, \
+             patch.object(_clubox, "mCellSecureShredding") as mock_secure, \
+             patch("exabox.ovm.clucontrol.connect_to_host") as mock_connect_to_host:
+            mock_node = mock_node_cls.return_value
+            mock_node.mConnect.return_value = None
+            mock_node.mDisconnect.return_value = None
+            mock_force_node = MagicMock()
+            mock_connect_to_host.return_value.__enter__.return_value = mock_force_node
+            mock_connect_to_host.return_value.__exit__.return_value = None
+
+            _clubox.mCellAssertNormalStatus(testOptions())
+
+        mock_secure.assert_not_called()
+        mock_connect_to_host.assert_called_once_with("cell1", get_gcontext())
+        self.assertEqual(mock_node_exec.call_count, 1)
+        self.assertIs(mock_node_exec.call_args[0][0], mock_force_node)
+        self.assertEqual(mock_node_exec.call_args[0][1], "/resolved/bin/cellcli -e IMPORT CELLDISK CD_01 FORCE")
+
+    @patch("exabox.ovm.clucontrol.node_cmd_abs_path_check")
+    @patch("exabox.ovm.clucontrol.node_exec_cmd")
+    def test_mCellAssertNormalStatus_force_import_imports_all_required_celldisks(
+            self, mock_node_exec, mock_node_cmd_abs_path_check):
+        mock_node_cmd_abs_path_check.return_value = "/resolved/bin/cellcli"
+        _cmds = {
+            self.mGetRegexCell():
+            [
+                [
+                    exaMockCommand("/resolved/bin/cellcli -e IMPORT CELLDISK CD_01 FORCE", aRc=0, aStdout="", aPersist=True),
+                    exaMockCommand("/resolved/bin/cellcli -e IMPORT CELLDISK CD_02 FORCE", aRc=0, aStdout="", aPersist=True),
+                ]
+            ]
+        }
+        self.mPrepareMockCommands(_cmds)
+
+        mock_node_exec.side_effect = [
+            CmdRet(0, "", ""),
+            CmdRet(0, "", ""),
+        ]
+
+        _clubox = self.mGetClubox()
+        _storage = MagicMock()
+        _storage.mListCellDisksAttributes.side_effect = [
+            {
+                'CD_01': {'STATUS': 'importForceRequired'},
+                'CD_02': {'STATUS': 'importForceRequired'},
+            },
+            {
+                'CD_01': {'STATUS': 'normal'},
+                'CD_02': {'STATUS': 'normal'},
+            },
+        ]
+        _original_storage = _clubox.mGetStorage()
+        self.addCleanup(_clubox.mSetStorage, _original_storage)
+        _clubox.mSetStorage(_storage)
+
+        with patch.object(_clubox, "mReturnCellNodes", return_value={"cell1": None}), \
+             patch("exabox.ovm.clucontrol.exaBoxNode") as mock_node_cls, \
+             patch.object(_clubox, "mCellSecureShredding") as mock_secure, \
+             patch("exabox.ovm.clucontrol.connect_to_host") as mock_connect_to_host:
+            mock_node = mock_node_cls.return_value
+            mock_node.mConnect.return_value = None
+            mock_node.mDisconnect.return_value = None
+            mock_force_node = MagicMock()
+            mock_connect_to_host.return_value.__enter__.return_value = mock_force_node
+            mock_connect_to_host.return_value.__exit__.return_value = None
+
+            _clubox.mCellAssertNormalStatus(testOptions())
+
+        mock_secure.assert_not_called()
+        mock_connect_to_host.assert_called_once_with("cell1", get_gcontext())
+        self.assertEqual(mock_node_exec.call_count, 2)
+        self.assertEqual(
+            [args[0][1] for args in mock_node_exec.call_args_list],
+            [
+                "/resolved/bin/cellcli -e IMPORT CELLDISK CD_01 FORCE",
+                "/resolved/bin/cellcli -e IMPORT CELLDISK CD_02 FORCE",
+            ]
+        )
+        self.assertEqual(
+            [args[0][0] for args in mock_node_exec.call_args_list],
+            [mock_force_node, mock_force_node]
+        )
+
+    @patch("exabox.ovm.clucontrol.node_cmd_abs_path_check")
+    @patch("exabox.ovm.clucontrol.node_exec_cmd")
+    def test_mCellAssertNormalStatus_force_import_attempts_remaining_celldisks_after_failure(
+            self, mock_node_exec, mock_node_cmd_abs_path_check):
+        mock_node_cmd_abs_path_check.return_value = "/resolved/bin/cellcli"
+        _cmds = {
+            self.mGetRegexCell():
+            [
+                [
+                    exaMockCommand("/resolved/bin/cellcli -e IMPORT CELLDISK CD_01 FORCE", aRc=1, aStdout="", aPersist=True),
+                    exaMockCommand("/resolved/bin/cellcli -e IMPORT CELLDISK CD_02 FORCE", aRc=0, aStdout="", aPersist=True),
+                ]
+            ]
+        }
+        self.mPrepareMockCommands(_cmds)
+
+        mock_node_exec.side_effect = [
+            CmdRet(1, "", ""),
+            CmdRet(0, "", ""),
+        ]
+
+        _clubox = self.mGetClubox()
+        _storage = MagicMock()
+        _storage.mListCellDisksAttributes.side_effect = [
+            {
+                'CD_01': {'STATUS': 'importForceRequired'},
+                'CD_02': {'STATUS': 'importForceRequired'},
+            },
+            {
+                'CD_01': {'STATUS': 'importForceRequired'},
+                'CD_02': {'STATUS': 'normal'},
+            },
+            {
+                'CD_01': {'STATUS': 'normal'},
+                'CD_02': {'STATUS': 'normal'},
+            },
+        ]
+        _original_storage = _clubox.mGetStorage()
+        self.addCleanup(_clubox.mSetStorage, _original_storage)
+        _clubox.mSetStorage(_storage)
+        _options = testOptions()
+
+        with patch.object(_clubox, "mReturnCellNodes", return_value={"cell1": None}), \
+             patch("exabox.ovm.clucontrol.exaBoxNode") as mock_node_cls, \
+             patch.object(_clubox, "mCellSecureShredding") as mock_secure, \
+             patch("exabox.ovm.clucontrol.connect_to_host") as mock_connect_to_host:
+            mock_node = mock_node_cls.return_value
+            mock_node.mConnect.return_value = None
+            mock_node.mDisconnect.return_value = None
+            mock_force_node = MagicMock()
+            mock_connect_to_host.return_value.__enter__.return_value = mock_force_node
+            mock_connect_to_host.return_value.__exit__.return_value = None
+
+            _clubox.mCellAssertNormalStatus(_options)
+
+        mock_secure.assert_called_once_with(_options, aForce=True)
+        mock_connect_to_host.assert_called_once_with("cell1", get_gcontext())
+        self.assertEqual(mock_node_exec.call_count, 2)
+        self.assertEqual(
+            [args[0][1] for args in mock_node_exec.call_args_list],
+            [
+                "/resolved/bin/cellcli -e IMPORT CELLDISK CD_01 FORCE",
+                "/resolved/bin/cellcli -e IMPORT CELLDISK CD_02 FORCE",
+            ]
+        )
+
+    @patch("exabox.ovm.clucontrol.node_cmd_abs_path_check")
+    @patch("exabox.ovm.clucontrol.node_exec_cmd")
+    def test_mCellAssertNormalStatus_skips_force_import_when_other_celldisk_issues_exist(
+            self, mock_node_exec, mock_node_cmd_abs_path_check):
+        mock_node_cmd_abs_path_check.return_value = "/resolved/bin/cellcli"
+        _cmds = {
+            self.mGetRegexCell():
+            [
+                [
+                    exaMockCommand("/resolved/bin/cellcli -e IMPORT CELLDISK CD_01 FORCE", aRc=0, aStdout="", aPersist=True),
+                ]
+            ]
+        }
+        self.mPrepareMockCommands(_cmds)
+
+        mock_node_exec.return_value = CmdRet(0, "", "")
+
+        _clubox = self.mGetClubox()
+        _storage = MagicMock()
+        _storage.mListCellDisksAttributes.side_effect = [
+            {
+                'CD_01': {'STATUS': 'importForceRequired'},
+                'CD_02': {'STATUS': 'failed'},
+            },
+            {
+                'CD_01': {'STATUS': 'normal'},
+                'CD_02': {'STATUS': 'normal'},
+            },
+        ]
+        _original_storage = _clubox.mGetStorage()
+        self.addCleanup(_clubox.mSetStorage, _original_storage)
+        _clubox.mSetStorage(_storage)
+
+        _options = testOptions()
+        with patch.object(_clubox, "mReturnCellNodes", return_value={"cell1": None}), \
+             patch("exabox.ovm.clucontrol.exaBoxNode") as mock_node_cls, \
+             patch.object(_clubox, "mCellSecureShredding") as mock_secure, \
+             patch("exabox.ovm.clucontrol.connect_to_host") as mock_connect_to_host:
+            mock_node = mock_node_cls.return_value
+            mock_node.mConnect.return_value = None
+            mock_node.mDisconnect.return_value = None
+
+            _clubox.mCellAssertNormalStatus(_options)
+
+        mock_connect_to_host.assert_not_called()
+        mock_node_exec.assert_not_called()
+        mock_secure.assert_called_once_with(_options, aForce=True)
+
+    @patch("exabox.ovm.clucontrol.exaBoxCluCtrl.mGetExadataCellModel")
+    @patch("exabox.ovm.clucontrol.node_cmd_abs_path_check")
+    @patch("exabox.ovm.clucontrol.node_exec_cmd")
+    def test_mCellAssertNormalStatus_raises_when_mixed_celldisk_issues_persist_after_secure_shredding(
+            self, mock_node_exec, mock_node_cmd_abs_path_check, mock_getCellModel):
+        mock_node_cmd_abs_path_check.return_value = "/resolved/bin/cellcli"
+        _cmds = {
+            self.mGetRegexCell():
+            [
+                [
+                    exaMockCommand("/resolved/bin/cellcli -e IMPORT CELLDISK CD_01 FORCE", aRc=0, aStdout="", aPersist=True),
+                ]
+            ]
+        }
+        self.mPrepareMockCommands(_cmds)
+
+        mock_node_exec.return_value = CmdRet(0, "", "")
+        mock_getCellModel.return_value = 'X7'
+
+        _clubox = self.mGetClubox()
+        _storage = MagicMock()
+        _storage.mListCellDisksAttributes.side_effect = [
+            {
+                'CD_01': {'STATUS': 'importForceRequired'},
+                'CD_02': {'STATUS': 'failed'},
+            },
+            {
+                'CD_01': {'STATUS': 'normal'},
+                'CD_02': {'STATUS': 'failed'},
+            },
+        ]
+        _original_storage = _clubox.mGetStorage()
+        self.addCleanup(_clubox.mSetStorage, _original_storage)
+        _clubox.mSetStorage(_storage)
+
+        _options = testOptions()
+        with patch.object(_clubox, "mReturnCellNodes", return_value={"cell1": None}), \
+             patch("exabox.ovm.clucontrol.exaBoxNode") as mock_node_cls, \
+             patch.object(_clubox, "mCellSecureShredding") as mock_secure, \
+             patch("exabox.ovm.clucontrol.connect_to_host") as mock_connect_to_host:
+            mock_node = mock_node_cls.return_value
+            mock_node.mConnect.return_value = None
+            mock_node.mDisconnect.return_value = None
+
+            with self.assertRaises(ExacloudRuntimeError) as cm:
+                _clubox.mCellAssertNormalStatus(_options)
+
+        self.assertIn("Some cell disks status is not normal and couldn't get fixed", str(cm.exception))
+        mock_connect_to_host.assert_not_called()
+        mock_node_exec.assert_not_called()
+        mock_secure.assert_called_once_with(_options, aForce=True)
 
     @patch("exabox.ovm.clucontrol.exaBoxCluCtrl.mGetExadataCellModel")
     def test_mVMImagesShredding(self, mock_getCellModel):
@@ -1847,19 +2433,23 @@ class ebTestClucontrolClasses(ebTestClucontrol):
         self.assertEqual(self.mGetClubox()._exaBoxCluCtrl__esracks.mGetDiskSize(), 14)
 
     def test_generic_exception_handling(self):
+        clubox = self.mGetClubox()
         _cmds = {
             self.mGetRegexCell(): [  
-                exaMockCommand("cellcli -e list physicaldisk *", aRc=0, aStdout=""),  
+                [
+                    exaMockCommand("cellcli -e list physicaldisk *", aRc=0, aStdout="", aPersist=True),
+                ]
+                for _ in range(2)
             ] 
         }
         self.mPrepareMockCommands(_cmds)  
 
-        clubox = self.mGetClubox()
-        try:
-            clubox.mUpdateCelldiskSize() 
-        except ExacloudRuntimeError as e:
-            self.assertEqual(e.mGetErrorMsg(), 'EXACLOUD : Could not update Cell Disk Size')
-            self.assertEqual(e.mGetErrorCode(), 2085)
+        with patch.object(clubox, 'mCheckCellsServicesUp', return_value=True):
+            try:
+                clubox.mUpdateCelldiskSize()
+            except ExacloudRuntimeError as e:
+                self.assertEqual(e.mGetErrorMsg(), 'EXACLOUD : Could not update Cell Disk Size')
+                self.assertEqual(e.mGetErrorCode(), 2085)
             
     def test_mParseOEDAErrorJson(self):
 
@@ -1905,6 +2495,41 @@ class ebTestClucontrolClasses(ebTestClucontrol):
             _rc, _skip_exception = self.mGetClubox().mParseOEDAErrorJson(_cmd_output, 'ESTP_INSTALL_CLUSTER')
             self.assertEqual(_rc, False)
             self.assertEqual(_skip_exception, True)
+
+    def test_mParseOEDAErrorJson_suite_cases(self):
+
+        get_gcontext().mSetConfigOption('ssh_diagnostic', 'False')
+
+        _ebox_local = copy.deepcopy(self.mGetClubox())
+        _original_oeda_path = _ebox_local.mGetOedaPath()
+
+        try:
+            with patch('exabox.ovm.clucontrol.ebLogError'), \
+                 patch('exabox.ovm.clucontrol.ebLogInfo'), \
+                 patch('exabox.ovm.clucontrol.ebLogTrace'):
+                for _case in MOCK_OEDA_ERROR_JSON_SUITE['cases']:
+                    with self.subTest(_case=_case['name']):
+                        with tempfile.TemporaryDirectory() as _tmpdir:
+                            _work_dir = os.path.join(_tmpdir, 'WorkDir')
+                            os.makedirs(_work_dir, exist_ok=True)
+
+                            if not _case.get('missing_file', False):
+                                _error_json = os.path.join(_work_dir, 'OedaErrors.json')
+                                with open(_error_json, 'w') as _json_file:
+                                    json.dump(_case['payload'], _json_file)
+
+                            _ebox_local.mSetOedaPath(_tmpdir)
+                            _rc, _skip_exception = _ebox_local.mParseOEDAErrorJson(
+                                aCmdOutput="",
+                                aStep=_case.get('step'),
+                                aUndo=_case.get('undo', False)
+                            )
+
+                            _expected = _case['expected']
+                            self.assertEqual(_rc, _expected['rc'])
+                            self.assertEqual(_skip_exception, _expected['skip_exception'])
+        finally:
+            _ebox_local.mSetOedaPath(_original_oeda_path)
 
     def test_mParseOEDALog_success_banner_followed_by_error_line(self):
         _ebox_local = copy.deepcopy(self.mGetClubox())
@@ -1970,6 +2595,27 @@ class ebTestClucontrolClasses(ebTestClucontrol):
         self.assertFalse(_rc)
         mock_warn.assert_not_called()
         mock_collect.assert_called_once_with(_cmd_output, 'ESTP_SETUP_CELL_CONNECTIVITY', None)
+        mock_diag.assert_not_called()
+
+    def test_mParseOEDALog_respects_success_marker_when_config_enabled(self):
+        _ebox_local = copy.deepcopy(self.mGetClubox())
+        _oeda_path = _ebox_local.mGetOedaPath()
+        os.makedirs(os.path.join(_oeda_path, 'WorkDir'), exist_ok=True)
+
+        _cmd_output = ([
+            "===== Successfully completed execution of step Configure DomU =====",
+            "Errors occurred. Send /tmp/Diag.zip to Oracle to receive assistance.",
+            "ERROR:Lock Could not acquire remote lock"
+        ], None)
+
+        with patch.object(_ebox_local, 'mCheckConfigOption', return_value=True), \
+             patch.object(_ebox_local, 'mCollectExtraInfoFromErrorOEDA') as mock_collect, \
+             patch.object(_ebox_local, 'mSshDiagnostic') as mock_diag:
+
+            _rc = _ebox_local.mParseOEDALog(_cmd_output, aStep='ESTP_CONFIG_DOMU')
+
+        self.assertTrue(_rc)
+        mock_collect.assert_not_called()
         mock_diag.assert_not_called()
 
     def test_mParseOEDALog_success_banner_followed_by_real_error(self):
@@ -2124,7 +2770,6 @@ class ebTestClucontrolClasses(ebTestClucontrol):
         ebLogInfo("Running unit test on exaBoxCluCtrl.mSetSysCtlConfigValue")
         _hpage_param = "vm.nr_hugepages"
         _hpage_value = 8000
-        print(self.mGetClubox().mReturnDom0DomUPair()[0][1])
         aDomU = self.mGetClubox().mReturnDom0DomUPair()[0][1]
         _cmds = {
             self.mGetRegexVm():
@@ -2194,7 +2839,6 @@ class ebTestClucontrolClasses(ebTestClucontrol):
         _newmem = "49152"
         _currvmem = "65536"
         _MinHugepageMem = "26"
-        print(self.mGetClubox().mReturnDom0DomUPair()[0][1])
         aDomU = self.mGetClubox().mReturnDom0DomUPair()[0][1]
         _cmds = {
             self.mGetRegexVm():
@@ -2266,7 +2910,7 @@ class ebTestClucontrolClasses(ebTestClucontrol):
                     exaMockCommand("/bin/su - opc -c \"/bin/chown *", aRc=0, aPersist=True),
                     exaMockCommand("/bin/su - opc -c \"/bin/ssh-keygen -R localhost\"", aRc=0, aPersist=True),
                     exaMockCommand("/bin/su - opc -c \"/bin/ssh-keygen -R *", aRc=0, aPersist=True),
-                    exaMockCommand("/bin/su - opc -c \"/bin/ssh-keyscan -H *", aRc=0, aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/ssh -o .*", aRc=0, aPersist=True),
                     exaMockCommand("/bin/su - opc -c \"/bin/mkdir -p *", aRc=0, aPersist=True),
                     exaMockCommand("/bin/su - opc -c \"/bin/chmod 700 *", aRc=0, aPersist=True),
                     exaMockCommand("/bin/su - opc -c \"/bin/echo ssh-rsa *", aRc=0, aPersist=True),
@@ -2275,9 +2919,9 @@ class ebTestClucontrolClasses(ebTestClucontrol):
                     exaMockCommand("/usr/bin/chage *", aRc=0, aPersist=True),
                     exaMockCommand("/bin/su - opc -c \"/bin/ssh-keygen -R*", aRc=0, aPersist=True),
                     exaMockCommand("/bin/cat < /dev/null > /dev/tcp/*", aRc=1, aPersist=True),
-                    exaMockCommand("/bin/su - opc -c \"/bin/ssh-keyscan -T 30 -H*", aRc=1, aPersist=True),
-                    exaMockCommand("/bin/su - opc -c \"/bin/ssh-keyscan -vv -T 30 -H *", aRc=1, aStderr=_sshkeyscan_verbose, aPersist=True),
-                    exaMockCommand("/bin/su - opc -c \"/bin/ssh-keyscan -T 30 -H scaqab10client02vm08", aRc=1, aPersist=True)
+                    exaMockCommand("/bin/su - opc -c \"/bin/ssh -o .*", aRc=1, aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/ssh -o .*", aRc=1, aStderr=_sshkeyscan_verbose, aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/ssh -o .*", aRc=1, aPersist=True)
                 ]
             ]
         }
@@ -2342,7 +2986,7 @@ class ebTestClucontrolClasses(ebTestClucontrol):
                     exaMockCommand("/bin/su - opc -c \"/bin/chown *", aRc=0, aPersist=True),
                     exaMockCommand("/bin/su - opc -c \"/bin/ssh-keygen -R localhost\"", aRc=0, aPersist=True),
                     exaMockCommand("/bin/su - opc -c \"/bin/ssh-keygen -R *", aRc=0, aPersist=True),
-                    exaMockCommand("/bin/su - opc -c \"/bin/ssh-keyscan -H *", aRc=0, aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/ssh -o .*", aRc=0, aPersist=True),
                     exaMockCommand("/bin/su - opc -c \"/bin/mkdir -p *", aRc=0, aPersist=True),
                     exaMockCommand("/bin/su - opc -c \"/bin/chmod 700 *", aRc=0, aPersist=True),
                     exaMockCommand("/bin/su - opc -c \"/bin/echo ssh-rsa *", aRc=0, aPersist=True),
@@ -2351,9 +2995,9 @@ class ebTestClucontrolClasses(ebTestClucontrol):
                     exaMockCommand("/usr/bin/chage *", aRc=0, aPersist=True),
                     exaMockCommand("/bin/su - opc -c \"/bin/ssh-keygen -R*", aRc=0, aPersist=True),
                     exaMockCommand("/bin/cat < /dev/null > /dev/tcp/*", aRc=0, aPersist=True),
-                    exaMockCommand("/bin/su - opc -c \"/bin/ssh-keyscan -T 30 -H scaqab10client02vm08.us.oracle.com*", aRc=0, aPersist=True),
-                    exaMockCommand("/bin/su - opc -c \"/bin/ssh-keyscan -vv -T 30 -H *", aRc=1, aStderr=_sshkeyscan_verbose, aPersist=True),
-                    exaMockCommand("/bin/su - opc -c \"/bin/ssh-keyscan -T 30 -H scaqab10client02vm08", aRc=1, aPersist=True)
+                    exaMockCommand("/bin/su - opc -c \"/bin/ssh -o.*", aRc=0, aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/ssh -o.*", aRc=1, aStderr=_sshkeyscan_verbose, aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/ssh -o.*", aRc=1, aPersist=True)
                 ]
             ]
         }
@@ -2418,7 +3062,7 @@ class ebTestClucontrolClasses(ebTestClucontrol):
                     exaMockCommand("/bin/su - opc -c \"/bin/chown *", aRc=0, aPersist=True),
                     exaMockCommand("/bin/su - opc -c \"/bin/ssh-keygen -R localhost\"", aRc=0, aPersist=True),
                     exaMockCommand("/bin/su - opc -c \"/bin/ssh-keygen -R *", aRc=0, aPersist=True),
-                    exaMockCommand("/bin/su - opc -c \"/bin/ssh-keyscan -H *", aRc=0, aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/ssh -o.*", aRc=0, aPersist=True),
                     exaMockCommand("/bin/su - opc -c \"/bin/mkdir -p *", aRc=0, aPersist=True),
                     exaMockCommand("/bin/su - opc -c \"/bin/chmod 700 *", aRc=0, aPersist=True),
                     exaMockCommand("/bin/su - opc -c \"/bin/echo ssh-rsa *", aRc=0, aPersist=True),
@@ -2427,9 +3071,9 @@ class ebTestClucontrolClasses(ebTestClucontrol):
                     exaMockCommand("/usr/bin/chage *", aRc=0, aPersist=True),
                     exaMockCommand("/bin/su - opc -c \"/bin/ssh-keygen -R*", aRc=0, aPersist=True),
                     exaMockCommand("/bin/cat < /dev/null > /dev/tcp/*", aRc=0, aPersist=True),
-                    exaMockCommand("/bin/su - opc -c \"/bin/ssh-keyscan -T 30 -H scaqab10client02vm08.us.oracle.com", aRc=0, aPersist=True),
-                    exaMockCommand("/bin/su - opc -c \"/bin/ssh-keyscan -vv -T 30 -H *", aRc=0, aPersist=True),
-                    exaMockCommand("/bin/su - opc -c \"/bin/ssh-keyscan -T 30 -H scaqab10client02vm08", aRc=0, aPersist=True)
+                    exaMockCommand("/bin/su - opc -c \"/bin/ssh -o.*", aRc=0, aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/ssh -o.*", aRc=0, aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/ssh -o.*", aRc=0, aPersist=True)
                 ],
                 [
                     exaMockCommand("/bin/su - opc -c \"/bin/mkdir -p *", aRc=0, aStdout="", aPersist=True),
@@ -2444,7 +3088,7 @@ class ebTestClucontrolClasses(ebTestClucontrol):
                     exaMockCommand("/usr/bin/chage *", aRc=0, aPersist=True),
                     exaMockCommand("/bin/su - opc -c \"/bin/ssh-keygen -R localhost\"", aRc=0, aPersist=True),
                     exaMockCommand("/bin/su - opc -c \"/bin/ssh-keygen -R *", aRc=0, aPersist=True),
-                    exaMockCommand("/bin/su - opc -c \"/bin/ssh-keyscan -H *", aRc=0, aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/ssh -o.*", aRc=0, aPersist=True),
                     exaMockCommand("/bin/su - opc -c \"/bin/mkdir -p *", aRc=0, aPersist=True),
                     exaMockCommand("/bin/su - opc -c \"/bin/chmod 700 *", aRc=0, aPersist=True),
                     exaMockCommand("/bin/su - opc -c \"/bin/echo ssh-rsa *", aRc=0, aPersist=True),
@@ -2453,15 +3097,272 @@ class ebTestClucontrolClasses(ebTestClucontrol):
                     exaMockCommand("/usr/bin/chage *", aRc=0, aPersist=True),
                     exaMockCommand("/bin/su - opc -c \"/bin/ssh-keygen -R*", aRc=0, aPersist=True),
                     exaMockCommand("/bin/cat < /dev/null > /dev/tcp/*", aRc=0, aPersist=True),
-                    exaMockCommand("/bin/su - opc -c \"/bin/ssh-keyscan -T 30 -H scaqab10client01vm08.us.oracle.com", aRc=1, aPersist=True),
-                    exaMockCommand("/bin/su - opc -c \"/bin/ssh-keyscan -vv -T 30 -H scaqab10client01vm08.us.oracle.com", aRc=0, aPersist=True),
-                    exaMockCommand("/bin/su - opc -c \"/bin/ssh-keyscan -T 30 -H scaqab10client01vm08", aRc=0, aPersist=True)
+                    exaMockCommand("/bin/su - opc -c \"/bin/ssh -o.*", aRc=1, aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/ssh -o.*", aRc=0, aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/ssh -o.*", aRc=0, aPersist=True)
                 ]
             ]
         }
         self.mPrepareMockCommands(_cmds)
         with patch('exabox.exakms.ExaKms.ExaKms.mGetDefaultKeyAlgorithm', return_value="RSA"):
             self.mGetClubox().mConfigurePasswordLessDomU("opc")
+
+    def test_mConfigurePasswordLessDomU_hostname_retry_after_garp(self):
+        ebLogInfo("")
+        ebLogInfo("Running unit test on exaBoxCluCtrl.mConfigurePasswordLessDomU hostname retry after GARP")
+        _pubkey = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDut20bFm9zUbWFs7GghzTy8CsxR7d6hOaIdKjGUQzIW8hEsJ1DawGmEur0j/M0vz9F8y8FBN3gEASVVnKVInQ30etTEPTzdtTfsGITyxu0Eb0FGwM5jLFwrMOwx35mhv6eDa9pRgku/LO5p2W39Ub5yfh2Xg98SmcJdXDB3Lb4KwE5HT93jLWSogMkyQuke3NKiX8bRE9q2bBzQ1z7DUUvvi1y7ZmqwHtV2PIogPViy2Tvl2aj6C4cosBjS9rxePj+dRg/qAF8OvDPRNr3/VD5NLvPBzWgWGpgsOJnwzX/Vi6/Y4szJXujcumBzz0P1x0XfqOgyhvT2d9wMf/M2ybMI5kjWiQZYUyVPUCSqH0j9K4SX/CCZequsOGMgDTqGCVEhOXAn1wjB4ngby0rOsp6VWT/o0a3b0J7OSbBsHjr2tV7J5gWxlN6Gny/vP8lBm3PxT5Om85FAbMuplsrCl/SPYaB86BnIV6CDeVB/p8a2cQ/ddIW/M8IYBHix/IKc+0= USER_KEY"
+        _cmds = {
+            self.mGetRegexVm():
+            [
+                [
+                    exaMockCommand("/bin/su - opc -c \"/bin/mkdir -p *", aRc=0, aStdout="", aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/chown `id -u opc`:`id -g opc` /home/opc/.ssh\"", aRc=0, aStdout="", aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/chmod 700 /home/opc/.ssh\"", aRc=0, aStdout="", aPersist=True),
+                    exaMockCommand("/bin/test -e*", aRc=0, aStdout="", aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/chmod 600*", aRc=0, aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/chown *", aRc=0, aStdout="", aPersist=True),
+                    exaMockCommand("/bin/cat /home/opc/.ssh/id_rsa.pub", aRc=0, aStdout=_pubkey, aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/chmod 600 *", aRc=0, aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/chown *", aRc=0, aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/ssh-keygen -R localhost\"", aRc=0, aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/ssh-keygen -R *", aRc=0, aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/ssh -o.*", aRc=0, aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/mkdir -p *", aRc=0, aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/chmod 700 *", aRc=0, aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/echo ssh-rsa *", aRc=0, aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/chmod 600 *", aRc=0, aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/chown *", aRc=0, aPersist=True),
+                    exaMockCommand("/usr/bin/chage *", aRc=0, aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/ssh-keygen -R*", aRc=0, aPersist=True),
+                    exaMockCommand("/bin/cat < /dev/null > /dev/tcp/scaqab10client02vm08\\.us\\.oracle\\.com/22", aRc=1),
+                    exaMockCommand("/bin/cat < /dev/null > /dev/tcp/77\\.0\\.0\\.11/22", aRc=0),
+                    exaMockCommand("/sbin/arping -A -c 2 -I bondeth0 77\\.0\\.0\\.[0-9]+", aRc=0),
+                    exaMockCommand("/bin/cat < /dev/null > /dev/tcp/scaqab10client02vm08\\.us\\.oracle\\.com/22", aRc=0),
+                    exaMockCommand("/bin/su - opc -c \"/bin/ssh -o.*", aRc=0, aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/ssh -o.*", aRc=0, aPersist=True)
+                ],
+                [
+                    exaMockCommand("/bin/su - opc -c \"/bin/mkdir -p *", aRc=0, aStdout="", aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/chown `id -u opc`:`id -g opc` /home/opc/.ssh\"", aRc=0, aStdout="", aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/chmod 700 /home/opc/.ssh\"", aRc=0, aStdout="", aPersist=True),
+                    exaMockCommand("/bin/test -e*", aRc=0, aStdout="", aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/chmod 600*", aRc=0, aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/chown *", aRc=0, aStdout="", aPersist=True),
+                    exaMockCommand("/bin/cat /home/opc/.ssh/id_rsa.pub", aRc=0, aStdout=_pubkey, aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/chmod 600 *", aRc=0, aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/chown *", aRc=0, aPersist=True),
+                    exaMockCommand("/usr/bin/chage *", aRc=0, aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/ssh-keygen -R localhost\"", aRc=0, aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/ssh-keygen -R *", aRc=0, aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/ssh -o.*", aRc=0, aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/mkdir -p *", aRc=0, aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/chmod 700 *", aRc=0, aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/echo ssh-rsa *", aRc=0, aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/chmod 600 *", aRc=0, aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/chown *", aRc=0, aPersist=True),
+                    exaMockCommand("/usr/bin/chage *", aRc=0, aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/ssh-keygen -R*", aRc=0, aPersist=True),
+                    exaMockCommand("/bin/cat < /dev/null > /dev/tcp/*", aRc=0, aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/ssh -o.*", aRc=0, aPersist=True),
+                    exaMockCommand("/bin/su - opc -c \"/bin/ssh -o.*", aRc=0, aPersist=True)
+                ]
+            ]
+        }
+        self.mPrepareMockCommands(_cmds)
+        with patch('exabox.exakms.ExaKms.ExaKms.mGetDefaultKeyAlgorithm', return_value="RSA"):
+            self.mGetClubox().mConfigurePasswordLessDomU("opc")
+
+    def _mBuildPasswordlessMockClubox(self, aSourceClientIp="77.0.0.10", aPeerClientIp="77.0.0.11"):
+        _clubox = copy.deepcopy(self.mGetClubox())
+        _source_domu = "scaqab10client01vm08.us.oracle.com"
+        _peer_domu = "scaqab10client02vm08.us.oracle.com"
+        _clubox.mReturnElasticAllDom0DomUPair = MagicMock(return_value=[
+            ("scaqab10adm01.us.oracle.com", _source_domu),
+            ("scaqab10adm02.us.oracle.com", _peer_domu)
+        ])
+
+        _machines = MagicMock()
+        _networks = MagicMock()
+        _machine_networks = {
+            _source_domu: ["source-client"] if aSourceClientIp else ["source-backup"],
+            _peer_domu: ["peer-client"] if aPeerClientIp else ["peer-backup"]
+        }
+        _network_data = {
+            "source-client": ("client", aSourceClientIp),
+            "source-backup": ("backup", "192.0.2.10"),
+            "peer-client": ("client", aPeerClientIp),
+            "peer-backup": ("backup", "192.0.2.11")
+        }
+
+        def _mGetMachineConfig(aHost):
+            _machine = MagicMock()
+            _machine.mGetMacNetworks.return_value = _machine_networks[aHost]
+            return _machine
+
+        def _mGetNetworkConfig(aNetwork):
+            _net = MagicMock()
+            _net_type, _net_ip = _network_data[aNetwork]
+            _net.mGetNetType.return_value = _net_type
+            _net.mGetNetIpAddr.return_value = _net_ip
+            return _net
+
+        _machines.mGetMachineConfig.side_effect = _mGetMachineConfig
+        _networks.mGetNetworkConfig.side_effect = _mGetNetworkConfig
+        _clubox._exaBoxCluCtrl__machines = _machines
+        _clubox._exaBoxCluCtrl__networks = _networks
+        return _clubox, _source_domu, _peer_domu
+
+    def _mPasswordlessMockNode(self):
+        _node = MagicMock()
+        _node.mFileExists.return_value = True
+        _stdout = MagicMock()
+        _stdout.readlines.return_value = [
+            "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDut20bFm9zUbWFs7GghzTy8CsxR7d6hOaIdKjGUQzIW8hEsJ1DawGmEur0j/M0vz9F8y8FBN3gEASVVnKVInQ30etTEPTzdtTfsGITyxu0Eb0FGwM5jLFwrMOwx35mhv6eDa9pRgku/LO5p2W39Ub5yfh2Xg98SmcJdXDB3Lb4KwE5HT93jLWSogMkyQuke3NKiX8bRE9q2bBzQ1z7DUUvvi1y7ZmqwHtV2PIogPViy2Tvl2aj6C4cosBjS9rxePj+dRg/qAF8OvDPRNr3/VD5NLvPBzWgWGpgsOJnwzX/Vi6/Y4szJXujcumBzz0P1x0XfqOgyhvT2d9wMf/M2ybMI5kjWiQZYUyVPUCSqH0j9K4SX/CCZequsOGMgDTqGCVEhOXAn1wjB4ngby0rOsp6VWT/o0a3b0J7OSbBsHjr2tV7J5gWxlN6Gny/vP8lBm3PxT5Om85FAbMuplsrCl/SPYaB86BnIV6CDeVB/p8a2cQ/ddIW/M8IYBHix/IKc+0= USER_KEY"
+        ]
+        _node.mExecuteCmd.return_value = (None, _stdout, None)
+        return _node
+
+    def test_mConfigurePasswordLessDomU_hostname_retry_fails_after_garp(self):
+        ebLogInfo("")
+        ebLogInfo("Running unit test on exaBoxCluCtrl.mConfigurePasswordLessDomU hostname retry failure after GARP")
+        _clubox, _source_domu, _peer_domu = self._mBuildPasswordlessMockClubox()
+        _commands = []
+        _hostname_probe_results = [1, 1]
+
+        def _mNodeExec(aNode, aCmd):
+            _commands.append(aCmd)
+            if f"/dev/tcp/{_peer_domu}/22" in aCmd:
+                return (_hostname_probe_results.pop(0), "", "Name or service not known")
+            if "/dev/tcp/77.0.0.11/22" in aCmd:
+                return (0, "", "")
+            if "/sbin/arping -A -c 2 -I bondeth0 77.0.0.10" in aCmd:
+                return (0, "", "")
+            return (0, "", "")
+
+        with patch('exabox.exakms.ExaKms.ExaKms.mGetDefaultKeyAlgorithm', return_value="RSA"),\
+             patch('exabox.ovm.clucontrol.exaBoxNode', side_effect=[self._mPasswordlessMockNode(), self._mPasswordlessMockNode()]),\
+             patch('exabox.ovm.clucontrol.node_exec_cmd', side_effect=_mNodeExec),\
+             patch('exabox.ovm.clucontrol.node_exec_cmd_check', return_value=(0, "", "")):
+            with self.assertRaises(ExacloudRuntimeError) as _ctx:
+                _clubox.mConfigurePasswordLessDomU("opc")
+
+        self.assertIn(f"hostname ssh probe to {_peer_domu} failed after GARP retry", str(_ctx.exception))
+        self.assertIn("/dev/tcp/77.0.0.11/22", " ".join(_commands))
+        self.assertIn("/sbin/arping -A -c 2 -I bondeth0 77.0.0.10", " ".join(_commands))
+
+    def test_mConfigurePasswordLessDomU_no_peer_client_ip_fails(self):
+        ebLogInfo("")
+        ebLogInfo("Running unit test on exaBoxCluCtrl.mConfigurePasswordLessDomU no peer client IP")
+        _clubox, _source_domu, _peer_domu = self._mBuildPasswordlessMockClubox(aPeerClientIp=None)
+        _commands = []
+
+        def _mNodeExec(aNode, aCmd):
+            _commands.append(aCmd)
+            if f"/dev/tcp/{_peer_domu}/22" in aCmd:
+                return (1, "", "Name or service not known")
+            return (0, "", "")
+
+        with patch('exabox.exakms.ExaKms.ExaKms.mGetDefaultKeyAlgorithm', return_value="RSA"),\
+             patch('exabox.ovm.clucontrol.exaBoxNode', side_effect=[self._mPasswordlessMockNode(), self._mPasswordlessMockNode()]),\
+             patch('exabox.ovm.clucontrol.node_exec_cmd', side_effect=_mNodeExec),\
+             patch('exabox.ovm.clucontrol.node_exec_cmd_check', return_value=(0, "", "")):
+            with self.assertRaises(ExacloudRuntimeError) as _ctx:
+                _clubox.mConfigurePasswordLessDomU("opc")
+
+        _joined_commands = " ".join(_commands)
+        self.assertIn("no peer client IP was found for bondeth0 fallback", str(_ctx.exception))
+        self.assertNotIn("/dev/tcp/77.0.0.11/22", _joined_commands)
+        self.assertNotIn("/sbin/arping", _joined_commands)
+
+    def test_mConfigurePasswordLessDomU_peer_client_ip_unreachable_fails(self):
+        ebLogInfo("")
+        ebLogInfo("Running unit test on exaBoxCluCtrl.mConfigurePasswordLessDomU unreachable peer client IP")
+        _clubox, _source_domu, _peer_domu = self._mBuildPasswordlessMockClubox()
+        _commands = []
+
+        def _mNodeExec(aNode, aCmd):
+            _commands.append(aCmd)
+            if f"/dev/tcp/{_peer_domu}/22" in aCmd:
+                return (1, "", "Name or service not known")
+            if "/dev/tcp/77.0.0.11/22" in aCmd:
+                return (1, "", "No route to host")
+            return (0, "", "")
+
+        with patch('exabox.exakms.ExaKms.ExaKms.mGetDefaultKeyAlgorithm', return_value="RSA"),\
+             patch('exabox.ovm.clucontrol.exaBoxNode', side_effect=[self._mPasswordlessMockNode(), self._mPasswordlessMockNode()]),\
+             patch('exabox.ovm.clucontrol.node_exec_cmd', side_effect=_mNodeExec),\
+             patch('exabox.ovm.clucontrol.node_exec_cmd_check', return_value=(0, "", "")):
+            with self.assertRaises(ExacloudRuntimeError) as _ctx:
+                _clubox.mConfigurePasswordLessDomU("opc")
+
+        _joined_commands = " ".join(_commands)
+        self.assertIn("peer client IP 77.0.0.11 is also unreachable on bondeth0", str(_ctx.exception))
+        self.assertIn("/dev/tcp/77.0.0.11/22", _joined_commands)
+        self.assertNotIn("/sbin/arping", _joined_commands)
+
+    def test_mConfigurePasswordLessDomU_garp_failure_still_retries_hostname(self):
+        ebLogInfo("")
+        ebLogInfo("Running unit test on exaBoxCluCtrl.mConfigurePasswordLessDomU GARP failure still retries hostname")
+        _clubox, _source_domu, _peer_domu = self._mBuildPasswordlessMockClubox()
+        _commands = []
+        _peer_hostname_probe_results = [1, 0]
+
+        def _mNodeExec(aNode, aCmd):
+            _commands.append(aCmd)
+            if f"/dev/tcp/{_peer_domu}/22" in aCmd:
+                return (_peer_hostname_probe_results.pop(0), "", "Name or service not known")
+            if "/dev/tcp/77.0.0.11/22" in aCmd:
+                return (0, "", "")
+            if "/sbin/arping -A -c 2 -I bondeth0 77.0.0.10" in aCmd:
+                return (1, "", "arping failed")
+            return (0, "", "")
+
+        with patch('exabox.exakms.ExaKms.ExaKms.mGetDefaultKeyAlgorithm', return_value="RSA"),\
+             patch('exabox.ovm.clucontrol.exaBoxNode', side_effect=[
+                 self._mPasswordlessMockNode(),
+                 self._mPasswordlessMockNode(),
+                 self._mPasswordlessMockNode(),
+                 self._mPasswordlessMockNode()
+             ]),\
+             patch('exabox.ovm.clucontrol.node_exec_cmd', side_effect=_mNodeExec),\
+             patch('exabox.ovm.clucontrol.node_exec_cmd_check', return_value=(0, "", "")):
+            _clubox.mConfigurePasswordLessDomU("opc")
+
+        _joined_commands = " ".join(_commands)
+        self.assertIn("/dev/tcp/77.0.0.11/22", _joined_commands)
+        self.assertIn("/sbin/arping -A -c 2 -I bondeth0 77.0.0.10", _joined_commands)
+        self.assertEqual(2, len([_cmd for _cmd in _commands if f"/dev/tcp/{_peer_domu}/22" in _cmd]))
+
+    def test_mConfigurePasswordLessDomU_source_client_ip_missing_retries_without_garp(self):
+        ebLogInfo("")
+        ebLogInfo("Running unit test on exaBoxCluCtrl.mConfigurePasswordLessDomU source client IP missing")
+        _clubox, _source_domu, _peer_domu = self._mBuildPasswordlessMockClubox(aSourceClientIp=None)
+        _commands = []
+        _peer_hostname_probe_results = [1, 0]
+
+        def _mNodeExec(aNode, aCmd):
+            _commands.append(aCmd)
+            if f"/dev/tcp/{_peer_domu}/22" in aCmd:
+                return (_peer_hostname_probe_results.pop(0), "", "Name or service not known")
+            if "/dev/tcp/77.0.0.11/22" in aCmd:
+                return (0, "", "")
+            return (0, "", "")
+
+        with patch('exabox.exakms.ExaKms.ExaKms.mGetDefaultKeyAlgorithm', return_value="RSA"),\
+             patch('exabox.ovm.clucontrol.exaBoxNode', side_effect=[
+                 self._mPasswordlessMockNode(),
+                 self._mPasswordlessMockNode(),
+                 self._mPasswordlessMockNode(),
+                 self._mPasswordlessMockNode()
+             ]),\
+             patch('exabox.ovm.clucontrol.node_exec_cmd', side_effect=_mNodeExec),\
+             patch('exabox.ovm.clucontrol.node_exec_cmd_check', return_value=(0, "", "")):
+            _clubox.mConfigurePasswordLessDomU("opc")
+
+        _joined_commands = " ".join(_commands)
+        self.assertIn("/dev/tcp/77.0.0.11/22", _joined_commands)
+        self.assertNotIn("/sbin/arping", _joined_commands)
+        self.assertEqual(2, len([_cmd for _cmd in _commands if f"/dev/tcp/{_peer_domu}/22" in _cmd]))
     
     def test_mExecuteCmdParallel(self):
         pairs = self.mGetClubox().mReturnDom0DomUPair()
@@ -2471,6 +3372,7 @@ class ebTestClucontrolClasses(ebTestClucontrol):
                 [
                     exaMockCommand("date", aStdout="Tue Feb 11 16:31:38 UTC 2025", aRc=0),
                 ]
+                for _ in pairs
             ]
         }
         self.mPrepareMockCommands(_cmds)              
@@ -2496,6 +3398,7 @@ class ebTestClucontrolClasses(ebTestClucontrol):
                 [
                     exaMockCommand("mockedcommmand", aStdout=None, aStderr=None, aRc=1),
                 ]
+                for _ in pairs
             ]
         }
         self.mPrepareMockCommands(_cmds)              
@@ -2581,9 +3484,10 @@ class ebTestClucontrolClasses(ebTestClucontrol):
         ebLogInfo("Running unit test on exaBoxCluCtrl.mGetMajorityHostVersion")
 
         pattern = "EXACLOUD FATAL EXCEPTION BEGIN"
-        with self.assertRaises(ExacloudRuntimeError) as cm:
-            _ol_versions = self.mGetClubox().mGetMajorityHostVersion(ExaKmsHostType.DOMU)
-            ebLogInfo(f"_ol_versions = {_ol_versions}")
+        with patch('sys.stderr', new_callable=StringIO):
+            with self.assertRaises(ExacloudRuntimeError) as cm:
+                _ol_versions = self.mGetClubox().mGetMajorityHostVersion(ExaKmsHostType.DOMU)
+                ebLogInfo(f"_ol_versions = {_ol_versions}")
         self.assertIn(pattern, str(cm.exception))
 
     @patch('exabox.core.Node.exaBoxNode.mConnect')
@@ -2602,6 +3506,36 @@ class ebTestClucontrolClasses(ebTestClucontrol):
         _ebox = self.mGetClubox()
         _handler = CommandHandler(_ebox)
         _handler.mHandlerXsUpdateNodesConf()
+
+    def test_mHandlerXsRemoveVMUserPrivilege(self):
+        fname = "mHandlerXsRemoveVMUserPrivilege"
+        ebLogInfo(f"Running unit test on clucommandhandler.py: {fname}")
+        _ebox = self.mGetClubox()
+        _utils = MagicMock()
+        _options = copy.deepcopy(_ebox.mGetArgsOptions())
+        _options.custom_attr = "marker"
+
+        with patch('exabox.ovm.clucontrol.mEnsureOedaJavaHome', return_value=None), \
+             patch.object(_ebox, 'mGetExascaleUtils', return_value=_utils):
+            _rc = _ebox.mDispatchNonXMLCluster('exascale_remove_user_privilege', _options)
+
+        self.assertEqual(_rc, 0)
+        _utils.mRemoveClusterUserPrivilege.assert_called_once_with(_ebox.mGetArgsOptions())
+
+    def test_mHandlerXsDisableNormalRedundancy(self):
+        fname = "mHandlerXsDisableNormalRedundancy"
+        ebLogInfo(f"Running unit test on clucommandhandler.py: {fname}")
+        _ebox = self.mGetClubox()
+        _utils = MagicMock()
+        _options = copy.deepcopy(_ebox.mGetArgsOptions())
+        _options.custom_attr = "marker"
+
+        with patch('exabox.ovm.clucontrol.mEnsureOedaJavaHome', return_value=None), \
+             patch.object(_ebox, 'mGetExascaleUtils', return_value=_utils):
+            _rc = _ebox.mDispatchNonXMLCluster('exascale_disable_normal_redundancy', _options)
+
+        self.assertEqual(_rc, 0)
+        _utils.mDisableNormalRedundancy.assert_called_once_with(_options)
 
     def mGetNodeModel(self, aHostName):
         return 'X11'
@@ -2668,8 +3602,9 @@ class ebTestClucontrolClasses(ebTestClucontrol):
              patch.object(_ebox, 'mGetPatchConfig', return_value='/tmp/config.xml'), \
              patch.object(_ebox, 'mSetPatchConfig') as mock_set_patch_config, \
              patch.object(_ebox, 'mExecuteLocal') as mock_execute_local, \
-             patch.object(_ebox, 'mGetNetworkSlaves', side_effect=[('id1', 'host1', 'slave1'),
-                                                                    ('id2', 'host2', 'slave2')]):
+             patch.object(_ebox, 'mGetNetworkSlavesList',
+                          side_effect=[[('id1', 'host1', 'slave1')],
+                                       [('id2', 'host2', 'slave2')]]):
             _ebox.mPatchNetworkSlaves('domU1', _client_slaves, _backup_slaves, 'bondeth0', 'bondeth1')
 
         mock_oedacli_cmd_mgr.assert_called_once_with('/tmp/oeda/oedacli', '/tmp/oeda/exacloud.conf')
@@ -2848,7 +3783,8 @@ class ebTestClucontrolClasses(ebTestClucontrol):
              patch("exabox.ovm.clucontrol.exaBoxCluCtrl.mReturnCellNodes", return_value={0: None, 1: None}), \
              patch("exabox.ovm.clucontrol.exaBoxCluCtrl.mCheckConfigOption", return_value=None), \
              patch("exabox.ovm.clucontrol.exaBoxNode", return_value=mock_node), \
-             patch("exabox.ovm.clucontrol.get_gcontext"):
+             patch("exabox.ovm.clucontrol.get_gcontext"), \
+             patch("builtins.print"):
             result = _ebox_local.mCheckPkeysConfig(aAllGUIDs, False)
 
         self.assertEqual(result, ("switch-1", "storage_partition", "0x1234", True))
@@ -2887,7 +3823,85 @@ class ebTestClucontrolClasses(ebTestClucontrol):
         }
         self.mPrepareMockCommands(_cmds)
 
-        _ebox.mExecuteStep("enable_qinq", _options)
+        with patch('exabox.ovm.clucontrol.mEnsureOedaJavaHome', return_value=None), \
+             patch('exabox.ovm.clucontrol.CommandHandler.mHandlerEnableQinQ') as mock_handler:
+            mock_handler.return_value = None
+            _ebox.mExecuteStep("enable_qinq", _options)
+            mock_handler.assert_called_once_with(_options)
+
+    @patch('exabox.ovm.clucontrol.connect_to_host')
+    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mPingHost', return_value=True)
+    def test_mSecureDOMUPwd_escapes_password_and_uses_shell(self, mock_mPingHost, mock_connect_to_host):
+        ebLogInfo("")
+        ebLogInfo("Running unit test on exaBoxCluCtrl.mSecureDOMUPwd")
+
+        clubox = self.mGetClubox()
+        dom_pair = [('dom0a.oracle.com', 'domUa.oracle.com')]
+        strong_pwd = "pa'ss"
+
+        mock_node = MagicMock()
+        mock_connect_to_host.return_value.__enter__.return_value = mock_node
+        mock_connect_to_host.return_value.__exit__.return_value = False
+
+        def _check_config(option, default=None):
+            if option == 'disable_spwd':
+                return None
+            if option == 'root_spwd':
+                return strong_pwd
+            if option == 'root_wpwd':
+                return 'weakpwd'
+            if option == 'default_pwd':
+                return 'defaultpwd'
+            return default
+
+        with patch.object(clubox, 'mReturnDom0DomUPair', return_value=dom_pair), \
+             patch.object(clubox, 'mCheckConfigOption', side_effect=_check_config):
+            clubox.mSecureDOMUPwd()
+
+        escaped_strong = strong_pwd.replace("'", "'\\''")
+        expected_cmds = [
+            f"set +H; printf '%s\\n' '{user}:{escaped_strong}' | chpasswd"
+            for user in ("root", "oracle", "grid")
+        ]
+        actual_cmds = [call.args[0] for call in mock_node.mExecuteCmdLog.call_args_list]
+        self.assertEqual(expected_cmds, actual_cmds)
+
+    @patch('exabox.ovm.clucontrol.connect_to_host')
+    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mPingHost', return_value=True)
+    def test_mSecureDOMUPwd_handles_backslash_and_quote(self, mock_mPingHost, mock_connect_to_host):
+        ebLogInfo("")
+        ebLogInfo("Running unit test on exaBoxCluCtrl.mSecureDOMUPwd with backslash and quote")
+
+        clubox = self.mGetClubox()
+        dom_pair = [('dom0a.oracle.com', 'domUa.oracle.com')]
+        strong_pwd = r"Abc'\\xyz"
+
+        mock_node = MagicMock()
+        mock_connect_to_host.return_value.__enter__.return_value = mock_node
+        mock_connect_to_host.return_value.__exit__.return_value = False
+
+        def _check_config(option, default=None):
+            if option == 'disable_spwd':
+                return None
+            if option == 'root_spwd':
+                return strong_pwd
+            if option == 'root_wpwd':
+                return 'weakpwd'
+            if option == 'default_pwd':
+                return 'defaultpwd'
+            return default
+
+        with patch.object(clubox, 'mReturnDom0DomUPair', return_value=dom_pair), \
+             patch.object(clubox, 'mCheckConfigOption', side_effect=_check_config):
+            clubox.mSecureDOMUPwd()
+
+        escaped_strong = strong_pwd.replace("'", "'\\''")
+        expected_cmds = [
+            f"set +H; printf '%s\\n' '{user}:{escaped_strong}' | chpasswd"
+            for user in ("root", "oracle", "grid")
+        ]
+        actual_cmds = [call.args[0] for call in mock_node.mExecuteCmdLog.call_args_list]
+        self.assertEqual(expected_cmds, actual_cmds)
 
     def test_mDispatchCluster_params_storage_type_unknown_defaults_asm(self):
         class StopDispatch(Exception):
@@ -3686,6 +4700,24 @@ class ebTestClucontrolClasses(ebTestClucontrol):
             patch.object(ctrl, 'mCheckConfigOption', side_effect=_check_config),
         ):
             ctrl.mCleanUpStaleVm(False, [(dom0_host, domU)])
+        
+    @patch('exabox.ovm.clucontrol.exaBoxCluCtrl.mPingHost', return_value=True)
+    def test_mSecureDOMUPwd(self, mock_mPingHost):
+        ebLogInfo("")
+        ebLogInfo("Running unit test on exaBoxCluCtrl.mSecureDOMUPwd")
+        _cmds = {
+            self.mGetRegexVm(): [
+                [
+                    exaMockCommand(r"set \+H; printf '%s\\n' 'root:.*' \| chpasswd", aRc=0, aStdout="", aPersist=True),
+                    exaMockCommand(r"set \+H; printf '%s\\n' 'oracle:.*' \| chpasswd", aRc=0, aStdout="", aPersist=True),
+                    exaMockCommand(r"set \+H; printf '%s\\n' 'grid:.*' \| chpasswd", aRc=0, aStdout="", aPersist=True),
+                    exaMockCommand(r"set \+H; printf '%s\\n' 'opc:.*' \| chpasswd", aRc=0, aStdout="", aPersist=True)
+                ]
+            ]
+        }
+        self.mPrepareMockCommands(_cmds)   
+
+        self.mGetClubox().mSecureDOMUPwd()
 
 if __name__ == "__main__":
     unittest.main(warnings='ignore')

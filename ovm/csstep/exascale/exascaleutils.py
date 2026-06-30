@@ -16,9 +16,22 @@
 #      NONE
 #
 #    MODIFIED   (MM/DD/YY)
+#    scoral      06/22/26 - Bug 39589421: Skip default ACFS cleanup without
+#                           Exascale controller
+#    rajsag      06/19/26 - 39586615 - exacc x11m - exacloud config exascale
+#                           failing when x11-hc is sent as cell type
+#    arturjim    06/10/26 - Enh 38429269 - EXACLOUD: USE CELL LIST PAYLOAD FOR CONFIGURE EXASCALE
+#    rajsag      05/29/26 - Bug 39283211 - support X11 no-XRMEM cell types
+#    nelango     05/21/26 - Bug 39348637: Handle legacy acfs vol deletion
+#    pbellary    05/12/26 - Bug 39120670 - VALIDATE EXASCALE SERVICES POST CONFIGURE EXASCALE
+#    pbellary    04/30/26 - ER 39187148 - ECRACLI API TO UPDATE HIGH REDUNDANCY AND 
+#                           ENSURE DEFAULT VLT_INSPECT PRVILEGE IS UNSET FOR VMCLUSTER USERID
 #    pbellary    04/20/26 - Bug 39196275 - X11M EF:EXASCALE CONFIGURATION FAILS: "DBM-00201: EDV SERVICES STARTUP FAILED. ERROR: DBM-01559: FAILURE FOR UNKNOWN REASONS"
 #    pbellary    04/15/26 - Enh 39213619 - EXACLOUD SHOULD UPDATE STORAGE INTERCONNECTS IN ASM ADD NODE FOR A EXASCALE INFRA
 #    siyarlag    04/02/26 - Update domU validation logic
+#    oespinos    03/26/26 - 39128891: Deconfigure exascale on delete cell
+#    arturjim    03/18/26 - Bug 39082491 - EXACLOUD: SUPPORT DEV SHARED-RACKS
+#                           IN DELETE INFRA WHEN EXASCALE IS CONFIGURED
 #    oespinos    03/09/26 - 39001455: Deconfigure exascale on kvm host
 #    pbellary    02/24/26 - Bug 38972840 - DELETE-SERVICE WF FAILED TO VERIFY ACL USER ID
 #    pbellary    02/24/26 - Bug 38858318 - IF CHACL COMMAND FAILS CREATE SERVICE FLOW SHOULD FAIL
@@ -209,6 +222,7 @@ from exabox.tools.ebOedacli.ebOedacli import ebOedacli
 from exabox.ovm.csstep.cs_constants import csXSConstants, csXSEighthConstants
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 from exabox.ovm.csstep.exascale.escli_util import ebEscliUtils
+from exabox.ovm.utils.cellcli_utils import ebCellCliUtils
 from exabox.core.Error import ebError, ExacloudRuntimeError, gReshapeError, gExascaleError
 from exabox.log.LogMgr import ebLogError, ebLogInfo, ebLogWarn, ebLogDebug, ebLogVerbose, ebLogTrace, ebLogCritical
 from exabox.utils.node import connect_to_host, node_cmd_abs_path_check, node_connect_to_host, node_exec_cmd, node_exec_cmd_check, node_read_text_file, node_write_text_file
@@ -221,7 +235,9 @@ DEVICE_NAME = "xacfsvol"
 CTRL_PORT   = "5052"
 REDUNDANCY_FACTOR = 3.0
 ATTR_AUTO_FILE_ENCRYPTION = "autoFileEncryption"
+NORMAL_REDUNDANCY = "normalRedundancy"
 MAX_CLU_NAME_LEN = 11
+EXACC_SHARED_DEV_FLAG = "/opt/oracle/EXACC_SHARED_DEV_RACK"
 
 class ebExascaleUtils(object):
 
@@ -235,6 +251,12 @@ class ebExascaleUtils(object):
 
     def mSetCluCtrl(self, aCluCtrl):
         self.__cluctrl = aCluCtrl
+
+    def mGetEscliUtils(self):
+        return self.__escli
+
+    def mSetEscliUtils(self, aEscliUtils):
+        self.__escli = aEscliUtils
 
     def _mUpdateRequestData(self, rc, aData, err):
         """
@@ -457,8 +479,9 @@ class ebExascaleUtils(object):
             _exascale_tag = self.mCheckExascaleTag()
             if not _exascale_tag:
                 ebLogInfo("exascale tag or exascale cluster name is not present in the input XML")
+                _sp_cell_list = ",".join(_cell_list)
                 _oedacliCmds.append(["ADD EXASCALECLUSTER", {"NAME": _exascale_name, "VIP": _sre_hostname, "IP": _sre_ip}, {}])
-                _oedacliCmds.append(["ADD STORAGEPOOL", {"NAME": _hc_pool, "SIZE": _pool_size, "CELLLIST": "ALL"}, {}])
+                _oedacliCmds.append(["ADD STORAGEPOOL", {"NAME": _hc_pool, "SIZE": _pool_size, "CELLLIST": _sp_cell_list}, {}])
             else:
                 ebLogInfo("exascale tag is present in the input XML")
                 #Fetch the EGS clustername from XML
@@ -484,8 +507,9 @@ class ebExascaleUtils(object):
             _exascale_tag = self.mCheckExascaleTag()
             if not _exascale_tag:
                 ebLogInfo("exascale tag is not present in the input XML")
+                _sp_cell_list = ",".join(_cell_list)
                 _oedacliCmds.append(["ADD EXASCALECLUSTER", {"NAME": _egs_cluster_name, "VIP": _sre_hostname, "IP": _sre_ip}, {}])
-                _oedacliCmds.append(["ADD STORAGEPOOL", {"NAME": _hc_pool, "SIZE": _pool_size, "CELLLIST": "ALL"}, {}])
+                _oedacliCmds.append(["ADD STORAGEPOOL", {"NAME": _hc_pool, "SIZE": _pool_size, "CELLLIST": _sp_cell_list}, {}])
             else:
                 ebLogInfo("exascale tag is present in the input XML")
                 #Fetch the EGS clustername from XML
@@ -2033,6 +2057,31 @@ class ebExascaleUtils(object):
 
         return _ret
 
+    def mExecuteXSDeconfigCell(self, aOptions):
+        _celllist = aOptions.jsonconf.get('removed_cells')
+        if not _celllist:
+            _msg = 'mExecuteXSDeconfigCell: removed_cells payload is empty'
+            ebLogError(_msg)
+            return -1
+
+        _esclustername = aOptions.jsonconf.get('exascale_cluster_name')
+        if not _esclustername:
+            _msg = 'mExecuteXSDeconfigCell: exascale_cluster_name payload is empty'
+            ebLogError(_msg)
+            return -1
+
+        _save_dir = self.__cluctrl.mGetOedaPath() + '/exacloud.conf'
+        self.__cluctrl.mExecuteLocal("/bin/mkdir -p {0}".format(_save_dir))
+
+        _configxml = _save_dir + '/xsdeconfig_cell_' + self.__cluctrl.mGetUUID() + '.xml'
+        _outputxml = _save_dir + '/xsdeconfig_cell_' + self.__cluctrl.mGetUUID() + '_output.xml'
+        self.__cluctrl.mExecuteLocal("/bin/cp {} {}".format(self.__cluctrl.mGetPatchConfig(), _configxml))
+
+        _oedacli_bin = self.__cluctrl.mGetOedaPath() + '/oedacli'
+        _oedacli_mgr = OedacliCmdMgr(_oedacli_bin, _save_dir)
+        _oedacli_mgr.mAlterExascaleClusterDropCells(_configxml, _outputxml, _celllist, _esclustername)
+        return 0
+
     def mExecuteXSDeconfigCompute(self, aOptions):
         """
         function to deconfigure exascale on a deleted compute
@@ -2104,6 +2153,8 @@ class ebExascaleUtils(object):
             return self.mExecuteXSConfigOedaStep(_options)
         elif _inputjson["config_op"] == "updatestoragepool":
             return self.mExecuteXSConfigReshapePool(_options)
+        elif _inputjson["config_op"] == "deconfigcell":
+            return self.mExecuteXSDeconfigCell(_options)
         elif _inputjson["config_op"] == "deconfigcompute":
             return self.mExecuteXSDeconfigCompute(_options)
         _msg = "Invalid DBVault operation %s "%(_inputjson["config_op"])
@@ -2192,6 +2243,85 @@ class ebExascaleUtils(object):
             ebLogInfo(f'*** Cell {_cell} Exadata model: {_model}')
         return _model
 
+    def mCheckExascaleWallet(self, aHostList, aType, aOptions):
+        _host_list = aHostList
+        _type = aType
+        _ebox = self.__cluctrl
+        _escli = self.__escli
+        _rc = -1
+        for _host in _host_list:
+            _rc = _escli.mCheckWalletExists(_host, aOptions, aType=_type)
+            if _rc !=0:
+                _detail_error = f"*** Exascale wallet is not available in {_host}"
+                ebLogError(_detail_error)
+                _ebox.mUpdateErrorObject(gExascaleError["WALLET_NOT_FOUND"], _detail_error)
+                raise ExacloudRuntimeError(0x0811, 0xA, _detail_error)
+
+        return _rc
+
+    def mValidateExascaleConfiguration(self, aOptions):
+        _ebox = self.__cluctrl
+        _escli = self.__escli
+        _options = aOptions
+
+        if not _ebox.mCheckConfigOption("xs_validate_services", "True"):
+            ebLogInfo(f"Validate exascale services is disabled.")
+            return
+
+        _inputjson = aOptions.jsonconf
+        _exascale_attr = _inputjson['exascale']
+        _cell_list = _exascale_attr['cell_list']
+        _dom0_list = [ _host_info["compute_hostname"] for _host_info in _exascale_attr["host_nodes"] ]
+        _failed_services = []
+        _unavailable_services = []
+
+        ebLogInfo("Validating Exascale Services...")
+
+        #Check Exascale wallet is existing on compute nodes
+        self.mCheckExascaleWallet(_dom0_list, "dom0", _options)
+
+        #Check Exascale wallet is existing on storage servers
+        self.mCheckExascaleWallet(_cell_list, "cell", _options)
+
+        _cell = _cell_list[0]
+        _result = _escli.mListExascaleServices(_cell, aOptions)
+        for _res in _result:
+            _name = _res["name"]
+            _service, _nodename = _name.split("_", 1)
+            _status = _res["status"]
+            if _status and _status.lower() != "online":
+                _msg = f'*** {_service} Service is not online on {_nodename}'
+                ebLogError(_msg)
+                _failed_services.append(_msg)
+            else:
+                ebLogTrace(f'*** {_service} Service status on {_nodename}: {_status}')
+
+        _attributes = ["controlServicesState", "storageVolumeWorkersState", "systemVaultManagersState", "userVaultManagersState", "volumeManagersState"]
+        _rc, _output, _err = _escli.mGetClusterAttribute(_cell, aAttributes=_attributes, aOptions=_options, aJson=True)
+        if _rc != 0:
+            _detail_error = "*** Exascale services are not available"
+            ebLogError(_detail_error)
+            _ebox.mUpdateErrorObject(gExascaleError["EXASCALE_DEPLOY_ERROR"], _detail_error)
+            raise ExacloudRuntimeError(0x0811, 0xA, _detail_error)
+        for _result in _output:
+            for _service, _state in _result.items():
+                if " - " in _state:
+                    _status, _additional_field = _state.split(" - ", 1)
+                    if _additional_field == "reduced redundancy":
+                        _msg = _service + " is not available"
+                        _unavailable_services.append(_msg)
+                        ebLogError(f"{_service}: {_status} is at reduced redundancy")
+                else:
+                    ebLogTrace(f"{_service}: {_state}")
+
+        if _unavailable_services or _failed_services:
+            _detail_error = "*** Exascale services are not available"
+            ebLogError(_detail_error)
+            _ebox.mUpdateErrorObject(gExascaleError["EXASCALE_DEPLOY_ERROR"], _detail_error)
+            raise ExacloudRuntimeError(0x0811, 0xA, _detail_error)
+        else:
+            ebLogInfo("All Exascale Services are online..")
+
     def mConfigureExascale(self, aOptions):
         _csu = csUtil()
         _steplist = ["XSCONFIG_STORAGE"]
@@ -2217,16 +2347,20 @@ class ebExascaleUtils(object):
         # create cell disks and Flash Disks if not available on the cell servers
         self.mValidateAndCreateDisks(aOptions)
 
-        #convert XML template to X11EF, if cell disks have extreme flash disks
+        #convert XML template to the concrete X11/X10 cell type when needed
+        _cellcli_utils = ebCellCliUtils(_ebox)
         for _cell_name in _cell_list:
             _exadata_model = _ebox.mGetNodeModel(aHostName=_cell_name)
             if _ebox.mCompareExadataModel(_exadata_model, 'X8') >= 0:
                 _exadata_model_gt_X8 = True
 
-            if _escli.mIsEFRack(_cell_name) and _exadata_model_gt_X8:
+            _cell_type = _cellcli_utils.mGetX11NoXrmemMachineType(_cell_name)
+            if not _cell_type and _escli.mIsEFRack(_cell_name) and _exadata_model_gt_X8:
                 _cell_model = _ebox.mGetNodeModel(aHostName=_cell_name)
                 _cell_type = _cell_model + "M" + "EF"
-                ebLogInfo(f'*** Cell {_cell_name} Exadata model: {_cell_model} Cell Type: {_cell_type}')
+
+            if _cell_type and _exadata_model_gt_X8 and _escli.mIsEFRack(_cell_name):
+                ebLogInfo(f'*** Cell {_cell_name} Exadata model: {_exadata_model} Cell Type: {_cell_type}')
                 self.mPatchEFRack(_cell_name, _cell_type, aOptions)
 
         # For reimaged Dom0s, make sure node type is KVMHOST in imageinfo
@@ -2252,6 +2386,9 @@ class ebExascaleUtils(object):
         #
         _csu.mExecuteOEDAStep(self.__cluctrl, "XSCONFIG_STORAGE", _steplist, aOedaStep=_csConstants.OSTP_CONFIG_STORAGE)
 
+        #Disable Normal Redundancy
+        self.mDisableNormalRedundancy(aOptions)
+
         # Enable Auto File Encryption if not already enabled
         # Skip only if flag is set in exabox.conf
         _flag_encryption = "exascale_autofileencryption_disable"
@@ -2263,6 +2400,9 @@ class ebExascaleUtils(object):
             if _rc:
                 ebLogError(f"Failed to enable Auto File Encryption")
                 return -1
+
+        # Validate Exascale services
+        self.mValidateExascaleConfiguration(aOptions)
 
     def mDeConfigureExascale(self, aOptions):
         _csu = csUtil()
@@ -2286,6 +2426,24 @@ class ebExascaleUtils(object):
         #
         _csu.mExecuteOEDAStep(self.__cluctrl, "XSCONFIG_STORAGE", _steplist, aOedaStep=_csConstants.OSTP_CONFIG_STORAGE, undo=True, dom0Lock = False, aSkipFail=False, aOverride=True)
 
+    def mIsSharedDevRack(self):
+        """
+        Identify ExaCC shared dev racks by checking the flag file on dom0 hosts.
+        """
+        if not self.__cluctrl.mIsOciEXACC():
+            return False
+
+        for _dom0, _ in self.__cluctrl.mReturnDom0DomUPair():
+            try:
+                with connect_to_host(_dom0, get_gcontext()) as _node:
+                    if _node.mFileExists(EXACC_SHARED_DEV_FLAG):
+                        ebLogInfo(f"mIsSharedDevRack: flag {EXACC_SHARED_DEV_FLAG} found on {_dom0}")
+                        return True
+            except Exception as ex:
+                ebLogWarn(f"mIsSharedDevRack: unable to check {_dom0}: {ex}")
+
+        return False
+
     #Configure XS config
     def mExecuteXSConfigOedaStep(self, aOptions):
         ebLogInfo(" *** mExecuteXSConfigOedaStep()>>")
@@ -2300,6 +2458,9 @@ class ebExascaleUtils(object):
         if not _undo:
             self.mConfigureExascale(aOptions)
         else: # undo
+            if self.mIsSharedDevRack():
+                ebLogInfo("mExecuteXSConfigOedaStep: detected shared dev ExaCC rack; skipping ExaScale deconfigure.")
+                return 0
             self.mDeConfigureExascale(aOptions)
 
     #Validate DomUs after dom0 reboot for CRS running and Dbs running
@@ -2843,6 +3004,9 @@ class ebExascaleUtils(object):
 
         _acfs_volname = "vol_" + _acfs_name
         _vol_id, _ = _escli.mGetVolumeID(_cell, _acfs_volname, aOptions)
+        if not _vol_id:
+            _acfs_volname = "acfs_" + _acfs_name
+            _vol_id, _ = _escli.mGetVolumeID(_cell, _acfs_volname, aOptions)
         if _vol_id:
             _vol_attach, _, _ = _escli.mGetVolumeAttachments(_cell, _vol_id, aOptions)
             _acfs_id, _, _, _ = _escli.mGetACFSFileSystem(_cell, _vol_id, aOptions)
@@ -2946,9 +3110,32 @@ class ebExascaleUtils(object):
                 raise ExacloudRuntimeError(aErrorMsg=_err_str)
 
     def mRemoveDefaultAcfsVolume(self, aOptions):
+        if not self.mHasExascaleControllerConfig(aOptions):
+            ebLogInfo("Skipping default ACFS volume cleanup: Exascale controller is not configured")
+            return
+
         self.mUnRegisterACFS(aOptions)
         self.mDetachAcfsVolume(aOptions)
         self.mRemoveAcfsDir()
+
+    def mHasExascaleControllerConfig(self, aOptions):
+        _exascale_attr = {}
+        if aOptions is not None and isinstance(aOptions.jsonconf, dict):
+            _inputjson = aOptions.jsonconf
+            if "exascale" in list(_inputjson.keys()) and isinstance(_inputjson["exascale"], dict):
+                _exascale_attr = _inputjson["exascale"]
+            elif "ctrl_network" in list(_inputjson.keys()):
+                _exascale_attr = _inputjson
+            elif "db_vaults" in list(_inputjson.keys()) and _inputjson["db_vaults"]:
+                _exascale_attr = _inputjson["db_vaults"][0]
+
+        if isinstance(_exascale_attr, dict):
+            _ctrl_network = _exascale_attr.get("ctrl_network", {})
+            if isinstance(_ctrl_network, dict) and _ctrl_network.get("ip"):
+                return True
+
+        _ctrl_ip, _ = self.__escli.mGetCtrlIP()
+        return bool(_ctrl_ip)
 
     def mGetClusterName(self, aOptions):
         _ebox = self.__cluctrl
@@ -2979,6 +3166,9 @@ class ebExascaleUtils(object):
             _gi_clustername = "grid" + _clusterName
             _acfs_volname = "vol" + "_" + _gi_clustername
             _volume_id, _ = _escli.mGetVolumeID(_cell, _acfs_volname, aOptions)
+            if not _volume_id:
+                _acfs_volname = "acfs" + "_" + _gi_clustername
+                _volume_id, _ = _escli.mGetVolumeID(_cell, _acfs_volname, aOptions)
             if _volume_id:
                 _acfs_id, _, _, _ = _escli.mGetACFSFileSystem(_cell, _volume_id, aOptions)
                 if _acfs_id:
@@ -3000,6 +3190,9 @@ class ebExascaleUtils(object):
         _gi_clustername = "grid" + _clusterName
         _acfs_volname = "vol" + "_" + _gi_clustername
         _volume_id, _ = _escli.mGetVolumeID(_cell, _acfs_volname, aOptions)
+        if not _volume_id:
+            _acfs_volname = "acfs" + "_" + _gi_clustername
+            _volume_id, _ = _escli.mGetVolumeID(_cell, _acfs_volname, aOptions)
         _vol_attach, _, _ = _escli.mGetVolumeAttachments(_cell, _volume_id, aOptions)
 
         #Remove EDV volume attachment
@@ -3579,11 +3772,14 @@ class ebExascaleUtils(object):
         _cell = _cell_list[0]
         ebLogInfo(f"Using cell {_cell} to enable Auto File Encryption")
 
+        _attributes = []
+        _attributes.append(ATTR_AUTO_FILE_ENCRYPTION)
+
         # If we can't detect attribute status or we detect false,
         # we attempt to enable it
         _current_auto_file_encryption = False
         _rc, _out, _err = self.__escli.mGetClusterAttribute(
-            _cell, ATTR_AUTO_FILE_ENCRYPTION, _options)
+            _cell, aAttributes=_attributes, aOptions=_options)
         if "true" in _out:
             ebLogInfo(f"The attribute '{ATTR_AUTO_FILE_ENCRYPTION} has "
                 "been detected to be 'true' already, will not attempt "
@@ -3601,7 +3797,7 @@ class ebExascaleUtils(object):
             # Do a quick validation of the attribute once after enabling it
             # Raise error in case we fail to do so
             _rc, _out, _err = self.__escli.mGetClusterAttribute(
-                _cell, ATTR_AUTO_FILE_ENCRYPTION, _options)
+                _cell, aAttributes=_attributes, aOptions=_options)
             if "true" in _out:
                 ebLogInfo(f"The attribute '{ATTR_AUTO_FILE_ENCRYPTION} has "
                     "been enabled to be 'true' with success")
@@ -3834,3 +4030,82 @@ class ebExascaleUtils(object):
                     ebLogInfo(f"Copying oracle eswallet from {_srcDomu} to {_domu}.")
                     _cmd = f"{_sudo_cmd} -u oracle {_scp_cmd} -r {_oracleWallet} oracle@{_domu}:/u02/app/oracle/admin"
                     _, _o, _ = _node.mExecuteCmd(_cmd)
+
+    def mRemoveClusterUserPrivilege(self, aOptions, aClusterName=None):
+        _clusterName = aClusterName
+        _ebox = self.__cluctrl
+        _escli = self.__escli
+        _cell_list, _cell  = [], ""
+        try:
+            if aOptions is not None and aOptions.jsonconf is not None and \
+               "exascale" in list(aOptions.jsonconf.keys()):
+                _exascale_attr = aOptions.jsonconf['exascale']
+                _cell_list = _exascale_attr['cell_list']
+                _cell = _cell_list[0]
+                _ctrl_ip = _exascale_attr['ctrl_network']['ip'].strip()
+                _ctrl_port = _exascale_attr['ctrl_network']['port'].strip()
+        except Exception as e:
+            ebLogWarn(f"*** mRemoveClusterUserPrivilege failed with Exception: {str(e)}")
+            _ctrl_ip, _ = _escli.mGetCtrlIP()
+            _ctrl_port = CTRL_PORT
+
+        if _clusterName:
+            _escli.mRemoveVMUserPrivilege(_cell, "grid" + _clusterName, aOptions)
+            _escli.mRemoveVMUserPrivilege(_cell, "oracle" + _clusterName, aOptions)
+        else:
+            _match_dict = {
+                "attributes.category" : "external", 
+                "attributes.privilege" : lambda v: v in {
+                "vlt_inspect|rest_vault_client|rest_volume_client",
+                "vlt_inspect"
+                },
+            }
+            _output = _escli.mGetUserDetails(_cell, aOptions, aMatchDict=_match_dict, aReturnKeys=["id"])
+            for _res in _output:
+                _escli.mRemoveVMUserPrivilege(_cell, _res["id"], aOptions)
+
+    def mDisableNormalRedundancy(self, aOptions):
+        _ebox = self.__cluctrl
+        _escli = self.__escli
+        _options = aOptions
+        _cell_list, _cell, _attributes  = [], "", []
+        try:
+            if aOptions is not None and aOptions.jsonconf is not None and \
+               "exascale" in list(aOptions.jsonconf.keys()):
+                _exascale_attr = aOptions.jsonconf['exascale']
+                _cell_list = _exascale_attr['cell_list']
+                _cell = _cell_list[0]
+                _ctrl_ip = _exascale_attr['ctrl_network']['ip'].strip()
+                _ctrl_port = _exascale_attr['ctrl_network']['port'].strip()
+        except Exception as e:
+            ebLogWarn(f"*** mDisableNormalRedundancy failed with Exception: {str(e)}")
+            _ctrl_ip, _ = _escli.mGetCtrlIP()
+            _ctrl_port = CTRL_PORT
+
+        _attributes.append(NORMAL_REDUNDANCY)
+        _rc, _output, _err = _escli.mGetClusterAttribute(_cell, aAttributes=_attributes, aOptions=_options, aJson=True)
+        if _output:
+            _value = _output[0].get(NORMAL_REDUNDANCY) if _output else None
+            if not _value:
+                ebLogInfo("normal redundancy is already disabled")
+                return 0
+            _vaults = _escli.mListFiles(_cell, aOptions=_options, aJson=True)
+            for _res in _vaults:
+                _vault = _res["name"]
+                _result = _escli.mListFiles(_cell, aOptions=_options, aJson=True, aVault=_vault, aFilter={"redundancy": "normal"})
+                _count = len(_result)
+                if _count > 0:
+                    _msg = f"ERROR: vault @{_vault} has NORMAL redundancy files"
+                    ebLogError(_msg)
+                    _ebox.mUpdateErrorObject(gExascaleError["DISALBLE_NORMAL_REDUNDANCY_FAILED"], _msg)
+                    raise ExacloudRuntimeError(0x0811, 0xA, _msg)
+
+            _rc = _escli.mChangeClusterAtributes(_cell, aOptions, aAttribute={"normalRedundancy" : "false"})
+            if _rc == 0:
+                ebLogInfo("SUCCESS, normal redundancy is disabled")
+                return 0
+            else:
+                _msg = "ERROR: failed to disable normal redundancy"
+                ebLogInfo(_msg)
+                _ebox.mUpdateErrorObject(gExascaleError["DISALBLE_NORMAL_REDUNDANCY_FAILED"], _msg)
+                raise ExacloudRuntimeError(0x0811, 0xA, _msg)

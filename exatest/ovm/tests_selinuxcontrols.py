@@ -16,6 +16,7 @@
 #      Tests rely on ebTestClucontrol base for request + node scaffolding.
 #
 #    MODIFIED   (MM/DD/YY)
+#    aypaul      05/25/26 - Bug#39432939 Fix unit tests for changes
 #    aypaul      03/30/26 - Adding unit tests for aypaul_bug-38277507
 #    aypaul      01/29/26 - Adding unit tests for selinux implementation
 
@@ -177,7 +178,7 @@ class ebTestSelinuxControls(ebTestClucontrol):
         statusinfodict = {}
         mocknode.mExecuteCmdLog.return_value = 0
         mocknode.mExecuteCmd.return_value = [0,io.StringIO("SELINUX=disabled"),None]
-        rcstatus = selinuxinstance.mSetSeLinux(mocknode, "enforcing", None, statusinfodict)
+        rcstatus = selinuxinstance.mSetSeLinux(mocknode, "enforcing", 'domU', statusinfodict)
         self.assertEqual(rcstatus, True)
 
         fullOptions = self.mGetClubox().mGetArgsOptions()

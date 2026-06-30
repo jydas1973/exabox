@@ -2,7 +2,7 @@
 
  $Header: 
 
- Copyright (c) 2018, 2021, Oracle and/or its affiliates. 
+ Copyright (c) 2018, 2026, Oracle and/or its affiliates.
 
  NAME:
       tests_ociccatppayload.py - Unitest for ATP EXACC
@@ -16,6 +16,8 @@
  History:
 
     MODIFIED   (MM/DD/YY)
+        joysjose    05/22/26 - Use request-local staged oedacli for OCI ExaCC
+                               ATP XML patching and add regression coverage.
         vgerard     03/09/20 - Adapt test for OCICC
 """
 
@@ -25,6 +27,7 @@ import sys
 import time
 import shutil
 import xml.etree.ElementTree as ET
+import exabox.ovm.cluexaccatp as cluexaccatp_module
 from exabox.ovm.cluexaccatp import ebExaCCAtpSimulatePayload, ebExaCCAtpPatchXML, ebExaCCAtpListener
 from exabox.exatest.common.ebTestClucontrol import ebTestClucontrol
 
@@ -148,6 +151,33 @@ class ebTestOciCCAtpXML(ebTestClucontrol):
                 len(_newconfig.findall('./networks/network/[hostName="'+'iad139936exdd00{}nat02'.format(i)+ '"]')))
         os.remove(_newpath)
 
+    def test_RequestLocalOedaCliPath(self):
+        _base_oeda_path = self.mGetClubox().mGetOedaPath()
+        _request_oeda_path = os.path.join(_base_oeda_path, "requests", "exaunit_00000000001_exatest")
+        _patcher = ebExaCCAtpPatchXML(
+            self._xmlpath,
+            ['scaqak03dv0102.us.oracle.com'],
+            True,
+            _request_oeda_path
+        )
+
+        _captured_cmd = []
+        _orig_check_output = cluexaccatp_module.subprocess.check_output
+
+        def _fake_check_output(aCmd):
+            _captured_cmd.append(aCmd)
+            return b'[]'
+
+        try:
+            cluexaccatp_module.subprocess.check_output = _fake_check_output
+            _patcher.mExecuteOEDACLI(['list networks where hostname=scaqak03dv0102 networktype=client'])
+        finally:
+            cluexaccatp_module.subprocess.check_output = _orig_check_output
+
+        self.assertEqual(1, len(_captured_cmd))
+        self.assertEqual(os.path.join(_request_oeda_path, 'oedacli'), _captured_cmd[0][0])
+        self.assertNotEqual(os.path.join(_base_oeda_path, 'oedacli'), _captured_cmd[0][0])
+
 class ebTestOciCCAtpPayload(ebTestClucontrol):
 
     @classmethod
@@ -238,4 +268,3 @@ class ebTestOciCCAtpPayload(ebTestClucontrol):
 
 if __name__ == '__main__':
     unittest.main()
-

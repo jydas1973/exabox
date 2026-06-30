@@ -17,6 +17,8 @@
 #    https://confluence.oraclecorp.com/confluence/display/EDCS/ExaCC-Exacloud+Key-Value+DB+to+save+FS+Encryptation+Passphrase
 #
 #    MODIFIED   (MM/DD/YY)
+#    jfsaldan    06/22/26 - Update stale IMDSv1 comments to generic IMDSv2
+#                           wording
 #    aararora    01/27/26 - Bug 38723384: Add retry/force logic for crs restart
 #    jfsaldan    10/06/25 - Bug 38496061 - EXACC:BB:FEDRAMP:ADD NODE OPERATION
 #                           HANGED - OEDACLI ERROR FOUND ON SCRIPT EXECUTION |
@@ -3260,7 +3262,7 @@ def copyOEDAKeyApiToNode(aHost: str, aRemoteKeyapiPath: str,
             # Add the certs beggining marker and move position to the end
             # NOTE: it's possible that we write nothing between the BEGIN/END
             # markers of the CERTS. This will make the keyapi use the default
-            # certs in the cavium, e.g. http://169.254.169.254/opc/v1/identity/
+            # certs in the cavium via the default IMDSv2 identity endpoint
             _tmp_local_keyapi_shell.write("\n__CERTS_BEGINS__\n")
             _tmp_local_keyapi_shell.seek(0,2)
 
@@ -5249,4 +5251,3 @@ def exacc_del_fsencryption_passphrase(aDomU:str) -> bool:
     _exakms = ExaKmsKVDB()
     _is_successful = _exakms.mDeleteExaKmsEntry(f"fs_encpass_{_domu}")
     return _is_successful
-

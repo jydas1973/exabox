@@ -16,6 +16,9 @@
 #      <other useful comments, qualifications, etc.>
 #
 #    MODIFIED   (MM/DD/YY)
+#    atgandhi    06/17/26 - Fix SLA vmCluster unit test command matching
+#    atgandhi    06/17/26 - Bug 39263024 - EXACS - SECURITY SCAN FINDINGS IN
+#                           EXABOX/JSONDISPATCH/HANDLER_SLA_VMCLUSTER.PY
 #    atgandhi    02/01/26 - Bug 38910261 - EXACS:SLA NOT SET TO 0 AFTER
 #                           SLA_SERVER_MAX_TIMEOUT EXPIRY WHEN ADMIN NETWORK
 #                           (ETH0) IS DOWN
@@ -198,12 +201,13 @@ class ebTestSLA(ebTestClucontrol):
             def __getattr__(self, name):
                 return lambda *a, **k: None
         def fake_node_exec_cmd(node, cmd, timeout=0):
-            if "journalctl -u libvirtd" in cmd:
+            cmd_text = " ".join(cmd) if isinstance(cmd, (list, tuple)) else cmd
+            if "journalctl -u libvirtd" in cmd_text:
                 return 0, (
                     f"Jun 24 08:55:00 Some Stopped Virtualization daemon\n"
                     f"Jun 24 09:15:00 Some Started Virtualization daemon"
                 ), ""
-            elif "journalctl -k" in cmd:
+            elif "journalctl -k" in cmd_text:
                 return 0, (
                     f"Jun 24 08:59:00 bondeth0: now running without any active interface!\n"
                     f"Jun 24 09:20:00 bondeth0: active interface up"

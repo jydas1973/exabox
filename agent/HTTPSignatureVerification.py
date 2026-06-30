@@ -1,10 +1,10 @@
 #!/bin/python
 #
-# $Header: ecs/exacloud/exabox/agent/HTTPSignatureVerification.py /main/8 2024/10/24 19:20:56 ririgoye Exp $
+# $Header: ecs/exacloud/exabox/agent/HTTPSignatureVerification.py jbrigido_bug-38545971/1 2026/01/13 20:15:11 jbrigido Exp $
 #
 # HTTPSignatureVerification.py
 #
-# Copyright (c) 2024, Oracle and/or its affiliates.
+# Copyright (c) 2024, 2026, Oracle and/or its affiliates.
 #
 #    NAME
 #      HTTPSignatureVerification.py - Verify the HTTP signature for API access control
@@ -18,6 +18,9 @@
 #      https://confluence.oci.oraclecorp.com/pages/viewpage.action?spaceKey=DBAAS&title=Gen+2+ExaCC+API+Access+Control
 #
 #    MODIFIED   (MM/DD/YY)
+#    aypaul      06/02/26 - SecBug#39471474 Fix http request line parsing logic
+#    jbrigido    10/22/25 - Bug 38545971 Adding delete compute/cell to
+#                           restricted apis
 #    ririgoye    10/23/24 - Bug 37197710 - Receive mSearchExaKmsEntries result
 #                           as list for ExaKVDB instances
 #    aypaul      08/29/24 - Bug#37002424 Determine deployment from CPS host
@@ -57,6 +60,8 @@ HTTP_HEADER_EXA_OPC_PRINCIPAL = "exa-opc-principal"
 CLAIMKEY_OPC_CERTTYPE = "ptype"
 CLAIMKEY_SVC = "svc"
 
+MALFORMED_URL = "Malformed URL"
+
 def insertRestrictedEndpointsInformation():
 
     _apiaccess_control_restricted_endpoints = [
@@ -65,7 +70,10 @@ def insertRestrictedEndpointsInformation():
         "vmgi_reshape",
         "storage_resize",
         "partition",
-        "add_vm_extra_size"
+        "add_vm_extra_size",
+        "delete_infra_node_exacc",
+        "elastic_cell_update", # only delete cell should be restricted, need to distinguish the delete reading the payload
+        "exascale_cell_update" # delete cell exascale
     ]
 
     _exakms = ExaKmsKVDB()
@@ -155,12 +163,16 @@ class HTTPSignatureVerify(object):
         return True         
 
     def mGenerateExaCCHTTPSignature(self):
-        if not self.__ociexacc:
-            return None
         
         _complete_http_requestline = self.__httpreq.getRequestLine()#POST /CLUCtrl/sim_install HTTP/1.1
-        split_values = re.split(r"HTTP", _complete_http_requestline)
-        _simpletext_signature = split_values[0].rstrip()
+        _parts = _complete_http_requestline.rstrip().split(" ", 2)
+        if len(_parts) != 3 or not _parts[2].startswith("HTTP/"):
+            ebLogError(f"Malformed HTTP request line. HTTP request line should contain 3 parts. Current request line contains {len(_parts)} parts.")
+            return MALFORMED_URL
+
+        _method, _target, _version = _parts
+        _simpletext_signature = f"{_method} {_target}"
+
         for _current_signature_header in self.__current_signature_headers:
             if _current_signature_header.startswith("("):
                 continue
@@ -228,17 +240,56 @@ class HTTPSignatureVerify(object):
             return False
 
         _complete_http_requestline = self.__httpreq.getRequestLine()#POST /CLUCtrl/sim_install HTTP/1.1
-        split_values = re.split(r"HTTP", _complete_http_requestline)
-        _request_target = split_values[0].rstrip()#POST /CLUCtrl/sim_install
-        _api_endpoint = _request_target.split(" ")[1]
+        _parts = _complete_http_requestline.rstrip().split(" ", 2)
+        if len(_parts) != 3 or not _parts[2].startswith("HTTP/"):
+            ebLogError(f"Malformed HTTP request line. HTTP request line should contain 3 parts. Current request line contains {len(_parts)} parts.")
+            return MALFORMED_URL
+
+        _method, _target, _version = _parts
+        _request_target = f"{_method} {_target}"
+
+        _api_endpoint = _target
 
         for _endpoint in self.__endpoints:
             if _endpoint in _api_endpoint:
+                # check if is delete cell
+                if _endpoint == "elastic_cell_update" or _endpoint == "exascale_cell_update":
+                    if not self.isDeleteCellRequest(): 
+                        ebLogInfo(f" API endpoint {_api_endpoint} matched shared cell update endpoint {_endpoint}, "
+                                  "but payload does not contain removed_cells. Skipping HTTP signature verification.")
+                        break
+
                 ebLogInfo(f" API endpoint {_api_endpoint} is access restricted using HTTP signature verification.")
                 return True
 
         ebLogInfo(f" API endpoint {_api_endpoint} is not access restricted. Skipping HTTP signature verification.")
         return False
+
+    def isDeleteCellRequest(self):
+        try:
+            bytesBody = self.__httpreq.getBody()
+            if bytesBody is None:
+                return False
+            if isinstance(bytesBody, bytes):
+                strBody = bytesBody.decode('utf-8')
+            else:
+                strBody = bytesBody
+            jsonBody = json.loads(strBody)
+        except (AttributeError, UnicodeDecodeError, ValueError):
+            return False
+        jsonconf = jsonBody.get("jsonconf")
+        if not isinstance(jsonconf, dict): 
+            return False
+        removed_cells = jsonconf.get("removed_cells")
+        if isinstance(removed_cells, list):
+            return len(removed_cells) > 0
+        reshaped_node_subset = jsonconf.get("reshaped_node_subset")
+        if not isinstance(reshaped_node_subset, dict):
+            return False
+        removed_cells = reshaped_node_subset.get("removed_cells")
+        if not isinstance(removed_cells, list):
+            return False
+        return len(removed_cells) > 0
 
     def mVerifySignature(self):
 
@@ -248,13 +299,20 @@ class HTTPSignatureVerify(object):
             ebLogInfo(" HTTP Signature verification is not enabled for ExaCS deployment.")
             return True
         else:
-            if not self.mCheckIfApiAccessRestricted():
-                return True
+            _rc = self.mCheckIfApiAccessRestricted()
+            if isinstance(_rc, bool):
+                if not _rc:
+                    return True #Meaning it is not a restricted API currently
+            elif isinstance(_rc, str):
+                return False #Meaning it is a malformed URL
+
             if not self.mCheckPresenceOfExaAuthorizationHeader():
                 return self.mIsEnvDevQaSetup()
             if not self.mValidateAndExtractHeaders():
                 return False
             _plaintext_http_signature = self.mGenerateExaCCHTTPSignature()
+            if MALFORMED_URL == _plaintext_http_signature:
+                return False
             if not self.mVerifySignatureExaCC(_plaintext_http_signature):
                 return False
             if not self.mValidateExaOPCPrincipal():
